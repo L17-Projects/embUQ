@@ -23,7 +23,9 @@ classifiers = [
   "Topic :: Scientific/Engineering"
 ]
 
-dependencies = []
+dependencies = [
+  "numpy>=1.26"
+]
 
 [project.urls]
 Repository = "https://github.com/BrieucB/MesoUQ"
