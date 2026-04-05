@@ -1,0 +1,14 @@
+name: mesouq-cpu-dev
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - pyyaml
+  - pydantic
+  - pandas
+  - matplotlib
+  - scipy
+  - pip:
+      - -e ..
