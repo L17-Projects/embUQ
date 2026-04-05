@@ -1,0 +1,204 @@
+#!/usr/bin/env python3
+
+from __future__ import annotations
+
+import inspect
+import os
+import sys
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import korali
+import numpy as np
+import pandas as pd
+import yaml
+from mpi4py import MPI
+
+here = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(here, "../.."))
+sys.path.insert(0, os.path.join(here, "../../src"))
+
+from compression.src.equil import run_equil
+
+_CONFIG_CACHE: Dict[str, Dict[str, Any]] = {}
+_SURROGATE_CACHE: Dict[Tuple[str, float], Any] = {}
+_SURROGATE_PATH_ADDED = False
+
+
+@lru_cache(maxsize=1)
+def _resolve_project_root() -> str:
+    cwd = os.getcwd()
+    for possible_root in [cwd, os.path.dirname(cwd), os.path.dirname(os.path.dirname(cwd))]:
+        if os.path.exists(os.path.join(possible_root, "compression", "src")):
+            return possible_root
+    file_dir = os.path.dirname(os.path.realpath(__file__))
+    file_based_root = os.path.dirname(os.path.dirname(file_dir))
+    if os.path.exists(os.path.join(file_based_root, "compression", "src")):
+        return file_based_root
+    raise RuntimeError(f"Could not find project root (compression/src) from {cwd}")
+
+
+def _resolve_config_path(project_root: str) -> Path:
+    override = os.getenv("HUQ_INFERENCE_CONFIG") or os.getenv("CONFIG_PATH")
+    if override:
+        candidate = Path(override)
+        if not candidate.is_absolute() and not candidate.exists():
+            candidate = Path(project_root, override)
+        if candidate.exists():
+            return candidate
+    for path in [
+        Path(project_root, "inference/configs/production/inference_config_compression.yaml"),
+        Path("../../inference/configs/production/inference_config_compression.yaml"),
+        Path("inference/configs/production/inference_config_compression.yaml"),
+    ]:
+        if path.exists():
+            return path
+    raise FileNotFoundError("Could not find inference_config_compression.yaml")
+
+
+def _load_config(project_root: str) -> Dict[str, Any]:
+    config_path = _resolve_config_path(project_root)
+    key = str(config_path)
+    if key not in _CONFIG_CACHE:
+        with open(config_path, "rb") as f:
+            _CONFIG_CACHE[key] = yaml.load(f, Loader=yaml.CLoader)
+    return _CONFIG_CACHE[key]
+
+
+def _build_surrogate(project_root: str, diameter_um: float) -> Any:
+    global _SURROGATE_PATH_ADDED
+    if not _SURROGATE_PATH_ADDED:
+        sys.path.insert(0, os.path.join(project_root, "compression", "surrogate"))
+        _SURROGATE_PATH_ADDED = True
+    surrogate_path = os.path.join(project_root, f"compression/surrogate/diameters/{diameter_um}um/trained")
+    from evaluate import Surrogate
+    return Surrogate(surrogate_path)
+
+
+def _get_surrogate(project_root: str, diameter_um: float) -> Any:
+    key = (project_root, diameter_um)
+    if key not in _SURROGATE_CACHE:
+        _SURROGATE_CACHE[key] = _build_surrogate(project_root, diameter_um)
+    return _SURROGATE_CACHE[key]
+
+
+def preload_compression_surrogate(diameter_um: float) -> None:
+    _get_surrogate(_resolve_project_root(), diameter_um)
+
+
+def compute_compression_surrogate(sample: Dict[str, Any], displ: List[float], diameter_um: float) -> None:
+    project_root = _resolve_project_root()
+    config = _load_config(project_root)
+    if config.get("debug", 0) >= 1:
+        print(f"Running from function {inspect.currentframe().f_code.co_name} in script {__file__}")
+    params = sample["Parameters"]
+    if len(params) == 8:
+        Yt, kb, b1, b2, a3, a4, d0, sigma = params
+    elif len(params) == 7:
+        Yt, kb, b1, b2, a3, a4, sigma = params
+        d0 = 0.0
+    else:
+        raise ValueError(f"Expected 7 or 8 parameters, got {len(params)}")
+    surrogate = _get_surrogate(project_root, diameter_um)
+    displ_corrected = [max(0.0, d - d0) for d in displ]
+    forces = surrogate.evaluate_compression(x=[Yt, kb, b1, b2, a3, a4], disp=displ_corrected)
+    sample["Reference Evaluations"] = forces
+    sample["Standard Deviation"] = [sigma * val for val in forces]
+
+
+def compute_compression(sample: Dict[str, Any], displ: List[float], diameter_um: float, init_compression_path: Optional[str] = None) -> None:
+    cwd = os.getcwd()
+    project_root = None
+    for possible_root in [cwd, os.path.dirname(cwd), os.path.dirname(os.path.dirname(cwd))]:
+        if os.path.exists(os.path.join(possible_root, "compression", "src")):
+            project_root = possible_root
+            break
+    if project_root is None:
+        raise RuntimeError(f"Could not find project root (compression/src) from {cwd}")
+    with open(os.path.join(project_root, "inference/configs/production/inference_config_compression.yaml"), "rb") as f:
+        config = yaml.load(f, Loader=yaml.CLoader)
+    params = sample["Parameters"]
+    if len(params) == 8:
+        Yt, kb, b1, b2, a3, a4, d0_offset, sig = params
+    elif len(params) == 7:
+        Yt, kb, b1, b2, a3, a4, sig = params
+        d0_offset = 0.0
+    else:
+        raise ValueError(f"Expected 7 or 8 parameters, got {len(params)}")
+    theta = [Yt, kb, b1, b2, a3, a4]
+    try:
+        comm = korali.getWorkerMPIComm()
+    except Exception:
+        comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    sample["Reference Evaluations"] = []
+    sample["Standard Deviation"] = []
+    out_names = ["" for _ in range(len(displ))]
+    n_ref = 0
+    list_simu_path = []
+    measured_forces = []
+    folder = os.path.join(project_root, f"_out/compression_{diameter_um}um") + "/"
+    last_d = 0.0
+    source_compression_path = os.path.join(project_root, "compression", "src") + "/"
+    if init_compression_path is None:
+        init_compression_path = os.path.join(project_root, f"_init_compression_{diameter_um}um") + "/"
+    elif not init_compression_path.endswith("/"):
+        init_compression_path = init_compression_path + "/"
+    for d in displ:
+        if rank == 0:
+            name = f"n{n_ref}_{np.random.randint(0, 99999):05d}/"
+            comm.send(name, dest=1, tag=0)
+        elif rank == 1:
+            name = comm.recv(source=0, tag=0)
+        simu_path = folder + name
+        simnum = "00001"
+        list_simu_path.append(simu_path)
+        if rank == 0:
+            prepare_simulation_parameters(source_compression_path, init_compression_path, simu_path, simnum, d - last_d, theta, diameter_um)
+        comm.Barrier()
+        run_equil(source_path=init_compression_path, simu_path=simu_path, simnum=simnum, equil=False, restart=True if n_ref >= 1 else False, restart_path=list_simu_path[-2] if n_ref >= 1 else None, comm=comm)
+        comm.Barrier()
+        df_canti = pd.read_csv(simu_path + "pinning/cantilever.csv", delimiter=",")
+        df_plate = pd.read_csv(simu_path + "pinning/plate.csv", delimiter=",")
+        forces_num = df_canti.fz.values - df_plate.fz.values
+        measured_forces.append(np.mean(forces_num))
+        last_d = d
+        n_ref += 1
+    sample["Reference Evaluations"] = measured_forces
+    sample["Standard Deviation"] = [sig for _ in measured_forces]
+
+
+def adjust_simu_params(sample_param: Dict[str, float], filename_1_simu: str, filename_2_simu: str) -> None:
+    for fname in [filename_1_simu, filename_2_simu]:
+        with open(fname, 'r') as file:
+            parameters = yaml.load(file, Loader=yaml.CLoader)
+        for p in sample_param:
+            parameters[p] = float(sample_param[p])
+        with open(fname, 'w') as file:
+            yaml.dump(parameters, file)
+
+
+def prepare_simulation_parameters(source_compression_path: str, init_compression_path: str, simu_path: str, simnum: str, displacement: float, theta: List[float], diameter_um: float) -> None:
+    sys.path.insert(0, source_compression_path)
+    from parameters import write_parameters
+    os.system(f"mkdir -p {simu_path}")
+    os.system(f"mkdir -p {simu_path}/mesh/")
+    os.system(f"mkdir -p {simu_path}/force/")
+    os.system(f"mkdir -p {simu_path}/stats/")
+    os.system(f"mkdir -p {simu_path}/restart/")
+    os.system(f"mkdir -p {simu_path}/pinning/")
+    os.system(f"cp {source_compression_path}mesh/cantilever.off {simu_path}mesh/cantilever.off")
+    os.system(f"cp {source_compression_path}mesh/rigid_coords.txt {simu_path}mesh/rigid_coords.txt")
+    os.system(f"cp {source_compression_path}mesh/rigid_coords_reflected.txt {simu_path}mesh/rigid_coords_reflected.txt")
+    os.system(f"cp -r {init_compression_path}parameter/ {simu_path}")
+    os.system(f"cp -r {source_compression_path}gas_vesicle {simu_path}")
+    os.system(f"cp -r {source_compression_path}microbubble {simu_path}")
+    Yt, kb, b1, b2, a3, a4 = theta
+    filename_1_simu = simu_path + "parameter/parameters-default" + simnum + ".yaml"
+    filename_2_simu = simu_path + "parameter/parameters-default" + simnum + "eq.yaml"
+    filename_3_simu = simu_path + "parameter/parameters.prms" + simnum + ".yaml"
+    filename_4_simu = simu_path + "parameter/parameters" + simnum + ".yaml"
+    adjust_simu_params({"disp": displacement, "Yt": Yt, "Yl": Yt, "b1": b1, "b2": b2, "a3": a3, "a4": a4}, filename_1_simu, filename_2_simu)
+    write_parameters(source_path=init_compression_path, simu_path=simu_path, simnum=simnum)
+    adjust_simu_params({"kb": kb, "b1": b1, "b2": b2, "a3": a3, "a4": a4}, filename_3_simu, filename_4_simu)
