@@ -1,0 +1,17 @@
+name: mesouq-mpi
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - pyyaml
+  - pydantic
+  - pandas
+  - matplotlib
+  - scipy
+  - salib
+  - mpi4py
+  - pip:
+      - torch
+      - -e ..
