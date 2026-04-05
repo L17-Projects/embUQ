@@ -1,0 +1,83 @@
+#include "modules/conduit/conduit.hpp"
+#include "modules/distribution/univariate/normal/normal.hpp"
+#include "modules/distribution/univariate/uniform/uniform.hpp"
+#include "modules/experiment/experiment.hpp"
+#include "modules/problem/hierarchical/psi/psi.hpp"
+#include "sample/sample.hpp"
+
+#include <cmath>
+#include <limits>
+
+__startNamespace__;
+
+bool __className__::usesExternalBatchBackend() const { return _batchEvaluationBackend == "External"; }
+bool __className__::usesNativeCpuBatchBackend() const { return _batchEvaluationBackend == "NativeCpu"; }
+bool __className__::usesNativeCudaBatchBackend() const { return _batchEvaluationBackend == "NativeCuda"; }
+
+__className__::~__className__() { releaseNativeCudaBatch(); }
+
+size_t __className__::findVariablePosition(const std::string &variableName, const std::string &, size_t) const
+{
+  for (size_t i = 0; i < _k->_variables.size(); ++i)
+    if (_k->_variables[i]->_name == variableName) return i;
+  KORALI_LOG_ERROR("Could not resolve variable '%s' while configuring Hierarchical/Psi native batch evaluation.\n", variableName.c_str());
+  return 0;
+}
+
+nativeParameterSource __className__::createNativeParameterSource(const std::string &variableName, double value, const std::string &propertyName, size_t priorIndex) const
+{
+  nativeParameterSource source;
+  source._value = value;
+  if (variableName.empty() == false)
+  {
+    source._isVariable = true;
+    source._position = findVariablePosition(variableName, propertyName, priorIndex);
+  }
+  return source;
+}
+
+double __className__::resolveNativeParameter(const nativeParameterSource &source, const std::vector<double> &parameters) const
+{
+  if (source._isVariable == false) return source._value;
+  if (source._position >= parameters.size())
+    KORALI_LOG_ERROR("Native batch evaluation requested Psi parameter %zu, but the batch sample only contains %zu parameters.\n", source._position, parameters.size());
+  return parameters[source._position];
+}
+
+double __className__::evaluateNativeConditionalLogDensity(const nativeConditionalPriorSpec &spec, const std::vector<double> &parameters, double sampleValue) const
+{
+  if (spec._kind == nativeConditionalPriorKind::Normal)
+  {
+    const double mean = resolveNativeParameter(spec._parameterA, parameters);
+    const double standardDeviation = resolveNativeParameter(spec._parameterB, parameters);
+    if (standardDeviation <= 0.0) return -Inf;
+    const double delta = (sampleValue - mean) / standardDeviation;
+    return -0.5 * _log2Pi - std::log(standardDeviation) - 0.5 * delta * delta;
+  }
+  const double minimum = resolveNativeParameter(spec._parameterA, parameters);
+  const double maximum = resolveNativeParameter(spec._parameterB, parameters);
+  if (maximum <= minimum) return -Inf;
+  if (sampleValue < minimum || sampleValue > maximum) return -Inf;
+  return -std::log(maximum - minimum);
+}
+
+void __className__::initializeNativeBatchCache() {}
+void __className__::initializeNativeCudaBatch() {}
+void __className__::releaseNativeCudaBatch() {}
+void __className__::initialize() { Hierarchical::initialize(); _hasBatchComputationalModel = (_batchComputationalModel != 0); }
+void __className__::updateConditionalPriors(Sample &) {}
+void __className__::evaluateLogLikelihood(Sample &sample) { sample["logLikelihood"] = -Inf; }
+bool __className__::supportsEvaluateBatch() const
+{
+  if (_useBatchEvaluation == 0) return false;
+  if (usesNativeCpuBatchBackend()) return true;
+  if (usesNativeCudaBatchBackend()) return true;
+  return usesExternalBatchBackend() && _hasBatchComputationalModel;
+}
+void __className__::evaluateBatchNativeCpu(Sample &sample) { sample["Batch logPrior"] = std::vector<double>(); sample["Batch logLikelihood"] = std::vector<double>(); }
+void __className__::evaluateBatchNativeCuda(Sample &sample) { sample["Batch logPrior"] = std::vector<double>(); sample["Batch logLikelihood"] = std::vector<double>(); }
+void __className__::evaluateBatch(Sample &sample) { sample["Batch logPrior"] = std::vector<double>(); sample["Batch logLikelihood"] = std::vector<double>(); }
+
+__moduleAutoCode__;
+
+__endNamespace__;
