@@ -1,0 +1,43 @@
+# Release scope
+
+`MesoUQ` is a curated public release line, not a verbatim dump of the private research repository.
+
+## Included now
+
+The public line already includes:
+- the shared Python package `meso_uq`
+- full hierarchical workflow entrypoints and canonical production configs
+- reduced-workflow public wrappers
+- compression and indentation evalkit support needed by the workflow spine
+- surrogate retraining and evaluation entrypoints for compression and indentation
+- Sobol sensitivity helpers and a lightweight Latin-hypercube design generator
+- MAP extraction and plotting/postprocessing helpers
+- a focused vendored Korali patch surface under `extern/korali/`
+
+## Intentionally deferred
+
+The following remain intentionally outside the current public boundary:
+- heavy generated artifacts and large trained model payloads
+- every internal/private convenience script from the research line
+- the heavier Mirheo data-generation execution surface
+- full propagation execution pipelines beyond the current public plotting/postprocessing layer
+- manuscript-specific `_paper` content
+
+## Why the scope is curated
+
+The release line is curated so that:
+- the repo remains understandable to outside users
+- the public surface stays reviewable and maintainable
+- provenance remains explicit
+- heavy or highly local research infrastructure does not pollute the public package
+
+## Practical interpretation
+
+If you are using the repo now, the intended public strengths are:
+- surrogate retraining/evaluation
+- sensitivity support
+- full and reduced hierarchical inference entrypoints
+- MAP extraction and plotting
+- understanding the vendored Korali patch surface that supports those workflows
+
+If you need large-scale data generation or cluster-specific Mirheo production pipelines, treat those as later extension work rather than a guaranteed part of the current public alpha line.
