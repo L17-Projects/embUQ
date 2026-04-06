@@ -29,6 +29,40 @@ dependencies = [
   "pydantic>=2.0",
 ]
 
+[project.optional-dependencies]
+plot = [
+  "matplotlib>=3.7",
+  "pandas>=2.0",
+]
+surrogate = [
+  "pandas>=2.0",
+  "scipy>=1.10",
+  "torch>=2.0",
+]
+mpi = [
+  "mpi4py>=3.1",
+]
+test = [
+  "build>=1.0",
+  "pytest>=7.0",
+]
+ci = [
+  "build>=1.0",
+  "matplotlib>=3.7",
+  "pandas>=2.0",
+  "pytest>=7.0",
+  "scipy>=1.10",
+  "torch>=2.0",
+]
+dev = [
+  "build>=1.0",
+  "matplotlib>=3.7",
+  "pandas>=2.0",
+  "pytest>=7.0",
+  "scipy>=1.10",
+  "torch>=2.0",
+]
+
 [project.urls]
 Repository = "https://github.com/BrieucB/MesoUQ"
 Issues = "https://github.com/BrieucB/MesoUQ/issues"
