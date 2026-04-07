@@ -21,8 +21,7 @@ jobs:
       - name: Install test tools
         run: |
           python -m pip install --upgrade pip
-          pip install pytest build
-          pip install -e .
+          pip install -e ".[ci]"
 
       - name: Build package metadata
         run: python -m build --sdist --wheel
