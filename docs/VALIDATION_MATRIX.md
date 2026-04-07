@@ -10,6 +10,8 @@ These checks are expected to run on GitHub-hosted Ubuntu:
 - package import and module smoke
 - postprocessing smoke
 - surrogate model-selection smoke
+- validation-runner smoke
+- Vega-acceptance-wrapper smoke
 - MPI smoke
 - docs presence / link-oriented checks
 
@@ -29,13 +31,17 @@ These checks require the real target environment:
 
 - install on Vega
 - validate MPI execution
+- run the single Vega-first acceptance command
 - validate Phase 1 GPU-batched
 - validate Phase 2 native-CUDA
 - validate Phase 3b GPU-batched
 - validate the required propagation + plotting path
+- archive the machine-readable acceptance report and logs
 
 ## Notes
 
 The public CI layer is intentionally smaller than the full release contract because some required workflows are hardware-specific.
 
 Those hardware-specific checks must still be recorded in-repo so the release does not depend on undocumented tribal knowledge.
+
+The single Vega-first acceptance command is documented in `VEGA_ACCEPTANCE_COMMAND.md`, and the tiny validation configs intended for that path are documented in `VALIDATION_CONFIGS.md`.

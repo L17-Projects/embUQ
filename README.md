@@ -13,7 +13,7 @@
 
 MesoUQ is a public software line for Bayesian uncertainty quantification and calibration of mesoscopic DPD models.
 
-The repository exposes a release-oriented workflow surface for compression and indentation calibration, hierarchical inference, surrogate retraining and model selection, MAP extraction, plotting, propagation, and supporting operator utilities.
+The repository exposes a release-oriented workflow surface for compression and indentation calibration, hierarchical inference, surrogate retraining and model selection, MAP extraction, plotting, propagation, Vega-first acceptance, and supporting operator utilities.
 
 ## Public workflow surface
 
@@ -26,7 +26,9 @@ The current public release surface includes:
 - Phase 3b workflow execution
 - MAP extraction and plotting utilities
 - lightweight propagation execution for Phase 1 and Phase 3b
-- operator utilities for validation and reduced-indentation refresh loops
+- a richer GPU/operator validation runner
+- a thin Vega-first acceptance command with a machine-readable report
+- dedicated tiny validation configs for full and reduced workflows
 - vendored Korali build surface and backend notes
 - public smoke tests and release-validation documentation
 
@@ -38,6 +40,12 @@ Basic package install:
 
 ```bash
 pip install -e .
+```
+
+Local pytest/test install:
+
+```bash
+pip install -e ".[test]"
 ```
 
 CI / smoke-test install:
@@ -64,6 +72,8 @@ MPI support:
 pip install -e ".[mpi]"
 ```
 
+See `docs/DEPENDENCY_EXTRAS.md` for the full extras contract and the remaining Korali/backend caveats.
+
 ## Canonical configuration entrypoints
 
 Full workflows:
@@ -76,6 +86,13 @@ Reduced workflows:
 - `reduced/configs/production/reduced_config_compression.yaml`
 - `reduced/configs/production/reduced_config_indentation.yaml`
 
+Validation workflows:
+
+- `inference/configs/validation/validation_config_compression.yaml`
+- `inference/configs/validation/validation_config_indentation.yaml`
+- `reduced/configs/validation/validation_config_compression.yaml`
+- `reduced/configs/validation/validation_config_indentation.yaml`
+
 A small release-oriented example bundle is also provided under `examples/configs/`.
 
 ## Documentation index
@@ -84,8 +101,11 @@ Start here:
 
 - `docs/README.md`
 - `docs/RELEASE_NOTES_v0.1.0.md`
+- `docs/DEPENDENCY_EXTRAS.md`
 - `docs/VALIDATION_MATRIX.md`
+- `docs/VEGA_ACCEPTANCE_COMMAND.md`
 - `docs/VEGA_ACCEPTANCE_CHECKLIST.md`
+- `docs/VALIDATION_CONFIGS.md`
 - `docs/HPC_GPU_BATCHED_REDUCED_INDENTATION.md`
 - `docs/SURROGATE_MODEL_SELECTION.md`
 - `docs/PROPAGATION_EXECUTION.md`
@@ -100,6 +120,7 @@ MesoUQ/
 ├── tests/
 ├── docs/
 ├── examples/
+├── scripts/
 ├── extern/korali/
 ├── compression/
 ├── indentation/
