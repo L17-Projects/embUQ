@@ -1,0 +1,66 @@
+# Validation Hierarchical Bayesian Inference Configuration
+# Tiny compression validation workflow for Vega/operator acceptance
+
+emb_diameters:
+  - 2.1
+  - 2.9
+  - 3.0
+
+experiment: compression
+data_dir: compression/evalkit/data
+data_prefix: compression_data_
+surrogate_dir: compression/surrogate/diameters
+
+frac_diam: 0.2
+use_surrogate: true
+
+pop_size: 256
+max_gen: 2
+target_cov: 0.8
+covariance_scaling: 0.04
+
+prior_Yt: [10000000.0, 50000000.0]
+prior_kb: [100.0, 1000.0]
+prior_b1: [0.0, 3.0]
+prior_b2: [0.0, 10.0]
+prior_a3: [-2.5, 3.0]
+prior_a4: [0.0, 4.0]
+prior_d0: [0.0, 0.5]
+prior_sigma: [0.0, 1.0]
+
+hbi_pop_size: 256
+hbi_burn_in: 1
+hbi_target_cov: 0.6
+hbi_covariance_scaling: 0.02
+
+phase3a_pop_size: 256
+phase3a_max_gen: 2
+phase3a_target_cov: 0.6
+phase3a_covariance_scaling: 0.02
+
+phase3b_pop_size: 256
+phase3b_max_gen: 2
+phase3b_target_cov: 0.6
+phase3b_covariance_scaling: 0.02
+
+map_n_displacements: 8
+
+hyperprior_mu_Yt: [10000000.0, 50000000.0]
+hyperprior_sigma_Yt: [0.0, 50000000.0]
+hyperprior_mu_kb: [100.0, 1000.0]
+hyperprior_sigma_kb: [0.0, 500.0]
+hyperprior_mu_b1: [0.0, 3.0]
+hyperprior_sigma_b1: [0.0, 3.0]
+hyperprior_mu_b2: [0.0, 10.0]
+hyperprior_sigma_b2: [0.0, 10.0]
+hyperprior_mu_a3: [-2.5, 3.0]
+hyperprior_sigma_a3: [0.0, 5.0]
+hyperprior_mu_a4: [0.0, 4.0]
+hyperprior_sigma_a4: [0.0, 4.0]
+hyperprior_mu_d0: [0.0, 0.5]
+hyperprior_sigma_d0: [0.0, 0.3]
+
+out: out_validation
+debug: 0
+dump: false
+description: "Validation: tiny-population compression workflow for acceptance/testing"
