@@ -31,6 +31,8 @@ These configs are intentionally conservative:
 - they only reduce expensive population/generation knobs,
 - they remain readable enough to be edited manually during acceptance/debug loops.
 
-## Planned usage
+## Current usage
 
-These configs are intended to become the default config layer used by the Vega acceptance command and by the real reduced-mode integration tests added in the next test-surface PRs.
+These configs are the default config layer used by the Vega acceptance command and by the GPU validation runner unless an explicit `--config-override` is provided.
+
+If an operator passes `--population-size`, that explicit override still rewrites the workflow population keys in the derived config. Otherwise the committed validation YAML values are preserved as-is.

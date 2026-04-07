@@ -2,6 +2,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import yaml
+
 
 def _load_module(path: Path, name: str):
     spec = importlib.util.spec_from_file_location(name, path)
@@ -99,3 +101,22 @@ def test_validation_runner_smoke_creates_summary_and_artifacts(tmp_path, monkeyp
     assert (workflow_dir / "map_phase3b" / "all_diameters_map.json").exists()
     assert (workflow_dir / "overlay_uq_ref" / "uq_overlay_2.1um.png").exists()
     assert (workflow_dir / "posteriors_phase3b" / "posterior_marginals_2.1um.png").exists()
+
+
+def test_validation_runner_defaults_to_validation_configs_and_preserves_population(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(repo_root / "inference" / "scripts" / "run_gpu_validation_suite.py", "run_gpu_validation_suite_defaults_test")
+
+    compression_reduced = module.WORKFLOW_CONFIGS["compression_reduced"]["config"]
+    indentation_reduced = module.WORKFLOW_CONFIGS["indentation_reduced"]["config"]
+    assert "validation" in str(compression_reduced)
+    assert "validation" in str(indentation_reduced)
+
+    derived_path = tmp_path / "config.yaml"
+    derived = module._write_derived_config(compression_reduced, derived_path, population_size=None)
+    with open(compression_reduced, "rb") as handle:
+        base = yaml.load(handle, Loader=yaml.CLoader)
+
+    for key in ("pop_size", "hbi_pop_size", "phase3a_pop_size", "phase3b_pop_size"):
+        assert derived[key] == base[key]
+    assert derived_path.name == "config.yaml"

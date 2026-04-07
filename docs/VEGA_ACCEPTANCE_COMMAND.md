@@ -27,6 +27,8 @@ Optional arguments:
 - `--population-size`
 - `--config-override workflow=/abs/path/config.yaml`
 
+By default, the wrapped validation runner uses the committed validation configs for the selected workflows and preserves the population settings encoded in those YAML files. `--population-size` is only for an explicit operator override.
+
 ## Outputs
 
 The command writes:
