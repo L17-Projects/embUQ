@@ -25,6 +25,11 @@ from compression.evalkit.posterior_compression import (
 from compression.evalkit.tools import datedPrint, prepareCompression
 from meso_uq.config import resolve_inference_config_path
 from meso_uq.experiments import load_experiments
+from meso_uq.workflow_acceleration import (
+    configure_korali_conduit,
+    phase1_prior_specs,
+    to_korali_path,
+)
 from indentation.evalkit.posterior_indentation import (
     compute_indentation_surrogate,
     preload_indentation_surrogate,
@@ -157,8 +162,12 @@ def run_inference(
 
     k = korali.Engine()
     k.setMPIComm(MPI.COMM_WORLD)
-    k["Conduit"]["Type"] = "Distributed"
-    k["Conduit"]["Ranks Per Worker"] = 1 if use_surrogate else 2
+    configure_korali_conduit(
+        k,
+        mpi_ranks=comm.Get_size(),
+        ranks_per_worker=1 if use_surrogate else 2,
+        concurrent_jobs=1,
+    )
 
     compute_surrogate_map = {
         "compression": compute_compression_surrogate,
@@ -185,7 +194,7 @@ def run_inference(
                 exp_name = exp.dataset_name(diameter_um)
                 experiment_root = phase1_root / exp_name
                 e = korali.Experiment()
-                e["File Output"]["Path"] = str(experiment_root)
+                e["File Output"]["Path"] = to_korali_path(str(experiment_root), base_dir=str(PROJECT_ROOT))
                 found = e.loadState(str(experiment_root / "latest"))
                 if not found:
                     raise FileNotFoundError(f"No previous state found for {exp_name} under {experiment_root}")
@@ -262,18 +271,12 @@ def run_inference(
                 if max_gen > 0:
                     e["Solver"]["Termination Criteria"]["Max Generations"] = max_gen
 
-                priors = [
-                    config["prior_Yt"],
-                    config["prior_kb"],
-                    config["prior_b1"],
-                    config["prior_b2"],
-                    config["prior_a3"],
-                    config["prior_a4"],
-                    exp.prior_d0 or config.get("prior_d0", [0.0, 0.5]),
-                    exp.prior_sigma or config["prior_sigma"],
-                ]
-                names = ["Yt", "kb", "b1", "b2", "a3", "a4", "d0", "sigma"]
-                for i, (name, bounds) in enumerate(zip(names, priors)):
+                prior_specs = phase1_prior_specs(
+                    config,
+                    prior_d0=exp.prior_d0 or config.get("prior_d0", [0.0, 0.5]),
+                    prior_sigma=exp.prior_sigma or config["prior_sigma"],
+                )
+                for i, (name, bounds) in enumerate(prior_specs):
                     e["Distributions"][i]["Name"] = f"Prior {name}"
                     e["Distributions"][i]["Type"] = "Univariate/Uniform"
                     e["Distributions"][i]["Minimum"] = bounds[0]
@@ -282,7 +285,10 @@ def run_inference(
                     e["Variables"][i]["Prior Distribution"] = f"Prior {name}"
 
                 e["File Output"]["Frequency"] = 1
-                e["File Output"]["Path"] = str(output_root / "results_phase_1" / exp_name)
+                e["File Output"]["Path"] = to_korali_path(
+                    str(output_root / "results_phase_1" / exp_name),
+                    base_dir=str(PROJECT_ROOT),
+                )
                 e["Console Output"]["Frequency"] = 1
                 e["Console Output"]["Verbosity"] = "Detailed"
                 e["Store Sample Information"] = True

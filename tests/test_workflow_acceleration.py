@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from meso_uq.workflow_acceleration import (
+    configure_korali_conduit,
     default_variable_names,
     expand_reduced_parameters,
     subsample_parameters,
@@ -37,6 +38,17 @@ def test_to_korali_path_relativizes_absolute_path(tmp_path):
     abs_path = str(tmp_path / "results" / "phase_1")
     rel = to_korali_path(abs_path, base_dir=str(tmp_path))
     assert rel == "results/phase_1"
+
+
+def test_configure_korali_conduit_switches_single_vs_multi_rank_modes():
+    engine = {}
+    configure_korali_conduit(engine, mpi_ranks=1, ranks_per_worker=2, concurrent_jobs=3)
+    assert "Conduit" not in engine
+
+    engine = {}
+    configure_korali_conduit(engine, mpi_ranks=4, ranks_per_worker=2, concurrent_jobs=3)
+    assert engine["Conduit"]["Type"] == "Distributed"
+    assert engine["Conduit"]["Ranks Per Worker"] == 2
 
 
 def test_write_propagation_state_creates_expected_files(tmp_path):

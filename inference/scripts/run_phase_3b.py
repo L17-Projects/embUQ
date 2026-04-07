@@ -19,7 +19,24 @@ from compression.evalkit.posterior_compression import compute_compression_surrog
 from compression.evalkit.tools import datedPrint
 from meso_uq.config import resolve_inference_config_path
 from meso_uq.experiments import load_experiments
+from meso_uq.workflow_acceleration import configure_korali_conduit, to_korali_path
 from indentation.evalkit.posterior_indentation import compute_indentation_surrogate
+
+
+def _resolve_config_path(config_path: str | None) -> Path:
+    if config_path is None:
+        return Path(resolve_inference_config_path(project_root, experiment="compression")).resolve()
+    candidate = Path(config_path).expanduser()
+    if not candidate.is_absolute() and not candidate.exists():
+        candidate = Path(project_root, candidate)
+    return candidate.resolve()
+
+
+def _resolve_output_root(output_dir: str | Path) -> Path:
+    output_root = Path(output_dir).expanduser()
+    if not output_root.is_absolute():
+        output_root = Path(project_root, output_root)
+    return output_root.resolve()
 
 
 def _extract_reference_data(sub):
@@ -49,7 +66,7 @@ def _align_sub_reference(sub, ref_points, exp_name, rank):
     return ref_points
 
 
-def run_phase_3b_dataset(experiment_name: str, diameter_um: float, reference_points: list, compute_model, pop_size: int, max_gen: int, target_cov: float, output_dir: str, profiling: bool = False):
+def run_phase_3b_dataset(experiment_name: str, diameter_um: float, reference_points: list, compute_model, pop_size: int, max_gen: int, target_cov: float, output_root: Path, profiling: bool = False):
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     exp_name = f"{experiment_name}_{diameter_um}um"
@@ -61,19 +78,19 @@ def run_phase_3b_dataset(experiment_name: str, diameter_um: float, reference_poi
 
     k = korali.Engine()
     k.setMPIComm(MPI.COMM_WORLD)
-    k["Conduit"]["Type"] = "Distributed"
-    k["Conduit"]["Ranks Per Worker"] = 1
+    configure_korali_conduit(k, mpi_ranks=comm.Get_size(), ranks_per_worker=1, concurrent_jobs=1)
 
     psi = korali.Experiment()
     sub = korali.Experiment()
-    psi.loadState(f"{output_dir}/results_phase_2/latest")
-    sub.loadState(f"{output_dir}/results_phase_1/{exp_name}/latest")
+    psi.loadState(str(output_root / "results_phase_2" / "latest"))
+    sub.loadState(str(output_root / "results_phase_1" / exp_name / "latest"))
     reference_points = _align_sub_reference(sub, reference_points, exp_name, rank)
     sub["Problem"]["Computational Model"] = lambda sampleData, d=diameter_um, pts=reference_points, model=compute_model: model(sampleData, pts, d)
 
     e = korali.Experiment()
-    e["File Output"]["Path"] = f"{output_dir}/results_phase_3b/{exp_name}/"
-    ensure_output_dir(f"{output_dir}/results_phase_3b/{exp_name}/")
+    experiment_output = output_root / "results_phase_3b" / exp_name
+    e["File Output"]["Path"] = to_korali_path(str(experiment_output), base_dir=str(project_root))
+    ensure_output_dir(str(experiment_output))
     e["Problem"]["Type"] = "Hierarchical/Theta"
     e["Problem"]["Psi Experiment"] = psi
     e["Problem"]["Sub Experiment"] = sub
@@ -99,12 +116,13 @@ def run_phase_3b_dataset(experiment_name: str, diameter_um: float, reference_poi
 def run_phase_3b(profiling: bool = False, config_path: str = None, output_dir: str = "_setup"):
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
-    if config_path is None:
-        config_path = str(resolve_inference_config_path(project_root, experiment="compression"))
-    with open(config_path, "rb") as f:
+    config_path_resolved = _resolve_config_path(config_path)
+    with open(config_path_resolved, "rb") as f:
         config = yaml.load(f, Loader=yaml.CLoader)
+    os.environ["HUQ_INFERENCE_CONFIG"] = str(config_path_resolved)
+    output_root = _resolve_output_root(output_dir)
     experiments = [exp for exp in load_experiments(config, Path(project_root)) if exp.enabled]
-    if not os.path.exists(f"{output_dir}/results_phase_2/latest"):
+    if not (output_root / "results_phase_2" / "latest").exists():
         if rank == 0:
             datedPrint("[Phase 3b] ERROR: Phase 2 results not found!")
         sys.exit(1)
@@ -120,7 +138,7 @@ def run_phase_3b(profiling: bool = False, config_path: str = None, output_dir: s
                 pop_size=config.get("phase3b_pop_size", 10000),
                 max_gen=config.get("phase3b_max_gen", -1),
                 target_cov=config.get("phase3b_target_cov", 0.6),
-                output_dir=output_dir,
+                output_root=output_root,
                 profiling=profiling,
             )
 

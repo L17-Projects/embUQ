@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -39,6 +40,8 @@ def main() -> int:
     config_path = Path(args.config)
     if not config_path.is_absolute():
         config_path = PROJECT_ROOT / config_path
+    config_path = config_path.resolve()
+    os.environ["HUQ_INFERENCE_CONFIG"] = str(config_path)
     output_root = Path(args.output_dir)
     if not output_root.is_absolute():
         output_root = PROJECT_ROOT / output_root

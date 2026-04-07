@@ -19,7 +19,7 @@ here = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(here, "../.."))
 sys.path.insert(0, os.path.join(here, "../../src"))
 
-from compression.src.equil import run_equil
+from meso_uq.workflow_acceleration import expand_parameter_vector, get_fixed_parameters
 
 _CONFIG_CACHE: Dict[str, Dict[str, Any]] = {}
 _SURROGATE_CACHE: Dict[Tuple[str, float], Any] = {}
@@ -87,19 +87,19 @@ def preload_compression_surrogate(diameter_um: float) -> None:
     _get_surrogate(_resolve_project_root(), diameter_um)
 
 
+def _load_run_equil():
+    from compression.src.equil import run_equil
+
+    return run_equil
+
+
 def compute_compression_surrogate(sample: Dict[str, Any], displ: List[float], diameter_um: float) -> None:
     project_root = _resolve_project_root()
     config = _load_config(project_root)
     if config.get("debug", 0) >= 1:
         print(f"Running from function {inspect.currentframe().f_code.co_name} in script {__file__}")
-    params = sample["Parameters"]
-    if len(params) == 8:
-        Yt, kb, b1, b2, a3, a4, d0, sigma = params
-    elif len(params) == 7:
-        Yt, kb, b1, b2, a3, a4, sigma = params
-        d0 = 0.0
-    else:
-        raise ValueError(f"Expected 7 or 8 parameters, got {len(params)}")
+    params = expand_parameter_vector(sample["Parameters"], fixed_params=get_fixed_parameters(config))
+    Yt, kb, b1, b2, a3, a4, d0, sigma = params.tolist()
     surrogate = _get_surrogate(project_root, diameter_um)
     displ_corrected = [max(0.0, d - d0) for d in displ]
     forces = surrogate.evaluate_compression(x=[Yt, kb, b1, b2, a3, a4], disp=displ_corrected)
@@ -118,14 +118,8 @@ def compute_compression(sample: Dict[str, Any], displ: List[float], diameter_um:
         raise RuntimeError(f"Could not find project root (compression/src) from {cwd}")
     with open(os.path.join(project_root, "inference/configs/production/inference_config_compression.yaml"), "rb") as f:
         config = yaml.load(f, Loader=yaml.CLoader)
-    params = sample["Parameters"]
-    if len(params) == 8:
-        Yt, kb, b1, b2, a3, a4, d0_offset, sig = params
-    elif len(params) == 7:
-        Yt, kb, b1, b2, a3, a4, sig = params
-        d0_offset = 0.0
-    else:
-        raise ValueError(f"Expected 7 or 8 parameters, got {len(params)}")
+    params = expand_parameter_vector(sample["Parameters"], fixed_params=get_fixed_parameters(config))
+    Yt, kb, b1, b2, a3, a4, d0_offset, sig = params.tolist()
     theta = [Yt, kb, b1, b2, a3, a4]
     try:
         comm = korali.getWorkerMPIComm()
@@ -145,6 +139,7 @@ def compute_compression(sample: Dict[str, Any], displ: List[float], diameter_um:
         init_compression_path = os.path.join(project_root, f"_init_compression_{diameter_um}um") + "/"
     elif not init_compression_path.endswith("/"):
         init_compression_path = init_compression_path + "/"
+    run_equil = _load_run_equil()
     for d in displ:
         if rank == 0:
             name = f"n{n_ref}_{np.random.randint(0, 99999):05d}/"
