@@ -2,9 +2,9 @@ name: Release Smoke
 
 on:
   push:
-    branches: [main, bootstrap/**]
+    branches: [main, bootstrap/**, release-hardening/**]
   pull_request:
-    branches: [main]
+    branches: [main, bootstrap/**, release-hardening/**]
 
 jobs:
   release-smoke:
