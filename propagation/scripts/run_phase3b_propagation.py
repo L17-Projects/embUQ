@@ -3,17 +3,22 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 import pandas as pd
 import yaml
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT / "compression"))
+sys.path.insert(0, str(PROJECT_ROOT / "compression" / "evalkit"))
+sys.path.insert(0, str(PROJECT_ROOT / "indentation"))
+sys.path.insert(0, str(PROJECT_ROOT / "indentation" / "evalkit"))
+
 from compression.evalkit.posterior_compression import compute_compression_surrogate
 from indentation.evalkit.posterior_indentation import compute_indentation_surrogate
 from meso_uq.experiments import load_experiments
 from meso_uq.postprocess.propagation import propagate_run_directory
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _reference_csv_for_experiment(exp, diameter_um: float, output_dir: Path) -> Path:
