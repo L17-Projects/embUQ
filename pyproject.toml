@@ -44,7 +44,11 @@ mpi = [
 ]
 test = [
   "build>=1.0",
+  "matplotlib>=3.7",
+  "pandas>=2.0",
   "pytest>=7.0",
+  "scipy>=1.10",
+  "torch>=2.0",
 ]
 ci = [
   "build>=1.0",
@@ -61,6 +65,7 @@ dev = [
   "pytest>=7.0",
   "scipy>=1.10",
   "torch>=2.0",
+  "mpi4py>=3.1",
 ]
 
 [project.urls]

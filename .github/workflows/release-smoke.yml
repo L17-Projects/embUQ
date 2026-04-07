@@ -18,11 +18,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install scientific test stack
+      - name: Install CI extras
         run: |
           python -m pip install --upgrade pip
-          pip install build pytest pandas matplotlib scipy torch
-          pip install -e .
+          pip install -e ".[ci]"
 
       - name: Build package metadata
         run: python -m build --sdist --wheel
