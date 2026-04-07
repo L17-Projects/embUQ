@@ -41,6 +41,20 @@ def _write_propagation_summary(summary_csv: Path):
     summary_csv.write_text("x,mean\n0.0,0.0\n1.0,1.0\n2.0,2.0\n", encoding="utf-8")
 
 
+class _FakeExperiment:
+    name = "compression"
+    diameters = [2.1, 2.9, 3.0]
+
+    def dataset_name(self, diameter_um):
+        return f"compression_{diameter_um}um"
+
+    def get_reference_points(self, diameter_um):
+        return [0.0, 1.0, 2.0]
+
+    def get_reference_data(self, diameter_um):
+        return [0.0, 1.0, 2.0]
+
+
 def test_validation_runner_smoke_creates_summary_and_artifacts(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(repo_root / "inference" / "scripts" / "run_gpu_validation_suite.py", "run_gpu_validation_suite_test")
@@ -56,28 +70,17 @@ def test_validation_runner_smoke_creates_summary_and_artifacts(tmp_path, monkeyp
         if "run_phase_3b.py" in command_str:
             out_idx = command.index("--output-dir") + 1
             results_dir = Path(command[out_idx])
-            with open(command[command.index("--config") + 1], "rb") as handle:
-                import yaml
-                config = yaml.load(handle, Loader=yaml.CLoader)
-            from meso_uq.experiments import load_experiments
-            experiments = [exp for exp in load_experiments(config, repo_root) if exp.enabled]
-            for exp in experiments:
-                for d in exp.diameters:
-                    _write_phase3b_latest(results_dir / "results_phase_3b" / exp.dataset_name(d) / "latest")
+            for d in [2.1, 2.9, 3.0]:
+                _write_phase3b_latest(results_dir / "results_phase_3b" / f"compression_{d}um" / "latest")
         if "run_phase3b_propagation.py" in command_str:
             out_idx = command.index("--output-dir") + 1
             results_dir = Path(command[out_idx])
-            with open(command[command.index("--config") + 1], "rb") as handle:
-                import yaml
-                config = yaml.load(handle, Loader=yaml.CLoader)
-            from meso_uq.experiments import load_experiments
-            experiments = [exp for exp in load_experiments(config, repo_root) if exp.enabled]
-            for exp in experiments:
-                for d in exp.diameters:
-                    _write_propagation_summary(results_dir / "propagation_phase3b" / exp.dataset_name(d) / "summary.csv")
+            for d in [2.1, 2.9, 3.0]:
+                _write_propagation_summary(results_dir / "propagation_phase3b" / f"compression_{d}um" / "summary.csv")
         return Result(0)
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
+    monkeypatch.setattr(module, "_load_experiment_spec", lambda config_path, experiment_name: _FakeExperiment())
 
     output_root = tmp_path / "runner"
     summary = module.run_workflow(

@@ -22,7 +22,7 @@ def test_vega_acceptance_wrapper_writes_machine_readable_report(tmp_path, monkey
             self.stdout = stdout
             self.stderr = stderr
 
-    def fake_run(command, cwd=None, env=None, text=None, capture_output=None, check=False):
+    def fake_run(command, cwd=None, env=None, text=None, capture_output=None, check=False, **kwargs):
         if any("run_gpu_validation_suite.py" in str(part) for part in command):
             out_idx = command.index("--output-root") + 1
             runner_output = Path(command[out_idx])
@@ -34,6 +34,8 @@ def test_vega_acceptance_wrapper_writes_machine_readable_report(tmp_path, monkey
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
     monkeypatch.setattr(module.platform, "node", lambda: "vega-node")
+    monkeypatch.setattr(module.platform, "platform", lambda: "Linux-test")
+    monkeypatch.setattr(module.platform, "python_version", lambda: "3.11.0")
 
     output_root = tmp_path / "acceptance"
     monkeypatch.setattr(sys, "argv", [
