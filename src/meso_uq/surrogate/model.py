@@ -1,4 +1,5 @@
 import pickle
+import sys
 
 import torch
 
@@ -31,7 +32,16 @@ def save_model_states(model, *, xshift, xscale, yshift, yscale, path):
         pickle.dump({"model": model, "xshift": xshift, "xscale": xscale, "yshift": yshift, "yscale": yscale}, f, pickle.HIGHEST_PROTOCOL)
 
 
+def _install_legacy_pickle_aliases() -> None:
+    package = sys.modules.get(__package__)
+    current_module = sys.modules[__name__]
+    if package is not None:
+        sys.modules.setdefault("learning", package)
+    sys.modules.setdefault("learning.model", current_module)
+
+
 def load_model_states(path):
+    _install_legacy_pickle_aliases()
     with open(path, "rb") as f:
         data = pickle.load(f)
     return data["model"], data["xshift"], data["xscale"], data["yshift"], data["yscale"]

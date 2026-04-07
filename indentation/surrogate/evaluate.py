@@ -10,9 +10,15 @@ from meso_uq.surrogate import load_model_states
 
 class Surrogate:
     def __init__(self, base_dir: str) -> None:
-        self.model, self.xshift, self.xscale, self.yshift, self.yscale = load_model_states(
-            os.path.join(base_dir, "microbubble_disp_BEST.pkl")
-        )
+        model_path = None
+        for filename in ("microbubble_displacement_BEST.pkl", "microbubble_disp_BEST.pkl"):
+            candidate = os.path.join(base_dir, filename)
+            if os.path.exists(candidate):
+                model_path = candidate
+                break
+        if model_path is None:
+            raise FileNotFoundError(f"Could not find indentation surrogate weights under {base_dir}")
+        self.model, self.xshift, self.xscale, self.yshift, self.yscale = load_model_states(model_path)
         self.xshift = np.array(self.xshift)
         self.xscale = np.array(self.xscale)
         self.yshift = np.array(self.yshift)

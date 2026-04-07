@@ -14,8 +14,7 @@ import yaml
 from mpi4py import MPI
 
 from indentation.evalkit.tools import dated_print
-from indentation.src.equil import run_equil
-from indentation.src.parameters import write_parameters
+from meso_uq.workflow_acceleration import expand_parameter_vector, get_fixed_parameters
 
 _CONFIG_CACHE: Dict[str, Dict[str, Any]] = {}
 _SURROGATE_CACHE: Dict[Tuple[str, float], Any] = {}
@@ -90,14 +89,9 @@ def _get_dump_flag() -> bool:
 def compute_indentation_surrogate(sample: Dict[str, Any], forces: List[float], diameter_um: float) -> None:
     project_root = _resolve_project_root()
     dump = _get_dump_flag()
-    params = sample["Parameters"]
-    if len(params) == 8:
-        Yt, kb, b1, b2, a3, a4, d0, sigma = params
-    elif len(params) == 7:
-        Yt, kb, b1, b2, a3, a4, sigma = params
-        d0 = 0.0
-    else:
-        raise ValueError(f"Expected 7 or 8 parameters, got {len(params)}")
+    config = _load_config(project_root)
+    params = expand_parameter_vector(sample["Parameters"], fixed_params=get_fixed_parameters(config))
+    Yt, kb, b1, b2, a3, a4, d0, sigma = params.tolist()
     surrogate = _get_surrogate(project_root, diameter_um)
     displacements = surrogate.evaluate_indentation(x=[Yt, kb, b1, b2, a3, a4], forces=forces)
     displacements = np.maximum(0.0, np.asarray(displacements) + d0).tolist()
@@ -122,6 +116,8 @@ def adjust_simu_params(sample_param, filename_1_simu, filename_2_simu):
 
 
 def prepare_simulation_parameters(source_indentation_path: str, init_indentation_path: str, simu_path: str, simnum: str, displacement: float, theta: List[float], diameter_um: float) -> None:
+    from indentation.src.parameters import write_parameters
+
     os.system(f"mkdir -p {simu_path}")
     os.system(f"mkdir -p {simu_path}/mesh/")
     os.system(f"mkdir -p {simu_path}/force/")

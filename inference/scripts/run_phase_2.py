@@ -8,18 +8,27 @@ import korali
 import yaml
 from mpi4py import MPI
 
-project_root = os.path.join(os.path.dirname(__file__), "..", "..")
+project_root = str(Path(__file__).resolve().parents[2])
 sys.path.insert(0, os.path.join(project_root, "compression"))
 sys.path.insert(0, os.path.join(project_root, "compression", "evalkit"))
 
 from compression.evalkit.tools import datedPrint
 from meso_uq.config import resolve_inference_config_path
 from meso_uq.experiments import load_experiments
+from meso_uq.workflow_acceleration import (
+    configure_korali_conduit,
+    phase2_hyperprior_specs,
+    to_korali_path,
+)
 
 
 def run_hierarchical_inference(profiling: bool = False, config_path: str = None, output_dir: str = "_setup"):
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
+    output_root = Path(output_dir).expanduser()
+    if not output_root.is_absolute():
+        output_root = Path(project_root, output_root)
+    output_root = output_root.resolve()
 
     def ensure_output_dir(path: str) -> None:
         if rank == 0:
@@ -40,19 +49,11 @@ def run_hierarchical_inference(profiling: bool = False, config_path: str = None,
         for diameter_um in exp.diameters:
             exp_name = exp.dataset_name(diameter_um)
             sub_problem = korali.Experiment()
-            sub_problem.loadState(f"{output_dir}/results_phase_1/{exp_name}/latest")
+            sub_problem.loadState(str(output_root / "results_phase_1" / exp_name / "latest"))
             e["Problem"]["Sub Experiments"][sub_idx] = sub_problem
             sub_idx += 1
 
-    hyperpairs = [
-        ("Yt", config["hyperprior_mu_Yt"], config["hyperprior_sigma_Yt"]),
-        ("kb", config["hyperprior_mu_kb"], config["hyperprior_sigma_kb"]),
-        ("b1", config["hyperprior_mu_b1"], config["hyperprior_sigma_b1"]),
-        ("b2", config["hyperprior_mu_b2"], config["hyperprior_sigma_b2"]),
-        ("a3", config["hyperprior_mu_a3"], config["hyperprior_sigma_a3"]),
-        ("a4", config["hyperprior_mu_a4"], config["hyperprior_sigma_a4"]),
-        ("d0", config.get("hyperprior_mu_d0", [0.0, 0.5]), config.get("hyperprior_sigma_d0", [0.0, 0.3])),
-    ]
+    hyperpairs = phase2_hyperprior_specs(config)
 
     var_idx = 0
     dist_idx = 0
@@ -100,13 +101,13 @@ def run_hierarchical_inference(profiling: bool = False, config_path: str = None,
         e["Solver"]["Termination Criteria"]["Max Generations"] = config["hbi_max_gen"]
 
     e["Console Output"]["Verbosity"] = "Detailed"
-    e["File Output"]["Path"] = f"{output_dir}/results_phase_2/"
-    ensure_output_dir(f"{output_dir}/results_phase_2/")
+    results_phase_2 = output_root / "results_phase_2"
+    e["File Output"]["Path"] = to_korali_path(str(results_phase_2), base_dir=project_root)
+    ensure_output_dir(str(results_phase_2))
 
     k = korali.Engine()
     k.setMPIComm(MPI.COMM_WORLD)
-    k["Conduit"]["Type"] = "Distributed"
-    k["Conduit"]["Ranks Per Worker"] = 1
+    configure_korali_conduit(k, mpi_ranks=comm.Get_size(), ranks_per_worker=1, concurrent_jobs=1)
     if profiling:
         k["Profiling"]["Detail"] = "Full"
         k["Profiling"]["Frequency"] = 0.5
