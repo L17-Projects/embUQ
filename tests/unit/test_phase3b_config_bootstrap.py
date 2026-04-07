@@ -1,7 +1,29 @@
 import importlib.util
 import os
 import sys
+import types
 from pathlib import Path
+
+
+class _FakeComm:
+    def Get_rank(self):
+        return 0
+
+
+def _install_phase3b_backend_stubs():
+    sys.modules.setdefault("korali", types.ModuleType("korali"))
+
+    mpi4py_module = types.ModuleType("mpi4py")
+    mpi4py_module.MPI = types.SimpleNamespace(COMM_WORLD=_FakeComm())
+    sys.modules.setdefault("mpi4py", mpi4py_module)
+
+    compression_module = types.ModuleType("compression.evalkit.posterior_compression")
+    compression_module.compute_compression_surrogate = lambda *args, **kwargs: None
+    sys.modules.setdefault("compression.evalkit.posterior_compression", compression_module)
+
+    indentation_module = types.ModuleType("indentation.evalkit.posterior_indentation")
+    indentation_module.compute_indentation_surrogate = lambda *args, **kwargs: None
+    sys.modules.setdefault("indentation.evalkit.posterior_indentation", indentation_module)
 
 
 def _load_phase3b_module():
@@ -11,6 +33,7 @@ def _load_phase3b_module():
     sys.path.insert(0, str(repo_root / "compression" / "evalkit"))
     sys.path.insert(0, str(repo_root / "indentation"))
     sys.path.insert(0, str(repo_root / "indentation" / "evalkit"))
+    _install_phase3b_backend_stubs()
     module_path = repo_root / "inference" / "scripts" / "run_phase_3b.py"
     spec = importlib.util.spec_from_file_location("mesouq_test_run_phase3b", module_path)
     module = importlib.util.module_from_spec(spec)
