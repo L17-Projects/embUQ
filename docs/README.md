@@ -6,8 +6,11 @@ This directory hosts the public documentation set for the `v0.1.0` release line.
 
 - `../README.md` for the root overview and install extras
 - `RELEASE_NOTES_v0.1.0.md` for the release summary
+- `DEPENDENCY_EXTRAS.md` for the install-extras contract
 - `VALIDATION_MATRIX.md` for the public / manual / Vega validation structure
-- `VEGA_ACCEPTANCE_CHECKLIST.md` for the cluster acceptance layer
+- `VEGA_ACCEPTANCE_COMMAND.md` for the single Vega-first acceptance command
+- `VEGA_ACCEPTANCE_CHECKLIST.md` for the cluster acceptance layer and pass criteria
+- `VALIDATION_CONFIGS.md` for the tiny validation config bundle
 
 ## Workflow and operator guides
 
@@ -28,4 +31,4 @@ The vendored Korali subtree is documented further in:
 
 ## Notes
 
-The early bootstrap scaffold is no longer the current state of the repo. The docs in this directory should now be treated as the public entrypoints for release, validation, workflow usage, and operator guidance.
+The early bootstrap scaffold is no longer the current state of the repo. The docs in this directory should now be treated as the public entrypoints for release, validation, workflow usage, acceptance, and operator guidance.
