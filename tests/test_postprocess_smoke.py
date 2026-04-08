@@ -3,7 +3,12 @@ from pathlib import Path
 import pandas as pd
 
 from meso_uq.postprocess.maps import extract_map_from_directory, load_posterior_samples
-from meso_uq.postprocess.plots import plot_d0_correlations, plot_posterior_marginals, plot_validation_overlay
+from meso_uq.postprocess.plots import (
+    plot_d0_correlations,
+    plot_posterior_marginals,
+    plot_propagation_summary,
+    plot_validation_overlay,
+)
 
 
 def _write_latest(path: Path) -> None:
@@ -76,3 +81,45 @@ def test_validation_overlay_accepts_headerless_reference_csv(tmp_path: Path) -> 
     plot_validation_overlay(str(ref_csv), str(pred_csv), str(overlay_png))
 
     assert overlay_png.exists()
+
+
+def test_validation_overlay_accepts_headerless_reference_csv_with_explicit_x_col(tmp_path: Path) -> None:
+    ref_csv = tmp_path / "reference.csv"
+    pred_csv = tmp_path / "prediction.csv"
+    overlay_png = tmp_path / "overlay.png"
+
+    ref_csv.write_text("0.2,288.4\n0.26,467.4\n0.34,576.8\n", encoding="utf-8")
+    pd.DataFrame({"x": [0.2, 0.26, 0.34], "map_surrogate": [236.1, 350.4, 556.3]}).to_csv(
+        pred_csv, index=False
+    )
+
+    plot_validation_overlay(
+        str(ref_csv),
+        str(pred_csv),
+        str(overlay_png),
+        x_col="x",
+        y_pred_col="map_surrogate",
+        label_pred="map surrogate",
+    )
+
+    assert overlay_png.exists()
+
+
+def test_propagation_summary_plot_accepts_reference_overlay(tmp_path: Path) -> None:
+    ref_csv = tmp_path / "reference.csv"
+    pred_csv = tmp_path / "summary.csv"
+    output_png = tmp_path / "propagation.png"
+
+    ref_csv.write_text("0.2,288.4\n0.26,467.4\n0.34,576.8\n", encoding="utf-8")
+    pd.DataFrame(
+        {
+            "x": [0.2, 0.26, 0.34],
+            "mean": [236.1, 350.4, 556.3],
+            "q05": [120.0, 220.0, 300.0],
+            "q95": [300.0, 500.0, 700.0],
+        }
+    ).to_csv(pred_csv, index=False)
+
+    plot_propagation_summary(str(pred_csv), str(output_png), reference_csv=str(ref_csv))
+
+    assert output_png.exists()

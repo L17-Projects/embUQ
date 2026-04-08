@@ -211,6 +211,17 @@ def test_vega_sbatch_templates_expose_model_family_and_profile_axes() -> None:
     assert templates
     for template in templates:
         text = template.read_text(encoding="utf-8")
-        assert "MODEL_FAMILY" in text or "MODEL_FAMILIES" in text
-        assert "PROFILE" in text or "PROFILES" in text
+        assert "MODEL_FAMILY" in text or "MODEL_FAMILIES" in text or "SELECTION" in text or "SELECTIONS" in text
+        assert "PROFILE" in text or "PROFILES" in text or "SELECTION" in text or "SELECTIONS" in text
         assert "_vega/korali/env.sh" in text
+
+
+def test_production_sanity_template_uses_public_command() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    template = repo_root / "scripts" / "vega" / "sbatch" / "production_sanity.sbatch"
+
+    text = template.read_text(encoding="utf-8")
+
+    assert "run_production_sanity.py" in text
+    assert "SELECTIONS" in text
+    assert "ALL_LANES" in text

@@ -23,7 +23,7 @@ def _read_reference_table(reference_csv):
 def plot_validation_overlay(reference_csv, prediction_csv, output_path, x_col=None, y_ref_col=None, y_pred_col=None, label_ref="reference", label_pred="prediction"):
     ref = _read_reference_table(reference_csv)
     pred = pd.read_csv(prediction_csv)
-    x_ref_col = ref.columns[0] if x_col is None else x_col
+    x_ref_col = ref.columns[0] if x_col is None or x_col not in ref.columns else x_col
     x_pred_col = pred.columns[0] if x_col is None or x_col not in pred.columns else x_col
     if y_ref_col is None:
         y_ref_col = ref.columns[1]
@@ -35,6 +35,41 @@ def plot_validation_overlay(reference_csv, prediction_csv, output_path, x_col=No
     plt.plot(pred[x_pred_col], pred[y_pred_col], marker="s", linestyle="--", label=label_pred)
     plt.xlabel(str(x_col if x_col is not None else x_ref_col))
     plt.ylabel(y_ref_col)
+    plt.legend()
+    plt.grid(alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+
+
+def plot_propagation_summary(
+    prediction_csv,
+    output_path,
+    *,
+    reference_csv=None,
+    x_col="x",
+    mean_col="mean",
+    q05_col="q05",
+    q95_col="q95",
+    y_ref_col=None,
+    label_ref="reference",
+    label_mean="propagation mean",
+    envelope_label="propagation q05-q95",
+):
+    pred = pd.read_csv(prediction_csv)
+    ref = _read_reference_table(reference_csv) if reference_csv is not None else None
+    if ref is not None and y_ref_col is None:
+        y_ref_col = ref.columns[1]
+
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    plt.figure(figsize=(6, 4))
+    if ref is not None:
+        plt.plot(ref.iloc[:, 0], ref[y_ref_col], marker="o", linestyle="-", label=label_ref)
+    plt.plot(pred[x_col], pred[mean_col], marker="s", linestyle="--", label=label_mean)
+    if q05_col in pred.columns and q95_col in pred.columns:
+        plt.fill_between(pred[x_col], pred[q05_col], pred[q95_col], alpha=0.2, label=envelope_label)
+    plt.xlabel(x_col)
+    plt.ylabel(y_ref_col if y_ref_col is not None else mean_col)
     plt.legend()
     plt.grid(alpha=0.3)
     plt.tight_layout()
