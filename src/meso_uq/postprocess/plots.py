@@ -5,20 +5,35 @@ import numpy as np
 import pandas as pd
 
 
-def plot_validation_overlay(reference_csv, prediction_csv, output_path, x_col=None, y_ref_col=None, y_pred_col=None, label_ref="reference", label_pred="prediction"):
+def _looks_numeric_label(value) -> bool:
+    try:
+        float(str(value))
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _read_reference_table(reference_csv):
     ref = pd.read_csv(reference_csv)
+    if len(ref.columns) >= 2 and all(_looks_numeric_label(column) for column in ref.columns[:2]):
+        ref = pd.read_csv(reference_csv, header=None)
+    return ref
+
+
+def plot_validation_overlay(reference_csv, prediction_csv, output_path, x_col=None, y_ref_col=None, y_pred_col=None, label_ref="reference", label_pred="prediction"):
+    ref = _read_reference_table(reference_csv)
     pred = pd.read_csv(prediction_csv)
-    if x_col is None:
-        x_col = ref.columns[0]
+    x_ref_col = ref.columns[0] if x_col is None else x_col
+    x_pred_col = pred.columns[0] if x_col is None or x_col not in pred.columns else x_col
     if y_ref_col is None:
         y_ref_col = ref.columns[1]
     if y_pred_col is None:
         y_pred_col = pred.columns[1]
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     plt.figure(figsize=(6, 4))
-    plt.plot(ref[x_col], ref[y_ref_col], marker="o", linestyle="-", label=label_ref)
-    plt.plot(pred[x_col], pred[y_pred_col], marker="s", linestyle="--", label=label_pred)
-    plt.xlabel(x_col)
+    plt.plot(ref[x_ref_col], ref[y_ref_col], marker="o", linestyle="-", label=label_ref)
+    plt.plot(pred[x_pred_col], pred[y_pred_col], marker="s", linestyle="--", label=label_pred)
+    plt.xlabel(str(x_col if x_col is not None else x_ref_col))
     plt.ylabel(y_ref_col)
     plt.legend()
     plt.grid(alpha=0.3)
