@@ -37,22 +37,22 @@ WORKFLOW_CONFIGS: Dict[str, Dict[str, Any]] = {
     "compression_reduced": {
         "experiment": "compression",
         "scope": "reduced",
-        "config": PROJECT_ROOT / "reduced" / "configs" / "production" / "reduced_config_compression.yaml",
+        "config": PROJECT_ROOT / "reduced" / "configs" / "validation" / "validation_config_compression.yaml",
     },
     "compression_full": {
         "experiment": "compression",
         "scope": "full",
-        "config": PROJECT_ROOT / "inference" / "configs" / "production" / "inference_config_compression.yaml",
+        "config": PROJECT_ROOT / "inference" / "configs" / "validation" / "validation_config_compression.yaml",
     },
     "indentation_reduced": {
         "experiment": "indentation",
         "scope": "reduced",
-        "config": PROJECT_ROOT / "reduced" / "configs" / "production" / "reduced_config_indentation.yaml",
+        "config": PROJECT_ROOT / "reduced" / "configs" / "validation" / "validation_config_indentation.yaml",
     },
     "indentation_full": {
         "experiment": "indentation",
         "scope": "full",
-        "config": PROJECT_ROOT / "inference" / "configs" / "production" / "inference_config_indentation.yaml",
+        "config": PROJECT_ROOT / "inference" / "configs" / "validation" / "validation_config_indentation.yaml",
     },
 }
 
@@ -70,11 +70,7 @@ def _run_step(step_name: str, command: list[str], cwd: Path, env: dict[str, str]
 
 def _set_population_settings(config: dict[str, Any], population_size: int | None) -> dict[str, Any]:
     updated = dict(config)
-    if population_size is None:
-        for key in ("pop_size", "hbi_pop_size", "phase3a_pop_size", "phase3b_pop_size"):
-            if key in updated:
-                updated[key] = max(1, int(updated[key]) // 2)
-    else:
+    if population_size is not None:
         for key in ("pop_size", "hbi_pop_size", "phase3a_pop_size", "phase3b_pop_size"):
             if key in updated:
                 updated[key] = int(population_size)
@@ -195,7 +191,7 @@ def run_workflow(
     workflow_dir = output_root / workflow_output_name
     workflow_dir.mkdir(parents=True, exist_ok=True)
     results_dir = workflow_dir / "results"
-    config_name = "config_halfpop.yaml" if population_size is None else f"config_pop{population_size}.yaml"
+    config_name = "config.yaml" if population_size is None else f"config_pop{population_size}.yaml"
     config_path = workflow_dir / config_name
     derived_config = _write_derived_config(Path(workflow_spec["config"]), config_path, population_size)
 
