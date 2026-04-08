@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=mesouq-matrix
+#SBATCH --job-name=mesouq-validation-matrix
 #SBATCH --partition=dev
 #SBATCH --time=00:30:00
 #SBATCH --nodes=1
@@ -18,10 +18,15 @@ if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
 fi
 EXPERIMENTS="${EXPERIMENTS:-compression indentation}"
 MODEL_FAMILIES="${MODEL_FAMILIES:-full-model reduced-model}"
-PROFILES="${PROFILES:-validation}"
-OUTPUT_ROOT="${OUTPUT_ROOT:-_vega/workflow_matrix/validation_smoke}"
+PROFILE="${PROFILE:-validation}"
+OUTPUT_ROOT="${OUTPUT_ROOT:-_vega/validation_matrix}"
 PHASE2_CPU_RANKS="${PHASE2_CPU_RANKS:-4}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
+
+if [[ "${PROFILE}" != "validation" ]]; then
+  echo "validation_matrix.sbatch only supports PROFILE=validation." >&2
+  exit 2
+fi
 
 module purge
 module load \
@@ -36,10 +41,9 @@ source "${REPO_ROOT}/_vega/korali/env.sh"
 
 cd "${REPO_ROOT}"
 
-"$PYTHON_BIN" scripts/vega/run_workflow_matrix.py \
+"$PYTHON_BIN" scripts/vega/run_validation_matrix.py \
   --experiments $EXPERIMENTS \
   --model-families $MODEL_FAMILIES \
-  --profiles $PROFILES \
   --output-root "$OUTPUT_ROOT" \
   --phase2-cpu-ranks "$PHASE2_CPU_RANKS" \
   --python-bin "$PYTHON_BIN"

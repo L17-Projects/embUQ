@@ -2,7 +2,7 @@
 
 This page documents the repo-managed Vega helpers added for fresh-clone workflow execution.
 
-For the higher-level fresh-clone matrix runner and its machine-readable report, see `VEGA_WORKFLOW_MATRIX.md`.
+For the public Vega validation matrix and its machine-readable report, see `VEGA_VALIDATION_MATRIX.md`.
 
 ## Selection axes
 
@@ -97,7 +97,7 @@ The following canned templates live under `scripts/vega/sbatch/`:
 - `workflow_phase1_to_3b.sbatch`
 - `workflow_propagation.sbatch`
 - `workflow_map.sbatch`
-- `workflow_matrix_smoke.sbatch`
+- `validation_matrix.sbatch`
 
 They assume:
 
