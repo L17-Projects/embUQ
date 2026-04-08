@@ -4,6 +4,8 @@ import sys
 import types
 from pathlib import Path
 
+import pytest
+
 
 class _FakeComm:
     def Get_rank(self):
@@ -58,3 +60,28 @@ def test_run_phase3b_exports_active_config(monkeypatch, tmp_path):
     module.run_phase_3b(config_path=str(config_path), output_dir=str(output_root))
 
     assert os.environ["HUQ_INFERENCE_CONFIG"] == str(config_path.resolve())
+
+
+def test_run_phase3b_requires_phase1_results(monkeypatch, tmp_path):
+    module = _load_phase3b_module()
+    config_path = tmp_path / "validation.yaml"
+    config_path.write_text("{}\n", encoding="utf-8")
+
+    output_root = tmp_path / "output"
+    phase2_dir = output_root / "results_phase_2"
+    phase2_dir.mkdir(parents=True)
+    (phase2_dir / "latest").write_text("{}", encoding="utf-8")
+
+    experiment = types.SimpleNamespace(
+        name="compression",
+        enabled=True,
+        diameters=[2.1],
+        dataset_name=lambda diameter_um: f"compression_{diameter_um}um",
+        get_reference_points=lambda diameter_um: [],
+    )
+    monkeypatch.setattr(module, "load_experiments", lambda config, root: [experiment])
+
+    with pytest.raises(SystemExit) as excinfo:
+        module.run_phase_3b(config_path=str(config_path), output_dir=str(output_root))
+
+    assert excinfo.value.code == 1
