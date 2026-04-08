@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Run reduced Phase 3b for a single dataset by writing a temporary config override.
+Internal helper: run reduced Phase 3b for a single dataset by writing a
+temporary config override.
 """
 
 from __future__ import annotations

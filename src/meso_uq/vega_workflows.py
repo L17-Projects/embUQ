@@ -130,12 +130,16 @@ def resolve_inference_stage_driver(
     if stage not in VALID_INFERENCE_STAGES:
         raise ValueError(f"Unsupported inference stage: {stage}")
 
+    if model_family == "reduced-model":
+        if stage == "phase1":
+            return repo_root / "reduced" / "scripts" / "run_phase_1.py"
+        if stage == "phase2":
+            return repo_root / "reduced" / "scripts" / "run_phase_2.py"
+        return repo_root / "reduced" / "scripts" / "run_phase_3b.py"
     if stage == "phase1":
         return repo_root / "inference" / "scripts" / "run_phase_1.py"
     if stage == "phase2":
         return repo_root / "inference" / "scripts" / "run_phase_2.py"
-    if model_family == "reduced-model":
-        return repo_root / "reduced" / "scripts" / "run_phase_3b.py"
     return repo_root / "inference" / "scripts" / "run_phase_3b.py"
 
 

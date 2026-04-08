@@ -109,6 +109,66 @@ def test_run_propagation_uses_explicit_stage_wrapper(tmp_path, monkeypatch):
     assert str(repo_root / "reduced" / "configs" / "production" / "reduced_config_indentation.yaml") in captured["command"]
 
 
+def test_run_inference_stage_uses_reduced_phase1_wrapper(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(repo_root / "scripts" / "vega" / "run_inference_stage.py", "run_inference_stage_reduced_test")
+    captured = {}
+
+    def fake_run(command, cwd=None, check=False):
+        captured["command"] = command
+        captured["cwd"] = cwd
+        return 0
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    rc = module.main(
+        [
+            "--experiment",
+            "compression",
+            "--model-family",
+            "reduced-model",
+            "--profile",
+            "production",
+            "--stage",
+            "phase1",
+            "--output-dir",
+            str(tmp_path / "run"),
+            "--python-bin",
+            "python",
+            "--restart",
+            "--dry-run",
+        ]
+    )
+
+    assert rc == 0
+    assert captured["cwd"] == str(repo_root)
+    assert captured["command"][1] == str(repo_root / "reduced" / "scripts" / "run_phase_1.py")
+    assert "--restart" in captured["command"]
+    assert "--dry_run" in captured["command"]
+    assert str(repo_root / "reduced" / "configs" / "production" / "reduced_config_compression.yaml") in captured["command"]
+
+
+def test_reduced_phase2_wrapper_delegates_to_main_driver(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(repo_root / "reduced" / "scripts" / "run_phase_2.py", "reduced_phase2_wrapper_test")
+    captured = {}
+
+    def fake_call(command, cwd=None):
+        captured["command"] = command
+        captured["cwd"] = cwd
+        return 0
+
+    monkeypatch.setattr(module.subprocess, "call", fake_call)
+    monkeypatch.setattr(module.sys, "argv", ["run_phase_2.py"])
+
+    rc = module.main()
+
+    assert rc == 0
+    assert captured["cwd"] == str(repo_root)
+    assert captured["command"][1] == str(repo_root / "inference" / "scripts" / "run_phase_2.py")
+    assert str(repo_root / "reduced" / "configs" / "production" / "reduced_config_compression.yaml") in captured["command"]
+
+
 def test_extract_map_writes_manifest_for_single_selected_dataset(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(repo_root / "scripts" / "vega" / "extract_map.py", "extract_map_test")
