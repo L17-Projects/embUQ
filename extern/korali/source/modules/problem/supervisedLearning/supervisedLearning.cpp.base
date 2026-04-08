@@ -1,0 +1,48 @@
+#include "modules/problem/supervisedLearning/supervisedLearning.hpp"
+
+__startNamespace__;
+
+void __className__::initialize()
+{
+  // Checking batch size
+  if (_trainingBatchSize == 0) KORALI_LOG_ERROR("Empty input batch provided.\n");
+  if (_maxTimesteps == 0) KORALI_LOG_ERROR("Incorrect max timesteps provided: %lu.\n", _maxTimesteps);
+  if (_inputSize == 0) KORALI_LOG_ERROR("Empty input vector size provided.\n");
+  if (_solutionSize == 0) KORALI_LOG_ERROR("Empty solution vector size provided.\n");
+}
+
+void __className__::verifyData()
+{
+  // Checking for empty input and solution data
+  if (_inputData.size() == 0) KORALI_LOG_ERROR("Empty input dataset provided.\n");
+  if (_solutionData.size() == 0) KORALI_LOG_ERROR("Empty solution dataset provided.\n");
+
+  // Checking that batch entry has the correct size
+  if (_trainingBatchSize != _inputData.size())
+    KORALI_LOG_ERROR("Training Batch size %lu  different than that of input data (%lu).\n", _inputData.size(), _trainingBatchSize);
+
+  // Checking that all timestep entries have the correct size
+  for (size_t b = 0; b < _inputData.size(); b++)
+  {
+    if (_inputData[b].size() > _maxTimesteps)
+      KORALI_LOG_ERROR("More timesteps (%lu) provided in batch %lu than max specified in the configuration (%lu).\n", _inputData[b].size(), b, _maxTimesteps);
+
+    // Checking that all batch entries have the correct size
+    for (size_t t = 0; t < _inputData[b].size(); t++)
+      if (_inputData[b][t].size() != _inputSize)
+        KORALI_LOG_ERROR("Vector size of timestep %lu input data %lu is inconsistent. Size: %lu - Expected: %lu.\n", b, t, _inputData[b][t].size(), _inputSize);
+  }
+
+  // Checking batch size for solution data
+  if (_trainingBatchSize != _solutionData.size())
+    KORALI_LOG_ERROR("Training Batch size of solution data (%lu) is different than that of input data (%lu).\n", _solutionData.size(), _inputData.size());
+
+  // Checking that all solution batch entries have the correct size
+  for (size_t b = 0; b < _solutionData.size(); b++)
+    if (_solutionData[b].size() != _solutionSize)
+      KORALI_LOG_ERROR("Solution vector size of batch %lu is inconsistent. Size: %lu - Expected: %lu.\n", b, _solutionData[b].size(), _solutionSize);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

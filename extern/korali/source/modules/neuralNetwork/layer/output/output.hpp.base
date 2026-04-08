@@ -1,0 +1,63 @@
+#pragma once
+
+#include "modules/neuralNetwork/layer/layer.hpp"
+
+__startNamespace__;
+
+/**
+ * @brief This enumerator details all possible transformations. It is used in lieu of string comparison to accelerate the application of this layer
+ */
+enum transformation_t
+{
+  /**
+   * @brief No transformation
+   */
+  t_identity = 0,
+
+  /**
+   * @brief Apply absolute mask
+   */
+  t_absolute = 1,
+
+  /**
+   * @brief Apply softplus mask
+   */
+  t_softplus = 2,
+
+  /**
+   * @brief Apply tanh mask
+   */
+  t_tanh = 3,
+
+  /**
+   * @brief Apply sigmoid mask
+   */
+  t_sigmoid = 4
+};
+
+class __className__ : public __parentClassName__
+{
+  public:
+  /**
+   * @brief Contains the original output, before preprocessing
+   */
+  float *_srcOutputValues;
+
+  /**
+   * @brief Contains the postprocessed gradients
+   */
+  float *_dstOutputGradients;
+
+  /**
+   * @brief Contains the description of the transformation to apply to each output element
+   */
+  std::vector<transformation_t> _transformationVector;
+
+  void initialize() override;
+  void createForwardPipeline() override;
+  void createBackwardPipeline() override;
+  void forwardData(const size_t t) override;
+  void backwardData(const size_t t) override;
+};
+
+__endNamespace__;

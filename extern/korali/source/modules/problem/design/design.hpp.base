@@ -1,0 +1,19 @@
+#pragma once
+
+#include "modules/problem/problem.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  void initialize() override;
+
+  /**
+   * @brief Evaluates the model for a given sample from the prior distribution
+   * @param sample A Korali Sample
+   */
+  void runModel(Sample &sample);
+};
+
+__endNamespace__;

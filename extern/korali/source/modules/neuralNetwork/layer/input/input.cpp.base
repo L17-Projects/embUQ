@@ -1,0 +1,82 @@
+#include "modules/neuralNetwork/layer/input/input.hpp"
+#include "modules/neuralNetwork/neuralNetwork.hpp"
+
+#ifdef _KORALI_USE_CUDNN
+  #include "auxiliar/cudaUtils.hpp"
+#endif
+
+#ifdef _KORALI_USE_ONEDNN
+  #include "auxiliar/dnnUtils.hpp"
+using namespace dnnl;
+#endif
+
+#include <Eigen/Dense>
+using namespace Eigen;
+
+__startNamespace__;
+
+void __className__::initialize()
+{
+  // Checking Layer size
+  if (_outputChannels == 0) KORALI_LOG_ERROR("Output Channels for layer (%lu) should be larger than zero.\n", _index);
+
+  // Checking position
+  if (_index != 0) KORALI_LOG_ERROR("Input layers can only be placed at the start of the NN\n");
+}
+
+void __className__::forwardData(const size_t t)
+{
+  size_t N = _batchSize;
+  size_t OC = _outputChannels;
+
+  if (_nn->_engine == "Korali")
+  {
+    memcpy(_outputValues, &_pipeline->_rawInputValues[t * N * OC], N * OC * sizeof(float));
+  }
+
+#ifdef _KORALI_USE_ONEDNN
+  if (_nn->_engine == "OneDNN")
+  {
+    write_to_dnnl_memory(&_pipeline->_rawInputValues[t * N * OC], _outputMem[t]);
+  }
+#endif
+
+#ifdef _KORALI_USE_CUDNN
+  if (_nn->_engine == "CuDNN")
+  {
+    cudaErrCheck(cudaMemcpy(_outputTensor[t], &_pipeline->_rawInputValues[t * N * OC], N * OC * sizeof(float), cudaMemcpyHostToDevice));
+  }
+#endif
+}
+
+void __className__::backwardData(const size_t t)
+{
+  int N = _batchSize;
+  int OC = _outputChannels;
+
+  if (_nn->_mode == "Inference")
+    KORALI_LOG_ERROR("Requesting Layer backward data propagation but NN was configured for inference only.\n");
+
+  if (_nn->_engine == "Korali")
+  {
+    memcpy(&_pipeline->_rawInputGradients[t * N * OC], _outputGradient, N * OC * sizeof(float));
+  }
+
+#ifdef _KORALI_USE_ONEDNN
+  if (_nn->_engine == "OneDNN")
+  {
+    read_from_dnnl_memory(&_pipeline->_rawInputGradients[t * N * OC], _outputGradientMem[t]);
+  }
+#endif
+
+#ifdef _KORALI_USE_CUDNN
+  if (_nn->_engine == "CuDNN")
+  {
+    cudaErrCheck(cudaMemcpy(&_pipeline->_rawInputGradients[t * N * OC], _outputGradientTensor[t], N * OC * sizeof(float), cudaMemcpyDeviceToHost));
+  }
+#endif
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

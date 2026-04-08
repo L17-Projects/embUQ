@@ -1,0 +1,36 @@
+#include "modules/problem/design/design.hpp"
+#include "sample/sample.hpp"
+
+__startNamespace__;
+
+void __className__::initialize()
+{
+  // Processing state/action variable configuration
+  for (size_t i = 0; i < _k->_variables.size(); i++)
+  {
+    if (_k->_variables[i]->_type == "Parameter")
+      _parameterVectorIndexes.push_back(i);
+    if (_k->_variables[i]->_type == "Design")
+      _designVectorIndexes.push_back(i);
+    if (_k->_variables[i]->_type == "Measurement")
+      _measurementVectorIndexes.push_back(i);
+  }
+
+  _parameterVectorSize = _parameterVectorIndexes.size();
+  _designVectorSize = _designVectorIndexes.size();
+  _measurementVectorSize = _measurementVectorIndexes.size();
+
+  if (_parameterVectorSize == 0) KORALI_LOG_ERROR("No parameter variables have been defined.\n");
+  if (_designVectorSize == 0) KORALI_LOG_ERROR("No design variables have been defined.\n");
+  if (_measurementVectorSize == 0) KORALI_LOG_ERROR("No measurement variables have been defined.\n");
+}
+
+void __className__::runModel(Sample &sample)
+{
+  // Evaluating Sample
+  sample.run(_model);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

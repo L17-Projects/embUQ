@@ -1,0 +1,41 @@
+#pragma once
+
+#include "modules/distribution/univariate/normal/normal.hpp"
+#include "modules/problem/reinforcementLearning/discrete/discrete.hpp"
+#include "modules/solver/agent/discrete/discrete.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  /**
+   * @brief Update the V-target or current and previous experiences in the episode
+   * @param expId Current Experience Id
+   */
+  void updateVtbc(size_t expId);
+
+  /**
+   * @brief Calculates the gradients for the policy/critic neural network
+   * @param miniBatch The indexes of the experience mini batch
+   * @param policyIdx The indexes of the policy to compute the gradient for
+   */
+  void calculatePolicyGradients(const std::vector<std::pair<size_t, size_t>> &miniBatch, const size_t policyIdx);
+
+  /**
+   * @brief Retreives the policy infos for the samples in the minibatch
+   * @param miniBatch The indexes of the experience mini batch
+   * @return A vector containing the policy infos in the order they are given in the miniBatch
+   */
+  std::vector<policy_t> getPolicyInfo(const std::vector<std::pair<size_t, size_t>> &miniBatch) const;
+
+  float calculateStateValue(const std::vector<std::vector<float>> &stateSequence, size_t policyIdx = 0) override;
+  void runPolicy(const std::vector<std::vector<std::vector<float>>> &stateSequenceBatch, std::vector<policy_t> &policy, size_t policyIdx = 0) override;
+  knlohmann::json getPolicy() override;
+  void setPolicy(const knlohmann::json &hyperparameters) override;
+  void trainPolicy() override;
+  void printInformation() override;
+  void initializeAgent() override;
+};
+
+__endNamespace__;

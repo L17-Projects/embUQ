@@ -1,0 +1,45 @@
+#pragma once
+
+#include "modules/distribution/distribution.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  /**
+   * @brief Gets the probability density of the distribution at point x.
+   * @param x point to evaluate P(x)
+   * @return Value of the probability density.
+   */
+  virtual double getDensity(const double x) const = 0;
+
+  /**
+   * @brief Gets the log probability density of the distribution at point x.
+   * @param x point to evaluate log(P(x))
+   * @return Log of probability density.
+   */
+  virtual double getLogDensity(const double x) const = 0;
+
+  /**
+   * @brief Gets the gradient of the log probability density of the distribution wrt. to x.
+   * @param x point to evaluate grad(log(P(x)))
+   * @return Gradient of log of probability density.
+   */
+  virtual double getLogDensityGradient(const double x) const { KORALI_LOG_ERROR("Gradient for prior not yet implemented\n"); };
+
+  /**
+   * @brief Gets the second derivative of the log probability density of the distribution wrt. to x.
+   * @param x point to evaluate H(log(P(x)))
+   * @return Hessian of log of probability density.
+   */
+  virtual double getLogDensityHessian(const double x) const { KORALI_LOG_ERROR("Hessian for prior not yet implemented\n"); };
+
+  /**
+   * @brief Draws and returns a random number from the distribution.
+   * @return Random real number.
+   */
+  virtual double getRandomNumber() = 0;
+};
+
+__endNamespace__;

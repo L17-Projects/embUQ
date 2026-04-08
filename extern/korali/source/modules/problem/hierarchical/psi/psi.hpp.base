@@ -1,0 +1,187 @@
+#pragma once
+
+#include <cstdint>
+#include <string>
+#include <vector>
+
+#ifdef _KORALI_USE_CUDA_BATCH
+  #include <cuda.h>
+#endif
+
+#include "modules/distribution/distribution.hpp"
+#include "modules/problem/hierarchical/hierarchical.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  private:
+  /**
+   * @brief Precomputed constant needed for direct Normal log-density evaluation.
+   */
+  const double _log2Pi = 1.83787706640934533908193770912476;
+
+  /**
+   * @brief Stores the pre-computed positions (pointers) of the conditional priors to evaluate for performance
+   */
+  struct conditionalPriorInfo
+  {
+    /**
+     * @brief Stores the position of the conditional prior
+     */
+    std::vector<size_t> _samplePositions;
+
+    /**
+     * @brief Stores the pointer of the conditional prior
+     */
+    std::vector<double *> _samplePointers;
+  };
+
+  /**
+   * @brief Describes whether a native batch prior parameter is constant or read from the Psi sample.
+   */
+  struct nativeParameterSource
+  {
+    bool _isVariable = false;
+    size_t _position = 0;
+    double _value = 0.0;
+  };
+
+  /**
+   * @brief Enumerates the conditional priors supported by the native batch backend.
+   */
+  enum nativeConditionalPriorKind
+  {
+    Normal,
+    Uniform
+  };
+
+  /**
+   * @brief Stores the metadata required to evaluate one conditional prior natively in batch mode.
+   */
+  struct nativeConditionalPriorSpec
+  {
+    nativeConditionalPriorKind _kind = nativeConditionalPriorKind::Normal;
+    size_t _sampleDimension = 0;
+    nativeParameterSource _parameterA;
+    nativeParameterSource _parameterB;
+
+    bool isConstant() const
+    {
+      return _parameterA._isVariable == false && _parameterB._isVariable == false;
+    }
+  };
+
+  /**
+   * @brief Stores sub-problem data in a structure-of-arrays layout for native batch evaluation.
+   */
+  struct nativeSubProblemCache
+  {
+    std::vector<std::vector<double>> _sampleCoordinatesByVariable;
+    std::vector<double> _baseLogWeights;
+  };
+
+  /**
+   * @brief Stores the number of subproblems
+   */
+  size_t _subProblemsCount;
+
+  /**
+   * @brief Stores the number of variables in the subproblems (all must be the same)
+   */
+  size_t _subProblemsVariablesCount;
+
+  /**
+   * @brief Stores the sample coordinates of all the subproblems
+   */
+  std::vector<std::vector<std::vector<double>>> _subProblemsSampleCoordinates;
+
+  /**
+   * @brief Stores the sample logLikelihoods of all the subproblems
+   */
+  std::vector<std::vector<double>> _subProblemsSampleLogLikelihoods;
+
+  /**
+   * @brief Stores the sample logPriors of all the subproblems
+   */
+  std::vector<std::vector<double>> _subProblemsSampleLogPriors;
+
+  /**
+   * @brief Stores the precomputed conditional prior information, for performance
+   */
+  std::vector<conditionalPriorInfo> _conditionalPriorInfos;
+
+  /**
+   * @brief Stores the native conditional-prior descriptors used by the native batch backend.
+   */
+  std::vector<nativeConditionalPriorSpec> _nativeConditionalPriorSpecs;
+
+  /**
+   * @brief Stores the subset of conditional priors that still depend on the current Psi sample.
+   */
+  std::vector<size_t> _nativeDynamicConditionalPriorIndexes;
+
+  /**
+   * @brief Stores the cached sub-problem data used by the native batch backend.
+   */
+  std::vector<nativeSubProblemCache> _nativeSubProblemCaches;
+
+#ifdef _KORALI_USE_CUDA_BATCH
+  bool _nativeCudaInitialized = false;
+  int _nativeCudaDeviceId = 0;
+  CUdevice _nativeCudaDevice = 0;
+  CUcontext _nativeCudaContext = nullptr;
+  CUmodule _nativeCudaModule = nullptr;
+  CUfunction _nativeCudaLogLikelihoodKernel = nullptr;
+  std::vector<CUdeviceptr> _nativeCudaSubProblemCoordinates;
+  std::vector<CUdeviceptr> _nativeCudaSubProblemBaseLogWeights;
+  CUdeviceptr _nativeCudaSubProblemCoordinatesDevice = 0;
+  CUdeviceptr _nativeCudaSubProblemBaseLogWeightsDevice = 0;
+  CUdeviceptr _nativeCudaSubProblemSampleCountsDevice = 0;
+  CUdeviceptr _nativeCudaPriorKindsDevice = 0;
+  CUdeviceptr _nativeCudaParameterAIsVariableDevice = 0;
+  CUdeviceptr _nativeCudaParameterAPositionDevice = 0;
+  CUdeviceptr _nativeCudaParameterAValueDevice = 0;
+  CUdeviceptr _nativeCudaParameterBIsVariableDevice = 0;
+  CUdeviceptr _nativeCudaParameterBPositionDevice = 0;
+  CUdeviceptr _nativeCudaParameterBValueDevice = 0;
+#endif
+
+  size_t findVariablePosition(const std::string &variableName, const std::string &propertyName, size_t priorIndex) const;
+  nativeParameterSource createNativeParameterSource(const std::string &variableName, double value, const std::string &propertyName, size_t priorIndex) const;
+  double resolveNativeParameter(const nativeParameterSource &source, const std::vector<double> &parameters) const;
+  double evaluateNativeConditionalLogDensity(const nativeConditionalPriorSpec &spec, const std::vector<double> &parameters, double sampleValue) const;
+  void initializeNativeBatchCache();
+  void initializeNativeCudaBatch();
+  void releaseNativeCudaBatch();
+  void evaluateBatchNativeCpu(korali::Sample &sample);
+  void evaluateBatchNativeCuda(korali::Sample &sample);
+  bool usesExternalBatchBackend() const;
+  bool usesNativeCpuBatchBackend() const;
+  bool usesNativeCudaBatchBackend() const;
+
+  public:
+  ~__className__() override;
+
+  /**
+   * @brief Tracks whether a batch computational model was explicitly configured.
+   */
+  bool _hasBatchComputationalModel = false;
+
+  /**
+   * @brief Stores the indexes of conditional priors to Experiment variables
+   */
+  std::vector<size_t> _conditionalPriorIndexes;
+
+  /**
+   * @brief Updates the distribution parameters for the conditional priors, given variable values in the sample.
+   * @param sample A Korali Sample
+   */
+  void updateConditionalPriors(korali::Sample &sample);
+  void evaluateLogLikelihood(korali::Sample &sample) override;
+  void evaluateBatch(korali::Sample &sample) override;
+  bool supportsEvaluateBatch() const override;
+  void initialize() override;
+};
+
+__endNamespace__;

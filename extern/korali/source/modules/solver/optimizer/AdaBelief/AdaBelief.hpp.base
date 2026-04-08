@@ -1,0 +1,24 @@
+#pragma once
+
+#include "modules/solver/optimizer/optimizer.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  /**
+   * @brief Takes a sample evaluation and its gradient and calculates the next set of parameters
+   * @param evaluation The value of the objective function at the current set of parameters
+   * @param gradient The gradient of the objective function at the current set of parameters
+   */
+  void processResult(double evaluation, std::vector<double> &gradient);
+
+  void finalize() override;
+  void setInitialConfiguration() override;
+  void runGeneration() override;
+  void printGenerationBefore() override;
+  void printGenerationAfter() override;
+};
+
+__endNamespace__;

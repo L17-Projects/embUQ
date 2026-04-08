@@ -1,0 +1,41 @@
+#pragma once
+
+#include "modules/neuralNetwork/layer/recurrent/recurrent.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+#ifdef _KORALI_USE_ONEDNN
+
+  /**
+   * @brief oneDNN primitive attributes that describe the forward GRU primitive
+   */
+  dnnl::gru_forward::primitive_desc _forwardGRUPrimitiveDesc;
+
+  /**
+   * @brief oneDNN primitive to run the forward GRU operation
+   */
+  dnnl::primitive _forwardGRUPrimitive;
+
+  /**
+   * @brief oneDNN primitive attributes that describe the backward GRU primitive
+   */
+  dnnl::gru_backward::primitive_desc _backwardGRUPrimitiveDesc;
+
+  /**
+   * @brief oneDNN primitive to run the backward GRU operation
+   */
+  dnnl::primitive _backwardGRUPrimitive;
+
+#endif
+
+  void initialize() override;
+  void createForwardPipeline() override;
+  void createBackwardPipeline() override;
+  void forwardData(const size_t t) override;
+  void backwardData(const size_t t) override;
+};
+
+__endNamespace__;

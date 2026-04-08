@@ -1,0 +1,117 @@
+#include "engine.hpp"
+#include "modules/solver/optimizer/AdaBelief/AdaBelief.hpp"
+#include "sample/sample.hpp"
+
+__startNamespace__;
+
+void __className__::setInitialConfiguration()
+{
+  _variableCount = _k->_variables.size();
+
+  for (size_t i = 0; i < _variableCount; i++)
+    if (std::isfinite(_k->_variables[i]->_initialValue) == false)
+      KORALI_LOG_ERROR("Initial Value of variable \'%s\' not defined (no defaults can be calculated).\n", _k->_variables[i]->_name.c_str());
+
+  _currentVariable.resize(_variableCount);
+  for (size_t i = 0; i < _variableCount; i++)
+    _currentVariable[i] = _k->_variables[i]->_initialValue;
+
+  _bestEverVariables = _currentVariable;
+  _bestEverGradient.resize(_variableCount, 0);
+  _gradient.resize(_variableCount);
+  _firstMoment.resize(_variableCount, 0.0);
+  _biasCorrectedFirstMoment.resize(_variableCount, 0.0);
+  _secondCentralMoment.resize(_variableCount, 0.0);
+  _biasCorrectedSecondCentralMoment.resize(_variableCount, 0.0);
+
+  _bestEverValue = Inf;
+  _gradientNorm = 1;
+}
+
+void __className__::runGeneration()
+{
+  if (_k->_currentGeneration == 1) setInitialConfiguration();
+
+  // update parameters
+  for (size_t i = 0; i < _variableCount; i++)
+  {
+    _currentVariable[i] += _eta / (std::sqrt(_biasCorrectedSecondCentralMoment[i]) + _epsilon) * _biasCorrectedFirstMoment[i];
+  }
+
+  // Initializing Sample Evaluation
+  Sample sample;
+  sample["Module"] = "Problem";
+  sample["Operation"] = "Evaluate With Gradients";
+  sample["Parameters"] = _currentVariable;
+  sample["Sample Id"] = 0;
+  KORALI_START(sample);
+
+  // Waiting for sample to finish
+  KORALI_WAIT(sample);
+
+  auto evaluation = KORALI_GET(double, sample, "F(x)");
+  auto gradient = KORALI_GET(std::vector<double>, sample, "Gradient");
+
+  // Processing results
+  processResult(evaluation, gradient);
+}
+
+void __className__::processResult(double evaluation, std::vector<double> &gradient)
+{
+  _modelEvaluationCount++;
+  _previousBestValue = _currentBestValue;
+  _currentBestValue = evaluation;
+  _bestEverValue = -Inf;
+  _gradientNorm = 0.0;
+
+  _gradient = gradient;
+  _gradientNorm = vectorNorm(_gradient);
+
+  if (_currentBestValue > _bestEverValue)
+  {
+    _bestEverValue = _currentBestValue;
+    _bestEverGradient = _gradient;
+    _bestEverVariables = _currentVariable;
+  }
+
+  // update first and second moment estimators and bias corrected versions
+  for (size_t i = 0; i < _variableCount; i++)
+  {
+    _firstMoment[i] = _beta1 * _firstMoment[i] + (1 - _beta1) * _gradient[i];
+    _biasCorrectedFirstMoment[i] = _firstMoment[i] / (1 - _beta1);
+    _secondCentralMoment[i] = _beta2 * _secondCentralMoment[i] + (1 - _beta2) * (_gradient[i] - _firstMoment[i]) * (_gradient[i] - _firstMoment[i]);
+    _biasCorrectedSecondCentralMoment[i] = _secondCentralMoment[i] / (1 - _beta2);
+  }
+}
+
+void __className__::printGenerationBefore()
+{
+  _k->_logger->logInfo("Normal", "Starting generation %lu...\n", _k->_currentGeneration);
+}
+
+void __className__::printGenerationAfter()
+{
+  _k->_logger->logInfo("Normal", "x = [ ");
+  for (size_t k = 0; k < _variableCount; k++) _k->_logger->logData("Normal", " %.5le  ", _currentVariable[k]);
+  _k->_logger->logData("Normal", " ]\n");
+
+  _k->_logger->logInfo("Normal", "F(X) = %le \n", _currentBestValue);
+
+  _k->_logger->logInfo("Normal", "DF(X) = [ ");
+  for (size_t k = 0; k < _variableCount; k++) _k->_logger->logData("Normal", " %.5le  ", _gradient[k]);
+  _k->_logger->logData("Normal", " ]\n");
+
+  _k->_logger->logInfo("Normal", "|DF(X)| = %le \n", _gradientNorm);
+}
+
+void __className__::finalize()
+{
+  // Updating Results
+  (*_k)["Results"]["Best Sample"]["F(x)"] = _bestEverValue;
+  (*_k)["Results"]["Best Sample"]["Gradient(x)"] = _bestEverGradient;
+  (*_k)["Results"]["Best Sample"]["Parameters"] = _bestEverVariables;
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

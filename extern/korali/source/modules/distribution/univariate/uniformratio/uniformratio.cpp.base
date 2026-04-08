@@ -1,0 +1,102 @@
+#include "modules/distribution/univariate/uniformratio/uniformratio.hpp"
+#include "modules/experiment/experiment.hpp"
+#include <gsl/gsl_randist.h>
+#include <gsl/gsl_sf.h>
+
+__startNamespace__;
+
+double __className__::getDensity(const double z) const
+{
+  const double b0 = _minimumX / _maximumY;
+  const double b3 = _maximumX / _minimumY;
+
+  if (z < b0) return 0.;
+  if (z > b3) return 0.;
+
+  return (std::pow(std::min(_maximumY, _maximumX / z), 2.) - std::pow(std::max(_minimumY, _minimumX / z), 2.)) / _aux;
+}
+
+double __className__::getLogDensity(const double z) const
+{
+  const double b0 = _minimumX / _maximumY;
+  const double b3 = _maximumX / _minimumY;
+
+  if (z < b0) return -Inf;
+  if (z > b3) return -Inf;
+
+  return std::log(std::pow(std::min(_maximumY, _maximumX / z), 2.) - std::pow(std::max(_minimumY, _minimumX / z), 2.)) - std::log(_aux);
+}
+
+double __className__::getLogDensityGradient(const double z) const
+{
+  const double b0 = _minimumX / _maximumY;
+  const double b3 = _maximumX / _minimumY;
+
+  const double density = getDensity(z);
+
+  if (z < b0)
+    return 0.;
+  else if (z > b3)
+    return 0.;
+  else if (_maximumX / z >= _maximumY && _minimumX / z <= _minimumY)
+    return 0.;
+  else if (_maximumX / z > _maximumY && _minimumX / z > _minimumY)
+    return 2. * _minimumX * _minimumX / (_aux * z * z * z * density);
+  else if (_maximumX / z < _maximumY && _minimumX / z < _minimumY)
+    return -2 * _maximumX * _maximumX / (_aux * z * z * z * density);
+  else
+    return 2. * (_minimumX * _minimumX - _maximumX * _maximumX) / (_aux * z * z * z * density);
+}
+
+double __className__::getLogDensityHessian(const double z) const
+{
+  const double b0 = _minimumX / _maximumY;
+  const double b3 = _maximumX / _minimumY;
+
+  const double density = getDensity(z);
+  const double logGrad = getLogDensityGradient(z);
+
+  if (z < b0)
+    return 0.;
+  else if (z > b3)
+    return 0.;
+  else if (_maximumX / z >= _maximumY && _minimumX / z <= _minimumY)
+    return 0.;
+  else if (_maximumX / z > _maximumY && _minimumX / z > _minimumY)
+    return -logGrad * logGrad + -6. * _minimumX * _minimumX / (_aux * z * z * z * z * density);
+  else if (_maximumX / z < _maximumY && _minimumX / z < _minimumY)
+    return -logGrad * logGrad + 6. * _maximumX * _maximumX / (_aux * z * z * z * z * density);
+  else
+    return -logGrad * logGrad + 6. * (_minimumX * _minimumX - _maximumX * _maximumX) / (_aux * z * z * z * z * density);
+}
+
+double __className__::getRandomNumber()
+{
+  return gsl_ran_flat(_range, _minimumX, _maximumX) / gsl_ran_flat(_range, _minimumY, _maximumY);
+}
+
+void __className__::updateDistribution()
+{
+  if (_maximumX - _minimumX <= 0.0)
+    KORALI_LOG_ERROR("Maximum (%f) bound must be higher than Minimum (%f) bound of the first (dividend) Uniform distribution in order to draw a random number.\n", _maximumX, _minimumX);
+  if (_maximumY - _minimumY <= 0.0)
+    KORALI_LOG_ERROR("Maximum (%f) bound must be higher than Minimum (%f) bound of the second (divisor) Uniform distribution in order to draw a random number.\n", _maximumY, _minimumY);
+
+  if (_minimumX <= 0.)
+    KORALI_LOG_ERROR("Minimum (%f) bound of the first (dividend) Uniform distribution must be larger 0.\n", _minimumX);
+  if (_minimumY <= 0.)
+    KORALI_LOG_ERROR("Minimum (%f) bound of the second (divisor) Uniform distribution must be larger 0.\n", _minimumY);
+
+  const double b0 = _minimumX / _maximumY;
+  const double b1 = _minimumX / _minimumY;
+  const double b2 = _maximumX / _maximumY;
+  const double b3 = _maximumX / _minimumY;
+
+  _aux = _maximumY * _maximumY * (b1 - b0) + _minimumX * _minimumX * (1. / b1 - 1. / b0) +
+         (_maximumY * _maximumY - _minimumY * _minimumY) * (b2 - b1) -
+         _maximumX * _maximumX * (1. / b3 - 1. / b2) - _minimumY * _minimumY * (b3 - b2);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

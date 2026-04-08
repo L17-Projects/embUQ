@@ -1,0 +1,55 @@
+#pragma once
+
+#include "modules/conduit/conduit.hpp"
+#include <chrono>
+#include <map>
+#include <vector>
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  /**
+   * @brief PID of worker processes
+   */
+  std::vector<pid_t> _workerPids;
+
+  /**
+   * @brief Worker Id for current workers - 0 for the master process
+   */
+  int _workerId;
+
+  /**
+   * @brief OS Pipe to handle result contents communication coming from worker processes
+   */
+  std::vector<std::vector<int>> _resultContentPipe;
+
+  /**
+   * @brief OS Pipe to handle result size communication coming from worker processes
+   */
+  std::vector<std::vector<int>> _resultSizePipe;
+
+  /**
+   * @brief OS Pipe to handle sample parameter communication to worker processes
+   */
+  std::vector<std::vector<int>> _inputsPipe;
+
+  bool isRoot() const override;
+  void initServer() override;
+  void initialize() override;
+  void terminateServer() override;
+
+  void stackEngine(Engine *engine) override;
+  void popEngine() override;
+
+  void listenWorkers() override;
+  void broadcastMessageToWorkers(knlohmann::json &message) override;
+  void sendMessageToEngine(knlohmann::json &message) override;
+  knlohmann::json recvMessageFromEngine() override;
+  void sendMessageToSample(Sample &sample, knlohmann::json &message) override;
+  size_t getProcessId() const override;
+  size_t getWorkerCount() const override;
+};
+
+__endNamespace__;

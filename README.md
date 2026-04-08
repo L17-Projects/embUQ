@@ -74,6 +74,8 @@ pip install -e ".[mpi]"
 
 See `docs/DEPENDENCY_EXTRAS.md` for the full extras contract and the remaining Korali/backend caveats.
 
+For a fresh Vega clone, the supported bootstrap path is documented in `docs/VEGA_BOOTSTRAP.md` and builds vendored `extern/korali/` into repo-local `_vega/`.
+
 ## Canonical configuration entrypoints
 
 Full workflows:
@@ -105,6 +107,7 @@ Start here:
 - `docs/VALIDATION_MATRIX.md`
 - `docs/VEGA_ACCEPTANCE_COMMAND.md`
 - `docs/VEGA_ACCEPTANCE_CHECKLIST.md`
+- `docs/VEGA_BOOTSTRAP.md`
 - `docs/VALIDATION_CONFIGS.md`
 - `docs/HPC_GPU_BATCHED_REDUCED_INDENTATION.md`
 - `docs/SURROGATE_MODEL_SELECTION.md`

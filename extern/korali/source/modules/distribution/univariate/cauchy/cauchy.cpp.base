@@ -1,0 +1,46 @@
+#include "modules/distribution/univariate/cauchy/cauchy.hpp"
+#include "modules/experiment/experiment.hpp"
+#include <gsl/gsl_randist.h>
+#include <gsl/gsl_sf.h>
+
+__startNamespace__;
+
+double
+__className__::getDensity(const double x) const
+{
+  return gsl_ran_cauchy_pdf(x - _location, _scale);
+}
+
+double __className__::getLogDensity(const double x) const
+{
+  return _aux - std::log(1. + (x - _location) * (x - _location) / (_scale * _scale));
+}
+
+double Cauchy::getLogDensityGradient(const double x) const
+{
+  double tmp = (x - _location) / _scale;
+  return -2. * tmp / (1. + tmp * tmp) / _scale;
+}
+
+double Cauchy::getLogDensityHessian(const double x) const
+{
+  double tmp = (x - _location) / _scale;
+  double tmp2 = tmp * tmp;
+  return -2. * ((1. + tmp2) - 2. * tmp2) / ((1. + tmp2) * (1. + tmp2) * _scale * _scale);
+}
+
+double __className__::getRandomNumber()
+{
+  return _location + gsl_ran_cauchy(_range, _scale);
+}
+
+void __className__::updateDistribution()
+{
+  if (_scale <= 0) KORALI_LOG_ERROR("Incorrect Scale parameter of Cauchy distribution: %f.\n", _scale);
+
+  _aux = -gsl_sf_log(_scale * M_PI);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

@@ -1,0 +1,14 @@
+#pragma once
+
+#include "modules/distribution/univariate/normal/normal.hpp"
+#include "modules/problem/reinforcementLearning/reinforcementLearning.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  void initialize() override;
+};
+
+__endNamespace__;

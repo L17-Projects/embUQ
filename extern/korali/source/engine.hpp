@@ -180,3 +180,4 @@ extern bool isPythonActive;
 */
 extern std::stack<Engine *> _engineStack;
 } // namespace korali
+

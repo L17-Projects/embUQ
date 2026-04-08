@@ -1,0 +1,46 @@
+#include "modules/solver/deepSupervisor/optimizers/fAdaGrad/fAdaGrad.hpp"
+
+__startNamespace__;
+
+void __className__::initialize()
+{
+  fGradientBasedOptimizer::initialize();
+  _gdiag.resize(_nVars, 0.0f);
+  reset();
+}
+
+void __className__::reset()
+{
+#pragma omp parallel for simd
+  for (size_t i = 0; i < _nVars; i++)
+  {
+    _currentValue[i] = 0.0f;
+    _gdiag[i] = 0.0f;
+  }
+}
+
+void __className__::processResult(std::vector<float> &gradient)
+{
+  __parentClassName__::preProcessResult(gradient);
+
+#pragma omp parallel for simd
+  for (size_t i = 0; i < _nVars; i++)
+  {
+    _gdiag[i] = _gdiag[i] + (gradient[i] * gradient[i]);
+    _currentValue[i] += (_eta / std::sqrt(_gdiag[i] + _epsilon)) * gradient[i];
+  }
+
+  __parentClassName__::postProcessResult(_currentValue);
+}
+
+void __className__::printInternals()
+{
+  printf("_currentValue[i], _gdiag[i]:\n");
+  for (size_t i = 0; i < 10; i++)
+    printf("%f %f\n", _currentValue[i], _gdiag[i]);
+  fflush(stdout);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

@@ -1,0 +1,46 @@
+#include "modules/distribution/univariate/laplace/laplace.hpp"
+#include "modules/experiment/experiment.hpp"
+#include <gsl/gsl_randist.h>
+#include <gsl/gsl_sf.h>
+
+__startNamespace__;
+
+double
+__className__::getDensity(const double x) const
+{
+  return gsl_ran_laplace_pdf(x - _mean, _width);
+}
+
+double __className__::getLogDensity(const double x) const
+{
+  return _aux - fabs(x - _mean) / _width;
+}
+
+double __className__::getLogDensityGradient(const double x) const
+{
+  if (x >= _mean)
+    return 1.0 / _width;
+  else
+    return -1.0 / _width;
+}
+
+double __className__::getLogDensityHessian(const double x) const
+{
+  return 0.;
+}
+
+double __className__::getRandomNumber()
+{
+  return _mean + gsl_ran_laplace(_range, _width);
+}
+
+void __className__::updateDistribution()
+{
+  if (_width <= 0.0) KORALI_LOG_ERROR("Incorrect Width parameter of Laplace distribution: %f.\n", _width);
+
+  _aux = -gsl_sf_log(2. * _width);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

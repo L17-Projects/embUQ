@@ -1,0 +1,27 @@
+#pragma once
+
+#include "modules/solver/solver.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  private:
+  public:
+  /**
+   * @brief Generate a sample and evaluate it.
+   */
+  void runGeneration() override;
+
+  /**
+   * @brief Console Output before generation runs.
+   */
+  void printGenerationBefore() override;
+
+  /**
+   * @brief Console output after generation.
+   */
+  void printGenerationAfter() override;
+};
+
+__endNamespace__;

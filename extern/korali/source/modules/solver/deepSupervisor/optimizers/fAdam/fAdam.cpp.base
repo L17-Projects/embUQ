@@ -1,0 +1,63 @@
+#include "modules/solver/deepSupervisor/optimizers/fAdam/fAdam.hpp"
+
+__startNamespace__;
+
+void __className__::initialize()
+{
+  _beta1Pow = 1.0f;
+  _beta2Pow = 1.0f;
+  fGradientBasedOptimizer::initialize();
+  _firstMoment.resize(_nVars, 0.0f);
+  _secondMoment.resize(_nVars, 0.0f);
+  reset();
+}
+
+void __className__::reset()
+{
+  _beta1Pow = 1.0f;
+  _beta2Pow = 1.0f;
+#pragma omp parallel for simd
+  for (size_t i = 0; i < _nVars; i++)
+  {
+    _currentValue[i] = 0.0f;
+    _firstMoment[i] = 0.0f;
+    _secondMoment[i] = 0.0f;
+  }
+}
+
+void __className__::processResult(std::vector<float> &gradient)
+{
+  __parentClassName__::preProcessResult(gradient);
+
+  // Calculate powers of beta1 & beta2
+  _beta1Pow *= _beta1;
+  _beta2Pow *= _beta2;
+  const float firstCentralMomentFactor = 1.0f / (1.0f - _beta1Pow);
+  const float secondCentralMomentFactor = 1.0f / (1.0f - _beta2Pow);
+  const float notBeta1 = 1.0f - _beta1;
+  const float notBeta2 = 1.0f - _beta2;
+
+// update first and second moment estimators and parameters
+#pragma omp parallel for simd
+  for (size_t i = 0; i < _nVars; i++)
+  {
+    _firstMoment[i] = _beta1 * _firstMoment[i] - notBeta1 * gradient[i];
+    _secondMoment[i] = _beta2 * _secondMoment[i] + notBeta2 * gradient[i] * gradient[i];
+    _currentValue[i] -= _eta / (std::sqrt(_secondMoment[i] * secondCentralMomentFactor) + _epsilon) * _firstMoment[i] * firstCentralMomentFactor;
+  }
+
+  __parentClassName__::postProcessResult(_currentValue);
+}
+
+void __className__::printInternals()
+{
+  printf("_beta1Pow=%f, _beta2Pow=%f, ", _beta1Pow, _beta2Pow);
+  printf("_currentValue[i], _firstMoment[i], _secondMoment[i]:\n");
+  for (size_t i = 0; i < 10; i++)
+    printf("%f %f %f\n", _currentValue[i], _firstMoment[i], _secondMoment[i]);
+  fflush(stdout);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

@@ -1,0 +1,52 @@
+#pragma once
+
+#include "modules/distribution/univariate/poisson/poisson.hpp"
+#include "modules/solver/SSM/SSM.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  /**
+   * @brief Storage for propensities of reactions during each step
+   */
+  std::vector<double> _propensities;
+
+  /**
+   * @brief Storage for cumulative propensities during each SSA step
+   */
+  std::vector<double> _cumPropensities;
+
+  /**
+   * @brief Storage for number of firings per reaction per tau leap step
+   */
+  std::vector<int> _numFirings;
+
+  /**
+   * @brief Storage for critical reaction marker during each step
+   */
+  std::vector<double> _isCriticalReaction;
+
+  /**
+   * @brief Storage for candidate reactants per leap step
+   */
+  std::vector<int> _candidateNumReactants;
+
+  /**
+   * @brief Estimate time step such that that many reaction events occur, but small enough that no propensity functin changes significantly
+   * @return tau time step duration
+   */
+  double estimateLargestTau();
+
+  /**
+   * @brief SSA advance step if leap step rejected.
+   */
+  void ssaAdvance();
+
+  void setInitialConfiguration() override;
+
+  void advance() override;
+};
+
+__endNamespace__;

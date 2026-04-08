@@ -1,0 +1,81 @@
+#pragma once
+
+#include "modules/experiment/experiment.hpp"
+#include "modules/neuralNetwork/neuralNetwork.hpp"
+#include "modules/problem/supervisedLearning/supervisedLearning.hpp"
+#include "modules/solver/deepSupervisor/optimizers/fGradientBasedOptimizer.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  /**
+   * @brief Korali Problem for optimizing NN weights and biases.
+   */
+  problem::SupervisedLearning *_problem;
+
+  /**
+   * @brief Korali Experiment for optimizing the NN's weights and biases.
+   */
+  korali::Experiment _optExperiment;
+
+  /**
+   * @brief A neural network to be trained based on inputs and solutions.
+   */
+  NeuralNetwork *_neuralNetwork;
+
+  /**
+   * @brief Evaluates a neural network on a  batch of sequential vectors.
+   * @param input Batch of seuential input data.
+   * @return Evaluation of batch of sequential data.
+   */
+  std::vector<std::vector<float>> &getEvaluation(const std::vector<std::vector<std::vector<float>>> &input);
+
+  /**
+   * @brief Returns the current hyperparameter of the neural network.
+   * @return The hyperparameter.
+   */
+  std::vector<float> getHyperparameters();
+
+  void initialize() override;
+  void runGeneration() override;
+  void printGenerationAfter() override;
+
+  /**
+   * @brief Runs training generation.
+   */
+  void runTrainingGeneration();
+
+  /**
+   * @brief Runs testing generation.
+   */
+  void runTestingGeneration();
+
+  /**
+   * @brief Run the backward pipeline of the network given the gradient of the loss and return the gradient.
+   * @param gradients A vector containing the gradient of the loss with respect to the output of the network
+   * @return A vector containing the gradient of the loss with respect to the weights of the network
+   */
+  std::vector<float> backwardGradients(const std::vector<std::vector<float>> &gradients);
+
+  /**
+   * @brief Run the training pipeline of the network given an input and return the output.
+   * @param sample A sample containing the NN's input BxTxIC (B: Batch Size, T: Time steps, IC: Input channels) and solution BxOC data (B: Batch Size, OC: Output channels)
+   */
+  void runTrainingOnWorker(korali::Sample &sample);
+
+  /**
+   * @brief Run the forward evaluation pipeline of the network given an input and return the output.
+   * @param sample A sample containing the NN's input BxTxIC (B: Batch Size, T: Time steps, IC: Input channels)
+   */
+  void runEvaluationOnWorker(korali::Sample &sample);
+
+  /**
+   * @brief Update the hyperparameters for the neural network after an update for every worker.
+   * @param sample A sample containing the new NN's hyperparameters
+   */
+  void updateHyperparametersOnWorker(korali::Sample &sample);
+};
+
+__endNamespace__;

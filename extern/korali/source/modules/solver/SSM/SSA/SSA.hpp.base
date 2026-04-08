@@ -1,0 +1,18 @@
+#pragma once
+
+#include "modules/solver/SSM/SSM.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  /**
+   * @brief Storage for cumulative propensities during each step
+   */
+  std::vector<double> _cumPropensities;
+
+  void advance() override;
+};
+
+__endNamespace__;

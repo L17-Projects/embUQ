@@ -1,0 +1,17 @@
+#pragma once
+
+#include "modules/solver/optimizer/optimizer.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  void finalize() override;
+  void setInitialConfiguration() override;
+  void runGeneration() override;
+  void printGenerationBefore() override;
+  void printGenerationAfter() override;
+};
+
+__endNamespace__;

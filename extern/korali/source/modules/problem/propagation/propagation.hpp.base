@@ -1,0 +1,19 @@
+#pragma once
+
+#include "modules/problem/problem.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  void initialize() override;
+
+  /**
+   * @brief Produces an evaluation of the model, storing it in a file.
+   * @param sample A Korali Sample
+   */
+  void execute(korali::Sample &sample);
+};
+
+__endNamespace__;

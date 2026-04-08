@@ -1,0 +1,121 @@
+#pragma once
+
+#include "auxiliar/koraliJson.hpp"
+#include "auxiliar/libco/libco.h"
+#include "config.hpp"
+#include "modules/module.hpp"
+#include "variable/variable.hpp"
+#include <chrono>
+#include <functional>
+#include <vector>
+
+__startNamespace__;
+
+class Solver;
+class Problem;
+class Engine;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  Experiment();
+
+  void initialize() override;
+  void finalize() override;
+
+  /**
+   * @brief JSON object to store the experiment's configuration
+   */
+  KoraliJson _js;
+
+  /**
+   * @brief A pointer to the Experiment's logger object.
+   */
+  Logger *_logger;
+
+  /**
+   * @brief A pointer to the parent engine
+   */
+  Engine *_engine;
+
+  /**
+   * @brief JSON object to details of all the samples that have been executed, if requested by the user.
+   */
+  KoraliJson _sampleInfo;
+
+  /**
+   * @brief Experiment Identifier
+   */
+  size_t _experimentId;
+
+  /**
+   * @brief Experiment's coroutine (thread). It is swapped among other experiments, and sample threads.
+   */
+  cothread_t _thread;
+
+  /**
+   * @brief Flag to indicate that the experiment has been initialized to prevent it from re-initializing upon resuming
+   */
+  bool _isInitialized;
+
+  /**
+   * @brief [Profiling] Measures the amount of time taken by saving results
+   */
+  double _resultSavingTime;
+
+  /**
+   * @brief For testing purposes, this field establishes whether the engine is the one to run samples (default = false) or a custom function (true)
+   */
+  bool _overrideEngine = false;
+
+  /**
+   * @brief For testing purposes, this field establishes which custom function to use to override the engine on sample execution for testing.
+   */
+  std::function<void(Sample &)> _overrideFunction;
+
+  /**
+   * @brief Gets an item from the JSON object at the current pointer position.
+   * @param key A pybind11 object acting as JSON key (number or string).
+   * @return A pybind11 object
+   */
+  pybind11::object getItem(const pybind11::object key);
+
+  /**
+   * @brief Sets an item on the JSON object at the current pointer position.
+   * @param key A pybind11 object acting as JSON key (number or string).
+   * @param val The value of the item to set.
+   */
+  void setItem(const pybind11::object key, const pybind11::object val);
+
+  /**
+   * @brief Load the state of an experiment from a Korali result file.
+   * @param path Path from which to load the experiment state.
+   * @return true, if file was found; false, otherwise
+   */
+  bool loadState(const std::string &path);
+
+  /**
+   * @brief Saves the state into the experiment's result path.
+   */
+  void saveState();
+
+  /**
+   * @brief Start the execution of the current experiment.
+   */
+  void run();
+
+  /**
+   * @brief C++ wrapper for the getItem operator.
+   * @param key A C++ string acting as JSON key.
+   * @return The referenced JSON object content.
+   */
+  knlohmann::json &operator[](const std::string &key);
+
+  /**
+   * @brief Initializes seed to a random value based on current time if not set by the user (i.e. Random Seed is 0).
+   * @param js Json object onto which to store the Experiment data.
+   */
+  void setSeed(knlohmann::json &js);
+};
+
+__endNamespace__;

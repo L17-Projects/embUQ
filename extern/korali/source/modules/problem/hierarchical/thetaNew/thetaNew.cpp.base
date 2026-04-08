@@ -1,0 +1,58 @@
+#include "modules/conduit/conduit.hpp"
+#include "modules/problem/hierarchical/thetaNew/thetaNew.hpp"
+#include "sample/sample.hpp"
+
+__startNamespace__;
+
+void __className__::initialize()
+{
+  Hierarchical::initialize();
+
+  // Setting experiment configurations to actual korali experiments
+  _psiExperimentObject._js.getJson() = _psiExperiment;
+
+  // Running initialization to verify that the configuration is correct
+  _psiExperimentObject.initialize();
+
+  // Psi-problem correctness checks
+  if (_psiExperiment["Is Finished"] == false)
+    KORALI_LOG_ERROR("The Hierarchical Bayesian (Theta New) requires that the psi-problem has run completely, but it has not.\n");
+
+  // Loading Psi problem results
+  _psiProblemSampleLogLikelihoods = _psiExperiment["Results"]["Posterior Sample LogLikelihood Database"].get<std::vector<double>>();
+  _psiProblemSampleLogPriors = _psiExperiment["Results"]["Posterior Sample LogPrior Database"].get<std::vector<double>>();
+  _psiProblemSampleCoordinates = _psiExperiment["Results"]["Posterior Sample Database"].get<std::vector<std::vector<double>>>();
+  _psiProblemSampleCount = _psiProblemSampleCoordinates.size();
+
+  for (size_t i = 0; i < _psiProblemSampleLogPriors.size(); i++)
+  {
+    double expPrior = exp(_psiProblemSampleLogPriors[i]);
+    if (std::isfinite(expPrior) == false)
+      KORALI_LOG_ERROR("Non finite (%lf) prior has been detected at sample %zu in subproblem.\n", expPrior, i);
+  }
+}
+
+void __className__::evaluateLogLikelihood(Sample &sample)
+{
+  auto _psiProblem = dynamic_cast<Psi *>(_psiExperimentObject._problem);
+
+  size_t Ntheta = _k->_variables.size();
+  std::vector<double> logValues(_psiProblemSampleCount, 0.0);
+
+  for (size_t i = 0; i < _psiProblemSampleCount; i++)
+  {
+    Sample psiSample;
+    psiSample["Parameters"] = _psiProblemSampleCoordinates[i];
+    _psiProblem->updateConditionalPriors(psiSample);
+
+    logValues[i] = 0.;
+    for (size_t k = 0; k < Ntheta; k++)
+      logValues[i] += _psiExperimentObject._distributions[_psiProblem->_conditionalPriorIndexes[k]]->getLogDensity(sample["Parameters"][k]);
+  }
+
+  sample["logLikelihood"] = -log(_psiProblemSampleCount) + logSumExp(logValues);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

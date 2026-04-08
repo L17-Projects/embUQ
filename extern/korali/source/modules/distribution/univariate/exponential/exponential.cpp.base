@@ -1,0 +1,42 @@
+#include "modules/distribution/univariate/exponential/exponential.hpp"
+#include "modules/experiment/experiment.hpp"
+#include <gsl/gsl_randist.h>
+
+__startNamespace__;
+
+double __className__::getDensity(const double x) const
+{
+  return gsl_ran_exponential_pdf(x - _location, _mean);
+}
+
+double __className__::getLogDensity(const double x) const
+{
+  if (x - _location < 0) return -INFINITY;
+  return -log(_mean) - (x - _location) / _mean;
+}
+
+double __className__::getLogDensityGradient(const double x) const
+{
+  if (x - _location < 0) return 0.;
+  return -1.0 / _mean;
+}
+
+double __className__::getLogDensityHessian(const double x) const
+{
+  return 0.;
+}
+
+double __className__::getRandomNumber()
+{
+  return _location + gsl_ran_exponential(_range, _mean);
+}
+
+void __className__::updateDistribution()
+{
+  _aux = 0.0;
+  if (_mean <= 0.0) KORALI_LOG_ERROR("Incorrect mean parameter of exponential distribution: %f.\n", _mean);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

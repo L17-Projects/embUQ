@@ -1,0 +1,29 @@
+#include "modules/solver/deepSupervisor/optimizers/fGradientBasedOptimizer.hpp"
+
+__startNamespace__;
+
+void __className__::initialize()
+{
+  _currentValue.resize(_nVars, 0.0f);
+};
+
+void __className__::preProcessResult(std::vector<float> &gradient)
+{
+  if (gradient.size() != _nVars)
+    KORALI_LOG_ERROR("Number of gradient values (%ld) is different from the number of parameters (%ld)", gradient.size(), _nVars);
+
+  for (const float v : gradient)
+    if (!std::isfinite(v))
+      KORALI_LOG_ERROR("\nOptimizer recieved non-finite gradient");
+};
+
+void __className__::postProcessResult(std::vector<float> &parameters)
+{
+  for (const float v : parameters)
+    if (!std::isfinite(v))
+      KORALI_LOG_ERROR("Optimizer calculated non-finite hyperparameters");
+};
+
+__moduleAutoCode__;
+
+__endNamespace__;

@@ -1,0 +1,16 @@
+#pragma once
+
+#include "modules/distribution/univariate/uniform/uniform.hpp"
+#include "modules/solver/integrator/integrator.hpp"
+#include "modules/solver/solver.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  void launchSample(size_t sampleIndex) override;
+  void setInitialConfiguration() override;
+};
+
+__endNamespace__;
