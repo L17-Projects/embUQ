@@ -63,3 +63,16 @@ def test_map_extraction_and_plotting_smoke(tmp_path: Path) -> None:
     assert overlay_png.exists()
     assert d0_png.exists()
     assert marg_png.exists()
+
+
+def test_validation_overlay_accepts_headerless_reference_csv(tmp_path: Path) -> None:
+    ref_csv = tmp_path / "reference.csv"
+    pred_csv = tmp_path / "prediction.csv"
+    overlay_png = tmp_path / "overlay.png"
+
+    ref_csv.write_text("0.2,288.4\n0.26,467.4\n0.34,576.8\n", encoding="utf-8")
+    pd.DataFrame({"x": [0.2, 0.26, 0.34], "mean": [236.1, 350.4, 556.3]}).to_csv(pred_csv, index=False)
+
+    plot_validation_overlay(str(ref_csv), str(pred_csv), str(overlay_png))
+
+    assert overlay_png.exists()
