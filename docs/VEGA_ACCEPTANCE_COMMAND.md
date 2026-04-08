@@ -7,7 +7,7 @@ This document describes the single Vega-first acceptance command shipped by `Mes
 The acceptance command is a thin wrapper around the richer operator runner:
 
 - wrapper: `scripts/run_vega_acceptance.py`
-- operator runner: `inference/scripts/run_gpu_validation_suite.py`
+- operator runner: `scripts/vega/run_validation_suite.py`
 
 The wrapper exists so a fresh clone on Vega has one obvious command to run and one machine-readable report to inspect.
 

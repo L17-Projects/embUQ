@@ -57,7 +57,7 @@ The most important top-level directories are:
 List the datasets enabled by a config:
 
 ```bash
-python inference/scripts/list_experiment_datasets.py --config inference/configs/production/inference_config_compression.yaml
+python scripts/config/list_experiment_datasets.py --config inference/configs/production/inference_config_compression.yaml
 ```
 
 Train a compression surrogate from a wide table:

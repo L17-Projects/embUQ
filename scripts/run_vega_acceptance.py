@@ -3,7 +3,7 @@
 Run the Vega-first acceptance command for MesoUQ.
 
 This is intentionally a thin wrapper around the richer
-`inference/scripts/run_gpu_validation_suite.py` operator runner.
+`scripts/vega/run_validation_suite.py` operator runner.
 It captures environment metadata, invokes the validation suite once, and writes
 one machine-readable acceptance report.
 """
@@ -24,7 +24,7 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_ROOT = PROJECT_ROOT.parent / "vega_acceptance"
-VALIDATION_RUNNER = PROJECT_ROOT / "inference" / "scripts" / "run_gpu_validation_suite.py"
+VALIDATION_RUNNER = PROJECT_ROOT / "scripts" / "vega" / "run_validation_suite.py"
 DEFAULT_WORKFLOWS = [
     "compression:reduced-model:validation",
     "indentation:reduced-model:validation",

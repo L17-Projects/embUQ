@@ -78,8 +78,8 @@ This surface is intentionally focused on analysis/design support and does not ye
 ## 6. MAP extraction and plotting
 
 MAP extraction:
-- `inference/scripts/extract_phase1_map.py`
-- `inference/scripts/extract_phase3b_map.py`
+- `scripts/postprocess/extract_phase1_map.py`
+- `scripts/postprocess/extract_phase3b_map.py`
 
 Plotting/postprocessing:
 - `propagation/scripts/plot_validation_overlay.py`
@@ -111,7 +111,7 @@ In particular, the public line now includes focused execution-level slices for:
 ## Suggested usage pattern for new users
 
 A good order for an outside user is:
-1. understand the config and dataset surface with `list_experiment_datasets.py`
+1. understand the config and dataset surface with `scripts/config/list_experiment_datasets.py`
 2. retrain or inspect the surrogate surface
 3. run reduced or full inference depending on the goal
 4. extract MAP samples

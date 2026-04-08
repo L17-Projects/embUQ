@@ -25,7 +25,7 @@ def test_vega_acceptance_wrapper_writes_machine_readable_report(tmp_path, monkey
 
     def fake_run(command, cwd=None, env=None, text=None, capture_output=None, check=False, **kwargs):
         captured["command"] = command
-        if any("run_gpu_validation_suite.py" in str(part) for part in command):
+        if any("run_validation_suite.py" in str(part) for part in command):
             out_idx = command.index("--output-root") + 1
             runner_output = Path(command[out_idx])
             runner_output.mkdir(parents=True, exist_ok=True)
