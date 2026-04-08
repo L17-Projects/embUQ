@@ -7,7 +7,7 @@
 
 #SBATCH --job-name=mesouq-phase123b
 #SBATCH --partition=dev
-#SBATCH --time=01:00:00
+#SBATCH --time=00:30:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -17,8 +17,11 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="${REPO_ROOT:-$(cd "${SCRIPT_DIR}/../../.." && pwd)}"
+REPO_ROOT="${REPO_ROOT:-${SLURM_SUBMIT_DIR:-$(pwd)}}"
+if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
+  echo "Set REPO_ROOT explicitly or submit the job from the repo root." >&2
+  exit 2
+fi
 EXPERIMENT="${EXPERIMENT:-compression}"
 MODEL_FAMILY="${MODEL_FAMILY:-full-model}"
 PROFILE="${PROFILE:-validation}"

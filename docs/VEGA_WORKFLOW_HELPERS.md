@@ -2,6 +2,8 @@
 
 This page documents the repo-managed Vega helpers added for fresh-clone workflow execution.
 
+For the higher-level fresh-clone matrix runner and its machine-readable report, see `VEGA_WORKFLOW_MATRIX.md`.
+
 ## Selection axes
 
 The public Vega helper surface separates four concerns explicitly:
@@ -95,6 +97,7 @@ The following canned templates live under `scripts/vega/sbatch/`:
 - `workflow_phase1_to_3b.sbatch`
 - `workflow_propagation.sbatch`
 - `workflow_map.sbatch`
+- `workflow_matrix_smoke.sbatch`
 
 They assume:
 
@@ -103,3 +106,7 @@ They assume:
 - `_vega/korali/env.sh` exists
 
 Each template exposes `EXPERIMENT`, `MODEL_FAMILY`, and `PROFILE` at the shell-variable level so fresh-clone workflow jobs do not rely on editing Python code or guessing config paths.
+
+These checked-in templates target the Vega `dev` partition. Their time limits are capped to stay within the `dev` maximum wall clock.
+
+When submitting with `sbatch`, run them from the repo root or set `REPO_ROOT` explicitly so the batch job can resolve the clone-local `_vega/` runtime correctly.

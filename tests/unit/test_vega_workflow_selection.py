@@ -4,11 +4,15 @@ from meso_uq.vega_workflows import (
     VegaWorkflowSelection,
     build_inference_command,
     build_propagation_command,
+    expand_selection_matrix,
     load_workflow_datasets,
+    parse_selection,
     resolve_inference_stage_driver,
     resolve_propagation_driver,
     resolve_workflow_config_path,
     resolve_workflow_output_root,
+    selection_key,
+    selection_slug,
 )
 
 
@@ -43,6 +47,31 @@ def test_workflow_output_root_separates_model_family_from_profile() -> None:
     assert resolve_workflow_output_root(repo_root, selection) == (
         repo_root / "_vega" / "runs" / "compression" / "reduced-model" / "validation"
     )
+
+
+def test_selection_helpers_preserve_explicit_axes() -> None:
+    parsed = parse_selection("compression:full-model:validation")
+    legacy = parse_selection("indentation_reduced")
+
+    assert parsed == VegaWorkflowSelection("compression", "full-model", "validation")
+    assert selection_key(parsed) == "compression:full-model:validation"
+    assert selection_slug(parsed) == "compression__full-model__validation"
+    assert legacy == VegaWorkflowSelection("indentation", "reduced-model", "validation")
+
+
+def test_expand_selection_matrix_builds_cartesian_product() -> None:
+    selections = expand_selection_matrix(
+        experiments=["compression", "indentation"],
+        model_families=["full-model"],
+        profiles=["validation", "production"],
+    )
+
+    assert selections == [
+        VegaWorkflowSelection("compression", "full-model", "validation"),
+        VegaWorkflowSelection("compression", "full-model", "production"),
+        VegaWorkflowSelection("indentation", "full-model", "validation"),
+        VegaWorkflowSelection("indentation", "full-model", "production"),
+    ]
 
 
 def test_stage_driver_resolution_uses_reduced_wrapper_only_for_phase3b() -> None:

@@ -37,21 +37,29 @@ WORKFLOW_CONFIGS: Dict[str, Dict[str, Any]] = {
     "compression_reduced": {
         "experiment": "compression",
         "scope": "reduced",
+        "model_family": "reduced-model",
+        "profile": "validation",
         "config": PROJECT_ROOT / "reduced" / "configs" / "validation" / "validation_config_compression.yaml",
     },
     "compression_full": {
         "experiment": "compression",
         "scope": "full",
+        "model_family": "full-model",
+        "profile": "validation",
         "config": PROJECT_ROOT / "inference" / "configs" / "validation" / "validation_config_compression.yaml",
     },
     "indentation_reduced": {
         "experiment": "indentation",
         "scope": "reduced",
+        "model_family": "reduced-model",
+        "profile": "validation",
         "config": PROJECT_ROOT / "reduced" / "configs" / "validation" / "validation_config_indentation.yaml",
     },
     "indentation_full": {
         "experiment": "indentation",
         "scope": "full",
+        "model_family": "full-model",
+        "profile": "validation",
         "config": PROJECT_ROOT / "inference" / "configs" / "validation" / "validation_config_indentation.yaml",
     },
 }
@@ -247,6 +255,9 @@ def run_workflow(
         "workflow_base_name": workflow_name,
         "scope": workflow_spec["scope"],
         "experiment": workflow_spec["experiment"],
+        "model_family": workflow_spec["model_family"],
+        "profile": workflow_spec["profile"],
+        "selection": f"{workflow_spec['experiment']}:{workflow_spec['model_family']}:{workflow_spec['profile']}",
         "config": str(config_path),
         "population_settings": {
             key: derived_config.get(key)

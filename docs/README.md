@@ -12,6 +12,7 @@ This directory hosts the public documentation set for the `v0.1.0` release line.
 - `VEGA_ACCEPTANCE_CHECKLIST.md` for the cluster acceptance layer and pass criteria
 - `VEGA_BOOTSTRAP.md` for the fresh-clone Vega bootstrap path
 - `VEGA_WORKFLOW_HELPERS.md` for split Vega workflow helpers and sbatch templates
+- `VEGA_WORKFLOW_MATRIX.md` for the fresh-clone Vega workflow matrix and report surface
 - `VALIDATION_CONFIGS.md` for the tiny validation config bundle
 
 ## Workflow and operator guides
