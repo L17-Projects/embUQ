@@ -13,7 +13,7 @@
 
 MesoUQ is a public software line for Bayesian uncertainty quantification and calibration of mesoscopic DPD models.
 
-The repository exposes a release-oriented workflow surface for compression and indentation calibration, hierarchical inference, surrogate retraining and model selection, MAP extraction, plotting, propagation, Vega-first acceptance, and supporting operator utilities.
+The repository exposes a release-oriented workflow surface for compression and indentation calibration, hierarchical inference, surrogate retraining and model selection, MAP extraction, plotting, propagation, a public Vega validation matrix, Vega-first acceptance, and supporting operator utilities.
 
 ## Public workflow surface
 
@@ -26,6 +26,7 @@ The current public release surface includes:
 - Phase 3b workflow execution
 - MAP extraction and plotting utilities
 - lightweight propagation execution for Phase 1 and Phase 3b
+- a public Vega validation matrix that runs the real validation workflows
 - a richer GPU/operator validation runner
 - a thin Vega-first acceptance command with a machine-readable report
 - dedicated tiny validation configs for full-model and reduced-model workflows
@@ -76,6 +77,33 @@ See `docs/DEPENDENCY_EXTRAS.md` for the full extras contract and the remaining K
 
 For a fresh Vega clone, the supported bootstrap path is documented in `docs/VEGA_BOOTSTRAP.md` and builds vendored `extern/korali/` into repo-local `_vega/`.
 
+## First Vega validation
+
+After the repo-local Vega bootstrap is complete, the first real validation step is the public validation matrix. It runs the shipped validation workflows across compression and indentation, full-model and reduced-model, and executes the real Korali path for:
+
+- Phase 1
+- MAP extraction from Phase 1 outputs
+- Phase 2
+- Phase 3b
+- propagation Phase 3b
+- MAP extraction from Phase 3b outputs
+
+Direct command inside an allocated Vega job:
+
+```bash
+python scripts/vega/run_validation_matrix.py \
+  --output-root _vega/validation_matrix \
+  --phase2-cpu-ranks 4
+```
+
+Tracked `sbatch` template:
+
+```bash
+REPO_ROOT=$(pwd) sbatch scripts/vega/sbatch/validation_matrix.sbatch
+```
+
+The machine-readable report is written to `_vega/validation_matrix/workflow_matrix_report.json`. Detailed usage and artifact layout are documented in `docs/VEGA_VALIDATION_MATRIX.md`.
+
 ## Canonical configuration entrypoints
 
 Full workflows:
@@ -108,6 +136,7 @@ Start here:
 - `docs/VEGA_ACCEPTANCE_COMMAND.md`
 - `docs/VEGA_ACCEPTANCE_CHECKLIST.md`
 - `docs/VEGA_BOOTSTRAP.md`
+- `docs/VEGA_VALIDATION_MATRIX.md`
 - `docs/VALIDATION_CONFIGS.md`
 - `docs/HPC_GPU_BATCHED_REDUCED_INDENTATION.md`
 - `docs/SURROGATE_MODEL_SELECTION.md`

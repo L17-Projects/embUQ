@@ -31,11 +31,11 @@ These checks require the real target environment:
 
 - install on Vega
 - bootstrap vendored `extern/korali/` into repo-local `_vega/`
-- run the fresh-clone workflow matrix with explicit experiment/model-family/profile selection
+- run the public Vega validation matrix first
 - validate MPI execution
 - run the single Vega-first acceptance command
 - validate Phase 1 GPU-batched
-- validate Phase 2 native-CUDA
+- validate Phase 2 on the current Korali backend
 - validate Phase 3b GPU-batched
 - validate the required propagation + plotting path
 - archive the machine-readable acceptance report and logs
@@ -46,6 +46,6 @@ The public CI layer is intentionally smaller than the full release contract beca
 
 Those hardware-specific checks must still be recorded in-repo so the release does not depend on undocumented tribal knowledge.
 
-The fresh-clone workflow matrix is documented in `VEGA_WORKFLOW_MATRIX.md`.
+The public Vega validation matrix is documented in `VEGA_VALIDATION_MATRIX.md`.
 
 The single Vega-first acceptance command is documented in `VEGA_ACCEPTANCE_COMMAND.md`, and the tiny validation configs intended for that path are documented in `VALIDATION_CONFIGS.md`.

@@ -227,6 +227,18 @@ def test_production_sanity_template_uses_public_command() -> None:
     assert "ALL_LANES" in text
 
 
+def test_validation_matrix_template_uses_public_command() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    template = repo_root / "scripts" / "vega" / "sbatch" / "validation_matrix.sbatch"
+
+    text = template.read_text(encoding="utf-8")
+
+    assert "run_validation_matrix.py" in text
+    assert "MODEL_FAMILIES" in text
+    assert "EXPERIMENTS" in text
+    assert "_vega/korali/env.sh" in text
+
+
 def test_acceptance_template_uses_public_command() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     template = repo_root / "scripts" / "vega" / "sbatch" / "acceptance.sbatch"

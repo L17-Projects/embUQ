@@ -137,3 +137,39 @@ def test_workflow_matrix_runner_normalizes_legacy_override_alias(tmp_path, monke
     assert rc == 0
     report = json.loads((matrix_root / "workflow_matrix_report.json").read_text(encoding="utf-8"))
     assert report["selections"][0]["config"] == str(override_path.resolve())
+
+
+def test_validation_matrix_wrapper_delegates_to_workflow_matrix_with_validation_profile(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(repo_root / "scripts" / "vega" / "run_validation_matrix.py", "validation_matrix_wrapper_test")
+    captured = {}
+
+    def fake_run(command, cwd=None, check=False):
+        captured["command"] = command
+        captured["cwd"] = cwd
+        return 0
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    rc = module.main(
+        [
+            "--experiments",
+            "compression",
+            "--model-families",
+            "full-model",
+            "--output-root",
+            str(tmp_path / "validation"),
+            "--phase2-cpu-ranks",
+            "4",
+            "--python-bin",
+            "python",
+        ]
+    )
+
+    assert rc == 0
+    assert captured["cwd"] == str(repo_root)
+    assert captured["command"][0] == "python"
+    assert captured["command"][1] == str(repo_root / "scripts" / "vega" / "run_workflow_matrix.py")
+    assert "--profiles" in captured["command"]
+    assert captured["command"][captured["command"].index("--profiles") + 1] == "validation"
+    assert str(tmp_path / "validation") in captured["command"]

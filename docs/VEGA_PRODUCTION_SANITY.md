@@ -6,7 +6,7 @@ This page documents the public production-sanity smoke command for Vega.
 
 The production-sanity command proves that one production-like workflow lane can run end to end from a clean clone without using the full production populations or generation counts.
 
-It is intentionally narrower than the workflow matrix:
+It is intentionally narrower than the validation matrix:
 
 - it defaults to one production lane
 - it keeps shipped production semantics

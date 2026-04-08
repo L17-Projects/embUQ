@@ -1,26 +1,23 @@
-# Vega workflow matrix
+# Vega validation matrix
 
-This page documents the fresh-clone workflow-matrix surface for Vega.
+This page documents the public Vega validation-matrix surface.
 
 ## Goal
 
-The matrix runner proves that a clean clone can execute the shipped public workflow stages without manual path repair.
+The validation matrix proves that a clean clone can execute the shipped public validation workflows without manual path repair.
 
-It keeps these axes explicit:
+It keeps the scientific/workflow axes explicit:
 
 - experiment: `compression` or `indentation`
 - model family:
   - `full-model`
   - `reduced-model`
-- execution profile:
-  - `validation`
-  - `production`
 
-This separation is intentional. `reduced-model` is not the same concept as a `validation` profile.
+The public validation command fixes the execution profile to `validation`. This separation is intentional. `reduced-model` is not the same concept as a `validation` profile.
 
-## Default smoke matrix
+## Default validation matrix
 
-The default matrix is the reduced-cost smoke path:
+The default matrix is the public validation path:
 
 - experiments: `compression indentation`
 - model families: `full-model reduced-model`
@@ -28,18 +25,21 @@ The default matrix is the reduced-cost smoke path:
 
 That exercises the full-model and reduced-model codepaths while keeping the workflow cost small enough for fresh-clone validation work.
 
-## Runner
+## Public command
 
 Run the matrix directly inside an allocated Vega job:
 
 ```bash
-python scripts/vega/run_workflow_matrix.py \
+python scripts/vega/run_validation_matrix.py \
   --experiments compression indentation \
   --model-families full-model reduced-model \
-  --profiles validation \
-  --output-root _vega/workflow_matrix/validation_smoke \
+  --output-root _vega/validation_matrix \
   --phase2-cpu-ranks 4
 ```
+
+The public command always fixes the execution profile to `validation`.
+
+It delegates to the lower-level `scripts/vega/run_workflow_matrix.py` operator runner, which remains available for broader matrix/debugging use.
 
 Each selection runs:
 
@@ -52,22 +52,22 @@ Each selection runs:
 
 ## Machine-readable outputs
 
-The runner writes:
+The command writes:
 
 - one top-level report:
-  - `_vega/workflow_matrix/<label>/workflow_matrix_report.json`
+  - `_vega/validation_matrix/workflow_matrix_report.json`
 - one summary per selection:
-  - `_vega/workflow_matrix/<label>/summaries/<experiment>__<model-family>__<profile>.json`
+  - `_vega/validation_matrix/summaries/<experiment>__<model-family>__<profile>.json`
 - captured stdout/stderr logs for every step:
-  - `_vega/workflow_matrix/<label>/logs/...`
+  - `_vega/validation_matrix/logs/...`
 - nested workflow outputs:
-  - `_vega/workflow_matrix/<label>/runs/<experiment>/<model-family>/<profile>/`
+  - `_vega/validation_matrix/runs/<experiment>/<model-family>/<profile>/`
 
 ## sbatch template
 
 The canned template is:
 
-- `scripts/vega/sbatch/workflow_matrix_smoke.sbatch`
+- `scripts/vega/sbatch/validation_matrix.sbatch`
 
 It targets the Vega `dev` partition and therefore keeps the wall clock at 30 minutes or less. For longer non-smoke operator runs, copy the template and adjust the partition/time budget explicitly.
 
@@ -83,7 +83,7 @@ The template exposes:
 
 - `EXPERIMENTS`
 - `MODEL_FAMILIES`
-- `PROFILES`
+- `PROFILE=validation`
 - `OUTPUT_ROOT`
 - `PHASE2_CPU_RANKS`
 
@@ -92,8 +92,9 @@ The template exposes:
 For targeted debugging, a selection-specific config can be injected with:
 
 ```bash
-python scripts/vega/run_workflow_matrix.py \
+python scripts/vega/run_validation_matrix.py \
   --selection compression:full-model:validation \
+  --output-root _vega/validation_matrix/custom_debug \
   --config-override compression:full-model:validation=/abs/path/config.yaml
 ```
 
