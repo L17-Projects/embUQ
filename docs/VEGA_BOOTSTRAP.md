@@ -96,6 +96,6 @@ The generated env script intentionally replaces inherited `PYTHONPATH` entries s
 With the repo-local runtime active, continue with:
 
 - `pytest`
-- `python scripts/vega/run_workflow_matrix.py ...`
+- `python scripts/vega/run_validation_matrix.py ...`
 - `python scripts/run_vega_acceptance.py ...`
 - the public Phase 1 / Phase 2 / Phase 3b / propagation / MAP wrappers as they are added in later PRs
