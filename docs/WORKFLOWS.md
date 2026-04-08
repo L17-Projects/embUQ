@@ -24,15 +24,18 @@ Typical order:
 ## 2. Reduced-model hierarchical inference
 
 The reduced-model workflow is exposed through:
+- `reduced/scripts/run_phase_1.py`
+- `reduced/scripts/run_phase_2.py`
 - `reduced/scripts/run_phase_3a.py`
 - `reduced/scripts/run_phase_3b.py`
-- `reduced/scripts/run_phase_3b_single.py`
 
 Canonical reduced configs live under:
 - `reduced/configs/production/reduced_config_compression.yaml`
 - `reduced/configs/production/reduced_config_indentation.yaml`
 
 These wrappers delegate to the main workflow spine while selecting the reduced-model configs by default.
+
+The former single-dataset Phase 3b helper is no longer part of the public script surface. It remains available only as an internal helper for narrowly scoped operator/debug work.
 
 ## 3. Execution profiles are separate from model family
 

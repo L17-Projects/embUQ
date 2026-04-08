@@ -74,16 +74,22 @@ def test_expand_selection_matrix_builds_cartesian_product() -> None:
     ]
 
 
-def test_stage_driver_resolution_uses_reduced_wrapper_only_for_phase3b() -> None:
+def test_stage_driver_resolution_uses_reduced_wrappers_for_all_reduced_stages() -> None:
     repo_root = _repo_root()
     assert resolve_inference_stage_driver(repo_root, "phase1", "reduced-model") == (
-        repo_root / "inference" / "scripts" / "run_phase_1.py"
+        repo_root / "reduced" / "scripts" / "run_phase_1.py"
     )
     assert resolve_inference_stage_driver(repo_root, "phase2", "reduced-model") == (
-        repo_root / "inference" / "scripts" / "run_phase_2.py"
+        repo_root / "reduced" / "scripts" / "run_phase_2.py"
     )
     assert resolve_inference_stage_driver(repo_root, "phase3b", "reduced-model") == (
         repo_root / "reduced" / "scripts" / "run_phase_3b.py"
+    )
+    assert resolve_inference_stage_driver(repo_root, "phase1", "full-model") == (
+        repo_root / "inference" / "scripts" / "run_phase_1.py"
+    )
+    assert resolve_inference_stage_driver(repo_root, "phase2", "full-model") == (
+        repo_root / "inference" / "scripts" / "run_phase_2.py"
     )
     assert resolve_inference_stage_driver(repo_root, "phase3b", "full-model") == (
         repo_root / "inference" / "scripts" / "run_phase_3b.py"
