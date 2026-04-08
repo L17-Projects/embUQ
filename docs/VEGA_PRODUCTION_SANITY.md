@@ -42,15 +42,11 @@ The current reduced-cost defaults are:
 - `pop_size: 10`
 - `max_gen: 1`
 - `hbi_pop_size: 10`
-- `phase3a_pop_size: 10`
-- `phase3a_max_gen: 1`
 - `phase3b_pop_size: 10`
 - `phase3b_max_gen: 1`
 - `map_n_displacements: 1`
 
 All other production semantics remain unchanged, including reduced-model fixed parameters and enabled diameters.
-
-The inherited `phase3a_*` keys remain in the generated override only because they are part of the shipped config schema. The production-sanity command does not execute a public Phase 3a lane.
 
 ## Command
 

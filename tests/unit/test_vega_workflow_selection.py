@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from meso_uq.vega_workflows import (
     VegaWorkflowSelection,
     build_inference_command,
@@ -51,12 +53,15 @@ def test_workflow_output_root_separates_model_family_from_profile() -> None:
 
 def test_selection_helpers_preserve_explicit_axes() -> None:
     parsed = parse_selection("compression:full-model:validation")
-    legacy = parse_selection("indentation_reduced")
 
     assert parsed == VegaWorkflowSelection("compression", "full-model", "validation")
     assert selection_key(parsed) == "compression:full-model:validation"
     assert selection_slug(parsed) == "compression__full-model__validation"
-    assert legacy == VegaWorkflowSelection("indentation", "reduced-model", "validation")
+
+
+def test_selection_helpers_reject_legacy_aliases() -> None:
+    with pytest.raises(ValueError):
+        parse_selection("indentation_reduced")
 
 
 def test_expand_selection_matrix_builds_cartesian_product() -> None:

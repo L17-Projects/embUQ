@@ -97,5 +97,3 @@ python scripts/vega/run_validation_matrix.py \
   --output-root _vega/validation_matrix/custom_debug \
   --config-override compression:full-model:validation=/abs/path/config.yaml
 ```
-
-Legacy aliases such as `compression_full` are accepted for the override selector, but the matrix report always records the explicit `experiment:model-family:profile` selection.

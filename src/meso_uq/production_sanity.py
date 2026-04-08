@@ -33,8 +33,6 @@ PRODUCTION_SMOKE_OVERRIDES = {
     "pop_size": 10,
     "max_gen": 1,
     "hbi_pop_size": 10,
-    "phase3a_pop_size": 10,
-    "phase3a_max_gen": 1,
     "phase3b_pop_size": 10,
     "phase3b_max_gen": 1,
     "map_n_displacements": 1,

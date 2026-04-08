@@ -47,7 +47,6 @@ This release turns the repository from a partial public skeleton into a substant
 
 - some hardware-specific workflow claims still depend on manual validation rather than public CI
 - the vendored Korali subtree has been strengthened substantially, but its strongest backend claims remain tied to documented validation paths rather than blanket public CI proof
-- Phase 3a remains outside the required public release path
 - propagation support is intentionally centered on the required public path rather than every historical upstream propagation utility
 
 ## Canonical docs to read first

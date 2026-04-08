@@ -107,7 +107,7 @@ def test_workflow_matrix_runner_writes_machine_readable_report(tmp_path, monkeyp
         assert Path(entry["artifacts"]["phase3b_map_manifest"]).exists()
 
 
-def test_workflow_matrix_runner_normalizes_legacy_override_alias(tmp_path, monkeypatch):
+def test_workflow_matrix_runner_accepts_explicit_override_selector(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(repo_root / "scripts" / "vega" / "run_workflow_matrix.py", "workflow_matrix_override_test")
 
@@ -123,11 +123,11 @@ def test_workflow_matrix_runner_normalizes_legacy_override_alias(tmp_path, monke
     rc = module.main(
         [
             "--selection",
-            "compression_full",
+            "compression:full-model:validation",
             "--output-root",
             str(matrix_root),
             "--config-override",
-            f"compression_full={override_path}",
+            f"compression:full-model:validation={override_path}",
             "--skip-phase1-map",
             "--skip-phase3b-propagation",
             "--skip-phase3b-map",

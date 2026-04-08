@@ -31,15 +31,6 @@ class VegaWorkflowSelection:
         if self.profile not in VALID_PROFILES:
             raise ValueError(f"Unsupported profile: {self.profile}")
 
-
-LEGACY_WORKFLOW_ALIASES = {
-    "compression_full": VegaWorkflowSelection("compression", "full-model", "validation"),
-    "compression_reduced": VegaWorkflowSelection("compression", "reduced-model", "validation"),
-    "indentation_full": VegaWorkflowSelection("indentation", "full-model", "validation"),
-    "indentation_reduced": VegaWorkflowSelection("indentation", "reduced-model", "validation"),
-}
-
-
 def _resolve_repo_path(repo_root: Path | str, value: str | Path | None) -> Path | None:
     if value is None:
         return None
@@ -58,14 +49,11 @@ def selection_slug(selection: VegaWorkflowSelection) -> str:
 
 
 def parse_selection(value: str) -> VegaWorkflowSelection:
-    if value in LEGACY_WORKFLOW_ALIASES:
-        return LEGACY_WORKFLOW_ALIASES[value]
-
     parts = value.split(":")
     if len(parts) != 3:
         raise ValueError(
-            "Workflow selection must use experiment:model-family:profile "
-            f"or a known legacy alias. Got: {value}"
+            "Workflow selection must use experiment:model-family:profile. "
+            f"Got: {value}"
         )
     return VegaWorkflowSelection(parts[0], parts[1], parts[2])
 

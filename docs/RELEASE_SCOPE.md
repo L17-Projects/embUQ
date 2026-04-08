@@ -17,7 +17,6 @@ The public line already includes:
 ## Intentionally deferred
 
 The following remain intentionally outside the current public boundary:
-- `Phase 3a` as a supported public workflow lane
 - heavy generated artifacts and large trained model payloads
 - every internal/private convenience script from the research line
 - the heavier Mirheo data-generation execution surface

@@ -73,10 +73,6 @@ class InferenceConfig(BaseModel):
     hbi_burn_in: int = Field(ge=0, default=1)
     hbi_target_cov: float = Field(ge=0.1, le=1.0, default=0.6)
     hbi_covariance_scaling: float = Field(ge=0.001, le=1.0, default=0.02)
-    phase3a_pop_size: int = Field(ge=100, le=500000, default=50000)
-    phase3a_max_gen: int = Field(default=-1)
-    phase3a_target_cov: float = Field(ge=0.1, le=1.0, default=0.6)
-    phase3a_covariance_scaling: float = Field(ge=0.001, le=1.0, default=0.02)
     phase3b_pop_size: int = Field(ge=100, le=500000, default=50000)
     phase3b_max_gen: int = Field(default=-1)
     phase3b_target_cov: float = Field(ge=0.1, le=1.0, default=0.6)
@@ -176,10 +172,6 @@ def create_default_inference_config() -> InferenceConfig:
         hbi_burn_in=1,
         hbi_target_cov=0.6,
         hbi_covariance_scaling=0.02,
-        phase3a_pop_size=50000,
-        phase3a_max_gen=-1,
-        phase3a_target_cov=0.6,
-        phase3a_covariance_scaling=0.02,
         phase3b_pop_size=50000,
         phase3b_max_gen=-1,
         phase3b_target_cov=0.6,
