@@ -2,7 +2,7 @@
 
 This document summarizes the public workflow surfaces currently exposed by `MesoUQ`.
 
-## 1. Full hierarchical inference
+## 1. Full-model hierarchical inference
 
 The full workflow entrypoints live under `inference/scripts/`:
 - `run_phase_1.py`
@@ -21,9 +21,9 @@ Typical order:
 4. run phase 3a / 3b for joint or per-dataset follow-up stages
 5. extract MAP samples and generate validation/posterior plots
 
-## 2. Reduced hierarchical inference
+## 2. Reduced-model hierarchical inference
 
-The reduced workflow is exposed through:
+The reduced-model workflow is exposed through:
 - `reduced/scripts/run_phase_3a.py`
 - `reduced/scripts/run_phase_3b.py`
 - `reduced/scripts/run_phase_3b_single.py`
@@ -34,7 +34,20 @@ Canonical reduced configs live under:
 
 These wrappers delegate to the main workflow spine while selecting the reduced-model configs by default.
 
-## 3. Surrogate retraining and evaluation
+## 3. Execution profiles are separate from model family
+
+The repository also ships reduced-cost validation configs under both the full-model and reduced-model trees:
+
+- full-model validation:
+  - `inference/configs/validation/validation_config_compression.yaml`
+  - `inference/configs/validation/validation_config_indentation.yaml`
+- reduced-model validation:
+  - `reduced/configs/validation/validation_config_compression.yaml`
+  - `reduced/configs/validation/validation_config_indentation.yaml`
+
+These validation configs are execution-profile choices for smoke and acceptance work. They are not the same concept as the reduced-model scientific surface.
+
+## 4. Surrogate retraining and evaluation
 
 Compression:
 - evaluator: `compression/surrogate/evaluate.py`
@@ -46,7 +59,7 @@ Indentation:
 
 Shared training logic is implemented once in `src/meso_uq/surrogate/`.
 
-## 4. Sensitivity and lightweight design generation
+## 5. Sensitivity and lightweight design generation
 
 Compression Sobol sensitivity:
 - `compression/surrogate/sensitivity/scripts/run_sobol_vs_disp.py`
@@ -59,7 +72,7 @@ Lightweight design generation:
 
 This surface is intentionally focused on analysis/design support and does not yet include the heavier Mirheo execution layer.
 
-## 5. MAP extraction and plotting
+## 6. MAP extraction and plotting
 
 MAP extraction:
 - `inference/scripts/extract_phase1_map.py`
@@ -72,7 +85,18 @@ Plotting/postprocessing:
 
 Shared postprocessing helpers live under `src/meso_uq/postprocess/`.
 
-## 6. Vendored Korali patch surface
+## 7. Vega helper surface
+
+For Vega-first operation, the repo now also ships split helpers under `scripts/vega/`:
+
+- `run_inference_stage.py`
+- `run_propagation.py`
+- `extract_map.py`
+- `sbatch/*.sbatch`
+
+These helpers expose experiment, model family, run profile, and stage explicitly so the operator surface does not overload the word `reduced`.
+
+## 8. Vendored Korali patch surface
 
 The vendored backend under `extern/korali/` is intentionally focused. It contains the public patch surface needed by the current release line, not a full indiscriminate vendor dump.
 

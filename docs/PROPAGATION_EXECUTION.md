@@ -17,18 +17,24 @@ It is intentionally lightweight:
 Phase 1 propagation:
 
 ```bash
-python propagation/scripts/run_phase1_propagation.py \
-  --config inference/configs/production/inference_config_compression.yaml \
-  --output-dir _setup
+python scripts/vega/run_propagation.py \
+  --experiment compression \
+  --model-family full-model \
+  --profile production \
+  --stage phase1
 ```
 
 Phase 3b propagation:
 
 ```bash
-python propagation/scripts/run_phase3b_propagation.py \
-  --config inference/configs/production/inference_config_compression.yaml \
-  --output-dir _setup
+python scripts/vega/run_propagation.py \
+  --experiment compression \
+  --model-family full-model \
+  --profile production \
+  --stage phase3b
 ```
+
+The direct propagation scripts remain available under `propagation/scripts/` if you need to bypass the Vega helper layer.
 
 ## Outputs
 
