@@ -46,6 +46,15 @@ def test_production_sanity_command_writes_override_configs_and_machine_readable_
         "load_korali_build_state",
         lambda repo_root: {"status": "detected", "build_options": {"native_cuda_batch": False}},
     )
+    monkeypatch.setattr(
+        module,
+        "render_production_sanity_plots",
+        lambda repo_root, **kwargs: {
+            "compression:full-model:production": {
+                "phase2": {"korali_plot": str(output_root / "plots" / "phase2.png")}
+            }
+        },
+    )
 
     output_root = tmp_path / "production_sanity"
     rc = module.main(["--output-root", str(output_root), "--python-bin", "python"])
@@ -67,3 +76,4 @@ def test_production_sanity_command_writes_override_configs_and_machine_readable_
     assert report["korali"]["build_options"]["native_cuda_batch"] is False
     assert report["selections"][0]["selection"] == "compression:full-model:production"
     assert Path(report["matrix"]["stdout_log"]).exists()
+    assert "compression:full-model:production" in report["plots"]

@@ -16,6 +16,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from meso_uq.production_sanity import (  # noqa: E402
     PRODUCTION_SMOKE_OVERRIDES,
     load_korali_build_state,
+    render_production_sanity_plots,
     resolve_production_sanity_selections,
     write_production_smoke_config,
 )
@@ -105,10 +106,26 @@ def main(argv: list[str] | None = None) -> int:
     if matrix_report_path.exists():
         matrix_report = json.loads(matrix_report_path.read_text(encoding="utf-8"))
 
+    plot_failure = None
+    plots = {}
+    command_exit_code = result.returncode
+    if result.returncode == 0:
+        try:
+            plots = render_production_sanity_plots(
+                REPO_ROOT,
+                selections=selections,
+                sanity_configs=sanity_configs,
+                matrix_root=matrix_root,
+                output_root=output_root,
+            )
+        except Exception as exc:  # pragma: no cover - guarded by integration smoke
+            plot_failure = str(exc)
+            command_exit_code = 1
+
     report = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "repo_root": str(REPO_ROOT),
-        "status": "passed" if result.returncode == 0 else "failed",
+        "status": "passed" if command_exit_code == 0 else "failed",
         "python_bin": args.python_bin,
         "phase2_cpu_ranks": args.phase2_cpu_ranks,
         "default_selection": selection_key(selections[0]) if selections else None,
@@ -131,13 +148,15 @@ def main(argv: list[str] | None = None) -> int:
             "report_path": str(matrix_report_path),
             "report_status": matrix_report.get("status") if matrix_report else None,
         },
+        "plots": plots,
+        "plot_error": plot_failure,
     }
 
     report_path = output_root / "production_sanity_report.json"
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(f"Production sanity report: {report_path}")
     print(f"Production sanity status: {report['status']}")
-    return result.returncode
+    return command_exit_code
 
 
 if __name__ == "__main__":
