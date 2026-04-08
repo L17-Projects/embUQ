@@ -1,0 +1,81 @@
+#pragma once
+
+#include "modules/distribution/univariate/uniform/uniform.hpp"
+#include "modules/neuralNetwork/neuralNetwork.hpp"
+#include "modules/problem/problem.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  void initialize() override;
+
+  /**
+   * @brief Runs an episode of the agent within the environment with actions produced by the policy + exploratory noise. If the reward exceeds the threshold, it also runs testing episodes.
+   * @param agent Sample containing current agent/state information.
+   */
+  void runTrainingEpisode(korali::Sample &agent);
+
+  /**
+   * @brief Runs an episode of the agent within the environment with actions produced by the policy only.
+   * @param agent Sample containing current agent/state information.
+   */
+  void runTestingEpisode(korali::Sample &agent);
+
+  /**
+   * @brief Initializes the environment and agent configuration
+   * @param agent Sample containing current agent/state information.
+   */
+  void initializeEnvironment(korali::Sample &agent);
+
+  /**
+   * @brief Finalizes the environemnt (frees resources)
+   */
+  void finalizeEnvironment();
+
+  /**
+   * @brief Runs/resumes the execution of the environment
+   * @param agent Sample containing current agent/state information.
+   */
+  void runEnvironment(Sample &agent);
+
+  /**
+   * @brief Communicates with the Engine to get the latest policy
+   * @param agent Sample containing current agent/state information.
+   */
+  void requestNewPolicy(Sample &agent);
+
+  /**
+   * @brief Runs the policy on the current state to get the action
+   * @param agent Sample containing current agent/state information.
+   */
+  void getAction(Sample &agent);
+
+  /**
+   * @brief Contains the state rescaling means
+   */
+  std::vector<std::vector<float>> _stateRescalingMeans;
+
+  /**
+   * @brief Contains the state rescaling sigmas
+   */
+  std::vector<std::vector<float>> _stateRescalingSdevs;
+
+  /**
+   * @brief [Profiling] Stores policy evaluation time per episode
+   */
+  double _agentPolicyEvaluationTime;
+
+  /**
+   * @brief [Profiling] Stores environment evaluation time per episode
+   */
+  double _agentComputationTime;
+
+  /**
+   * @brief [Profiling] Stores communication time per episode
+   */
+  double _agentCommunicationTime;
+};
+
+__endNamespace__;

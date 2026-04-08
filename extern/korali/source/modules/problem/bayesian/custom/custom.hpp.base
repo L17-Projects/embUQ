@@ -1,0 +1,17 @@
+#pragma once
+
+#include "modules/problem/bayesian/bayesian.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  private:
+  public:
+  void evaluateLoglikelihood(korali::Sample &sample) override;
+  void evaluateLoglikelihoodGradient(korali::Sample &sample) override;
+  void evaluateFisherInformation(korali::Sample &sample) override;
+  void initialize() override;
+};
+
+__endNamespace__;

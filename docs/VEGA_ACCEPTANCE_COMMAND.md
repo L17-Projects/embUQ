@@ -11,6 +11,12 @@ The acceptance command is a thin wrapper around the richer operator runner:
 
 The wrapper exists so a fresh clone on Vega has one obvious command to run and one machine-readable report to inspect.
 
+Before running acceptance from a fresh clone, bootstrap the repo-local Korali runtime and verify it:
+
+- `bash scripts/vega/bootstrap_korali.sh --jobs 8`
+- `source _vega/korali/env.sh`
+- `python scripts/vega/doctor_vega.py --strict`
+
 ## Command
 
 ```bash

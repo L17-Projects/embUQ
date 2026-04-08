@@ -1,0 +1,48 @@
+#include "modules/distribution/univariate/weibull/weibull.hpp"
+#include "modules/experiment/experiment.hpp"
+#include <gsl/gsl_randist.h>
+#include <gsl/gsl_sf.h>
+
+__startNamespace__;
+
+double
+__className__::getDensity(const double x) const
+{
+  return gsl_ran_weibull_pdf(x, _scale, _shape);
+}
+
+double __className__::getLogDensity(const double x) const
+{
+  if (x <= 0.0) return -INFINITY;
+
+  return _aux - std::pow(x / _scale, _shape) + (_shape - 1.) * gsl_sf_log(x);
+}
+
+double __className__::getLogDensityGradient(const double x) const
+{
+  if (x <= 0.0) return 0.0;
+  return (_shape - 1.) / x - _shape * std::pow(x, _shape - 1.) / std::pow(_scale, _shape);
+}
+
+double __className__::getLogDensityHessian(const double x) const
+{
+  if (x <= 0.0) return 0.0;
+  return (1. - _shape) / (x * x) - _shape * (_shape - 1.) * std::pow(x, _shape - 2.) / std::pow(_scale, _shape);
+}
+
+double __className__::getRandomNumber()
+{
+  return gsl_ran_weibull(_range, _scale, _shape);
+}
+
+void __className__::updateDistribution()
+{
+  if (_shape <= 0.0) KORALI_LOG_ERROR("Incorrect Shape parameter of Weibull distribution: %f.\n", _shape);
+  if (_scale <= 0.0) KORALI_LOG_ERROR("Incorrect Scale parameter of Weibull distribution: %f.\n", _scale);
+
+  _aux = gsl_sf_log(_shape) - _shape * gsl_sf_log(_scale);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

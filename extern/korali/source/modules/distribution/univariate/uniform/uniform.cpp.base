@@ -1,0 +1,45 @@
+#include "modules/distribution/univariate/uniform/uniform.hpp"
+#include "modules/experiment/experiment.hpp"
+#include <gsl/gsl_randist.h>
+#include <gsl/gsl_sf.h>
+
+__startNamespace__;
+
+double
+__className__::getDensity(const double x) const
+{
+  return gsl_ran_flat_pdf(x, _minimum, _maximum);
+}
+
+double __className__::getLogDensity(const double x) const
+{
+  if (x >= _minimum && x <= _maximum) return _aux;
+  return -Inf;
+}
+
+double __className__::getLogDensityGradient(const double x) const
+{
+  return 0.0;
+}
+
+double __className__::getLogDensityHessian(const double x) const
+{
+  return 0.0;
+}
+
+double __className__::getRandomNumber()
+{
+  return gsl_ran_flat(_range, _minimum, _maximum);
+}
+
+void __className__::updateDistribution()
+{
+  if (_maximum - _minimum <= 0.0)
+    KORALI_LOG_ERROR("Maximum (%f) bound must be higher than Minimum (%f) bound in a Uniform distribution.\n", _maximum, _minimum);
+  else
+    _aux = -gsl_sf_log(_maximum - _minimum);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

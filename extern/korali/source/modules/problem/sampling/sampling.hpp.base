@@ -1,0 +1,32 @@
+#pragma once
+
+#include "modules/problem/problem.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  private:
+  public:
+  void initialize() override;
+
+  /**
+   * @brief Evaluates a function at the given parameters.
+   * @param sample Sample to evaluate
+   */
+  virtual void evaluate(korali::Sample &sample);
+
+  /**
+   * @brief Evaluates the gradient of a function at the given parameters.
+   * @param sample Sample to evaluate
+   */
+  virtual void evaluateGradient(korali::Sample &sample);
+
+  /**
+   * @brief Evaluates the Heassian of a function at the given parameters.
+   * @param sample Sample to evaluate
+   */
+  virtual void evaluateHessian(korali::Sample &sample);
+};
+
+__endNamespace__;

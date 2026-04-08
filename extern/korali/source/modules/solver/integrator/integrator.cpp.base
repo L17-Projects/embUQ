@@ -1,0 +1,59 @@
+#include "engine.hpp"
+#include "modules/solver/integrator/integrator.hpp"
+
+__startNamespace__;
+
+void __className__::setInitialConfiguration()
+{
+  _variableCount = _k->_variables.size();
+
+  for (size_t i = 0; i < _variableCount; ++i)
+  {
+    if (_k->_variables[i]->_upperBound <= _k->_variables[i]->_lowerBound) KORALI_LOG_ERROR("'Upper Bound' is not strictly bigger then 'Lower Bound' for variable %s.\n", _k->_variables[i]->_name.c_str());
+  }
+
+  _accumulatedIntegral = 0.;
+}
+
+void __className__::runGeneration()
+{
+  if (_k->_currentGeneration == 1) setInitialConfiguration();
+
+  _executionsPerGeneration = std::min(_executionsPerGeneration, _maxModelEvaluations - _modelEvaluationCount);
+  _samples.resize(_executionsPerGeneration);
+
+  for (size_t i = 0; i < _executionsPerGeneration; i++)
+  {
+    launchSample(i);
+    _modelEvaluationCount++;
+  }
+
+  KORALI_WAITALL(_samples);
+
+  for (size_t i = 0; i < _executionsPerGeneration; i++)
+  {
+    auto f = KORALI_GET(double, _samples[i], "Evaluation");
+    auto w = KORALI_GET(double, _samples[i], "Weight");
+    _accumulatedIntegral += w * f;
+  }
+
+  (*_k)["Results"]["Integral"] = _accumulatedIntegral;
+}
+
+void __className__::printGenerationBefore()
+{
+}
+
+void __className__::printGenerationAfter()
+{
+  _k->_logger->logInfo("Minimal", "Total evaluations accumulated %lu/%lu.\n", _modelEvaluationCount, _maxModelEvaluations);
+}
+
+void __className__::finalize()
+{
+  _k->_logger->logInfo("Minimal", "Integral Calculated: %e\n", _accumulatedIntegral);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

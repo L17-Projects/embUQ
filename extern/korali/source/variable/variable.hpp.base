@@ -1,0 +1,23 @@
+/** \file
+ * @brief Contains the definition of a Korali Variable
+ *****************************************************************************************************/
+
+#pragma once
+
+#include "modules/distribution/univariate/univariate.hpp"
+#include <vector>
+
+namespace korali
+{
+/**
+ * \class Variable
+ * @brief Contains information for Korali Experiment's variables.
+ * This header file is automatically filled with the configuration of Korali's modules, which require that variables contain specific fields.
+ */
+class Variable
+{
+  public:
+  // Variable Declaration List
+};
+
+} // namespace korali

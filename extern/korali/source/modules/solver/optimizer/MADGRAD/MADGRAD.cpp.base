@@ -1,0 +1,121 @@
+#include "engine.hpp"
+#include "modules/solver/optimizer/MADGRAD/MADGRAD.hpp"
+#include "sample/sample.hpp"
+
+__startNamespace__;
+
+void __className__::setInitialConfiguration()
+{
+  _variableCount = _k->_variables.size();
+
+  for (size_t i = 0; i < _variableCount; i++)
+    if (std::isfinite(_k->_variables[i]->_initialValue) == false)
+      KORALI_LOG_ERROR("Initial Value of variable \'%s\' not defined (no defaults can be calculated).\n", _k->_variables[i]->_name.c_str());
+
+  _currentVariable.resize(_variableCount);
+  for (size_t i = 0; i < _variableCount; i++)
+    _currentVariable[i] = _k->_variables[i]->_initialValue;
+
+  _bestEverVariables = _currentVariable;
+  _initialParameter = _currentVariable;
+  _gradient.resize(_variableCount, 0.0);
+  _bestEverGradient.resize(_variableCount, 0);
+  _gradientSum.resize(_variableCount, 0.0);
+  _squaredGradientSum.resize(_variableCount, 0.0);
+
+  _bestEverValue = -Inf;
+  _gradientNorm = 0.0;
+  _scaledLearningRate = _eta;
+
+  if (_eta <= 0) KORALI_LOG_ERROR("Learning Rate 'eta' must be larger 0 (is %lf).\n", _eta);
+  if (_weightDecay <= 0) KORALI_LOG_ERROR("Weight decaymust be larger 0 (is %lf).\n", _weightDecay);
+  if (_epsilon <= 0) KORALI_LOG_ERROR("Epsilon must be larger 0 (is %lf).\n", _epsilon);
+}
+
+void __className__::runGeneration()
+{
+  if (_k->_currentGeneration == 1) setInitialConfiguration();
+
+  // update parameters
+  for (size_t i = 0; i < _variableCount; i++)
+  {
+    double intermediateParam = _initialParameter[i] + 1.0 / (std::cbrt(_squaredGradientSum[i]) + _epsilon) * _gradientSum[i];
+    _currentVariable[i] = (1.0 - _weightDecay) * _currentVariable[i] + _weightDecay * intermediateParam;
+  }
+
+  // Initializing Sample Evaluation
+  Sample sample;
+  sample["Module"] = "Problem";
+  sample["Operation"] = "Evaluate With Gradients";
+  sample["Parameters"] = _currentVariable;
+  sample["Sample Id"] = 0;
+  KORALI_START(sample);
+
+  // Waiting for sample to finish
+  KORALI_WAIT(sample);
+
+  auto evaluation = KORALI_GET(double, sample, "F(x)");
+  auto gradient = KORALI_GET(std::vector<double>, sample, "Gradient");
+
+  // Processing results
+  processResult(evaluation, gradient);
+}
+
+void __className__::processResult(double evaluation, std::vector<double> &gradient)
+{
+  _modelEvaluationCount++;
+  _previousBestValue = _currentBestValue;
+  _currentBestValue = evaluation;
+
+  _gradientNorm = 0.0;
+  _gradient = gradient;
+
+  //_scaledLearningRate = std::sqrt(_modelEvaluationCount+1.0) * _eta;
+
+  for (size_t i = 0; i < _variableCount; i++)
+  {
+    _gradientSum[i] += _scaledLearningRate * _gradient[i];
+    _squaredGradientSum[i] += _scaledLearningRate * _gradient[i] * _gradient[i];
+    _gradientNorm += _gradient[i] * _gradient[i];
+  }
+  _gradientNorm = std::sqrt(_gradientNorm);
+
+  if (_currentBestValue > _bestEverValue)
+  {
+    _bestEverValue = _currentBestValue;
+    _bestEverGradient = _gradient;
+    _bestEverVariables = _currentVariable;
+  }
+}
+
+void __className__::printGenerationBefore()
+{
+  _k->_logger->logInfo("Normal", "Starting generation %lu...\n", _k->_currentGeneration);
+}
+
+void __className__::printGenerationAfter()
+{
+  _k->_logger->logInfo("Normal", "x = [ ");
+  for (size_t k = 0; k < _variableCount; k++) _k->_logger->logData("Normal", " %.5le  ", _currentVariable[k]);
+  _k->_logger->logData("Normal", " ]\n");
+
+  _k->_logger->logInfo("Normal", "F(X) = %le \n", _currentBestValue);
+
+  _k->_logger->logInfo("Normal", "DF(X) = [ ");
+  for (size_t k = 0; k < _variableCount; k++) _k->_logger->logData("Normal", " %.5le  ", _gradient[k]);
+  _k->_logger->logData("Normal", " ]\n");
+
+  _k->_logger->logInfo("Normal", "|DF(X)| = %le \n", _gradientNorm);
+}
+
+void __className__::finalize()
+{
+  // Updating Results
+  (*_k)["Results"]["Best Sample"]["F(x)"] = _bestEverValue;
+  (*_k)["Results"]["Best Sample"]["Gradient(x)"] = _bestEverGradient;
+  (*_k)["Results"]["Best Sample"]["Parameters"] = _bestEverVariables;
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

@@ -1,0 +1,134 @@
+#pragma once
+
+// TODO: REMOVE normal/normal.hpp
+#include "modules/distribution/multivariate/normal/normal.hpp"
+#include "modules/distribution/univariate/normal/normal.hpp"
+#include "modules/distribution/univariate/uniform/uniform.hpp"
+#include "modules/solver/sampler/sampler.hpp"
+#include <string>
+#include <vector>
+
+#include "modules/solver/sampler/HMC/helpers/hamiltonian_euclidean_dense.hpp"
+#include "modules/solver/sampler/HMC/helpers/hamiltonian_euclidean_diag.hpp"
+#include "modules/solver/sampler/HMC/helpers/hamiltonian_riemannian_const_dense.hpp"
+#include "modules/solver/sampler/HMC/helpers/hamiltonian_riemannian_const_diag.hpp"
+#include "modules/solver/sampler/HMC/helpers/hamiltonian_riemannian_diag.hpp"
+#include "modules/solver/sampler/HMC/helpers/leapfrog_explicit.hpp"
+#include "modules/solver/sampler/HMC/helpers/leapfrog_implicit.hpp"
+#include "modules/solver/sampler/HMC/helpers/tree_helper_euclidean.hpp"
+#include "modules/solver/sampler/HMC/helpers/tree_helper_riemannian.hpp"
+
+__startNamespace__;
+
+/**
+ * @brief Enum to set metric type.
+ */
+enum Metric
+{
+  /**
+   * @brief Static Metric type.
+   */
+  Static = 0,
+
+  /**
+   * @brief Euclidean Metric type.
+   */
+  Euclidean = 1,
+
+  /**
+   * @brief Riemannian Metric type.
+   */
+  Riemannian = 2,
+
+  /**
+   * @brief Const Riemannian Metric type.
+   */
+  Riemannian_Const = 3,
+};
+
+class __className__ : public __parentClassName__
+{
+  std::shared_ptr<Hamiltonian> _hamiltonian;
+  std::unique_ptr<Leapfrog> _integrator;
+
+  /**
+   * @brief Updates internal state such as mean, Metric and InverseMetric.
+   */
+  void updateState();
+
+  /**
+   * @brief Process sample after evaluation.
+   */
+  void finishSample(size_t sampleId);
+
+  /**
+   * @brief Runs generation of HMC sampler.
+   * @param logUniSample Log of uniform sample needed for Metropolis accepance / rejection step.
+   */
+  void runGenerationHMC(const double logUniSample);
+
+  /**
+   * @brief Runs NUTS algorithm with buildTree.
+   * @param logUniSample Log of uniform sample needed for Metropolis accepance / rejection step.
+   */
+  void runGenerationNUTS(const double logUniSample);
+
+  /**
+   * @brief Runs NUTS algorithm with buildTree.
+   * @param logUniSample Log of uniform sample needed for Metropolis accepance / rejection step.
+   */
+  void runGenerationNUTSRiemannian(const double logUniSample);
+
+  /**
+   * @brief Saves sample.
+   */
+  void saveSample();
+
+  /**
+   * @brief Updates Step Size for Adaptive Step Size.
+   */
+  void updateStepSize();
+
+  /**
+   * @brief Recursive binary tree building algorithm. Applied if configuration 'Use NUTS' is set to True.
+   * @param helper Helper struct for large argument list.
+   * @param depth Current depth of binary tree.
+   */
+  void buildTree(std::shared_ptr<TreeHelperEuclidean> helper, const size_t depth);
+
+  /**
+   * @brief Recursive binary tree building algorithm. Applied if configuration 'Use NUTS' is set to True.
+   * @param helper Helper struct for large argument list.
+   * @param rho Sum of momenta encountered along path.
+   * @param depth Current depth of binary tree.
+   */
+  void buildTreeIntegration(std::shared_ptr<TreeHelperRiemannian> helper, std::vector<double> &rho, const size_t depth);
+
+  public:
+  /**
+   * @brief Configures HMC.
+   */
+  void setInitialConfiguration() override;
+
+  /**
+   * @brief Final console output at termination.
+   */
+  void finalize() override;
+
+  /**
+   * @brief Generate a sample and evaluate it.
+   */
+  void runGeneration() override;
+
+  /**
+   * @brief Console Output before generation runs.
+   */
+  void printGenerationBefore() override;
+
+  /**
+   * @brief Console output after generation.
+   */
+  void printGenerationAfter() override;
+};
+
+__endNamespace__;

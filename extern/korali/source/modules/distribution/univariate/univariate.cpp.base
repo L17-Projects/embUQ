@@ -1,0 +1,8 @@
+#include "modules/distribution/univariate/univariate.hpp"
+#include "modules/experiment/experiment.hpp"
+
+__startNamespace__;
+
+__moduleAutoCode__;
+
+__endNamespace__;

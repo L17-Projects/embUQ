@@ -1,0 +1,47 @@
+#pragma once
+
+#include "auxiliar/logger.hpp"
+#include "modules/module.hpp"
+#include <cmath>
+#include <cstddef>
+#include <cstdlib>
+#include <stdexcept>
+#include <vector>
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  /**
+   * @brief Takes a sample evaluation and its gradient and calculates the next set of parameters
+   * @param gradient The gradient of the objective function at the current set of parameters
+   */
+  virtual void processResult(std::vector<float> &gradient) = 0;
+
+  /**
+   * @brief Checks size and values of gradient
+   * @param gradient Gradient values to check
+   */
+  virtual void preProcessResult(std::vector<float> &gradient);
+
+  /**
+   * @brief Checks the result of the gradient update
+   * @param parameters Parameter values to check
+   */
+  virtual void postProcessResult(std::vector<float> &parameters);
+
+  /**
+   * @brief Prints internals of solver
+   */
+  virtual void printInternals() = 0;
+
+  /**
+   * @brief Restores the optimizer to the initial state
+   */
+  virtual void reset() = 0;
+
+  virtual void initialize() override;
+};
+
+__endNamespace__;

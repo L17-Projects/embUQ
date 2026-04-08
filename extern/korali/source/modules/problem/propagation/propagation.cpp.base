@@ -1,0 +1,54 @@
+#include "modules/problem/propagation/propagation.hpp"
+#include "sample/sample.hpp"
+
+__startNamespace__;
+
+void __className__::initialize()
+{
+  if (_k->_variables.size() == 0) KORALI_LOG_ERROR("Execution problems require at least one variable.\n");
+
+  // Validate the given _priorDistribution and _precomputedValues
+  size_t Ns = _k->_variables[0]->_precomputedValues.size();
+  for (size_t i = 0; i < _k->_variables.size(); i++)
+    if (_k->_variables[i]->_precomputedValues.size() != Ns) KORALI_LOG_ERROR("All 'Precomputed Values' must have the same length ");
+
+  for (size_t i = 0; i < _k->_variables.size(); i++)
+  {
+    bool foundDistribution = false;
+    if (Ns == 0)
+    {
+      // Validate the _priorDistribution names
+      for (size_t j = 0; j < _k->_distributions.size(); j++)
+        if (_k->_variables[i]->_priorDistribution == _k->_distributions[j]->_name)
+        {
+          foundDistribution = true;
+          _k->_variables[i]->_distributionIndex = j;
+        }
+
+      if (foundDistribution == false) KORALI_LOG_ERROR("Did not find distribution %s, specified by variable %s\n", _k->_variables[i]->_priorDistribution.c_str(), _k->_variables[i]->_name.c_str());
+      if (_numberOfSamples == 0) KORALI_LOG_ERROR("Number of Samples must be larger than 0");
+      _k->_variables[i]->_sampledValues.resize(_numberOfSamples);
+    }
+    else
+    {
+      for (size_t j = 0; j < _k->_distributions.size(); j++)
+        if (_k->_variables[i]->_priorDistribution == _k->_distributions[j]->_name)
+        {
+          foundDistribution = true;
+          _k->_variables[i]->_distributionIndex = j;
+        }
+
+      if (foundDistribution == true) KORALI_LOG_ERROR("Found distribution %s in variable %s\n, although using precomputed Values", _k->_variables[i]->_priorDistribution.c_str(), _k->_variables[i]->_name.c_str());
+      if (_numberOfSamples > 0) KORALI_LOG_ERROR("Number of Samples set although using precomputed Values");
+    }
+  }
+}
+
+void __className__::execute(Sample &sample)
+{
+  sample.run(_executionModel);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

@@ -1,0 +1,48 @@
+#include "modules/distribution/univariate/igamma/igamma.hpp"
+#include "modules/experiment/experiment.hpp"
+#include <gsl/gsl_randist.h>
+
+__startNamespace__;
+
+double
+__className__::getDensity(const double x) const
+{
+  if (x <= 0.0) return -INFINITY;
+  return _aux * std::pow(x, -_shape - 1.) * std::exp(-_scale / x);
+}
+
+double __className__::getLogDensity(const double x) const
+{
+  if (x <= 0) return -INFINITY;
+  return _aux - (_shape + 1) * std::log(x) - (_scale / x);
+}
+
+double Igamma::getLogDensityGradient(const double x) const
+{
+  if (x <= 0) return -INFINITY;
+  return _scale / (x * x) - (_shape + 1.) / x;
+}
+
+double Igamma::getLogDensityHessian(const double x) const
+{
+  if (x <= 0) return -INFINITY;
+  return -2. * _scale / (x * x * x) + (_shape + 1.) / (x * x);
+}
+
+double __className__::getRandomNumber()
+{
+  return 1. / gsl_ran_gamma(_range, _shape, 1. / _scale);
+}
+
+void __className__::updateDistribution()
+{
+  if (_shape <= 0.0) KORALI_LOG_ERROR("Incorrect Shape parameter of Inverse Gamma distribution: %f.\n", _shape);
+  if (_scale <= 0.0) KORALI_LOG_ERROR("Incorrect Scale parameter of Inverse Gamma distribution: %f.\n", _scale);
+
+  _auxLog = _shape * log(_scale) - gsl_sf_lngamma(_shape);
+  _aux = std::exp(_auxLog);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

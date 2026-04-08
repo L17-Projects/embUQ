@@ -1,0 +1,102 @@
+#pragma once
+
+#include "modules/problem/bayesian/bayesian.hpp"
+#include "modules/problem/hierarchical/psi/psi.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  private:
+  /**
+   * @brief Stores the actual Korali object for the psi experiment
+   */
+  korali::Experiment _psiExperimentObject;
+
+  /**
+   * @brief Stores the actual Korali object for the theta experiment
+   */
+  korali::Experiment _subExperimentObject;
+
+  /**
+   * @brief Stores the number of variables defined in the Psi problem
+   */
+  size_t _psiVariableCount;
+
+  /**
+   * @brief Stores the number of samples in the Psi problem experiment to use as input
+   */
+  size_t _psiProblemSampleCount;
+
+  /**
+   * @brief Stores the sample coordinates of the Psi Problem
+   */
+  std::vector<std::vector<double>> _psiProblemSampleCoordinates;
+
+  /**
+   * @brief Stores the sample logLikelihoods of the Psi Problem
+   */
+  std::vector<double> _psiProblemSampleLogLikelihoods;
+
+  /**
+   * @brief Stores the sample logPriors of the Psi Problem
+   */
+  std::vector<double> _psiProblemSampleLogPriors;
+
+  /**
+   * @brief Stores the Problem module of the Psi problem experiment to use as input
+   */
+  korali::problem::hierarchical::Psi *_psiProblem;
+
+  /**
+   * @brief Stores the number of variables defined in the Sub problem
+   */
+  size_t _subProblemVariableCount;
+
+  /**
+   * @brief Stores the number of samples in the sub problem experiment to use as input
+   */
+  size_t _subProblemSampleCount;
+
+  /**
+   * @brief Stores the sample coordinates of the sub Problem
+   */
+  std::vector<std::vector<double>> _subProblemSampleCoordinates;
+
+  /**
+   * @brief Stores the sample logLikelihoods of the sub Problem
+   */
+  std::vector<double> _subProblemSampleLogLikelihoods;
+
+  /**
+   * @brief Stores the sample logPriors of the sub Problem
+   */
+  std::vector<double> _subProblemSampleLogPriors;
+
+  /**
+   * @brief Stores the precomputed log denomitator to speed up calculations
+   */
+  std::vector<double> _precomputedLogDenominator;
+
+  /**
+   * @brief Computes the hierarchical log-likelihood correction for a single parameter vector.
+   * @param parameters Parameter vector to evaluate
+   * @return The additive hierarchical correction term
+   */
+  double calculateHierarchicalCorrection(const std::vector<double> &parameters);
+
+  /**
+   * @brief Computes the hierarchical log-likelihood correction for a batch of parameter vectors.
+   * @param batchParameters Batch of parameter vectors to evaluate
+   * @return The additive hierarchical correction term for each batch row
+   */
+  std::vector<double> calculateHierarchicalCorrectionBatch(const std::vector<std::vector<double>> &batchParameters);
+
+  public:
+  void evaluateLogLikelihood(korali::Sample &sample) override;
+  void evaluateBatch(korali::Sample &sample) override;
+  bool supportsEvaluateBatch() const override;
+  void initialize() override;
+};
+
+__endNamespace__;

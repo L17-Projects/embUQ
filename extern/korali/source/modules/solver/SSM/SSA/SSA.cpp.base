@@ -1,0 +1,48 @@
+#include "modules/solver/SSM/SSA/SSA.hpp"
+
+__startNamespace__;
+
+void __className__::advance()
+{
+  _cumPropensities.resize(_numReactions);
+
+  double a0 = 0.0;
+
+  // Calculate propensities
+  for (size_t k = 0; k < _numReactions; ++k)
+  {
+    const double a = _problem->computePropensity(k, _numReactants);
+
+    a0 += a;
+    _cumPropensities[k] = a0;
+  }
+
+  // Sample time step from exponential distribution
+  const double r1 = _uniformGenerator->getRandomNumber();
+
+  double tau = -std::log(r1) / a0;
+
+  // Advance time
+  _time += tau;
+
+  if (_time > _simulationLength)
+    _time = _simulationLength;
+
+  // Exit if no reactions fire
+  if (a0 == 0)
+    return;
+
+  const double r2 = _cumPropensities.back() * _uniformGenerator->getRandomNumber();
+
+  // Sample a reaction
+  size_t selection = 0;
+  while (r2 > _cumPropensities[selection])
+    selection++;
+
+  // Update the reactants according to chosen reaction
+  _problem->applyChanges(selection, _numReactants);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

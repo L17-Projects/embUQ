@@ -1,0 +1,44 @@
+#include "modules/distribution/univariate/geometric/geometric.hpp"
+#include "modules/experiment/experiment.hpp"
+#include <gsl/gsl_randist.h>
+
+__startNamespace__;
+
+double
+__className__::getDensity(const double x) const
+{
+  return gsl_ran_geometric_pdf((int)x, _successProbability);
+}
+
+double __className__::getLogDensity(const double x) const
+{
+  return std::log(_successProbability) + (x - 1) * std::log(1.0 - _successProbability);
+}
+
+double Geometric::getLogDensityGradient(const double x) const
+{
+  KORALI_LOG_ERROR("Gradient of discrete pdf %s not defined.\n", _name.c_str());
+  return 0.;
+}
+
+double Geometric::getLogDensityHessian(const double x) const
+{
+  KORALI_LOG_ERROR("Hessian of discrete pdf %s not defined.\n", _name.c_str());
+  return 0.;
+}
+
+double __className__::getRandomNumber()
+{
+  return gsl_ran_geometric(_range, _successProbability);
+}
+
+void __className__::updateDistribution()
+{
+  if (_successProbability <= 0.0) KORALI_LOG_ERROR("Incorrect success probability parameter of geometric distribution: %f.\n", _successProbability);
+  if (_successProbability > 1.0) KORALI_LOG_ERROR("Incorrect success probability parameter of geometric distribution: %f.\n", _successProbability);
+  _aux = 0.0;
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

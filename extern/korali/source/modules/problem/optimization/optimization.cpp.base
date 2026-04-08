@@ -1,0 +1,67 @@
+#include "modules/problem/optimization/optimization.hpp"
+#include "sample/sample.hpp"
+
+__startNamespace__;
+
+void __className__::initialize()
+{
+  if (_k->_variables.size() == 0) KORALI_LOG_ERROR("Optimization Evaluation problems require at least one variable.\n");
+}
+
+void __className__::evaluateConstraints(Sample &sample)
+{
+  for (size_t i = 0; i < _constraints.size(); i++)
+  {
+    sample.run(_constraints[i]);
+
+    auto evaluation = KORALI_GET(double, sample, "F(x)");
+
+    if (std::isfinite(evaluation) == false)
+      KORALI_LOG_ERROR("Non finite value of constraint evaluation %lu detected: %f\n", i, evaluation);
+
+    sample["Constraint Evaluations"][i] = evaluation;
+  }
+}
+
+void __className__::evaluate(Sample &sample)
+{
+  sample.run(_objectiveFunction);
+
+  auto evaluation = KORALI_GET(double, sample, "F(x)");
+
+  if (std::isfinite(evaluation) == false)
+    KORALI_LOG_ERROR("Non finite value of function evaluation detected: %f\n", evaluation);
+}
+
+void __className__::evaluateMultiple(Sample &sample)
+{
+  sample.run(_objectiveFunction);
+
+  auto evaluation = KORALI_GET(std::vector<double>, sample, "F(x)");
+
+  for (size_t i = 0; i < evaluation.size(); i++)
+    if (std::isfinite(evaluation[i]) == false)
+      KORALI_LOG_ERROR("Non finite value of function evaluation detected for variable %lu: %f\n", i, evaluation[i]);
+}
+
+void __className__::evaluateWithGradients(Sample &sample)
+{
+  sample.run(_objectiveFunction);
+
+  auto evaluation = KORALI_GET(double, sample, "F(x)");
+  auto gradient = KORALI_GET(std::vector<double>, sample, "Gradient");
+
+  if (gradient.size() != _k->_variables.size())
+    KORALI_LOG_ERROR("Size of sample's gradient evaluations vector (%lu) is different from the number of problem variables defined (%lu).\n", gradient.size(), _k->_variables.size());
+
+  if (std::isfinite(evaluation) == false)
+    KORALI_LOG_ERROR("Non finite value of function evaluation detected: %f\n", evaluation);
+
+  for (size_t i = 0; i < gradient.size(); i++)
+    if (std::isfinite(gradient[i]) == false)
+      KORALI_LOG_ERROR("Non finite value of gradient evaluation detected for variable %lu: %f\n", i, gradient[i]);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

@@ -1,0 +1,18 @@
+#pragma once
+
+#include "modules/experiment/experiment.hpp"
+#include "modules/module.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  /**
+   * @brief Evaluates whether at least one of constraints have been met.
+   * @param operation Name of the operation
+   * @param sample A Korali Sample
+   */
+};
+
+__endNamespace__;

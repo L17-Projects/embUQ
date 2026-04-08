@@ -1,0 +1,78 @@
+#include "modules/problem/hierarchical/hierarchical.hpp"
+#include "sample/sample.hpp"
+
+__startNamespace__;
+
+void __className__::initialize()
+{
+  for (size_t i = 0; i < _k->_variables.size(); i++)
+  {
+    bool foundDistribution = false;
+
+    for (size_t j = 0; j < _k->_distributions.size(); j++)
+      if (_k->_variables[i]->_priorDistribution == _k->_distributions[j]->_name)
+      {
+        foundDistribution = true;
+        _k->_variables[i]->_distributionIndex = j;
+      }
+
+    if (foundDistribution == false)
+      KORALI_LOG_ERROR("Did not find distribution %s, specified by variable %s\n", _k->_variables[i]->_priorDistribution.c_str(), _k->_variables[i]->_name.c_str());
+  }
+}
+
+void __className__::evaluateLogPrior(Sample &sample)
+{
+  double logPrior = 0.0;
+
+  for (size_t i = 0; i < sample["Parameters"].size(); i++)
+    logPrior += _k->_distributions[_k->_variables[i]->_distributionIndex]->getLogDensity(sample["Parameters"][i]);
+
+  sample["logPrior"] = logPrior;
+}
+
+void __className__::evaluateLogPosterior(Sample &sample)
+{
+  int sampleId = sample["Sample Id"];
+  evaluateLogPrior(sample);
+
+  if (sample["logPrior"] == -Inf)
+  {
+    sample["logLikelihood"] = -Inf;
+    sample["logPosterior"] = -Inf;
+  }
+  else
+  {
+    evaluateLogLikelihood(sample);
+    double logPrior = sample["logPrior"];
+    double logLikelihood = sample["logLikelihood"];
+    double logPosterior = logPrior + logLikelihood;
+
+    if (std::isnan(logPosterior) == true) KORALI_LOG_ERROR("Sample %d returned NaN logPosterior evaluation.\n", sampleId);
+
+    sample["logPosterior"] = logPrior + logLikelihood;
+  }
+}
+
+bool __className__::isSampleFeasible(Sample &sample)
+{
+  for (size_t i = 0; i < sample["Parameters"].size(); i++)
+    if (isfinite(_k->_distributions[_k->_variables[i]->_distributionIndex]->getLogDensity(sample["Parameters"][i])) == false)
+    {
+      sample["Is Feasible"] = false;
+      return false;
+    }
+  sample["Is Feasible"] = true;
+  return true;
+}
+
+void __className__::evaluate(Sample &sample)
+{
+  evaluateLogPosterior(sample);
+  sample["P(x)"] = sample["logPosterior"];
+  sample["F(x)"] = sample["logPosterior"];
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

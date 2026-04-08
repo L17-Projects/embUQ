@@ -1,0 +1,42 @@
+#pragma once
+
+#include "auxiliar/libco/libco.h"
+#include "modules/conduit/conduit.hpp"
+#include <chrono>
+#include <map>
+#include <queue>
+#include <vector>
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  /**
+   * @brief User-Level thread (coroutine) containing the CPU execution state of the single worker.
+   */
+  cothread_t _workerThread;
+
+  /**
+   * @brief Queue of messages sent from the engine to the worker
+   */
+  std::queue<knlohmann::json> _workerMessageQueue;
+
+  bool isRoot() const override;
+  void initServer() override;
+  void initialize() override;
+  void terminateServer() override;
+
+  void stackEngine(Engine *engine) override;
+  void popEngine() override;
+
+  void listenWorkers() override;
+  void broadcastMessageToWorkers(knlohmann::json &message) override;
+  void sendMessageToEngine(knlohmann::json &message) override;
+  knlohmann::json recvMessageFromEngine() override;
+  void sendMessageToSample(Sample &sample, knlohmann::json &message) override;
+  size_t getProcessId() const override;
+  size_t getWorkerCount() const override;
+};
+
+__endNamespace__;

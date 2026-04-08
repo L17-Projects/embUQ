@@ -1,0 +1,45 @@
+#include "engine.hpp"
+#include "modules/solver/integrator/montecarlo/MonteCarlo.hpp"
+
+__startNamespace__;
+
+void __className__::setInitialConfiguration()
+{
+  Integrator::setInitialConfiguration();
+
+  // Calculate weight
+  _weight = 1. / (double)_numberOfSamples;
+  for (size_t d = 0; d < _variableCount; ++d)
+  {
+    _weight *= (_k->_variables[d]->_upperBound - _k->_variables[d]->_lowerBound);
+  }
+
+  // Init max model evaluations
+  _maxModelEvaluations = std::min(_maxModelEvaluations, _numberOfSamples);
+}
+
+void __className__::launchSample(size_t sampleIndex)
+{
+  std::vector<float> params(_variableCount);
+
+  /// Uniformly sample parameter
+  for (size_t d = 0; d < _variableCount; ++d)
+  {
+    params[d] = (_k->_variables[d]->_upperBound - _k->_variables[d]->_lowerBound) * _uniformGenerator->getRandomNumber();
+  }
+
+  _samples[sampleIndex]["Sample Id"] = sampleIndex;
+  _samples[sampleIndex]["Module"] = "Problem";
+  _samples[sampleIndex]["Operation"] = "Execute";
+  _samples[sampleIndex]["Parameters"] = params;
+  _samples[sampleIndex]["Weight"] = _weight;
+
+  // Store parameter
+  _gridPoints.push_back(params);
+
+  KORALI_START(_samples[sampleIndex]);
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

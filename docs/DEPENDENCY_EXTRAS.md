@@ -53,10 +53,16 @@ Install a broader development stack used for local development and debugging.
 
 The package extras do **not** currently make the full Korali backend available purely through pip.
 
-For the full workflow and Vega acceptance paths, the environment may still need:
+For the full workflow and Vega acceptance paths, the environment still needs:
 
-- a locally built or otherwise available Korali Python path
+- a locally built Korali Python path
 - system MPI libraries
 - CUDA/NVIDIA runtime support where applicable
 
-Those backend expectations are documented separately in the workflow and acceptance docs.
+For Vega, the supported bootstrap path is now repo-managed:
+
+- build vendored `extern/korali/`
+- install it into repo-local `_vega/korali/install`
+- source `_vega/korali/env.sh`
+
+See `VEGA_BOOTSTRAP.md` for the exact commands and helper scripts.

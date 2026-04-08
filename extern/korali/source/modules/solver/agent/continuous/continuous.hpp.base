@@ -1,0 +1,54 @@
+#pragma once
+
+#include "modules/distribution/univariate/beta/beta.hpp"
+#include "modules/problem/reinforcementLearning/continuous/continuous.hpp"
+#include "modules/solver/agent/agent.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  /**
+   * @brief Storage for the pointer to the (continuous) learning problem
+   */
+  problem::reinforcementLearning::Continuous *_problem;
+
+  /**
+   * @brief Calculates the gradient of teh importance weight  wrt to the parameter of the 2nd (current) distribution evaluated at old action.
+   * @param action The action taken by the agent in the given experience
+   * @param oldPolicy The policy for the given state used at the time the action was performed
+   * @param curPolicy The current policy for the given state
+   * @param importanceWeight The importance weight
+   * @return gradient of policy wrt curParamsOne and curParamsTwo
+   */
+  std::vector<float> calculateImportanceWeightGradient(const std::vector<float> &action, const policy_t &curPolicy, const policy_t &oldPolicy, const float importanceWeight);
+
+  /**
+   * @brief Calculates the gradient of KL(p_old, p_cur) wrt to the parameter of the 2nd (current) distribution.
+   * @param oldPolicy The policy for the given state used at the time the action was performed
+   * @param curPolicy The current policy for the given state
+   * @return
+   */
+  std::vector<float> calculateKLDivergenceGradient(const policy_t &oldPolicy, const policy_t &curPolicy);
+
+  /**
+   * @brief Function to generate randomized actions from neural network output.
+   * @param curPolicy The current policy for the given state
+   * @return An action vector
+   */
+  std::vector<float> generateTrainingAction(policy_t &curPolicy);
+
+  /**
+   * @brief Function to generate deterministic actions from neural network output required for policy evaluation, respectively testing.
+   * @param curPolicy The current policy for the given state
+   * @return An action vector
+   */
+  std::vector<float> generateTestingAction(const policy_t &curPolicy);
+
+  float calculateImportanceWeight(const std::vector<float> &action, const policy_t &curPolicy, const policy_t &oldPolicy) override;
+  virtual void getAction(korali::Sample &sample) override;
+  virtual void initializeAgent() override;
+};
+
+__endNamespace__;

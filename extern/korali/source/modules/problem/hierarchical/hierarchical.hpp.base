@@ -1,0 +1,57 @@
+#pragma once
+
+#include "modules/problem/problem.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  private:
+  public:
+  void initialize() override;
+
+  /**
+   * @brief Checks whether the proposed sample fits within the range of the prior distribution.
+   * @param sample A Korali Sample
+   * @return True, if feasible; false, otherwise.
+   */
+  bool isSampleFeasible(korali::Sample &sample);
+
+  /**
+   * @brief Produces a generic evaluation from the Posterior distribution of the sample, for optimization with CMAES, DEA, storing it in and stores it in sample["F(x)"].
+   * @param sample A Korali Sample
+   */
+  virtual void evaluate(korali::Sample &sample);
+
+  /**
+   * @brief Evaluates the log prior of the given sample, and stores it in sample["Log Prior"]
+   * @param sample A Korali Sample
+   */
+  void evaluateLogPrior(korali::Sample &sample);
+
+  /**
+   * @brief Evaluates the log likelihood of the given sample, and stores it in sample["Log Likelihood"]
+   * @param sample A Korali Sample
+   */
+  virtual void evaluateLogLikelihood(korali::Sample &sample) = 0;
+
+  /**
+   * @brief Evaluates the log posterior of the given sample, and stores it in sample["Log Posterior"]
+   * @param sample A Korali Sample
+   */
+  void evaluateLogPosterior(korali::Sample &sample);
+
+  /**
+   * @brief Evaluates a batch of samples and stores batch outputs on the batch sample.
+   * @param sample A Korali batch sample
+   */
+  virtual void evaluateBatch(korali::Sample &sample) { KORALI_LOG_ERROR("Batch evaluation not yet implemented for selected Hierarchical problem."); }
+
+  /**
+   * @brief Indicates whether the problem exposes a valid batch-evaluation path.
+   * @return True when batch evaluation is enabled.
+   */
+  virtual bool supportsEvaluateBatch() const { return false; }
+};
+
+__endNamespace__;

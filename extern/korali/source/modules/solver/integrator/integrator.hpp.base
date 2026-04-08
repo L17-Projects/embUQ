@@ -1,0 +1,28 @@
+#pragma once
+
+#include "modules/solver/solver.hpp"
+#include "sample/sample.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  /**
+   * @brief Container for samples to be evaluated per generation
+   */
+  std::vector<Sample> _samples;
+
+  /**
+   * @brief Prepares and launches a sample to be evaluated
+   * @param sampleIndex index of sample to be launched
+   */
+  virtual void launchSample(size_t sampleIndex) = 0;
+  virtual void setInitialConfiguration() override;
+  void runGeneration() override;
+  void printGenerationBefore() override;
+  void printGenerationAfter() override;
+  void finalize() override;
+};
+
+__endNamespace__;

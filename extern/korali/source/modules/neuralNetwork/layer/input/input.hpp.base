@@ -1,0 +1,15 @@
+#pragma once
+
+#include "modules/neuralNetwork/layer/layer.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  void initialize() override;
+  void forwardData(const size_t t) override;
+  void backwardData(const size_t t) override;
+};
+
+__endNamespace__;

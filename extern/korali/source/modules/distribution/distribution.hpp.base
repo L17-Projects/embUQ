@@ -1,0 +1,54 @@
+#pragma once
+
+#include "modules/module.hpp"
+#include <gsl/gsl_rng.h>
+#include <map>
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  /**
+   * @brief Map to store the link between parameter names and their pointers.
+   */
+  std::map<std::string, double *> _conditionalsMap;
+
+  /**
+   * @brief Auxiliar variable to hold pre-calculated data to avoid re-processing information.
+   */
+  double _aux;
+
+  /**
+   * @brief Indicates whether or not this distribution contains conditional variables.
+   */
+  bool _hasConditionalVariables;
+
+  /**
+   * @brief Creates and sets the RNG range (state and seed) of the random distribution
+   * @param rangeString The range to load, in string of hexadecimal values form
+   * @return Pointer to the new range.
+   */
+  gsl_rng *setRange(const std::string rangeString);
+
+  /**
+   * @brief Gets a hexadecimal string from a given range's state and seed
+   * @param range Range to read from
+   * @return Hexadecimal string produced.
+   */
+  std::string getRange(gsl_rng *range) const;
+
+  /**
+   * @brief Updates the parameters of the distribution based on conditional variables.
+   */
+  virtual void updateDistribution(){};
+
+  /**
+   * @brief Gets the pointer to a distribution property.
+   * @param property The name of the property to update
+   * @return Pointer to the property
+   */
+  virtual double *getPropertyPointer(const std::string &property) { return NULL; };
+};
+
+__endNamespace__;

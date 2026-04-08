@@ -1,0 +1,7 @@
+/dnnl*
+/googletest-*
+/gtest-mpi-listener-*
+/eigen*
+/gsl*
+/packagecache
+/pybind11*

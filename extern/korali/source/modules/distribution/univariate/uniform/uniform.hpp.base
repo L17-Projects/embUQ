@@ -1,0 +1,51 @@
+#pragma once
+
+#include "modules/distribution/univariate/univariate.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  private:
+  public:
+  /*
+   * @brief Updates distribution with new parameter (here normalization constant).
+   */
+  void updateDistribution() override;
+
+  /**
+   * @brief Gets the probability density of the distribution at point x.
+   * @param x point to evaluate P(x)
+   * @return Value of the probability density.
+   */
+  double getDensity(const double x) const override;
+
+  /**
+   * @brief Gets the Log probability density of the distribution at point x.
+   * @param x point to evaluate log(P(x))
+   * @return Log of probability density.
+   */
+  double getLogDensity(const double x) const override;
+
+  /**
+   * @brief Gets the Gradient of the log probability density of the distribution wrt. to x.
+   * @param x point to evaluate grad(log(P(x)))
+   * @return Gradient of log of probability density.
+   */
+  double getLogDensityGradient(double x) const override;
+
+  /**
+   * @brief Gets the second derivative of the log probability density of the distribution wrt. to x.
+   * @param x point to evaluate H(log(P(x)))
+   * @return Hessian of log of probability density.
+   */
+  double getLogDensityHessian(double x) const override;
+
+  /**
+   * @brief Draws and returns a random number from the distribution.
+   * @return Random real number.
+   */
+  double getRandomNumber() override;
+};
+
+__endNamespace__;

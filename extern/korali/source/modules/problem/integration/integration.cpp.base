@@ -1,0 +1,23 @@
+#include "modules/problem/integration/integration.hpp"
+#include "sample/sample.hpp"
+
+__startNamespace__;
+
+void __className__::initialize()
+{
+  if (_k->_variables.size() == 0) KORALI_LOG_ERROR("Integration problems require at least one variable.\n");
+}
+
+void __className__::execute(Sample &sample)
+{
+  // Evaluating Sample
+  sample.run(_integrand);
+
+  auto evaluation = KORALI_GET(double, sample, "Evaluation");
+
+  if (std::isnan(evaluation)) KORALI_LOG_ERROR("The function evaluation returned NaN.\n");
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

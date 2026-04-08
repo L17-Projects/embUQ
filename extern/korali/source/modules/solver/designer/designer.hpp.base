@@ -1,0 +1,36 @@
+#pragma once
+
+#include "modules/distribution/univariate/normal/normal.hpp"
+#include "modules/problem/design/design.hpp"
+#include "modules/solver/solver.hpp"
+#include "sample/sample.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  /**
+   * @brief Container for samples to be evaluated per generation
+   */
+  std::vector<Sample> _samples;
+
+  /**
+   * @brief Problem pointer
+   */
+  problem::Design *_problem;
+
+  /**
+   * @brief Evaluates the utility function for a given design
+   * @param sample A Korali Sample
+   */
+  void evaluateDesign(Sample &sample);
+
+  virtual void setInitialConfiguration() override;
+  void runGeneration() override;
+  void printGenerationBefore() override;
+  void printGenerationAfter() override;
+  void finalize() override;
+};
+
+__endNamespace__;

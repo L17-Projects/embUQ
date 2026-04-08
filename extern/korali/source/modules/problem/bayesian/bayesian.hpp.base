@@ -1,0 +1,92 @@
+#pragma once
+
+#include "modules/problem/problem.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  private:
+  public:
+  void initialize() override;
+
+  /**
+   * @brief Produces a generic evaluation from the Posterior distribution of the sample, for optimization with CMAES, DEA, storing it in and stores it in sample["F(x)"].
+   * @param sample A Korali Sample
+   */
+  virtual void evaluate(korali::Sample &sample);
+
+  /**
+   * @brief Evaluates the log prior of the given sample, and stores it in sample["Log Prior"]
+   * @param sample A Korali Sample
+   */
+  void evaluateLogPrior(korali::Sample &sample);
+
+  /**
+   * @brief Evaluates the log likelihood of the given sample, and stores it in sample["Log Likelihood"]
+   * @param sample A Korali Sample
+   */
+  virtual void evaluateLoglikelihood(korali::Sample &sample) = 0;
+
+  /**
+   * @brief Evaluates the log posterior of the given sample, and stores it in sample["Log Posterior"]
+   * @param sample A Korali Sample
+   */
+  void evaluateLogPosterior(korali::Sample &sample);
+
+  /**
+   * @brief Evaluates a batch of samples and stores batch outputs on the batch sample.
+   * @param sample A Korali batch sample
+   */
+  virtual void evaluateBatch(korali::Sample &sample) { KORALI_LOG_ERROR("Batch evaluation not yet implemented for selected Bayesian problem."); }
+
+  /**
+   * @brief Indicates whether the problem exposes a valid batch-evaluation path.
+   * @return True when batch evaluation is enabled.
+   */
+  virtual bool supportsEvaluateBatch() const { return false; }
+
+  /**
+   * @brief Evaluates the gradient of the objective w.r.t. to the variables, and stores it in sample["Gradient"]
+   * @param sample A Korali Sample
+   */
+  virtual void evaluateGradient(korali::Sample &sample);
+
+  /**
+   * @brief Evaluates the gradient of the logPrior w.r.t. to the variables, and stores it in sample["logPrior Gradient"]
+   * @param sample A Korali Sample
+   */
+  void evaluateLogPriorGradient(korali::Sample &sample);
+
+  /**
+   * @brief Evaluates the gradient of the logLikelikood w.r.t. to the variables, and stores it in sample["logLikelihood Gradient"]
+   * @param sample A Korali Sample
+   */
+  virtual void evaluateLoglikelihoodGradient(korali::Sample &sample) { KORALI_LOG_ERROR("Gradient not yet implemented for selected Bayesian problem and logLikelihood model."); }
+
+  /**
+   * @brief Evaluates the hessian of the objective w.r.t. to the variables, and stores it in sample["Hessian"]
+   * @param sample A Korali Sample
+   */
+  virtual void evaluateHessian(korali::Sample &sample);
+
+  /**
+   * @brief Evaluates the gradient of the logPrior w.r.t. to the variables, and stores it in sample["logPrior Hessian"]
+   * @param sample A Korali Sample
+   */
+  void evaluateLogPriorHessian(korali::Sample &sample);
+
+  /**
+   * @brief Evaluates the gradient of the logLikelikood w.r.t. to the variables, and stores it in sample["logLikelihood Hessian"]
+   * @param sample A Korali Sample
+   */
+  virtual void evaluateLogLikelihoodHessian(korali::Sample &sample) { KORALI_LOG_ERROR("Hessian not yet implemented for selected Bayesian problem and logLikelihood model."); }
+
+  /**
+   * @brief Evaluates the empirical Fisher information.
+   * @param sample A Korali Sample
+   */
+  virtual void evaluateFisherInformation(korali::Sample &sample) { KORALI_LOG_ERROR("Fisher information not yet implemented for selected Bayesian problem and log likelihood model."); }
+};
+
+__endNamespace__;

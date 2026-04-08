@@ -1,0 +1,60 @@
+#include "modules/distribution/univariate/truncatedNormal/truncatedNormal.hpp"
+#include "modules/experiment/experiment.hpp"
+#include <gsl/gsl_math.h>
+#include <gsl/gsl_sf.h>
+
+#include "auxiliar/rtnorm/rtnorm.hpp"
+
+using namespace Rtnorm;
+
+__startNamespace__;
+
+double
+__className__::getDensity(const double x) const
+{
+  double d = (x - _mu) / _sigma;
+  return gsl_sf_exp(-0.5 * d * d) / _normalization;
+}
+
+double __className__::getLogDensity(const double x) const
+{
+  double d = (x - _mu) / _sigma;
+  return -0.5 * d * d - _logNormalization;
+}
+
+double __className__::getLogDensityGradient(const double x) const
+{
+  return (x - _mu) / (_sigma * _sigma);
+}
+
+double __className__::getLogDensityHessian(const double x) const
+{
+  return 1. / (_sigma * _sigma);
+}
+
+double __className__::getRandomNumber()
+{
+  std::pair<double, double> s = rtnorm(_range, _minimum, _maximum, _mu, _sigma);
+  return s.first;
+}
+
+void __className__::updateDistribution()
+{
+  if (_sigma <= 0.0) KORALI_LOG_ERROR("Incorrect Standard Deviation parameter of Truncated Normal distribution: %f.\n", _sigma);
+
+  if (_maximum - _minimum <= 0.0)
+    KORALI_LOG_ERROR("Incorrect Minimum/Maximum configuration: %f/%f.\n", _minimum, _maximum);
+
+  else
+  {
+    double a = (_minimum - _mu) / _sigma;
+    double b = (_maximum - _mu) / _sigma;
+
+    _normalization = 0.5 * M_SQRT2 * M_SQRTPI * _sigma * (gsl_sf_erf(b * M_SQRT1_2) - gsl_sf_erf(a * M_SQRT1_2));
+    _logNormalization = gsl_sf_log(_normalization);
+  }
+}
+
+__moduleAutoCode__;
+
+__endNamespace__;

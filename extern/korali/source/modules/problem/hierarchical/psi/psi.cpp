@@ -5,8 +5,303 @@
 #include "modules/problem/hierarchical/psi/psi.hpp"
 #include "sample/sample.hpp"
 
+#include <algorithm>
+#include <chrono>
+#include <cctype>
 #include <cmath>
+#include <cstdlib>
+#include <fstream>
+#include <iomanip>
 #include <limits>
+#include <mutex>
+#include <sstream>
+
+#ifdef _KORALI_USE_CUDA_BATCH
+  #include <cuda.h>
+  #include <nvrtc.h>
+#endif
+
+namespace
+{
+using steadyClock = std::chrono::steady_clock;
+
+constexpr size_t kNativeBatchOmpThreshold = 128;
+constexpr unsigned int kNativeCudaThreadBlockSize = 256;
+
+inline double elapsedSeconds(const steadyClock::time_point &start, const steadyClock::time_point &end)
+{
+  return std::chrono::duration<double>(end - start).count();
+}
+
+inline std::string nativeCudaProfilePath()
+{
+  const char *profilePath = std::getenv("HUQ_PSI_NATIVE_CUDA_PROFILE_JSONL");
+  if (profilePath == nullptr) return "";
+  return profilePath;
+}
+
+inline void appendNativeCudaProfileLine(const std::string &line)
+{
+  const std::string profilePath = nativeCudaProfilePath();
+  if (profilePath.empty()) return;
+
+  static std::mutex profileMutex;
+  std::lock_guard<std::mutex> lock(profileMutex);
+
+  std::ofstream handle(profilePath, std::ios::app);
+  if (handle.good() == false) return;
+  handle << line << '\n';
+}
+
+inline void appendNativeCudaSetupProfileRecord(
+    int deviceId,
+    unsigned int subProblemCount,
+    unsigned int dynamicPriorCount,
+    double contextSeconds,
+    double compileSeconds,
+    double moduleLoadSeconds,
+    double allocSeconds,
+    double h2dSeconds,
+    double totalSeconds)
+{
+  std::ostringstream record;
+  record << std::setprecision(17);
+  record << "{\"kind\":\"native_cuda_setup\""
+         << ",\"device_id\":" << deviceId
+         << ",\"sub_problem_count\":" << subProblemCount
+         << ",\"dynamic_prior_count\":" << dynamicPriorCount
+         << ",\"context_seconds\":" << contextSeconds
+         << ",\"compile_seconds\":" << compileSeconds
+         << ",\"module_load_seconds\":" << moduleLoadSeconds
+         << ",\"alloc_seconds\":" << allocSeconds
+         << ",\"h2d_seconds\":" << h2dSeconds
+         << ",\"total_seconds\":" << totalSeconds
+         << "}";
+  appendNativeCudaProfileLine(record.str());
+}
+
+inline void appendNativeCudaBatchProfileRecord(
+    unsigned int batchSize,
+    unsigned int parameterCount,
+    unsigned int subProblemCount,
+    unsigned int dynamicPriorCount,
+    double logPriorSeconds,
+    double flattenSeconds,
+    double contextSeconds,
+    double allocSeconds,
+    double h2dSeconds,
+    double launchSeconds,
+    double computeSeconds,
+    double d2hSeconds,
+    double freeSeconds,
+    double hostReduceSeconds,
+    double totalSeconds)
+{
+  std::ostringstream record;
+  record << std::setprecision(17);
+  record << "{\"kind\":\"native_cuda_batch\""
+         << ",\"batch_size\":" << batchSize
+         << ",\"parameter_count\":" << parameterCount
+         << ",\"sub_problem_count\":" << subProblemCount
+         << ",\"dynamic_prior_count\":" << dynamicPriorCount
+         << ",\"log_prior_seconds\":" << logPriorSeconds
+         << ",\"flatten_seconds\":" << flattenSeconds
+         << ",\"context_seconds\":" << contextSeconds
+         << ",\"alloc_seconds\":" << allocSeconds
+         << ",\"h2d_seconds\":" << h2dSeconds
+         << ",\"launch_seconds\":" << launchSeconds
+         << ",\"compute_seconds\":" << computeSeconds
+         << ",\"d2h_seconds\":" << d2hSeconds
+         << ",\"free_seconds\":" << freeSeconds
+         << ",\"host_reduce_seconds\":" << hostReduceSeconds
+         << ",\"total_seconds\":" << totalSeconds
+         << "}";
+  appendNativeCudaProfileLine(record.str());
+}
+
+#ifdef _KORALI_USE_CUDA_BATCH
+inline void cudaDriverErrCheck(CUresult status, const char *statement, const char *file, int line)
+{
+  if (status == CUDA_SUCCESS) return;
+
+  const char *errorName = nullptr;
+  const char *errorString = nullptr;
+  cuGetErrorName(status, &errorName);
+  cuGetErrorString(status, &errorString);
+  korali::Logger::logError(file, line, "CUDA driver call '%s' failed with %s (%s).\n", statement, errorName == nullptr ? "UNKNOWN" : errorName, errorString == nullptr ? "No description" : errorString);
+}
+
+inline void nvrtcErrCheck(nvrtcResult status, const char *statement, const char *file, int line)
+{
+  if (status == NVRTC_SUCCESS) return;
+
+  korali::Logger::logError(file, line, "NVRTC call '%s' failed with %s.\n", statement, nvrtcGetErrorString(status));
+}
+
+inline std::string extractCudaKernelEntryName(const std::string &ptx)
+{
+  const std::string entryToken = ".entry";
+  const size_t entryPos = ptx.find(entryToken);
+  if (entryPos == std::string::npos) return "";
+
+  size_t nameStart = entryPos + entryToken.size();
+  while (nameStart < ptx.size() && std::isspace(static_cast<unsigned char>(ptx[nameStart]))) ++nameStart;
+
+  size_t nameEnd = nameStart;
+  while (nameEnd < ptx.size() && std::isspace(static_cast<unsigned char>(ptx[nameEnd])) == false && ptx[nameEnd] != '(') ++nameEnd;
+
+  return ptx.substr(nameStart, nameEnd - nameStart);
+}
+
+  #define KORALI_CUDA_DRIVER_CHECK(statement) cudaDriverErrCheck((statement), #statement, __FILE__, __LINE__)
+  #define KORALI_NVRTC_CHECK(statement) nvrtcErrCheck((statement), #statement, __FILE__, __LINE__)
+
+constexpr const char *kPsiNativeCudaKernelSource = R"CUDA(
+static __device__ __forceinline__ double koraliNegativeInfinity()
+{
+  return -1.0 / 0.0;
+}
+
+extern "C" __global__
+void psiBatchLogLikelihoodKernel(
+    const double *batchParameters,
+    const unsigned int parameterCount,
+    const unsigned int batchSize,
+    const unsigned int dynamicPriorCount,
+    const int *priorKinds,
+    const int *parameterAIsVariable,
+    const int *parameterAPositions,
+    const double *parameterAValues,
+    const int *parameterBIsVariable,
+    const int *parameterBPositions,
+    const double *parameterBValues,
+    const double * const *subProblemCoordinates,
+    const double * const *subProblemBaseLogWeights,
+    const unsigned int *subProblemSampleCounts,
+    const unsigned int subProblemCount,
+    double *subProblemLogLikelihoods)
+{
+  const unsigned int candidateId = blockIdx.x;
+  const unsigned int subProblemId = blockIdx.y;
+  const unsigned int tid = threadIdx.x;
+
+  if (candidateId >= batchSize || subProblemId >= subProblemCount) return;
+
+  const double *parameters = batchParameters + (size_t)candidateId * parameterCount;
+  const double *sampleCoordinates = subProblemCoordinates[subProblemId];
+  const double *baseLogWeights = subProblemBaseLogWeights[subProblemId];
+  const unsigned int sampleCount = subProblemSampleCounts[subProblemId];
+
+  double localMax = koraliNegativeInfinity();
+
+  for (unsigned int sampleId = tid; sampleId < sampleCount; sampleId += blockDim.x)
+  {
+    double logValue = baseLogWeights[sampleId];
+
+    if (!isfinite(logValue)) continue;
+
+    for (unsigned int priorId = 0; priorId < dynamicPriorCount; ++priorId)
+    {
+      const double sampleValue = sampleCoordinates[(size_t)priorId * sampleCount + sampleId];
+      const double parameterA = parameterAIsVariable[priorId] != 0 ? parameters[parameterAPositions[priorId]] : parameterAValues[priorId];
+      const double parameterB = parameterBIsVariable[priorId] != 0 ? parameters[parameterBPositions[priorId]] : parameterBValues[priorId];
+
+      if (priorKinds[priorId] == 0)
+      {
+        if (parameterB <= 0.0)
+        {
+          logValue = koraliNegativeInfinity();
+          break;
+        }
+
+        const double delta = (sampleValue - parameterA) / parameterB;
+        logValue += -0.91893853320467266954 - log(parameterB) - 0.5 * delta * delta;
+      }
+      else
+      {
+        if (parameterB <= parameterA || sampleValue < parameterA || sampleValue > parameterB)
+        {
+          logValue = koraliNegativeInfinity();
+          break;
+        }
+
+        logValue += -log(parameterB - parameterA);
+      }
+    }
+
+    if (logValue > localMax) localMax = logValue;
+  }
+
+  __shared__ double sharedMax[256];
+  sharedMax[tid] = localMax;
+  __syncthreads();
+
+  for (unsigned int stride = blockDim.x / 2; stride > 0; stride >>= 1)
+  {
+    if (tid < stride && sharedMax[tid + stride] > sharedMax[tid]) sharedMax[tid] = sharedMax[tid + stride];
+    __syncthreads();
+  }
+
+  const double blockMax = sharedMax[0];
+  double localSum = 0.0;
+
+  if (isfinite(blockMax))
+  {
+    for (unsigned int sampleId = tid; sampleId < sampleCount; sampleId += blockDim.x)
+    {
+      double logValue = baseLogWeights[sampleId];
+
+      if (!isfinite(logValue)) continue;
+
+      for (unsigned int priorId = 0; priorId < dynamicPriorCount; ++priorId)
+      {
+        const double sampleValue = sampleCoordinates[(size_t)priorId * sampleCount + sampleId];
+        const double parameterA = parameterAIsVariable[priorId] != 0 ? parameters[parameterAPositions[priorId]] : parameterAValues[priorId];
+        const double parameterB = parameterBIsVariable[priorId] != 0 ? parameters[parameterBPositions[priorId]] : parameterBValues[priorId];
+
+        if (priorKinds[priorId] == 0)
+        {
+          if (parameterB <= 0.0)
+          {
+            logValue = koraliNegativeInfinity();
+            break;
+          }
+
+          const double delta = (sampleValue - parameterA) / parameterB;
+          logValue += -0.91893853320467266954 - log(parameterB) - 0.5 * delta * delta;
+        }
+        else
+        {
+          if (parameterB <= parameterA || sampleValue < parameterA || sampleValue > parameterB)
+          {
+            logValue = koraliNegativeInfinity();
+            break;
+          }
+
+          logValue += -log(parameterB - parameterA);
+        }
+      }
+
+      if (isfinite(logValue)) localSum += exp(logValue - blockMax);
+    }
+  }
+
+  __shared__ double sharedSum[256];
+  sharedSum[tid] = localSum;
+  __syncthreads();
+
+  for (unsigned int stride = blockDim.x / 2; stride > 0; stride >>= 1)
+  {
+    if (tid < stride) sharedSum[tid] += sharedSum[tid + stride];
+    __syncthreads();
+  }
+
+  if (tid == 0)
+    subProblemLogLikelihoods[(size_t)subProblemId * batchSize + candidateId] = isfinite(blockMax) ? blockMax + log(sharedSum[0]) : koraliNegativeInfinity();
+}
+)CUDA";
+#endif
+}
 
 namespace korali
 {
@@ -16,17 +311,32 @@ namespace hierarchical
 {
 ;
 
-bool Psi::usesExternalBatchBackend() const { return _batchEvaluationBackend == "External"; }
-bool Psi::usesNativeCpuBatchBackend() const { return _batchEvaluationBackend == "NativeCpu"; }
-bool Psi::usesNativeCudaBatchBackend() const { return _batchEvaluationBackend == "NativeCuda"; }
+bool Psi::usesExternalBatchBackend() const
+{
+  return _batchEvaluationBackend == "External";
+}
 
-Psi::~Psi() { releaseNativeCudaBatch(); }
+bool Psi::usesNativeCpuBatchBackend() const
+{
+  return _batchEvaluationBackend == "NativeCpu";
+}
 
-size_t Psi::findVariablePosition(const std::string &variableName, const std::string &, size_t) const
+bool Psi::usesNativeCudaBatchBackend() const
+{
+  return _batchEvaluationBackend == "NativeCuda";
+}
+
+Psi::~Psi()
+{
+  releaseNativeCudaBatch();
+}
+
+size_t Psi::findVariablePosition(const std::string &variableName, const std::string &propertyName, size_t priorIndex) const
 {
   for (size_t i = 0; i < _k->_variables.size(); ++i)
     if (_k->_variables[i]->_name == variableName) return i;
-  KORALI_LOG_ERROR("Could not resolve variable '%s' while configuring Hierarchical/Psi native batch evaluation.\n", variableName.c_str());
+
+  KORALI_LOG_ERROR("No variable name specified that satisfies conditional prior property \"%s\" for prior %zu with key: \"%s\".\n", propertyName.c_str(), priorIndex, variableName.c_str());
   return 0;
 }
 
@@ -34,19 +344,23 @@ Psi::nativeParameterSource Psi::createNativeParameterSource(const std::string &v
 {
   nativeParameterSource source;
   source._value = value;
+
   if (variableName.empty() == false)
   {
     source._isVariable = true;
     source._position = findVariablePosition(variableName, propertyName, priorIndex);
   }
+
   return source;
 }
 
 double Psi::resolveNativeParameter(const nativeParameterSource &source, const std::vector<double> &parameters) const
 {
   if (source._isVariable == false) return source._value;
+
   if (source._position >= parameters.size())
     KORALI_LOG_ERROR("Native batch evaluation requested Psi parameter %zu, but the batch sample only contains %zu parameters.\n", source._position, parameters.size());
+
   return parameters[source._position];
 }
 
@@ -56,33 +370,494 @@ double Psi::evaluateNativeConditionalLogDensity(const nativeConditionalPriorSpec
   {
     const double mean = resolveNativeParameter(spec._parameterA, parameters);
     const double standardDeviation = resolveNativeParameter(spec._parameterB, parameters);
+
     if (standardDeviation <= 0.0) return -Inf;
+
     const double delta = (sampleValue - mean) / standardDeviation;
     return -0.5 * _log2Pi - std::log(standardDeviation) - 0.5 * delta * delta;
   }
 
-  const double minimum = resolveNativeParameter(spec._parameterA, parameters);
-  const double maximum = resolveNativeParameter(spec._parameterB, parameters);
-  if (maximum <= minimum) return -Inf;
-  if (sampleValue < minimum || sampleValue > maximum) return -Inf;
-  return -std::log(maximum - minimum);
+  if (spec._kind == nativeConditionalPriorKind::Uniform)
+  {
+    const double minimum = resolveNativeParameter(spec._parameterA, parameters);
+    const double maximum = resolveNativeParameter(spec._parameterB, parameters);
+
+    if (maximum <= minimum) return -Inf;
+    if (sampleValue < minimum || sampleValue > maximum) return -Inf;
+
+    return -std::log(maximum - minimum);
+  }
+
+  KORALI_LOG_ERROR("Unsupported native conditional prior kind requested in Hierarchical/Psi.\n");
+  return -Inf;
 }
 
-void Psi::initializeNativeBatchCache() {}
-void Psi::initializeNativeCudaBatch() {}
-void Psi::releaseNativeCudaBatch() {}
+void Psi::initializeNativeBatchCache()
+{
+  _nativeConditionalPriorSpecs.clear();
+  _nativeDynamicConditionalPriorIndexes.clear();
+  _nativeSubProblemCaches.clear();
+
+  if (usesNativeCpuBatchBackend() == false && usesNativeCudaBatchBackend() == false) return;
+
+  _nativeConditionalPriorSpecs.resize(_conditionalPriors.size());
+
+  for (size_t i = 0; i < _conditionalPriors.size(); ++i)
+  {
+    nativeConditionalPriorSpec spec;
+    spec._sampleDimension = i;
+
+    auto *distribution = _k->_distributions[_conditionalPriorIndexes[i]];
+
+    if (auto *normal = dynamic_cast<korali::distribution::univariate::Normal *>(distribution))
+    {
+      spec._kind = nativeConditionalPriorKind::Normal;
+      spec._parameterA = createNativeParameterSource(normal->_meanConditional, normal->_mean, "Mean", i);
+      spec._parameterB = createNativeParameterSource(normal->_standardDeviationConditional, normal->_standardDeviation, "Standard Deviation", i);
+    }
+    else if (auto *uniform = dynamic_cast<korali::distribution::univariate::Uniform *>(distribution))
+    {
+      spec._kind = nativeConditionalPriorKind::Uniform;
+      spec._parameterA = createNativeParameterSource(uniform->_minimumConditional, uniform->_minimum, "Minimum", i);
+      spec._parameterB = createNativeParameterSource(uniform->_maximumConditional, uniform->_maximum, "Maximum", i);
+    }
+    else
+    {
+      KORALI_LOG_ERROR("Hierarchical/Psi native CPU batch backend currently supports only Univariate/Normal and Univariate/Uniform conditional priors, but prior %zu uses distribution '%s'.\n", i, distribution->_type.c_str());
+    }
+
+    if (spec.isConstant() == false) _nativeDynamicConditionalPriorIndexes.push_back(i);
+
+    _nativeConditionalPriorSpecs[i] = spec;
+  }
+
+  _nativeSubProblemCaches.resize(_subProblemsCount);
+  const std::vector<double> emptyParameters;
+
+  for (size_t subProblemId = 0; subProblemId < _subProblemsCount; ++subProblemId)
+  {
+    auto &cache = _nativeSubProblemCaches[subProblemId];
+    const auto sampleCount = _subProblemsSampleCoordinates[subProblemId].size();
+
+    if (_subProblemsSampleLogPriors[subProblemId].size() != sampleCount)
+      KORALI_LOG_ERROR("Sub-problem %zu stores %zu posterior samples but %zu posterior log-priors.\n", subProblemId, sampleCount, _subProblemsSampleLogPriors[subProblemId].size());
+
+    cache._sampleCoordinatesByVariable.assign(_subProblemsVariablesCount, std::vector<double>(sampleCount));
+    cache._baseLogWeights.resize(sampleCount, -Inf);
+
+    for (size_t sampleId = 0; sampleId < sampleCount; ++sampleId)
+    {
+      if (_subProblemsSampleCoordinates[subProblemId][sampleId].size() != _subProblemsVariablesCount)
+        KORALI_LOG_ERROR("Sub-problem %zu sample %zu contains %zu coordinates, but the hierarchical Psi problem expects %zu.\n", subProblemId, sampleId, _subProblemsSampleCoordinates[subProblemId][sampleId].size(), _subProblemsVariablesCount);
+
+      double baseLogWeight = -_subProblemsSampleLogPriors[subProblemId][sampleId];
+
+      for (size_t variableId = 0; variableId < _subProblemsVariablesCount; ++variableId)
+        cache._sampleCoordinatesByVariable[variableId][sampleId] = _subProblemsSampleCoordinates[subProblemId][sampleId][variableId];
+
+      for (size_t priorId = 0; priorId < _nativeConditionalPriorSpecs.size(); ++priorId)
+      {
+        const auto &spec = _nativeConditionalPriorSpecs[priorId];
+        if (spec.isConstant() == false) continue;
+
+        const double logDensity = evaluateNativeConditionalLogDensity(spec, emptyParameters, cache._sampleCoordinatesByVariable[spec._sampleDimension][sampleId]);
+        if (std::isfinite(logDensity) == false)
+        {
+          baseLogWeight = -Inf;
+          break;
+        }
+
+        baseLogWeight += logDensity;
+      }
+
+      cache._baseLogWeights[sampleId] = baseLogWeight;
+    }
+  }
+}
+
+void Psi::releaseNativeCudaBatch()
+{
+#ifdef _KORALI_USE_CUDA_BATCH
+  if (_nativeCudaInitialized == false) return;
+
+  KORALI_CUDA_DRIVER_CHECK(cuCtxSetCurrent(_nativeCudaContext));
+
+  for (auto devicePointer : _nativeCudaSubProblemCoordinates)
+    if (devicePointer != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(devicePointer));
+  _nativeCudaSubProblemCoordinates.clear();
+
+  for (auto devicePointer : _nativeCudaSubProblemBaseLogWeights)
+    if (devicePointer != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(devicePointer));
+  _nativeCudaSubProblemBaseLogWeights.clear();
+
+  if (_nativeCudaSubProblemCoordinatesDevice != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaSubProblemCoordinatesDevice));
+  if (_nativeCudaSubProblemBaseLogWeightsDevice != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaSubProblemBaseLogWeightsDevice));
+  if (_nativeCudaSubProblemSampleCountsDevice != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaSubProblemSampleCountsDevice));
+  if (_nativeCudaPriorKindsDevice != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaPriorKindsDevice));
+  if (_nativeCudaParameterAIsVariableDevice != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaParameterAIsVariableDevice));
+  if (_nativeCudaParameterAPositionDevice != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaParameterAPositionDevice));
+  if (_nativeCudaParameterAValueDevice != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaParameterAValueDevice));
+  if (_nativeCudaParameterBIsVariableDevice != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaParameterBIsVariableDevice));
+  if (_nativeCudaParameterBPositionDevice != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaParameterBPositionDevice));
+  if (_nativeCudaParameterBValueDevice != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaParameterBValueDevice));
+
+  _nativeCudaSubProblemCoordinatesDevice = 0;
+  _nativeCudaSubProblemBaseLogWeightsDevice = 0;
+  _nativeCudaSubProblemSampleCountsDevice = 0;
+  _nativeCudaPriorKindsDevice = 0;
+  _nativeCudaParameterAIsVariableDevice = 0;
+  _nativeCudaParameterAPositionDevice = 0;
+  _nativeCudaParameterAValueDevice = 0;
+  _nativeCudaParameterBIsVariableDevice = 0;
+  _nativeCudaParameterBPositionDevice = 0;
+  _nativeCudaParameterBValueDevice = 0;
+
+  if (_nativeCudaModule != nullptr) KORALI_CUDA_DRIVER_CHECK(cuModuleUnload(_nativeCudaModule));
+  if (_nativeCudaContext != nullptr) KORALI_CUDA_DRIVER_CHECK(cuDevicePrimaryCtxRelease(_nativeCudaDevice));
+
+  _nativeCudaModule = nullptr;
+  _nativeCudaLogLikelihoodKernel = nullptr;
+  _nativeCudaContext = nullptr;
+  _nativeCudaInitialized = false;
+#endif
+}
+
+void Psi::initializeNativeCudaBatch()
+{
+#ifndef _KORALI_USE_CUDA_BATCH
+  KORALI_LOG_ERROR("Hierarchical/Psi native CUDA batch backend requested, but Korali was built without -Dnative_cuda_batch=true.\n");
+#else
+  const auto setupStart = steadyClock::now();
+  double contextSeconds = 0.0;
+  double compileSeconds = 0.0;
+  double moduleLoadSeconds = 0.0;
+  double allocSeconds = 0.0;
+  double h2dSeconds = 0.0;
+
+  releaseNativeCudaBatch();
+
+  auto contextStart = steadyClock::now();
+  KORALI_CUDA_DRIVER_CHECK(cuInit(0));
+
+  int deviceCount = 0;
+  KORALI_CUDA_DRIVER_CHECK(cuDeviceGetCount(&deviceCount));
+  if (deviceCount <= 0) KORALI_LOG_ERROR("Hierarchical/Psi native CUDA batch backend requested, but no CUDA device is available.\n");
+
+  KORALI_CUDA_DRIVER_CHECK(cuDeviceGet(&_nativeCudaDevice, _nativeCudaDeviceId));
+  KORALI_CUDA_DRIVER_CHECK(cuDevicePrimaryCtxRetain(&_nativeCudaContext, _nativeCudaDevice));
+  KORALI_CUDA_DRIVER_CHECK(cuCtxSetCurrent(_nativeCudaContext));
+  contextSeconds += elapsedSeconds(contextStart, steadyClock::now());
+
+  int major = 0;
+  int minor = 0;
+  KORALI_CUDA_DRIVER_CHECK(cuDeviceComputeCapability(&major, &minor, _nativeCudaDevice));
+
+  auto compileStart = steadyClock::now();
+  nvrtcProgram program;
+  KORALI_NVRTC_CHECK(nvrtcCreateProgram(&program, kPsiNativeCudaKernelSource, "psi_native_cuda.cu", 0, nullptr, nullptr));
+
+  const std::string architectureFlag = "--gpu-architecture=compute_" + std::to_string(major) + std::to_string(minor);
+  const std::vector<const char *> compileOptions = {
+      architectureFlag.c_str(),
+      "--std=c++11"};
+
+  const nvrtcResult compileResult = nvrtcCompileProgram(program, static_cast<int>(compileOptions.size()), compileOptions.data());
+  if (compileResult != NVRTC_SUCCESS)
+  {
+    size_t logSize = 0;
+    KORALI_NVRTC_CHECK(nvrtcGetProgramLogSize(program, &logSize));
+    std::string compileLog(logSize, '\0');
+    KORALI_NVRTC_CHECK(nvrtcGetProgramLog(program, compileLog.data()));
+    nvrtcDestroyProgram(&program);
+    KORALI_LOG_ERROR("Failed to compile native CUDA Psi kernel for compute capability %d%d.\n%s\n", major, minor, compileLog.c_str());
+  }
+
+  size_t ptxSize = 0;
+  KORALI_NVRTC_CHECK(nvrtcGetPTXSize(program, &ptxSize));
+  std::string ptx(ptxSize, '\0');
+  KORALI_NVRTC_CHECK(nvrtcGetPTX(program, ptx.data()));
+  KORALI_NVRTC_CHECK(nvrtcDestroyProgram(&program));
+  const std::string kernelName = extractCudaKernelEntryName(ptx);
+  if (kernelName.empty()) KORALI_LOG_ERROR("Failed to extract CUDA kernel entry name from generated PTX for native Psi batch backend.\n");
+  compileSeconds += elapsedSeconds(compileStart, steadyClock::now());
+
+  auto moduleLoadStart = steadyClock::now();
+  KORALI_CUDA_DRIVER_CHECK(cuModuleLoadData(&_nativeCudaModule, ptx.c_str()));
+  KORALI_CUDA_DRIVER_CHECK(cuModuleGetFunction(&_nativeCudaLogLikelihoodKernel, _nativeCudaModule, kernelName.c_str()));
+  moduleLoadSeconds += elapsedSeconds(moduleLoadStart, steadyClock::now());
+
+  const size_t dynamicPriorCount = _nativeDynamicConditionalPriorIndexes.size();
+
+  std::vector<int> priorKinds(dynamicPriorCount, 0);
+  std::vector<int> parameterAIsVariable(dynamicPriorCount, 0);
+  std::vector<int> parameterAPositions(dynamicPriorCount, 0);
+  std::vector<double> parameterAValues(dynamicPriorCount, 0.0);
+  std::vector<int> parameterBIsVariable(dynamicPriorCount, 0);
+  std::vector<int> parameterBPositions(dynamicPriorCount, 0);
+  std::vector<double> parameterBValues(dynamicPriorCount, 0.0);
+
+  for (size_t localPriorId = 0; localPriorId < dynamicPriorCount; ++localPriorId)
+  {
+    const auto &spec = _nativeConditionalPriorSpecs[_nativeDynamicConditionalPriorIndexes[localPriorId]];
+    priorKinds[localPriorId] = static_cast<int>(spec._kind);
+    parameterAIsVariable[localPriorId] = spec._parameterA._isVariable ? 1 : 0;
+    parameterAPositions[localPriorId] = static_cast<int>(spec._parameterA._position);
+    parameterAValues[localPriorId] = spec._parameterA._value;
+    parameterBIsVariable[localPriorId] = spec._parameterB._isVariable ? 1 : 0;
+    parameterBPositions[localPriorId] = static_cast<int>(spec._parameterB._position);
+    parameterBValues[localPriorId] = spec._parameterB._value;
+  }
+
+  _nativeCudaSubProblemCoordinates.resize(_nativeSubProblemCaches.size(), 0);
+  _nativeCudaSubProblemBaseLogWeights.resize(_nativeSubProblemCaches.size(), 0);
+  std::vector<CUdeviceptr> coordinatePointers(_nativeSubProblemCaches.size(), 0);
+  std::vector<CUdeviceptr> baseLogWeightPointers(_nativeSubProblemCaches.size(), 0);
+  std::vector<unsigned int> sampleCounts(_nativeSubProblemCaches.size(), 0);
+
+  for (size_t subProblemId = 0; subProblemId < _nativeSubProblemCaches.size(); ++subProblemId)
+  {
+    const auto &cache = _nativeSubProblemCaches[subProblemId];
+    const unsigned int sampleCount = static_cast<unsigned int>(cache._baseLogWeights.size());
+    sampleCounts[subProblemId] = sampleCount;
+
+    std::vector<double> dynamicCoordinates(dynamicPriorCount * static_cast<size_t>(sampleCount), 0.0);
+    for (size_t localPriorId = 0; localPriorId < dynamicPriorCount; ++localPriorId)
+    {
+      const auto &spec = _nativeConditionalPriorSpecs[_nativeDynamicConditionalPriorIndexes[localPriorId]];
+      const auto &sampleCoordinates = cache._sampleCoordinatesByVariable[spec._sampleDimension];
+      std::copy(sampleCoordinates.begin(), sampleCoordinates.end(), dynamicCoordinates.begin() + localPriorId * static_cast<size_t>(sampleCount));
+    }
+
+    if (dynamicCoordinates.empty() == false)
+    {
+      auto allocStart = steadyClock::now();
+      KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&_nativeCudaSubProblemCoordinates[subProblemId], dynamicCoordinates.size() * sizeof(double)));
+      allocSeconds += elapsedSeconds(allocStart, steadyClock::now());
+
+      auto h2dStart = steadyClock::now();
+      KORALI_CUDA_DRIVER_CHECK(cuMemcpyHtoD(_nativeCudaSubProblemCoordinates[subProblemId], dynamicCoordinates.data(), dynamicCoordinates.size() * sizeof(double)));
+      h2dSeconds += elapsedSeconds(h2dStart, steadyClock::now());
+      coordinatePointers[subProblemId] = _nativeCudaSubProblemCoordinates[subProblemId];
+    }
+
+    if (cache._baseLogWeights.empty() == false)
+    {
+      auto allocStart = steadyClock::now();
+      KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&_nativeCudaSubProblemBaseLogWeights[subProblemId], cache._baseLogWeights.size() * sizeof(double)));
+      allocSeconds += elapsedSeconds(allocStart, steadyClock::now());
+
+      auto h2dStart = steadyClock::now();
+      KORALI_CUDA_DRIVER_CHECK(cuMemcpyHtoD(_nativeCudaSubProblemBaseLogWeights[subProblemId], cache._baseLogWeights.data(), cache._baseLogWeights.size() * sizeof(double)));
+      h2dSeconds += elapsedSeconds(h2dStart, steadyClock::now());
+      baseLogWeightPointers[subProblemId] = _nativeCudaSubProblemBaseLogWeights[subProblemId];
+    }
+  }
+
+  if (coordinatePointers.empty() == false)
+  {
+    auto allocStart = steadyClock::now();
+    KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&_nativeCudaSubProblemCoordinatesDevice, coordinatePointers.size() * sizeof(CUdeviceptr)));
+    KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&_nativeCudaSubProblemBaseLogWeightsDevice, baseLogWeightPointers.size() * sizeof(CUdeviceptr)));
+    KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&_nativeCudaSubProblemSampleCountsDevice, sampleCounts.size() * sizeof(unsigned int)));
+    allocSeconds += elapsedSeconds(allocStart, steadyClock::now());
+
+    auto h2dStart = steadyClock::now();
+    KORALI_CUDA_DRIVER_CHECK(cuMemcpyHtoD(_nativeCudaSubProblemCoordinatesDevice, coordinatePointers.data(), coordinatePointers.size() * sizeof(CUdeviceptr)));
+    KORALI_CUDA_DRIVER_CHECK(cuMemcpyHtoD(_nativeCudaSubProblemBaseLogWeightsDevice, baseLogWeightPointers.data(), baseLogWeightPointers.size() * sizeof(CUdeviceptr)));
+    KORALI_CUDA_DRIVER_CHECK(cuMemcpyHtoD(_nativeCudaSubProblemSampleCountsDevice, sampleCounts.data(), sampleCounts.size() * sizeof(unsigned int)));
+    h2dSeconds += elapsedSeconds(h2dStart, steadyClock::now());
+  }
+
+  if (dynamicPriorCount > 0)
+  {
+    auto allocStart = steadyClock::now();
+    KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&_nativeCudaPriorKindsDevice, dynamicPriorCount * sizeof(int)));
+    KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&_nativeCudaParameterAIsVariableDevice, dynamicPriorCount * sizeof(int)));
+    KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&_nativeCudaParameterAPositionDevice, dynamicPriorCount * sizeof(int)));
+    KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&_nativeCudaParameterAValueDevice, dynamicPriorCount * sizeof(double)));
+    KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&_nativeCudaParameterBIsVariableDevice, dynamicPriorCount * sizeof(int)));
+    KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&_nativeCudaParameterBPositionDevice, dynamicPriorCount * sizeof(int)));
+    KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&_nativeCudaParameterBValueDevice, dynamicPriorCount * sizeof(double)));
+    allocSeconds += elapsedSeconds(allocStart, steadyClock::now());
+
+    auto h2dStart = steadyClock::now();
+    KORALI_CUDA_DRIVER_CHECK(cuMemcpyHtoD(_nativeCudaPriorKindsDevice, priorKinds.data(), dynamicPriorCount * sizeof(int)));
+    KORALI_CUDA_DRIVER_CHECK(cuMemcpyHtoD(_nativeCudaParameterAIsVariableDevice, parameterAIsVariable.data(), dynamicPriorCount * sizeof(int)));
+    KORALI_CUDA_DRIVER_CHECK(cuMemcpyHtoD(_nativeCudaParameterAPositionDevice, parameterAPositions.data(), dynamicPriorCount * sizeof(int)));
+    KORALI_CUDA_DRIVER_CHECK(cuMemcpyHtoD(_nativeCudaParameterAValueDevice, parameterAValues.data(), dynamicPriorCount * sizeof(double)));
+    KORALI_CUDA_DRIVER_CHECK(cuMemcpyHtoD(_nativeCudaParameterBIsVariableDevice, parameterBIsVariable.data(), dynamicPriorCount * sizeof(int)));
+    KORALI_CUDA_DRIVER_CHECK(cuMemcpyHtoD(_nativeCudaParameterBPositionDevice, parameterBPositions.data(), dynamicPriorCount * sizeof(int)));
+    KORALI_CUDA_DRIVER_CHECK(cuMemcpyHtoD(_nativeCudaParameterBValueDevice, parameterBValues.data(), dynamicPriorCount * sizeof(double)));
+    h2dSeconds += elapsedSeconds(h2dStart, steadyClock::now());
+  }
+
+  _nativeCudaInitialized = true;
+  appendNativeCudaSetupProfileRecord(
+      _nativeCudaDeviceId,
+      static_cast<unsigned int>(_nativeSubProblemCaches.size()),
+      static_cast<unsigned int>(dynamicPriorCount),
+      contextSeconds,
+      compileSeconds,
+      moduleLoadSeconds,
+      allocSeconds,
+      h2dSeconds,
+      elapsedSeconds(setupStart, steadyClock::now()));
+#endif
+}
 
 void Psi::initialize()
 {
   Hierarchical::initialize();
+
   _hasBatchComputationalModel = (_batchComputationalModel != 0);
+
+  if (usesExternalBatchBackend() == false && usesNativeCpuBatchBackend() == false && usesNativeCudaBatchBackend() == false)
+    KORALI_LOG_ERROR("Hierarchical/Psi received unsupported 'Batch Evaluation Backend' value '%s'.\n", _batchEvaluationBackend.c_str());
+
+  if (_useBatchEvaluation != 0 && usesExternalBatchBackend() && _hasBatchComputationalModel == false)
+    KORALI_LOG_ERROR("Batch evaluation is enabled for Hierarchical/Psi with backend 'External', but 'Batch Computational Model' was not provided.\n");
+
+  _conditionalPriorIndexes.resize(_conditionalPriors.size());
+
+  if (_conditionalPriors.size() == 0) KORALI_LOG_ERROR("Hierarchical Bayesian (Psi) problems require at least one conditional prior\n");
+
+  for (size_t i = 0; i < _conditionalPriors.size(); i++)
+  {
+    bool foundDistribution = false;
+
+    for (size_t j = 0; j < _k->_distributions.size(); j++)
+      if (_conditionalPriors[i] == _k->_distributions[j]->_name)
+      {
+        foundDistribution = true;
+        _conditionalPriorIndexes[i] = j;
+      }
+
+    if (foundDistribution == false)
+      KORALI_LOG_ERROR("Did not find conditional prior distribution %s\n", _conditionalPriors[i].c_str());
+  }
+
+  if (_subExperiments.size() < 2) KORALI_LOG_ERROR("Hierarchical Bayesian (Psi) problem requires defining at least two executed sub-problems.\n");
+
+  _subProblemsCount = _subExperiments.size();
+  _subProblemsVariablesCount = _conditionalPriors.size();
+
+  for (size_t i = 0; i < _subProblemsCount; i++)
+  {
+    if (_conditionalPriors.size() != _subExperiments[i]["Variables"].size())
+      KORALI_LOG_ERROR("Sub-problem %lu contains a different number of variables (%lu) than conditional priors in the Hierarchical Bayesian (Psi) problem (%lu).\n", i, _subExperiments[i]["Problem"]["Variables"].size(), _conditionalPriors.size());
+
+    if (_subExperiments[i]["Is Finished"] == false)
+      KORALI_LOG_ERROR("The Hierarchical Bayesian (Psi) requires that all problems have run completely, but Problem %lu has not.\n", i);
+  }
+
+  _subProblemsSampleCoordinates.resize(_subProblemsCount);
+  _subProblemsSampleLogLikelihoods.resize(_subProblemsCount);
+  _subProblemsSampleLogPriors.resize(_subProblemsCount);
+
+  for (size_t i = 0; i < _subProblemsCount; i++)
+  {
+    try
+    {
+      _subProblemsSampleLogPriors[i] = _subExperiments[i]["Results"]["Posterior Sample LogPrior Database"].get<std::vector<double>>();
+      _subProblemsSampleLogLikelihoods[i] = _subExperiments[i]["Results"]["Posterior Sample LogLikelihood Database"].get<std::vector<double>>();
+      _subProblemsSampleCoordinates[i] = _subExperiments[i]["Results"]["Posterior Sample Database"].get<std::vector<std::vector<double>>>();
+    }
+    catch (std::exception &e)
+    {
+      KORALI_LOG_ERROR("Error reading the sample database from sub-problem: %lu. Was it a sampling experiment?\n", i);
+    }
+
+    if (_subProblemsSampleLogLikelihoods[i].size() != _subProblemsSampleCoordinates[i].size())
+      KORALI_LOG_ERROR("Sub-problem %zu stores %zu posterior samples but %zu posterior log-likelihoods.\n", i, _subProblemsSampleCoordinates[i].size(), _subProblemsSampleLogLikelihoods[i].size());
+
+    for (size_t j = 0; j < _subProblemsSampleLogPriors[i].size(); j++)
+    {
+      double expPrior = std::exp(_subProblemsSampleLogPriors[i][j]);
+      if (std::isfinite(expPrior) == false)
+        KORALI_LOG_ERROR("Non finite (%lf) prior has been detected at sample %zu in subproblem %zu.\n", expPrior, j, i);
+    }
+  }
+
+  _conditionalPriorInfos.resize(_conditionalPriors.size());
+
+  for (size_t i = 0; i < _conditionalPriors.size(); i++)
+  {
+    auto distributionJs = knlohmann::json();
+    _k->_distributions[_conditionalPriorIndexes[i]]->getConfiguration(distributionJs);
+
+    for (auto it = distributionJs.begin(); it != distributionJs.end(); ++it)
+      if (it.value().is_string())
+      {
+        std::string key(it.key());
+        std::string value(it.value().get<std::string>());
+        size_t position = 0;
+        double *pointer = NULL;
+
+        if (key == "Name") continue;
+        if (key == "Type") continue;
+        if (key == "Range") continue;
+        if (key == "Random Seed") continue;
+
+        bool foundValue = false;
+        for (size_t k = 0; k < _k->_variables.size(); k++)
+          if (_k->_variables[k]->_name == value)
+          {
+            position = k;
+            pointer = _k->_distributions[_conditionalPriorIndexes[i]]->getPropertyPointer(key);
+            foundValue = true;
+          }
+        if (foundValue == false) KORALI_LOG_ERROR("No variable name specified that satisfies conditional prior property \"%s\" with key: \"%s\".\n", key.c_str(), value.c_str());
+
+        _conditionalPriorInfos[i]._samplePointers.push_back(pointer);
+        _conditionalPriorInfos[i]._samplePositions.push_back(position);
+      }
+  }
+
+  if (_useBatchEvaluation != 0 && (usesNativeCpuBatchBackend() || usesNativeCudaBatchBackend()))
+    initializeNativeBatchCache();
+
+  if (_useBatchEvaluation != 0 && usesNativeCudaBatchBackend())
+    initializeNativeCudaBatch();
 }
 
-void Psi::updateConditionalPriors(Sample &) {}
+void Psi::updateConditionalPriors(Sample &sample)
+{
+  for (size_t i = 0; i < _conditionalPriors.size(); i++)
+  {
+    for (size_t j = 0; j < _conditionalPriorInfos[i]._samplePositions.size(); j++)
+      *(_conditionalPriorInfos[i]._samplePointers[j]) = sample["Parameters"][_conditionalPriorInfos[i]._samplePositions[j]];
+    _k->_distributions[_conditionalPriorIndexes[i]]->updateDistribution();
+  }
+}
 
 void Psi::evaluateLogLikelihood(Sample &sample)
 {
-  sample["logLikelihood"] = -Inf;
+  try
+  {
+    updateConditionalPriors(sample);
+
+    double logLikelihood = 0.0;
+
+    for (size_t i = 0; i < _subProblemsCount; i++)
+    {
+      std::vector<double> logValues(_subProblemsSampleLogPriors[i].size());
+
+      for (size_t j = 0; j < _subProblemsSampleLogPriors[i].size(); j++)
+      {
+        logValues[j] = -_subProblemsSampleLogPriors[i][j];
+        for (size_t k = 0; k < _conditionalPriors.size(); k++)
+          logValues[j] += _k->_distributions[_conditionalPriorIndexes[k]]->getLogDensity(_subProblemsSampleCoordinates[i][j][k]);
+      }
+
+      logLikelihood += logSumExp(logValues);
+    }
+
+    sample["logLikelihood"] = logLikelihood;
+  }
+  catch (std::exception &e)
+  {
+    sample["logLikelihood"] = -Inf;
+  }
 }
 
 bool Psi::supportsEvaluateBatch() const
@@ -95,14 +870,273 @@ bool Psi::supportsEvaluateBatch() const
 
 void Psi::evaluateBatchNativeCpu(Sample &sample)
 {
-  sample["Batch logPrior"] = std::vector<double>();
-  sample["Batch logLikelihood"] = std::vector<double>();
+  const auto batchParameters = KORALI_GET(std::vector<std::vector<double>>, sample, "Batch Parameters");
+  const size_t batchSize = batchParameters.size();
+  std::vector<double> batchLogPriors(batchSize, -Inf);
+
+  for (size_t i = 0; i < batchSize; ++i)
+    if (batchParameters[i].size() != _k->_variables.size())
+      KORALI_LOG_ERROR("Batch sample %zu provides %zu parameters, but the hierarchical problem expects %zu.\n", i, batchParameters[i].size(), _k->_variables.size());
+
+  #pragma omp parallel for if(batchSize > kNativeBatchOmpThreshold)
+  for (size_t i = 0; i < batchSize; ++i)
+  {
+    double logPrior = 0.0;
+    for (size_t j = 0; j < batchParameters[i].size(); ++j)
+      logPrior += _k->_distributions[_k->_variables[j]->_distributionIndex]->getLogDensity(batchParameters[i][j]);
+
+    batchLogPriors[i] = logPrior;
+  }
+
+  sample["Batch logPrior"] = batchLogPriors;
+
+  if (batchSize == 0)
+  {
+    sample["Batch logLikelihood"] = std::vector<double>();
+    return;
+  }
+
+  std::vector<double> batchLogLikelihood(batchSize, -Inf);
+
+  #pragma omp parallel for if(batchSize > kNativeBatchOmpThreshold)
+  for (size_t batchId = 0; batchId < batchSize; ++batchId)
+  {
+    if (std::isfinite(batchLogPriors[batchId]) == false)
+    {
+      batchLogLikelihood[batchId] = -Inf;
+      continue;
+    }
+
+    const auto &parameters = batchParameters[batchId];
+    double logLikelihood = 0.0;
+    bool sampleIsFeasible = true;
+
+    for (size_t subProblemId = 0; subProblemId < _nativeSubProblemCaches.size(); ++subProblemId)
+    {
+      const auto &cache = _nativeSubProblemCaches[subProblemId];
+      double maxLogValue = -Inf;
+      double sumExpValues = 0.0;
+
+      for (size_t sampleId = 0; sampleId < cache._baseLogWeights.size(); ++sampleId)
+      {
+        double logValue = cache._baseLogWeights[sampleId];
+
+        if (std::isfinite(logValue) == false) continue;
+
+        for (size_t dynamicPriorId = 0; dynamicPriorId < _nativeDynamicConditionalPriorIndexes.size(); ++dynamicPriorId)
+        {
+          const auto &spec = _nativeConditionalPriorSpecs[_nativeDynamicConditionalPriorIndexes[dynamicPriorId]];
+          const double logDensity = evaluateNativeConditionalLogDensity(spec, parameters, cache._sampleCoordinatesByVariable[spec._sampleDimension][sampleId]);
+
+          if (std::isfinite(logDensity) == false)
+          {
+            logValue = -Inf;
+            break;
+          }
+
+          logValue += logDensity;
+        }
+
+        if (std::isfinite(logValue) == false) continue;
+
+        if (std::isfinite(maxLogValue) == false)
+        {
+          maxLogValue = logValue;
+          sumExpValues = 1.0;
+        }
+        else if (logValue > maxLogValue)
+        {
+          sumExpValues = sumExpValues * std::exp(maxLogValue - logValue) + 1.0;
+          maxLogValue = logValue;
+        }
+        else
+        {
+          sumExpValues += std::exp(logValue - maxLogValue);
+        }
+      }
+
+      if (std::isfinite(maxLogValue) == false)
+      {
+        sampleIsFeasible = false;
+        break;
+      }
+
+      logLikelihood += maxLogValue + std::log(sumExpValues);
+    }
+
+    batchLogLikelihood[batchId] = sampleIsFeasible ? logLikelihood : -Inf;
+  }
+
+  sample["Batch logLikelihood"] = batchLogLikelihood;
 }
 
 void Psi::evaluateBatchNativeCuda(Sample &sample)
 {
-  sample["Batch logPrior"] = std::vector<double>();
-  sample["Batch logLikelihood"] = std::vector<double>();
+#ifndef _KORALI_USE_CUDA_BATCH
+  KORALI_LOG_ERROR("Hierarchical/Psi native CUDA batch evaluation requested, but Korali was built without -Dnative_cuda_batch=true.\n");
+#else
+  const auto batchStart = steadyClock::now();
+  double logPriorSeconds = 0.0;
+  double flattenSeconds = 0.0;
+  double contextSeconds = 0.0;
+  double allocSeconds = 0.0;
+  double h2dSeconds = 0.0;
+  double launchSeconds = 0.0;
+  double computeSeconds = 0.0;
+  double d2hSeconds = 0.0;
+  double freeSeconds = 0.0;
+  double hostReduceSeconds = 0.0;
+
+  if (_nativeCudaInitialized == false)
+    KORALI_LOG_ERROR("Hierarchical/Psi native CUDA batch evaluation requested before the CUDA backend was initialized.\n");
+
+  auto logPriorStart = steadyClock::now();
+  const auto batchParameters = KORALI_GET(std::vector<std::vector<double>>, sample, "Batch Parameters");
+  const size_t batchSize = batchParameters.size();
+  std::vector<double> batchLogPriors(batchSize, -Inf);
+
+  for (size_t i = 0; i < batchSize; ++i)
+  {
+    if (batchParameters[i].size() != _k->_variables.size())
+      KORALI_LOG_ERROR("Batch sample %zu provides %zu parameters, but the hierarchical problem expects %zu.\n", i, batchParameters[i].size(), _k->_variables.size());
+
+    double logPrior = 0.0;
+    for (size_t j = 0; j < batchParameters[i].size(); ++j)
+      logPrior += _k->_distributions[_k->_variables[j]->_distributionIndex]->getLogDensity(batchParameters[i][j]);
+
+    batchLogPriors[i] = logPrior;
+  }
+  logPriorSeconds = elapsedSeconds(logPriorStart, steadyClock::now());
+
+  sample["Batch logPrior"] = batchLogPriors;
+
+  if (batchSize == 0)
+  {
+    sample["Batch logLikelihood"] = std::vector<double>();
+    return;
+  }
+
+  unsigned int parameterCount = static_cast<unsigned int>(_k->_variables.size());
+  unsigned int batchSizeInt = static_cast<unsigned int>(batchSize);
+  unsigned int dynamicPriorCount = static_cast<unsigned int>(_nativeDynamicConditionalPriorIndexes.size());
+  unsigned int subProblemCount = static_cast<unsigned int>(_nativeSubProblemCaches.size());
+
+  auto flattenStart = steadyClock::now();
+  std::vector<double> flattenedBatchParameters(batchSize * parameterCount, 0.0);
+  for (size_t batchId = 0; batchId < batchSize; ++batchId)
+    std::copy(batchParameters[batchId].begin(), batchParameters[batchId].end(), flattenedBatchParameters.begin() + batchId * parameterCount);
+  flattenSeconds = elapsedSeconds(flattenStart, steadyClock::now());
+
+  auto contextStart = steadyClock::now();
+  KORALI_CUDA_DRIVER_CHECK(cuCtxSetCurrent(_nativeCudaContext));
+  contextSeconds = elapsedSeconds(contextStart, steadyClock::now());
+
+  CUdeviceptr batchParametersDevice = 0;
+  CUdeviceptr subProblemLogLikelihoodDevice = 0;
+
+  auto allocStart = steadyClock::now();
+  KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&batchParametersDevice, flattenedBatchParameters.size() * sizeof(double)));
+  KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&subProblemLogLikelihoodDevice, static_cast<size_t>(batchSizeInt) * subProblemCount * sizeof(double)));
+  allocSeconds = elapsedSeconds(allocStart, steadyClock::now());
+
+  auto h2dStart = steadyClock::now();
+  KORALI_CUDA_DRIVER_CHECK(cuMemcpyHtoD(batchParametersDevice, flattenedBatchParameters.data(), flattenedBatchParameters.size() * sizeof(double)));
+  h2dSeconds = elapsedSeconds(h2dStart, steadyClock::now());
+
+  void *kernelParameters[] = {
+      &batchParametersDevice,
+      &parameterCount,
+      &batchSizeInt,
+      &dynamicPriorCount,
+      &_nativeCudaPriorKindsDevice,
+      &_nativeCudaParameterAIsVariableDevice,
+      &_nativeCudaParameterAPositionDevice,
+      &_nativeCudaParameterAValueDevice,
+      &_nativeCudaParameterBIsVariableDevice,
+      &_nativeCudaParameterBPositionDevice,
+      &_nativeCudaParameterBValueDevice,
+      &_nativeCudaSubProblemCoordinatesDevice,
+      &_nativeCudaSubProblemBaseLogWeightsDevice,
+      &_nativeCudaSubProblemSampleCountsDevice,
+      &subProblemCount,
+      &subProblemLogLikelihoodDevice};
+
+  auto launchStart = steadyClock::now();
+  KORALI_CUDA_DRIVER_CHECK(cuLaunchKernel(
+      _nativeCudaLogLikelihoodKernel,
+      batchSizeInt,
+      subProblemCount,
+      1,
+      kNativeCudaThreadBlockSize,
+      1,
+      1,
+      0,
+      nullptr,
+      kernelParameters,
+      nullptr));
+  launchSeconds = elapsedSeconds(launchStart, steadyClock::now());
+
+  auto computeStart = steadyClock::now();
+  KORALI_CUDA_DRIVER_CHECK(cuCtxSynchronize());
+  computeSeconds = elapsedSeconds(computeStart, steadyClock::now());
+
+  std::vector<double> subProblemLogLikelihoods(static_cast<size_t>(batchSizeInt) * subProblemCount, -Inf);
+  auto d2hStart = steadyClock::now();
+  KORALI_CUDA_DRIVER_CHECK(cuMemcpyDtoH(subProblemLogLikelihoods.data(), subProblemLogLikelihoodDevice, subProblemLogLikelihoods.size() * sizeof(double)));
+  d2hSeconds = elapsedSeconds(d2hStart, steadyClock::now());
+
+  auto freeStart = steadyClock::now();
+  KORALI_CUDA_DRIVER_CHECK(cuMemFree(batchParametersDevice));
+  KORALI_CUDA_DRIVER_CHECK(cuMemFree(subProblemLogLikelihoodDevice));
+  freeSeconds = elapsedSeconds(freeStart, steadyClock::now());
+
+  auto hostReduceStart = steadyClock::now();
+  std::vector<double> batchLogLikelihood(batchSize, -Inf);
+
+  for (size_t batchId = 0; batchId < batchSize; ++batchId)
+  {
+    if (std::isfinite(batchLogPriors[batchId]) == false)
+    {
+      batchLogLikelihood[batchId] = -Inf;
+      continue;
+    }
+
+    double logLikelihood = 0.0;
+    bool feasible = true;
+    for (size_t subProblemId = 0; subProblemId < subProblemCount; ++subProblemId)
+    {
+      const double partialLogLikelihood = subProblemLogLikelihoods[subProblemId * batchSize + batchId];
+      if (std::isfinite(partialLogLikelihood) == false)
+      {
+        feasible = false;
+        break;
+      }
+
+      logLikelihood += partialLogLikelihood;
+    }
+
+    batchLogLikelihood[batchId] = feasible ? logLikelihood : -Inf;
+  }
+  hostReduceSeconds = elapsedSeconds(hostReduceStart, steadyClock::now());
+
+  sample["Batch logLikelihood"] = batchLogLikelihood;
+  appendNativeCudaBatchProfileRecord(
+      batchSizeInt,
+      parameterCount,
+      subProblemCount,
+      dynamicPriorCount,
+      logPriorSeconds,
+      flattenSeconds,
+      contextSeconds,
+      allocSeconds,
+      h2dSeconds,
+      launchSeconds,
+      computeSeconds,
+      d2hSeconds,
+      freeSeconds,
+      hostReduceSeconds,
+      elapsedSeconds(batchStart, steadyClock::now()));
+#endif
 }
 
 void Psi::evaluateBatch(Sample &sample)
@@ -110,48 +1144,146 @@ void Psi::evaluateBatch(Sample &sample)
   if (_useBatchEvaluation == 0)
     KORALI_LOG_ERROR("Batch evaluation requested, but 'Use Batch Evaluation' is disabled.\n");
 
-  if (usesNativeCpuBatchBackend()) { evaluateBatchNativeCpu(sample); return; }
-  if (usesNativeCudaBatchBackend()) { evaluateBatchNativeCuda(sample); return; }
+  if (usesNativeCpuBatchBackend())
+  {
+    evaluateBatchNativeCpu(sample);
+    return;
+  }
 
-  sample["Batch logPrior"] = std::vector<double>();
-  sample["Batch logLikelihood"] = std::vector<double>();
+  if (usesNativeCudaBatchBackend())
+  {
+    evaluateBatchNativeCuda(sample);
+    return;
+  }
+
+  if (usesExternalBatchBackend() == false)
+    KORALI_LOG_ERROR("Batch evaluation requested, but Hierarchical/Psi received unsupported backend '%s'.\n", _batchEvaluationBackend.c_str());
+  if (_hasBatchComputationalModel == false)
+    KORALI_LOG_ERROR("Batch evaluation requested, but 'Batch Computational Model' was not provided.\n");
+
+  const auto batchParameters = KORALI_GET(std::vector<std::vector<double>>, sample, "Batch Parameters");
+  const size_t batchSize = batchParameters.size();
+  std::vector<double> batchLogPriors(batchSize, -Inf);
+
+  for (size_t i = 0; i < batchSize; ++i)
+  {
+    if (batchParameters[i].size() != _k->_variables.size())
+      KORALI_LOG_ERROR("Batch sample %zu provides %zu parameters, but the hierarchical problem expects %zu.\n", i, batchParameters[i].size(), _k->_variables.size());
+
+    double logPrior = 0.0;
+    for (size_t j = 0; j < batchParameters[i].size(); ++j)
+      logPrior += _k->_distributions[_k->_variables[j]->_distributionIndex]->getLogDensity(batchParameters[i][j]);
+
+    batchLogPriors[i] = logPrior;
+  }
+  sample["Batch logPrior"] = batchLogPriors;
+
+  if (batchSize == 0)
+  {
+    sample["Batch logLikelihood"] = std::vector<double>();
+    return;
+  }
+
+  sample.run(_batchComputationalModel);
+
+  auto batchLogLikelihood = KORALI_GET(std::vector<double>, sample, "Batch logLikelihood");
+  if (batchLogLikelihood.size() != batchSize)
+    KORALI_LOG_ERROR("Batched Hierarchical/Psi evaluation returned %zu log-likelihood values, expected %zu.\n", batchLogLikelihood.size(), batchSize);
+
+  for (size_t i = 0; i < batchSize; ++i)
+    if (std::isfinite(batchLogPriors[i]) == false) batchLogLikelihood[i] = -Inf;
+
+  sample["Batch logLikelihood"] = batchLogLikelihood;
 }
 
-void Psi::setConfiguration(knlohmann::json& js)
+void Psi::setConfiguration(knlohmann::json& js) 
 {
-  if (isDefined(js, "Use Batch Evaluation")) { _useBatchEvaluation = js["Use Batch Evaluation"].get<int>(); eraseValue(js, "Use Batch Evaluation"); }
-  if (isDefined(js, "Batch Evaluation Backend")) { _batchEvaluationBackend = js["Batch Evaluation Backend"].get<std::string>(); eraseValue(js, "Batch Evaluation Backend"); }
-  if (isDefined(js, "Sub Experiments")) { _subExperiments = js["Sub Experiments"].get<std::vector<knlohmann::json>>(); eraseValue(js, "Sub Experiments"); }
-  if (isDefined(js, "Conditional Priors")) { _conditionalPriors = js["Conditional Priors"].get<std::vector<std::string>>(); eraseValue(js, "Conditional Priors"); }
-  if (isDefined(js, "Batch Computational Model")) { _batchComputationalModel = js["Batch Computational Model"].get<std::uint64_t>(); eraseValue(js, "Batch Computational Model"); }
-  Hierarchical::setConfiguration(js);
-  _type = "hierarchical/psi";
-  if (isDefined(js, "Type")) eraseValue(js, "Type");
-}
+ if (isDefined(js, "Results"))  eraseValue(js, "Results");
 
-void Psi::getConfiguration(knlohmann::json& js)
-{
-  js["Type"] = _type;
-  js["Use Batch Evaluation"] = _useBatchEvaluation;
-  js["Batch Evaluation Backend"] = _batchEvaluationBackend;
-  js["Sub Experiments"] = _subExperiments;
-  js["Conditional Priors"] = _conditionalPriors;
-  js["Batch Computational Model"] = _batchComputationalModel;
-  Hierarchical::getConfiguration(js);
-}
+ if (isDefined(js, "Batch Computational Model"))
+ {
+ try { _batchComputationalModel = js["Batch Computational Model"].get<std::uint64_t>();
+} catch (const std::exception& e)
+ { KORALI_LOG_ERROR(" + Object: [ psi ] \n + Key:    ['Batch Computational Model']\n%s", e.what()); } 
+   eraseValue(js, "Batch Computational Model");
+ }
 
-void Psi::applyModuleDefaults(knlohmann::json& js)
-{
-  std::string defaultString = "{\"Use Batch Evaluation\": false, \"Batch Evaluation Backend\": \"External\", \"Batch Computational Model\": 0}";
-  knlohmann::json defaultJs = knlohmann::json::parse(defaultString);
-  mergeJson(js, defaultJs);
-  Hierarchical::applyModuleDefaults(js);
-}
+ if (isDefined(js, "Use Batch Evaluation"))
+ {
+ try { _useBatchEvaluation = js["Use Batch Evaluation"].get<int>();
+} catch (const std::exception& e)
+ { KORALI_LOG_ERROR(" + Object: [ psi ] \n + Key:    ['Use Batch Evaluation']\n%s", e.what()); } 
+   eraseValue(js, "Use Batch Evaluation");
+ }
+  else   KORALI_LOG_ERROR(" + No value provided for mandatory setting: ['Use Batch Evaluation'] required by psi.\n"); 
 
-void Psi::applyVariableDefaults()
+ if (isDefined(js, "Batch Evaluation Backend"))
+ {
+ try { _batchEvaluationBackend = js["Batch Evaluation Backend"].get<std::string>();
+} catch (const std::exception& e)
+ { KORALI_LOG_ERROR(" + Object: [ psi ] \n + Key:    ['Batch Evaluation Backend']\n%s", e.what()); } 
 {
-  Hierarchical::applyVariableDefaults();
+ bool validOption = false; 
+ if (_batchEvaluationBackend == "External") validOption = true; 
+ if (_batchEvaluationBackend == "NativeCpu") validOption = true; 
+ if (_batchEvaluationBackend == "NativeCuda") validOption = true; 
+ if (validOption == false) KORALI_LOG_ERROR(" + Unrecognized value (%s) provided for mandatory setting: ['Batch Evaluation Backend'] required by psi.\n", _batchEvaluationBackend.c_str()); 
 }
+   eraseValue(js, "Batch Evaluation Backend");
+ }
+  else   KORALI_LOG_ERROR(" + No value provided for mandatory setting: ['Batch Evaluation Backend'] required by psi.\n"); 
+
+ if (isDefined(js, "Sub Experiments"))
+ {
+ _subExperiments = js["Sub Experiments"].get<std::vector<knlohmann::json>>();
+
+   eraseValue(js, "Sub Experiments");
+ }
+  else   KORALI_LOG_ERROR(" + No value provided for mandatory setting: ['Sub Experiments'] required by psi.\n"); 
+
+ if (isDefined(js, "Conditional Priors"))
+ {
+ try { _conditionalPriors = js["Conditional Priors"].get<std::vector<std::string>>();
+} catch (const std::exception& e)
+ { KORALI_LOG_ERROR(" + Object: [ psi ] \n + Key:    ['Conditional Priors']\n%s", e.what()); } 
+   eraseValue(js, "Conditional Priors");
+ }
+  else   KORALI_LOG_ERROR(" + No value provided for mandatory setting: ['Conditional Priors'] required by psi.\n"); 
+
+ Hierarchical::setConfiguration(js);
+ _type = "hierarchical/psi";
+ if(isDefined(js, "Type")) eraseValue(js, "Type");
+ if(isEmpty(js) == false) KORALI_LOG_ERROR(" + Unrecognized settings for Korali module: psi: \n%s\n", js.dump(2).c_str());
+} 
+
+void Psi::getConfiguration(knlohmann::json& js) 
+{
+
+ js["Type"] = _type;
+   js["Use Batch Evaluation"] = _useBatchEvaluation;
+   js["Batch Evaluation Backend"] = _batchEvaluationBackend;
+   js["Sub Experiments"] = _subExperiments;
+   js["Conditional Priors"] = _conditionalPriors;
+   js["Batch Computational Model"] = _batchComputationalModel;
+ Hierarchical::getConfiguration(js);
+} 
+
+void Psi::applyModuleDefaults(knlohmann::json& js) 
+{
+
+ std::string defaultString = "{\"Use Batch Evaluation\": false, \"Batch Evaluation Backend\": \"External\", \"Batch Computational Model\": 0}";
+ knlohmann::json defaultJs = knlohmann::json::parse(defaultString);
+ mergeJson(js, defaultJs); 
+ Hierarchical::applyModuleDefaults(js);
+} 
+
+void Psi::applyVariableDefaults() 
+{
+
+ Hierarchical::applyVariableDefaults();
+} 
+
+;
 
 } //hierarchical
 } //problem

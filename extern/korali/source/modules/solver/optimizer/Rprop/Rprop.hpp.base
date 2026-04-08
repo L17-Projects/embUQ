@@ -1,0 +1,23 @@
+#pragma once
+
+#include "modules/solver/optimizer/optimizer.hpp"
+#include <vector>
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  private:
+  void evaluateFunctionAndGradient(Sample &sample);
+
+  void performUpdate(void); // iRprop_minus
+
+  public:
+  void setInitialConfiguration() override;
+  void finalize() override;
+  void runGeneration() override;
+  void printGenerationBefore() override;
+  void printGenerationAfter() override;
+};
+
+__endNamespace__;

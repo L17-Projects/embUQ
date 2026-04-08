@@ -1,0 +1,16 @@
+#pragma once
+
+#include "modules/solver/deepSupervisor/optimizers/fGradientBasedOptimizer.hpp"
+
+__startNamespace__;
+
+class __className__ : public __parentClassName__
+{
+  public:
+  virtual void initialize() override;
+  virtual void processResult(std::vector<float> &gradient) override;
+  virtual void reset() override;
+  virtual void printInternals() override;
+};
+
+__endNamespace__;
