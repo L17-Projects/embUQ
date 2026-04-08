@@ -1,133 +1,160 @@
-# HPC Install and GPU-Batched Reduced Indentation Workflow
+# Vega Reduced-Model Indentation Workflow
 
-This guide explains how to:
-
-1. perform a clean user-local install of the modified Korali fork on an HPC system,
-2. prepare the dev workflow for GPU-batched execution,
-3. retrain the `3.4um` indentation surrogate when new training data arrives,
-4. run the full reduced indentation workflow on a single node with one `A40` or `L40S` GPU,
-5. skip `Phase 3a`, but still produce `Phase 3b`, MAP extraction, posterior plots, propagation, and overlay plots.
-
-This is the recommended operator path for the current GPU-batched reduced indentation workflow.
+This guide describes the current supported operator path for the reduced-model indentation workflow on Vega.
 
 ## Scope
 
-- Primary install path: `conda`
-- Fallback install path: `venv`
-- Runtime scope: single-node SLURM jobs
-- GPU target: one `A40` or one `L40S`
-- Workflow target: reduced indentation only
-- Workflow mode: `Phase 1` + `Phase 2` + `Phase 3b` + propagation + MAP postprocessing
-- `Phase 3a`: skipped intentionally
+- clone-local runtime rooted under `_vega/`
+- vendored `extern/korali/` bootstrap only
+- single-node SLURM jobs on the Vega `dev` partition
+- one GPU for surrogate-backed `Phase 1` and `Phase 3b`
+- workflow path:
+  - `Phase 1`
+  - `Phase 2`
+  - `Phase 3b`
+  - propagation `Phase 3b`
+  - MAP extraction and plotting
 
-## Repositories and branches
+`Phase 3a` is not part of the supported public workflow surface.
 
-You need both repositories:
+## Backend expectations
 
-- `BrieucB/UQ_DPD`, branch `gpu-batching-dev`
-- `BrieucB/korali`, branch `gpu-batch-eval`
+For this workflow, the current documented backend contract is:
 
-Recommended layout on the HPC filesystem:
+- `Phase 1`: GPU-batched surrogate path
+- `Phase 2`: CPU MPI using the current documented Korali state
+- `Phase 3b`: GPU-batched surrogate path
+- propagation, MAP extraction, and plotting: CPU-side postprocess work
 
-```text
-$HOME/work/UQ_DPD/
-├── Hierarchical_UQ_compression_dev/
-└── korali/
-```
+This is why the supported bootstrap path builds vendored Korali with MPI support, but does not claim a validated native-CUDA `Phase 2` lane.
 
-## What is GPU-accelerated
+## Bootstrap the repo-local runtime
 
-For this workflow, Korali itself remains a CPU/MPI library. The GPU acceleration happens in the PyTorch surrogates called from Python.
-
-That means:
-
-- `Phase 1`: GPU batched
-- `Phase 2`: CPU MPI
-- `Phase 3a`: skipped
-- `Phase 3b`: GPU batched
-- propagation from `Phase 1` and `Phase 3b`: GPU batched
-- plotting and MAP postprocessing: CPU
-
-This is why you should build Korali with MPI and MPI4Py, but you do not need to enable Korali’s own CUDA/cuDNN options for this workflow.
-
-## Clean install on the login node
-
-Assumptions:
-
-- no root privileges
-- compute nodes may be offline
-- software is installed once on the login node
-- jobs only activate and use the prepared environment
-
-### 1. Load an approximate module stack
-
-Use your site’s actual module names, but this is the intended stack:
-
-- GCC `12.x`
-- OpenMPI `4.1.x`
-- CMake `3.24+`
-- CUDA `12.2` or `12.3`
-- optional site packages for `GSL`, `Eigen`, `HDF5`
-
-### 2. Create and activate the conda environment
-
-The existing runtime wrappers assume `conda activate env3.8`, so keep that name unless you also patch the wrappers.
-
-Recommended Python range for this workflow:
-
-- Python `3.10` or `3.11`
-
-### 3. Install Python dependencies
-
-Install the core scientific stack and a GPU-enabled PyTorch build in `conda`, then build `mpi4py` against the loaded MPI.
-
-The relevant dependencies in the upstream workflow are:
-
-- `numpy`, `scipy`, `pandas`, `matplotlib`, `pyyaml`, `h5py`, `pydantic`
-- `torch`
-- `mpi4py`
-
-### 4. Build and install the modified Korali fork
-
-For this workflow, the required source tree is the modified branch in the Korali fork, not upstream vanilla Korali.
-
-### 5. Runtime environment variables
-
-At runtime you typically need:
+From a fresh clone on Vega:
 
 ```bash
-export HUQ_ROOT=$HOME/work/UQ_DPD/Hierarchical_UQ_compression_dev
-export KORALI_ROOT=$HOME/work/UQ_DPD/korali
-export KORALI_PREFIX=$HOME/software/korali-gpu-batch
-export KORALI_PYTHONPATH=$(find "$KORALI_PREFIX" -type d -path '*/site-packages' | head -n 1)
-export PYTHONPATH=$KORALI_PYTHONPATH:$HUQ_ROOT:${PYTHONPATH:-}
-export LD_LIBRARY_PATH=$KORALI_PREFIX/lib64:$KORALI_PREFIX/lib:${LD_LIBRARY_PATH:-}
+module purge
+module load \
+  Python/3.10.8-GCCcore-12.2.0 \
+  openmpi/4.1.2.1 \
+  CUDA/12.2.2 \
+  GSL/2.7-GCC-12.2.0 \
+  Eigen/3.4.0-GCCcore-12.2.0
+
+python -m venv _vega/venv
+source _vega/venv/bin/activate
+python -m pip install -U pip
+pip install -e ".[test,mpi]"
+pip install pybind11 meson ninja
+
+bash scripts/vega/bootstrap_korali.sh --jobs 8
+source _vega/korali/env.sh
+python scripts/vega/doctor_vega.py --strict
 ```
 
-## Recommended operator path for reduced indentation
+For more detail on the bootstrap path, see [VEGA_BOOTSTRAP.md](/ceph/hpc/home/benvegnenb/dev/MesoUQ_fresh_clone_2026-04-08/docs/VEGA_BOOTSTRAP.md).
 
-Use the current Vega helper surface under `scripts/vega/` together with the reduced-model indentation configs. The older one-off refresh helper has been retired.
+## Recommended execution path
 
-## Important output locations
+Use the explicit Vega helper surface with the reduced-model indentation production config.
 
-The current Vega workflow helpers create a fresh output root under `_vega/` with:
+Phase 1:
 
-- the reduced indentation workflow output
+```bash
+python scripts/vega/run_inference_stage.py \
+  --experiment indentation \
+  --model-family reduced-model \
+  --profile production \
+  --stage phase1
+```
+
+Phase 2:
+
+```bash
+python scripts/vega/run_inference_stage.py \
+  --experiment indentation \
+  --model-family reduced-model \
+  --profile production \
+  --stage phase2 \
+  --cpu-ranks 4
+```
+
+Phase 3b:
+
+```bash
+python scripts/vega/run_inference_stage.py \
+  --experiment indentation \
+  --model-family reduced-model \
+  --profile production \
+  --stage phase3b
+```
+
+Propagation `Phase 3b`:
+
+```bash
+python scripts/vega/run_propagation.py \
+  --experiment indentation \
+  --model-family reduced-model \
+  --profile production \
+  --stage phase3b
+```
+
+MAP extraction:
+
+```bash
+python scripts/vega/extract_map.py \
+  --experiment indentation \
+  --model-family reduced-model \
+  --profile production \
+  --stage phase3b
+```
+
+## sbatch helpers
+
+The checked-in Vega templates under `scripts/vega/sbatch/` are the preferred batch entrypoints.
+
+For reduced-model indentation, set:
+
+- `EXPERIMENT=indentation`
+- `MODEL_FAMILY=reduced-model`
+- `PROFILE=production`
+
+Relevant templates:
+
+- `workflow_phase1_to_3b.sbatch`
+- `workflow_propagation.sbatch`
+- `workflow_map.sbatch`
+
+## Output locations
+
+By default, the reduced-model indentation workflow lands under:
+
+```text
+_vega/runs/indentation/reduced-model/production/
+```
+
+That tree then contains:
+
+- `results_phase_1/`
+- `results_phase_2/`
+- `results_phase_3b/`
+- `propagation_phase3b/`
+- `map_phase3b/`
 
 ## Troubleshooting
 
 ### `import korali` fails
 
-Usually `PYTHONPATH` is missing the installed Korali site-packages directory.
+Make sure `_vega/korali/env.sh` is sourced in the current shell or batch job.
 
 ### `mpi4py` or MPI launcher errors
 
-Rebuild `mpi4py` after loading the same MPI module stack used for Korali.
+Rebuild or reinstall `mpi4py` after loading the same MPI module stack used for the Korali bootstrap.
 
 ### GPU utilization looks low during `Phase 2`
 
-That is expected. `Phase 2` is CPU MPI only.
+That is expected. `Phase 2` is currently a CPU MPI stage in the documented public workflow.
 
 ### GPU utilization looks bursty during `Phase 1` or `Phase 3b`
 
-That is also expected. The surrogate runs in batched kernels, but orchestration and plotting still happen on the CPU.
+That is expected. The surrogate work is GPU-batched, but orchestration and postprocess steps still happen on the CPU.

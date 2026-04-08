@@ -32,10 +32,10 @@ The release contract requires real execution support for:
 - surrogate retraining, indentation
 - sensitivity analysis
 - Phase 1 GPU-batched
-- Phase 2 native-CUDA
+- Phase 2 hierarchical inference with the current documented Korali backend state
 - Phase 3b GPU-batched
 - MAP extraction
 - plotting / postprocessing
 - Phase 3b propagation + plotting
 
-Phase 3a can remain partial for the first serious release.
+Phase 3a is not part of the current public release workflow surface.

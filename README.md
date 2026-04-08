@@ -28,7 +28,7 @@ The current public release surface includes:
 - lightweight propagation execution for Phase 1 and Phase 3b
 - a richer GPU/operator validation runner
 - a thin Vega-first acceptance command with a machine-readable report
-- dedicated tiny validation configs for full and reduced workflows
+- dedicated tiny validation configs for full-model and reduced-model workflows
 - vendored Korali build surface and backend notes
 - public smoke tests and release-validation documentation
 

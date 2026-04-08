@@ -50,6 +50,8 @@ The current reduced-cost defaults are:
 
 All other production semantics remain unchanged, including reduced-model fixed parameters and enabled diameters.
 
+The inherited `phase3a_*` keys remain in the generated override only because they are part of the shipped config schema. The production-sanity command does not execute a public Phase 3a lane.
+
 ## Command
 
 Run it inside an allocated Vega job:
@@ -66,7 +68,7 @@ To run a non-default lane:
 ```bash
 python scripts/vega/run_production_sanity.py \
   --selection indentation:reduced-model:production \
-  --output-root _vega/production_sanity/indentation_reduced
+  --output-root _vega/production_sanity/indentation_reduced_model
 ```
 
 To run multiple lanes explicitly:

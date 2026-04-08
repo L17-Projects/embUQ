@@ -32,11 +32,20 @@ python -m pip install -U pip
 python -m pip install -e .
 ```
 
-Then install the scientific extras you actually need for your tasks. For example:
+Then install the extras that match your task surface. For example:
 
 ```bash
-python -m pip install torch pandas matplotlib scipy SALib mpi4py
+python -m pip install -e ".[surrogate,plot]"
+python -m pip install -e ".[mpi]"
 ```
+
+For local test parity:
+
+```bash
+python -m pip install -e ".[test]"
+```
+
+See `docs/INSTALL.md` and `docs/DEPENDENCY_EXTRAS.md` for the full extras contract and the Korali/backend caveats.
 
 ## Repository orientation
 

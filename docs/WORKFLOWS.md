@@ -4,10 +4,9 @@ This document summarizes the public workflow surfaces currently exposed by `Meso
 
 ## 1. Full-model hierarchical inference
 
-The full workflow entrypoints live under `inference/scripts/`:
+The supported full-model workflow entrypoints live under `inference/scripts/`:
 - `run_phase_1.py`
 - `run_phase_2.py`
-- `run_phase_3a.py`
 - `run_phase_3b.py`
 
 Canonical configs live under:
@@ -18,15 +17,14 @@ Typical order:
 1. prepare or verify the relevant surrogate/data surface
 2. run phase 1 for per-dataset posterior inference
 3. run phase 2 for the hierarchical `Psi` stage
-4. run phase 3a / 3b for joint or per-dataset follow-up stages
+4. run phase 3b for the per-dataset follow-up stage
 5. extract MAP samples and generate validation/posterior plots
 
 ## 2. Reduced-model hierarchical inference
 
-The reduced-model workflow is exposed through:
+The supported reduced-model workflow is exposed through:
 - `reduced/scripts/run_phase_1.py`
 - `reduced/scripts/run_phase_2.py`
-- `reduced/scripts/run_phase_3a.py`
 - `reduced/scripts/run_phase_3b.py`
 
 Canonical reduced configs live under:
@@ -35,7 +33,7 @@ Canonical reduced configs live under:
 
 These wrappers delegate to the main workflow spine while selecting the reduced-model configs by default.
 
-The former single-dataset Phase 3b helper is no longer part of the public script surface. It remains available only as an internal helper for narrowly scoped operator/debug work.
+`Phase 3a` scripts and config keys still exist in the tree for compatibility with older/internal work, but `Phase 3a` is not part of the supported public workflow surface or the validated Vega workflow contract.
 
 ## 3. Execution profiles are separate from model family
 
@@ -92,6 +90,7 @@ Shared postprocessing helpers live under `src/meso_uq/postprocess/`.
 
 For Vega-first operation, the repo now also ships split helpers under `scripts/vega/`:
 
+- `run_validation_suite.py`
 - `run_inference_stage.py`
 - `run_propagation.py`
 - `extract_map.py`
@@ -113,6 +112,6 @@ In particular, the public line now includes focused execution-level slices for:
 A good order for an outside user is:
 1. understand the config and dataset surface with `scripts/config/list_experiment_datasets.py`
 2. retrain or inspect the surrogate surface
-3. run reduced or full inference depending on the goal
+3. run full-model or reduced-model inference depending on the goal
 4. extract MAP samples
 5. generate validation and posterior plots
