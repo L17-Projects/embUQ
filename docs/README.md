@@ -5,6 +5,7 @@ This directory hosts the public documentation set for the `v0.1.0` release line.
 ## Start here
 
 - `../README.md` for the root overview and install extras
+- `INSTALL.md` for the practical editable-install contract
 - `RELEASE_NOTES_v0.1.0.md` for the release summary
 - `DEPENDENCY_EXTRAS.md` for the install-extras contract
 - `VALIDATION_MATRIX.md` for the public / manual / Vega validation structure

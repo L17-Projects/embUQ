@@ -1,76 +1,93 @@
 # Installation
 
-This document is the practical installation contract for the current public alpha line.
+This document is the practical installation contract for the current public release line.
 
 ## Supported Python versions
 
-The intended public Python range is:
+The supported public Python range is:
+
 - Python 3.10
 - Python 3.11
 
-## Installation modes
+## Editable install
 
-## 1. Minimal package install
-
-For light package inspection, docs, and non-heavy utilities:
+Start from a clean virtual environment:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -e .
 ```
 
-Current `pyproject.toml` covers only the minimal base dependencies. For real scientific use, install the relevant workflow extras manually until the package metadata is widened in the next hardening pass.
+## Extras contract
 
-## 2. Surrogate / plotting / analysis install
+The package metadata already declares the public extras in `pyproject.toml`.
+
+Minimal package install:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -U pip
-python -m pip install -e .
-python -m pip install torch pandas matplotlib scipy SALib
+pip install -e .
 ```
 
-Use this mode for:
-- surrogate retraining and evaluation
-- sensitivity analysis
-- MAP extraction
-- plotting and postprocessing
-- lightweight sampling design
-
-## 3. MPI-oriented workflow install
+Plotting/postprocess utilities:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -U pip
-python -m pip install -e .
-python -m pip install torch pandas matplotlib scipy SALib mpi4py
+pip install -e ".[plot]"
 ```
 
-You also need a working MPI runtime on the machine or cluster.
+Surrogate/model-selection utilities:
 
-Use this mode for:
-- MPI smoke tests
-- hierarchical workflow scripts
-- cluster-side execution
+```bash
+pip install -e ".[surrogate]"
+```
 
-## 4. GPU / HPC install notes
+MPI-aware workflow support:
 
-For GPU-oriented or cluster-side execution, the Python environment is only one part of the install contract.
-You also need:
-- the correct NVIDIA driver and CUDA stack for the target machine
-- a working MPI stack where relevant
-- a build/runtime path compatible with the vendored Korali surface
+```bash
+pip install -e ".[mpi]"
+```
 
-The public alpha line does not yet encode CUDA runtime dependencies inside `pyproject.toml`.
-Those paths remain environment-specific and must be validated on the actual target machine.
+Local pytest contract:
 
-## Suggested environment files
+```bash
+pip install -e ".[test]"
+```
 
-This repo now ships small environment definitions under `environments/`:
+CI-parity Python dependency contract:
+
+```bash
+pip install -e ".[ci]"
+```
+
+For Vega bootstrap work, the practical combination is usually:
+
+```bash
+pip install -e ".[test,mpi]"
+pip install pybind11 meson ninja
+```
+
+## Host-side requirements that extras do not provide
+
+The Python extras do not ship the full Korali backend or system MPI/CUDA runtimes.
+
+For workflow execution on GPU/HPC targets you still need:
+
+- a working MPI runtime
+- the appropriate NVIDIA/CUDA stack where applicable
+- a Korali build compatible with the vendored `extern/korali/` tree
+
+For Vega, the supported path is repo-managed and clone-local:
+
+- build vendored `extern/korali/`
+- install it under `_vega/korali/install`
+- source `_vega/korali/env.sh`
+
+Use [VEGA_BOOTSTRAP.md](/ceph/hpc/home/benvegnenb/dev/MesoUQ_fresh_clone_2026-04-08/docs/VEGA_BOOTSTRAP.md) for the exact bootstrap commands.
+
+## Convenience environment files
+
+This repo also ships small environment definitions under `environments/`:
+
 - `cpu-dev.yml`
 - `analysis.yml`
 - `mpi.yml`
@@ -83,14 +100,14 @@ Try these in order:
 
 ```bash
 python -c "import meso_uq; print('meso_uq import ok')"
-python inference/scripts/list_experiment_datasets.py --config inference/configs/production/inference_config_compression.yaml
+python scripts/config/list_experiment_datasets.py --config inference/configs/production/inference_config_compression.yaml
 python sampling/run_LHS.py --output lhs_samples.csv
 ```
 
-For analysis installs, also try:
+For surrogate/plot installs:
 
 ```bash
-python -c "import torch, pandas, scipy, SALib, matplotlib; print('analysis stack ok')"
+python -c "import torch, pandas, scipy, matplotlib; print('surrogate and plot stack ok')"
 ```
 
 For MPI installs:
@@ -98,7 +115,3 @@ For MPI installs:
 ```bash
 mpirun --oversubscribe -np 2 python -c "from mpi4py import MPI; c=MPI.COMM_WORLD; print(c.Get_rank(), c.Get_size())"
 ```
-
-## Important current limitation
-
-The package metadata and the public runtime surface are still being reconciled. This means the installation contract is now documented here, but not yet fully encoded in the package extras metadata. That is being hardened as part of the v0.1.0 release work.

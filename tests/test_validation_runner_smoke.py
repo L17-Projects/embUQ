@@ -59,7 +59,8 @@ class _FakeExperiment:
 
 def test_validation_runner_smoke_creates_summary_and_artifacts(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
-    module = _load_module(repo_root / "inference" / "scripts" / "run_gpu_validation_suite.py", "run_gpu_validation_suite_test")
+    module = _load_module(repo_root / "scripts" / "vega" / "run_validation_suite.py", "run_gpu_validation_suite_test")
+    workflow_name = "compression:reduced-model:validation"
 
     class Result:
         def __init__(self, returncode=0):
@@ -86,8 +87,8 @@ def test_validation_runner_smoke_creates_summary_and_artifacts(tmp_path, monkeyp
 
     output_root = tmp_path / "runner"
     summary = module.run_workflow(
-        workflow_name="compression_reduced",
-        workflow_spec=dict(module.WORKFLOW_CONFIGS["compression_reduced"]),
+        workflow_name=workflow_name,
+        workflow_spec=dict(module.WORKFLOW_CONFIGS[workflow_name]),
         output_root=output_root,
         python_bin="python",
         korali_pythonpath=None,
@@ -95,8 +96,9 @@ def test_validation_runner_smoke_creates_summary_and_artifacts(tmp_path, monkeyp
         population_size=8,
     )
 
-    workflow_dir = output_root / "compression_reduced_8"
-    assert summary["workflow"] == "compression_reduced_8"
+    workflow_dir = output_root / "compression__reduced-model__validation_8"
+    assert summary["workflow"] == "compression__reduced-model__validation_8"
+    assert summary["workflow_base_name"] == workflow_name
     assert summary["model_family"] == "reduced-model"
     assert summary["profile"] == "validation"
     assert summary["selection"] == "compression:reduced-model:validation"
@@ -108,10 +110,10 @@ def test_validation_runner_smoke_creates_summary_and_artifacts(tmp_path, monkeyp
 
 def test_validation_runner_defaults_to_validation_configs_and_preserves_population(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
-    module = _load_module(repo_root / "inference" / "scripts" / "run_gpu_validation_suite.py", "run_gpu_validation_suite_defaults_test")
+    module = _load_module(repo_root / "scripts" / "vega" / "run_validation_suite.py", "run_gpu_validation_suite_defaults_test")
 
-    compression_reduced = module.WORKFLOW_CONFIGS["compression_reduced"]["config"]
-    indentation_reduced = module.WORKFLOW_CONFIGS["indentation_reduced"]["config"]
+    compression_reduced = module.WORKFLOW_CONFIGS["compression:reduced-model:validation"]["config"]
+    indentation_reduced = module.WORKFLOW_CONFIGS["indentation:reduced-model:validation"]["config"]
     assert "validation" in str(compression_reduced)
     assert "validation" in str(indentation_reduced)
 
@@ -123,3 +125,11 @@ def test_validation_runner_defaults_to_validation_configs_and_preserves_populati
     for key in ("pop_size", "hbi_pop_size", "phase3a_pop_size", "phase3b_pop_size"):
         assert derived[key] == base[key]
     assert derived_path.name == "config.yaml"
+
+
+def test_validation_runner_accepts_legacy_aliases_for_compatibility():
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(repo_root / "scripts" / "vega" / "run_validation_suite.py", "run_gpu_validation_suite_alias_test")
+
+    assert module._resolve_validation_selection("compression_reduced") == "compression:reduced-model:validation"
+    assert module._resolve_validation_selection("indentation_full") == "indentation:full-model:validation"

@@ -7,7 +7,7 @@ This document describes the single Vega-first acceptance command shipped by `Mes
 The acceptance command is a thin wrapper around the richer operator runner:
 
 - wrapper: `scripts/run_vega_acceptance.py`
-- operator runner: `inference/scripts/run_gpu_validation_suite.py`
+- operator runner: `scripts/vega/run_validation_suite.py`
 
 The wrapper exists so a fresh clone on Vega has one obvious command to run and one machine-readable report to inspect.
 
@@ -16,6 +16,10 @@ Before running acceptance from a fresh clone, bootstrap the repo-local Korali ru
 - `bash scripts/vega/bootstrap_korali.sh --jobs 8`
 - `source _vega/korali/env.sh`
 - `python scripts/vega/doctor_vega.py --strict`
+
+For a canned Vega batch submission, the repo also ships:
+
+- `scripts/vega/sbatch/acceptance.sbatch`
 
 ## Command
 
@@ -33,9 +37,14 @@ Optional arguments:
 - `--workflows`
 - `--config-override workflow=/abs/path/config.yaml`
 
-By default, the wrapped validation runner uses the committed validation configs for the selected workflows and preserves the population settings encoded in those YAML files. `--population-size` is only for an explicit operator override.
+By default, the wrapped validation runner requests the canonical reduced-model validation selections:
 
-`--workflows` is a legacy alias surface for the underlying validation runner. The acceptance wrapper defaults already select the reduced-model validation workflows, so fresh-clone acceptance does not require remembering ambiguous labels such as `compression_reduced`.
+- `compression:reduced-model:validation`
+- `indentation:reduced-model:validation`
+
+The wrapped validation runner uses the committed validation configs for the selected workflows and preserves the population settings encoded in those YAML files. `--population-size` is only for an explicit operator override.
+
+`--workflows` accepts the canonical `experiment:model-family:profile` selections. Legacy aliases remain accepted only as compatibility shims inside the underlying validation runner.
 
 ## Outputs
 

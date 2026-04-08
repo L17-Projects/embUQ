@@ -3,7 +3,7 @@
 Run the Vega-first acceptance command for MesoUQ.
 
 This is intentionally a thin wrapper around the richer
-`inference/scripts/run_gpu_validation_suite.py` operator runner.
+`scripts/vega/run_validation_suite.py` operator runner.
 It captures environment metadata, invokes the validation suite once, and writes
 one machine-readable acceptance report.
 """
@@ -24,8 +24,11 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_ROOT = PROJECT_ROOT.parent / "vega_acceptance"
-VALIDATION_RUNNER = PROJECT_ROOT / "inference" / "scripts" / "run_gpu_validation_suite.py"
-DEFAULT_WORKFLOWS = ["compression_reduced", "indentation_reduced"]
+VALIDATION_RUNNER = PROJECT_ROOT / "scripts" / "vega" / "run_validation_suite.py"
+DEFAULT_WORKFLOWS = [
+    "compression:reduced-model:validation",
+    "indentation:reduced-model:validation",
+]
 
 
 def _run_command(command: list[str], cwd: Path, env: dict[str, str]) -> subprocess.CompletedProcess:
@@ -82,7 +85,15 @@ def main() -> int:
     parser.add_argument("--output-root", type=str, default=str(DEFAULT_OUTPUT_ROOT))
     parser.add_argument("--python-bin", type=str, default=sys.executable)
     parser.add_argument("--korali-pythonpath", type=str, default=None)
-    parser.add_argument("--workflows", nargs="+", default=DEFAULT_WORKFLOWS)
+    parser.add_argument(
+        "--workflows",
+        nargs="+",
+        default=DEFAULT_WORKFLOWS,
+        help=(
+            "Validation selections in experiment:model-family:profile form. "
+            "Legacy aliases remain accepted by the wrapped runner."
+        ),
+    )
     parser.add_argument("--cpu-ranks", type=int, default=1)
     parser.add_argument("--population-size", type=int, default=None)
     parser.add_argument("--config-override", action="append", default=[])

@@ -6,8 +6,8 @@
 
 The public line already includes:
 - the shared Python package `meso_uq`
-- full hierarchical workflow entrypoints and canonical production configs
-- reduced-workflow public wrappers
+- the supported workflow spine for `Phase 1`, `Phase 2`, and `Phase 3b` plus canonical production configs
+- reduced-model public wrappers for `Phase 1`, `Phase 2`, and `Phase 3b`
 - compression and indentation evalkit support needed by the workflow spine
 - surrogate retraining and evaluation entrypoints for compression and indentation
 - Sobol sensitivity helpers and a lightweight Latin-hypercube design generator
@@ -17,6 +17,7 @@ The public line already includes:
 ## Intentionally deferred
 
 The following remain intentionally outside the current public boundary:
+- `Phase 3a` as a supported public workflow lane
 - heavy generated artifacts and large trained model payloads
 - every internal/private convenience script from the research line
 - the heavier Mirheo data-generation execution surface
@@ -36,7 +37,7 @@ The release line is curated so that:
 If you are using the repo now, the intended public strengths are:
 - surrogate retraining/evaluation
 - sensitivity support
-- full and reduced hierarchical inference entrypoints
+- full-model and reduced-model hierarchical inference through `Phase 1`, `Phase 2`, and `Phase 3b`
 - MAP extraction and plotting
 - understanding the vendored Korali patch surface that supports those workflows
 

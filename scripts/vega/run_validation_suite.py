@@ -22,42 +22,40 @@ from typing import Any, Dict
 import pandas as pd
 import yaml
 
+from meso_uq.vega_workflows import VegaWorkflowSelection, parse_selection, selection_key, selection_slug
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_ROOT = PROJECT_ROOT.parent / "korali_gpu"
 DEFAULT_KORALI_PYTHONPATH = (
     PROJECT_ROOT.parent / "korali_gpu" / "local_install" / "usr" / "local" / "lib" / "python3.8" / "site-packages"
 )
 DEFAULT_WORKFLOWS = [
-    "compression_reduced",
-    "compression_full",
-    "indentation_reduced",
-    "indentation_full",
+    "compression:reduced-model:validation",
+    "compression:full-model:validation",
+    "indentation:reduced-model:validation",
+    "indentation:full-model:validation",
 ]
 WORKFLOW_CONFIGS: Dict[str, Dict[str, Any]] = {
-    "compression_reduced": {
+    "compression:reduced-model:validation": {
         "experiment": "compression",
-        "scope": "reduced",
         "model_family": "reduced-model",
         "profile": "validation",
         "config": PROJECT_ROOT / "reduced" / "configs" / "validation" / "validation_config_compression.yaml",
     },
-    "compression_full": {
+    "compression:full-model:validation": {
         "experiment": "compression",
-        "scope": "full",
         "model_family": "full-model",
         "profile": "validation",
         "config": PROJECT_ROOT / "inference" / "configs" / "validation" / "validation_config_compression.yaml",
     },
-    "indentation_reduced": {
+    "indentation:reduced-model:validation": {
         "experiment": "indentation",
-        "scope": "reduced",
         "model_family": "reduced-model",
         "profile": "validation",
         "config": PROJECT_ROOT / "reduced" / "configs" / "validation" / "validation_config_indentation.yaml",
     },
-    "indentation_full": {
+    "indentation:full-model:validation": {
         "experiment": "indentation",
-        "scope": "full",
         "model_family": "full-model",
         "profile": "validation",
         "config": PROJECT_ROOT / "inference" / "configs" / "validation" / "validation_config_indentation.yaml",
@@ -102,6 +100,19 @@ def _build_env(korali_pythonpath: str | None) -> dict[str, str]:
         extra_pythonpath.insert(0, korali_pythonpath)
     env["PYTHONPATH"] = ":".join(extra_pythonpath + [env.get("PYTHONPATH", "")]).rstrip(":")
     return env
+
+
+def _resolve_validation_selection(value: str) -> str:
+    selection = parse_selection(value)
+    if selection.profile != "validation":
+        raise ValueError(
+            "The validation suite only supports validation-profile selections. "
+            f"Got: {value}"
+        )
+    key = selection_key(selection)
+    if key not in WORKFLOW_CONFIGS:
+        raise ValueError(f"Unsupported validation workflow selection: {value}")
+    return key
 
 
 def _load_experiment_spec(config_path: Path, experiment_name: str):
@@ -195,7 +206,13 @@ def run_workflow(
     cpu_ranks: int,
     population_size: int | None,
 ) -> dict[str, Any]:
-    workflow_output_name = workflow_name if population_size is None else f"{workflow_name}_{population_size}"
+    selection = VegaWorkflowSelection(
+        workflow_spec["experiment"],
+        workflow_spec["model_family"],
+        workflow_spec["profile"],
+    )
+    workflow_slug = selection_slug(selection)
+    workflow_output_name = workflow_slug if population_size is None else f"{workflow_slug}_{population_size}"
     workflow_dir = output_root / workflow_output_name
     workflow_dir.mkdir(parents=True, exist_ok=True)
     results_dir = workflow_dir / "results"
@@ -252,12 +269,11 @@ def run_workflow(
 
     summary = {
         "workflow": workflow_output_name,
-        "workflow_base_name": workflow_name,
-        "scope": workflow_spec["scope"],
+        "workflow_base_name": selection_key(selection),
         "experiment": workflow_spec["experiment"],
         "model_family": workflow_spec["model_family"],
         "profile": workflow_spec["profile"],
-        "selection": f"{workflow_spec['experiment']}:{workflow_spec['model_family']}:{workflow_spec['profile']}",
+        "selection": selection_key(selection),
         "config": str(config_path),
         "population_settings": {
             key: derived_config.get(key)
@@ -275,7 +291,15 @@ def run_workflow(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run GPU-batched workflow validation suite.")
-    parser.add_argument("--workflows", nargs="+", default=DEFAULT_WORKFLOWS, choices=sorted(WORKFLOW_CONFIGS))
+    parser.add_argument(
+        "--workflows",
+        nargs="+",
+        default=DEFAULT_WORKFLOWS,
+        help=(
+            "Validation workflow selections in experiment:model-family:profile form. "
+            "Legacy aliases such as compression_reduced remain accepted."
+        ),
+    )
     parser.add_argument("--output-root", type=str, default=str(DEFAULT_OUTPUT_ROOT))
     parser.add_argument("--python-bin", type=str, default=sys.executable)
     parser.add_argument(
@@ -307,12 +331,12 @@ def main() -> int:
         if "=" not in item:
             raise ValueError(f"Invalid --config-override value '{item}'. Expected workflow=path.")
         workflow_name, path_str = item.split("=", 1)
-        if workflow_name not in WORKFLOW_CONFIGS:
-            raise ValueError(f"Unknown workflow '{workflow_name}' in --config-override.")
-        config_overrides[workflow_name] = Path(path_str).resolve()
+        resolved_name = _resolve_validation_selection(workflow_name)
+        config_overrides[resolved_name] = Path(path_str).resolve()
 
     suite_summary = []
-    for workflow_name in args.workflows:
+    for requested_name in args.workflows:
+        workflow_name = _resolve_validation_selection(requested_name)
         workflow_spec = dict(WORKFLOW_CONFIGS[workflow_name])
         if workflow_name in config_overrides:
             workflow_spec["config"] = config_overrides[workflow_name]

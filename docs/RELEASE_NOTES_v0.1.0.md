@@ -10,7 +10,7 @@ This release turns the repository from a partial public skeleton into a substant
 - surrogate retraining and lightweight model-selection utilities
 - MAP extraction and plotting
 - lightweight propagation execution and plotting handoff
-- promoted operator / refresh utilities
+- promoted operator utilities
 - vendored Korali build-surface notes
 - public smoke tests and release-validation docs
 
