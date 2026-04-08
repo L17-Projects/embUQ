@@ -81,7 +81,12 @@ python sampling/run_LHS.py --output lhs_samples.csv
 Extract a MAP sample from a Korali run directory:
 
 ```bash
-python inference/scripts/extract_phase1_map.py path/to/run_dir --output phase1_map.csv
+python scripts/vega/extract_map.py \
+  --experiment compression \
+  --model-family full-model \
+  --profile validation \
+  --stage phase1 \
+  --dataset compression_2.1um
 ```
 
 Create a posterior marginal plot:
@@ -93,6 +98,7 @@ python propagation/scripts/plot_posterior_marginals.py posterior_samples.csv --o
 ## Read next
 
 - `docs/WORKFLOWS.md`
+- `docs/VEGA_WORKFLOW_HELPERS.md`
 - `docs/RELEASE_SCOPE.md`
 - `docs/HPC_GPU_BATCHED_REDUCED_INDENTATION.md`
 - `CONTRIBUTING.md`
