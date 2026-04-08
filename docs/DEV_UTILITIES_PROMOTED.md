@@ -8,7 +8,6 @@ These utilities are not the narrow paper-facing core. They exist because they im
 
 - runnability,
 - diagnosis,
-- refresh workflows,
 - operator convenience during common scientific loops.
 
 ## Key promoted utilities
@@ -19,13 +18,7 @@ These utilities are not the narrow paper-facing core. They exist because they im
 
 Use this when you want to run a packaged reduced/full validation sequence and collect workflow artifacts.
 
-### 2. Reduced-indentation refresh helper
-
-`inference/scripts/run_indentation_reduced_refresh.py`
-
-Use this when new `3.4um` training data arrives and you want to rerun the reduced indentation path with a refreshed surrogate.
-
-### 3. Richer indentation multi-architecture trainer
+### 2. Richer indentation multi-architecture trainer
 
 `indentation/surrogate/scripts/train_multi_arch.py`
 
@@ -46,4 +39,4 @@ These promoted utilities complement, rather than replace, the simpler public int
 
 ## Honest status
 
-These utilities are public because they are useful and improve operator experience, but they are still closer to an operator / refresh / analysis layer than to the minimal paper-facing core.
+These utilities are public because they are useful and improve operator experience, but they are still closer to an operator / analysis layer than to the minimal paper-facing core.

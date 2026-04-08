@@ -76,16 +76,34 @@ def run_phase_3b_dataset(experiment_name: str, diameter_um: float, reference_poi
             Path(path).mkdir(parents=True, exist_ok=True)
         comm.Barrier()
 
+    if rank == 0:
+        datedPrint(f"[Phase 3b] Setting up {exp_name}")
+
+    phase2_latest = output_root / "results_phase_2" / "latest"
+    phase1_latest = output_root / "results_phase_1" / exp_name / "latest"
+    if not phase2_latest.exists():
+        raise FileNotFoundError(f"Phase 2 results not found: {phase2_latest}")
+    if not phase1_latest.exists():
+        raise FileNotFoundError(f"Phase 1 results not found for {exp_name}: {phase1_latest}")
+
     k = korali.Engine()
     k.setMPIComm(MPI.COMM_WORLD)
     configure_korali_conduit(k, mpi_ranks=comm.Get_size(), ranks_per_worker=1, concurrent_jobs=1)
 
     psi = korali.Experiment()
     sub = korali.Experiment()
-    psi.loadState(str(output_root / "results_phase_2" / "latest"))
-    sub.loadState(str(output_root / "results_phase_1" / exp_name / "latest"))
+    psi_found = psi.loadState(str(phase2_latest))
+    sub_found = sub.loadState(str(phase1_latest))
+    if not psi_found:
+        raise RuntimeError(f"Failed to load Phase 2 state from {phase2_latest}")
+    if not sub_found:
+        raise RuntimeError(f"Failed to load Phase 1 state from {phase1_latest}")
+
     reference_points = _align_sub_reference(sub, reference_points, exp_name, rank)
     sub["Problem"]["Computational Model"] = lambda sampleData, d=diameter_um, pts=reference_points, model=compute_model: model(sampleData, pts, d)
+
+    if rank == 0:
+        datedPrint(f"[Phase 3b] Loaded Phase 1 and Phase 2 states for {exp_name}")
 
     e = korali.Experiment()
     experiment_output = output_root / "results_phase_3b" / exp_name
@@ -107,10 +125,21 @@ def run_phase_3b_dataset(experiment_name: str, diameter_um: float, reference_poi
     if profiling:
         k["Profiling"]["Detail"] = "Full"
         k["Profiling"]["Frequency"] = 0.5
+
+    if rank == 0:
+        datedPrint(f"[Phase 3b] Starting TMCMC for {exp_name} with {comm.Get_size()} MPI ranks")
+
     k.run(e)
+
+    if rank == 0:
+        datedPrint(f"[Phase 3b] Completed sampling for {exp_name}")
+
     del e, psi, sub, k
     gc.collect()
     comm.Barrier()
+
+    if rank == 0:
+        datedPrint(f"[Phase 3b] Memory cleanup completed for {exp_name}")
 
 
 def run_phase_3b(profiling: bool = False, config_path: str = None, output_dir: str = "_setup"):
@@ -122,10 +151,36 @@ def run_phase_3b(profiling: bool = False, config_path: str = None, output_dir: s
     os.environ["HUQ_INFERENCE_CONFIG"] = str(config_path_resolved)
     output_root = _resolve_output_root(output_dir)
     experiments = [exp for exp in load_experiments(config, Path(project_root)) if exp.enabled]
-    if not (output_root / "results_phase_2" / "latest").exists():
+    phase3b_pop_size = config.get("phase3b_pop_size", 10000)
+    phase3b_max_gen = config.get("phase3b_max_gen", -1)
+    phase3b_target_cov = config.get("phase3b_target_cov", 0.6)
+
+    if rank == 0:
+        datedPrint("[Phase 3b] Starting dataset-specific posterior sampling")
+        datedPrint(f"[Phase 3b] Population size: {phase3b_pop_size} per dataset")
+        datedPrint(f"[Phase 3b] Max generations: {phase3b_max_gen}")
+        datedPrint(f"[Phase 3b] Target CoV: {phase3b_target_cov}")
+        datedPrint(f"[Phase 3b] Output root: {output_root}")
+        total_sets = sum(len(exp.diameters) for exp in experiments)
+        datedPrint(f"[Phase 3b] Datasets: {total_sets}")
+
+    phase2_latest = output_root / "results_phase_2" / "latest"
+    if not phase2_latest.exists():
         if rank == 0:
-            datedPrint("[Phase 3b] ERROR: Phase 2 results not found!")
+            datedPrint(f"[Phase 3b] ERROR: Phase 2 results not found: {phase2_latest}")
         sys.exit(1)
+
+    for exp in experiments:
+        for diameter_um in exp.diameters:
+            phase1_latest = output_root / "results_phase_1" / exp.dataset_name(diameter_um) / "latest"
+            if not phase1_latest.exists():
+                if rank == 0:
+                    datedPrint(f"[Phase 3b] ERROR: Phase 1 results not found for {exp.name} {diameter_um} μm: {phase1_latest}")
+                sys.exit(1)
+
+    if rank == 0:
+        datedPrint("[Phase 3b] Verified prerequisite Phase 1 and Phase 2 results")
+
     compute_surrogate_map = {"compression": compute_compression_surrogate, "indentation": compute_indentation_surrogate}
     for exp in experiments:
         model = compute_surrogate_map[exp.name]
@@ -135,9 +190,9 @@ def run_phase_3b(profiling: bool = False, config_path: str = None, output_dir: s
                 diameter_um=diameter_um,
                 reference_points=exp.get_reference_points(diameter_um),
                 compute_model=model,
-                pop_size=config.get("phase3b_pop_size", 10000),
-                max_gen=config.get("phase3b_max_gen", -1),
-                target_cov=config.get("phase3b_target_cov", 0.6),
+                pop_size=phase3b_pop_size,
+                max_gen=phase3b_max_gen,
+                target_cov=phase3b_target_cov,
                 output_root=output_root,
                 profiling=profiling,
             )
