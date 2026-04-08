@@ -23,7 +23,7 @@ def _read_reference_table(reference_csv):
 def plot_validation_overlay(reference_csv, prediction_csv, output_path, x_col=None, y_ref_col=None, y_pred_col=None, label_ref="reference", label_pred="prediction"):
     ref = _read_reference_table(reference_csv)
     pred = pd.read_csv(prediction_csv)
-    x_ref_col = ref.columns[0] if x_col is None else x_col
+    x_ref_col = ref.columns[0] if x_col is None or x_col not in ref.columns else x_col
     x_pred_col = pred.columns[0] if x_col is None or x_col not in pred.columns else x_col
     if y_ref_col is None:
         y_ref_col = ref.columns[1]
