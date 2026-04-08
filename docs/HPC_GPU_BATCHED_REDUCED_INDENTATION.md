@@ -106,21 +106,12 @@ export LD_LIBRARY_PATH=$KORALI_PREFIX/lib64:$KORALI_PREFIX/lib:${LD_LIBRARY_PATH
 
 ## Recommended operator path for reduced indentation
 
-### Case A: new `3.4um` training data arrived
-
-Use `inference/scripts/run_indentation_reduced_refresh.py` to stage the new data, retrain the surrogate, skip Phase 3a, and produce the reduced indentation workflow outputs.
-
-### Case B: the surrogate is already retrained and you only want the workflow
-
-Use the same helper with `--skip-training`.
+Use the current Vega helper surface under `scripts/vega/` together with the reduced-model indentation configs. The older one-off refresh helper has been retired.
 
 ## Important output locations
 
-The refresh helper creates a fresh timestamped root under an output directory with:
+The current Vega workflow helpers create a fresh output root under `_vega/` with:
 
-- refresh backups
-- a refresh manifest
-- a derived workflow config
 - the reduced indentation workflow output
 
 ## Troubleshooting
