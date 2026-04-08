@@ -225,3 +225,15 @@ def test_production_sanity_template_uses_public_command() -> None:
     assert "run_production_sanity.py" in text
     assert "SELECTIONS" in text
     assert "ALL_LANES" in text
+
+
+def test_acceptance_template_uses_public_command() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    template = repo_root / "scripts" / "vega" / "sbatch" / "acceptance.sbatch"
+
+    text = template.read_text(encoding="utf-8")
+
+    assert "run_vega_acceptance.py" in text
+    assert "SELECTIONS" in text
+    assert "compression:reduced-model:validation" in text
+    assert "_vega/korali/env.sh" in text
