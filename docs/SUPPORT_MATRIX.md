@@ -37,5 +37,3 @@ The release contract requires real execution support for:
 - MAP extraction
 - plotting / postprocessing
 - Phase 3b propagation + plotting
-
-Phase 3a is not part of the current public release workflow surface.

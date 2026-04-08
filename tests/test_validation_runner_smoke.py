@@ -2,6 +2,7 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 
 
@@ -122,14 +123,16 @@ def test_validation_runner_defaults_to_validation_configs_and_preserves_populati
     with open(compression_reduced, "rb") as handle:
         base = yaml.load(handle, Loader=yaml.CLoader)
 
-    for key in ("pop_size", "hbi_pop_size", "phase3a_pop_size", "phase3b_pop_size"):
+    for key in ("pop_size", "hbi_pop_size", "phase3b_pop_size"):
         assert derived[key] == base[key]
     assert derived_path.name == "config.yaml"
 
 
-def test_validation_runner_accepts_legacy_aliases_for_compatibility():
+def test_validation_runner_rejects_legacy_aliases():
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(repo_root / "scripts" / "vega" / "run_validation_suite.py", "run_gpu_validation_suite_alias_test")
 
-    assert module._resolve_validation_selection("compression_reduced") == "compression:reduced-model:validation"
-    assert module._resolve_validation_selection("indentation_full") == "indentation:full-model:validation"
+    with pytest.raises(ValueError):
+        module._resolve_validation_selection("compression_reduced")
+    with pytest.raises(ValueError):
+        module._resolve_validation_selection("indentation_full")

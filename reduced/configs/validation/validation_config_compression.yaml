@@ -35,11 +35,6 @@ hbi_burn_in: 1
 hbi_target_cov: 0.6
 hbi_covariance_scaling: 0.02
 
-phase3a_pop_size: 256
-phase3a_max_gen: 2
-phase3a_target_cov: 0.6
-phase3a_covariance_scaling: 0.02
-
 phase3b_pop_size: 256
 phase3b_max_gen: 2
 phase3b_target_cov: 0.6

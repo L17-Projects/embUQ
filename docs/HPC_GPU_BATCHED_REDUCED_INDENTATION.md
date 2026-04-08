@@ -15,8 +15,6 @@ This guide describes the current supported operator path for the reduced-model i
   - propagation `Phase 3b`
   - MAP extraction and plotting
 
-`Phase 3a` is not part of the supported public workflow surface.
-
 ## Backend expectations
 
 For this workflow, the current documented backend contract is:

@@ -77,7 +77,7 @@ def _run_step(step_name: str, command: list[str], cwd: Path, env: dict[str, str]
 def _set_population_settings(config: dict[str, Any], population_size: int | None) -> dict[str, Any]:
     updated = dict(config)
     if population_size is not None:
-        for key in ("pop_size", "hbi_pop_size", "phase3a_pop_size", "phase3b_pop_size"):
+        for key in ("pop_size", "hbi_pop_size", "phase3b_pop_size"):
             if key in updated:
                 updated[key] = int(population_size)
     return updated
@@ -277,7 +277,7 @@ def run_workflow(
         "config": str(config_path),
         "population_settings": {
             key: derived_config.get(key)
-            for key in ("pop_size", "hbi_pop_size", "phase3a_pop_size", "phase3b_pop_size")
+            for key in ("pop_size", "hbi_pop_size", "phase3b_pop_size")
             if key in derived_config
         },
         "population_override": population_size,
@@ -295,10 +295,7 @@ def main() -> int:
         "--workflows",
         nargs="+",
         default=DEFAULT_WORKFLOWS,
-        help=(
-            "Validation workflow selections in experiment:model-family:profile form. "
-            "Legacy aliases such as compression_reduced remain accepted."
-        ),
+        help="Validation workflow selections in experiment:model-family:profile form.",
     )
     parser.add_argument("--output-root", type=str, default=str(DEFAULT_OUTPUT_ROOT))
     parser.add_argument("--python-bin", type=str, default=sys.executable)

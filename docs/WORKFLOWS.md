@@ -33,8 +33,6 @@ Canonical reduced configs live under:
 
 These wrappers delegate to the main workflow spine while selecting the reduced-model configs by default.
 
-`Phase 3a` scripts and config keys still exist in the tree for compatibility with older/internal work, but `Phase 3a` is not part of the supported public workflow surface or the validated Vega workflow contract.
-
 ## 3. Execution profiles are separate from model family
 
 The repository also ships reduced-cost validation configs under both the full-model and reduced-model trees:
