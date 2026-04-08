@@ -39,6 +39,8 @@ pip install pybind11 meson ninja
 
 The helper script below can also install `pybind11`, `meson`, and `ninja` into the active environment automatically.
 
+That editable install now includes the mesh-preparation dependency `trimesh`, which is required by the public Phase 1 workflow bootstrap for compression and indentation.
+
 ## Preflight check
 
 Run the Vega doctor before building Korali:
@@ -94,5 +96,6 @@ The generated env script intentionally replaces inherited `PYTHONPATH` entries s
 With the repo-local runtime active, continue with:
 
 - `pytest`
+- `python scripts/vega/run_workflow_matrix.py ...`
 - `python scripts/run_vega_acceptance.py ...`
 - the public Phase 1 / Phase 2 / Phase 3b / propagation / MAP wrappers as they are added in later PRs

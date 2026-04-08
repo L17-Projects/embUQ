@@ -4,6 +4,17 @@ This page explains the install extras declared in `pyproject.toml` and the inten
 
 ## Extras
 
+## Base package dependencies
+
+The core package dependency set includes:
+
+- `numpy`
+- `pydantic`
+- `pyyaml`
+- `trimesh`
+
+`trimesh` is a required public workflow dependency because the Phase 1 runtime prepares mesh geometry for compression and indentation runs.
+
 ### `.[plot]`
 
 Install the plotting-oriented stack used by the public postprocessing utilities.

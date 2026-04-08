@@ -151,6 +151,6 @@ def test_vega_sbatch_templates_expose_model_family_and_profile_axes() -> None:
     assert templates
     for template in templates:
         text = template.read_text(encoding="utf-8")
-        assert "MODEL_FAMILY" in text
-        assert "PROFILE" in text
+        assert "MODEL_FAMILY" in text or "MODEL_FAMILIES" in text
+        assert "PROFILE" in text or "PROFILES" in text
         assert "_vega/korali/env.sh" in text

@@ -30,6 +30,8 @@ These checks require a Linux workstation with an NVIDIA GPU:
 These checks require the real target environment:
 
 - install on Vega
+- bootstrap vendored `extern/korali/` into repo-local `_vega/`
+- run the fresh-clone workflow matrix with explicit experiment/model-family/profile selection
 - validate MPI execution
 - run the single Vega-first acceptance command
 - validate Phase 1 GPU-batched
@@ -43,5 +45,7 @@ These checks require the real target environment:
 The public CI layer is intentionally smaller than the full release contract because some required workflows are hardware-specific.
 
 Those hardware-specific checks must still be recorded in-repo so the release does not depend on undocumented tribal knowledge.
+
+The fresh-clone workflow matrix is documented in `VEGA_WORKFLOW_MATRIX.md`.
 
 The single Vega-first acceptance command is documented in `VEGA_ACCEPTANCE_COMMAND.md`, and the tiny validation configs intended for that path are documented in `VALIDATION_CONFIGS.md`.

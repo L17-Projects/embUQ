@@ -97,6 +97,9 @@ def test_validation_runner_smoke_creates_summary_and_artifacts(tmp_path, monkeyp
 
     workflow_dir = output_root / "compression_reduced_8"
     assert summary["workflow"] == "compression_reduced_8"
+    assert summary["model_family"] == "reduced-model"
+    assert summary["profile"] == "validation"
+    assert summary["selection"] == "compression:reduced-model:validation"
     assert (workflow_dir / "summary.json").exists()
     assert (workflow_dir / "map_phase3b" / "all_diameters_map.json").exists()
     assert (workflow_dir / "overlay_uq_ref" / "uq_overlay_2.1um.png").exists()

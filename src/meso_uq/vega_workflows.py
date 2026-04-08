@@ -32,6 +32,14 @@ class VegaWorkflowSelection:
             raise ValueError(f"Unsupported profile: {self.profile}")
 
 
+LEGACY_WORKFLOW_ALIASES = {
+    "compression_full": VegaWorkflowSelection("compression", "full-model", "validation"),
+    "compression_reduced": VegaWorkflowSelection("compression", "reduced-model", "validation"),
+    "indentation_full": VegaWorkflowSelection("indentation", "full-model", "validation"),
+    "indentation_reduced": VegaWorkflowSelection("indentation", "reduced-model", "validation"),
+}
+
+
 def _resolve_repo_path(repo_root: Path | str, value: str | Path | None) -> Path | None:
     if value is None:
         return None
@@ -39,6 +47,40 @@ def _resolve_repo_path(repo_root: Path | str, value: str | Path | None) -> Path 
     if not candidate.is_absolute() and not candidate.exists():
         candidate = Path(repo_root, candidate)
     return candidate.resolve()
+
+
+def selection_key(selection: VegaWorkflowSelection) -> str:
+    return f"{selection.experiment}:{selection.model_family}:{selection.profile}"
+
+
+def selection_slug(selection: VegaWorkflowSelection) -> str:
+    return "__".join((selection.experiment, selection.model_family, selection.profile))
+
+
+def parse_selection(value: str) -> VegaWorkflowSelection:
+    if value in LEGACY_WORKFLOW_ALIASES:
+        return LEGACY_WORKFLOW_ALIASES[value]
+
+    parts = value.split(":")
+    if len(parts) != 3:
+        raise ValueError(
+            "Workflow selection must use experiment:model-family:profile "
+            f"or a known legacy alias. Got: {value}"
+        )
+    return VegaWorkflowSelection(parts[0], parts[1], parts[2])
+
+
+def expand_selection_matrix(
+    experiments: Iterable[str],
+    model_families: Iterable[str],
+    profiles: Iterable[str],
+) -> list[VegaWorkflowSelection]:
+    selections: list[VegaWorkflowSelection] = []
+    for experiment in experiments:
+        for model_family in model_families:
+            for profile in profiles:
+                selections.append(VegaWorkflowSelection(experiment, model_family, profile))
+    return selections
 
 
 def resolve_workflow_config_path(

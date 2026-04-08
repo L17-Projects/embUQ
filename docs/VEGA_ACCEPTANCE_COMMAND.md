@@ -22,8 +22,7 @@ Before running acceptance from a fresh clone, bootstrap the repo-local Korali ru
 ```bash
 python scripts/run_vega_acceptance.py \
   --output-root ../vega_acceptance \
-  --cpu-ranks 1 \
-  --workflows compression_reduced indentation_reduced
+  --cpu-ranks 1
 ```
 
 Optional arguments:
@@ -31,9 +30,12 @@ Optional arguments:
 - `--python-bin`
 - `--korali-pythonpath`
 - `--population-size`
+- `--workflows`
 - `--config-override workflow=/abs/path/config.yaml`
 
 By default, the wrapped validation runner uses the committed validation configs for the selected workflows and preserves the population settings encoded in those YAML files. `--population-size` is only for an explicit operator override.
+
+`--workflows` is a legacy alias surface for the underlying validation runner. The acceptance wrapper defaults already select the reduced-model validation workflows, so fresh-clone acceptance does not require remembering ambiguous labels such as `compression_reduced`.
 
 ## Outputs
 
