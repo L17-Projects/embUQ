@@ -8,6 +8,7 @@ def test_public_package_imports_smoke():
         "meso_uq.postprocess.plots",
         "meso_uq.postprocess.propagation",
         "meso_uq.surrogate.model_selection",
+        "meso_uq.sensitivity",
         "meso_uq.config.loader",
         "meso_uq.experiments",
     ]

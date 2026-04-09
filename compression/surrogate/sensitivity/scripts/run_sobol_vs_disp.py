@@ -3,6 +3,7 @@
 import argparse
 import os
 import pickle
+import numpy as np
 import pandas as pd
 
 from meso_uq.sensitivity import build_problem, run_sobol_over_axis
@@ -26,7 +27,7 @@ def main():
         yscale=data["yscale"],
         problem=build_problem(comp_variables),
         fixed_axis_name="disp",
-        fixed_axis_values=pd.Series(pd.np.linspace(0.1, 1.8, args.n_displacements)).tolist(),
+        fixed_axis_values=np.linspace(0.1, 1.8, args.n_displacements).tolist(),
         evaluate_columns=["Yt", "kb", "b1", "b2", "a3", "a4", "disp"],
         n_samples=args.n_samples,
         calc_second_order=False,
