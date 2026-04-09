@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -18,12 +19,13 @@ def test_retraining_canary_runner_writes_report_and_checks_outputs(tmp_path, mon
     module = _load_module(repo_root / "scripts" / "ci" / "run_retraining_canary.py", "run_retraining_canary_test")
     captured = {}
 
-    def fake_run(command, cwd=None, check=False):
+    def fake_run(command, cwd=None, capture_output=False, text=False):
         captured["command"] = command
         model_path = Path(command[command.index("--out") + 1])
         model_path.parent.mkdir(parents=True, exist_ok=True)
         model_path.write_text("model", encoding="utf-8")
         model_path.with_name(f"{model_path.stem}_loss_hist.pkl").write_text("loss", encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="retraining ok\n", stderr="")
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
 
@@ -35,3 +37,5 @@ def test_retraining_canary_runner_writes_report_and_checks_outputs(tmp_path, mon
     assert report["status"] == "passed"
     assert Path(report["artifacts"]["model"]).exists()
     assert Path(report["artifacts"]["loss_history"]).exists()
+    assert Path(report["artifacts"]["stdout_log"]).read_text(encoding="utf-8") == "retraining ok\n"
+    assert Path(report["artifacts"]["stderr_log"]).read_text(encoding="utf-8") == ""
