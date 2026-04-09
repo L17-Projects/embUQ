@@ -60,3 +60,5 @@ This release turns the repository from a partial public skeleton into a substant
 ## Tag intent
 
 Once CI is green and the final release-artifact sweep is accepted, this branch is intended to be ready for tagging as `v0.1.0`.
+
+The final evidence bar is captured explicitly in `RELEASE_EVIDENCE_CHECKLIST_v0.1.0.md`.

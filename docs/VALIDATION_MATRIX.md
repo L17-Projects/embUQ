@@ -26,6 +26,7 @@ These checks require a Linux workstation with an NVIDIA GPU:
 - run Phase 1 GPU-batched
 - run Phase 3b GPU-batched
 - run MAP extraction and plotting on the resulting outputs
+- archive a machine-readable `workstation_acceptance_report.json`
 
 ## 3. Cluster / Vega acceptance validation
 
@@ -52,6 +53,9 @@ That split is deliberate:
 - Vega remains the authoritative surface for the wider validation matrix, acceptance, production sanity, and hardware-specific backend proof.
 
 Those hardware-specific checks must still be recorded in-repo so the release does not depend on undocumented tribal knowledge.
+
+The workstation proof layer is documented in `WORKSTATION_ACCEPTANCE_CHECKLIST.md`.
+Validate archived workstation reports with `scripts/workstation/validate_acceptance_record.py`.
 
 The public Vega validation matrix is documented in `VEGA_VALIDATION_MATRIX.md`.
 

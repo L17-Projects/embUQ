@@ -9,8 +9,10 @@ This directory hosts the public documentation set for the `v0.1.0` release line.
 - `../SECURITY.md` for the public security-reporting policy
 - `INSTALL.md` for the practical editable-install contract
 - `RELEASE_NOTES_v0.1.0.md` for the release summary
+- `RELEASE_EVIDENCE_CHECKLIST_v0.1.0.md` for the pre-tag evidence bar
 - `DEPENDENCY_EXTRAS.md` for the install-extras contract
 - `VALIDATION_MATRIX.md` for the public / manual / Vega validation structure
+- `WORKSTATION_ACCEPTANCE_CHECKLIST.md` for the Linux NVIDIA workstation proof layer
 - `VEGA_ACCEPTANCE_COMMAND.md` for the single Vega-first acceptance command
 - `VEGA_ACCEPTANCE_CHECKLIST.md` for the cluster acceptance layer and pass criteria
 - `VEGA_BOOTSTRAP.md` for the fresh-clone Vega bootstrap path
