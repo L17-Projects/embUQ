@@ -162,6 +162,8 @@ A small release-oriented example bundle is also provided under `examples/configs
 Start here:
 
 - `docs/README.md`
+- `CONTRIBUTING.md`
+- `SECURITY.md`
 - `docs/RELEASE_NOTES_v0.1.0.md`
 - `docs/DEPENDENCY_EXTRAS.md`
 - `docs/VALIDATION_MATRIX.md`
@@ -173,6 +175,12 @@ Start here:
 - `docs/HPC_GPU_BATCHED_REDUCED_INDENTATION.md`
 - `docs/SURROGATE_MODEL_SELECTION.md`
 - `docs/PROPAGATION_EXECUTION.md`
+
+## Governance
+
+- `CONTRIBUTING.md` defines contribution and provenance expectations for the public release line.
+- `SECURITY.md` defines the supported version line and the private-first vulnerability reporting path.
+- `.github/CODEOWNERS` and `.github/dependabot.yml` keep review ownership and dependency maintenance explicit.
 
 ## Repository layout
 

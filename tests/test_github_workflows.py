@@ -91,6 +91,14 @@ def test_release_smoke_workflow_has_concurrency_timeouts_and_dist_artifact():
     assert release_upload["with"]["path"] == "dist"
     assert release_upload["with"]["retention-days"] == 14
 
+    docs_steps = workflow["jobs"]["docs-link-check"]["steps"]
+    docs_check = next(step for step in docs_steps if step["name"] == "Validate release docs and governance metadata")
+    docs_run = docs_check["run"]
+    assert "test -f CONTRIBUTING.md" in docs_run
+    assert "test -f SECURITY.md" in docs_run
+    assert "test -f .github/CODEOWNERS" in docs_run
+    assert "test -f .github/dependabot.yml" in docs_run
+
     action_refs = set(_uses_by_step(workflow).values())
     assert action_refs == {
         "actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd",
