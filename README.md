@@ -102,6 +102,45 @@ See `docs/DEPENDENCY_EXTRAS.md` for the full extras contract and the remaining K
 
 For a fresh Vega clone, the supported bootstrap path is documented in `docs/VEGA_BOOTSTRAP.md` and builds vendored `extern/korali/` into repo-local `_vega/`.
 
+## Quick start
+
+To test the implementation on Vega from a fresh clone, the shortest supported path is:
+
+```bash
+module purge
+module load \
+  Python/3.10.8-GCCcore-12.2.0 \
+  openmpi/4.1.2.1 \
+  CUDA/12.2.2 \
+  GSL/2.7-GCC-12.2.0 \
+  Eigen/3.4.0-GCCcore-12.2.0
+
+python -m venv _vega/venv
+source _vega/venv/bin/activate
+python -m pip install --upgrade pip
+pip install -e ".[test,mpi]"
+pip install pybind11 meson ninja
+
+python scripts/vega/doctor_vega.py
+bash scripts/vega/bootstrap_korali.sh --jobs 8
+source _vega/korali/env.sh
+python scripts/vega/doctor_vega.py --strict
+
+REPO_ROOT=$(pwd) sbatch scripts/vega/sbatch/validation_matrix.sbatch
+```
+
+That submission runs the public validation workflow matrix on the Vega `dev` partition and writes the machine-readable report to `_vega/validation_matrix/workflow_matrix_report.json`.
+
+If you are already inside an allocated Vega job, replace the last line with:
+
+```bash
+python scripts/vega/run_validation_matrix.py \
+  --experiments compression indentation \
+  --model-families full-model reduced-model \
+  --output-root _vega/validation_matrix \
+  --phase2-cpu-ranks 4
+```
+
 ## GitHub CI real canaries
 
 The default GitHub CI lane now includes two real canaries:
