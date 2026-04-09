@@ -17,6 +17,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
 
       - name: Install test extras
         run: |
@@ -53,6 +55,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
 
       - name: Install MPI stack
         run: |
@@ -66,6 +70,7 @@ jobs:
           mpirun --oversubscribe -np 2 python -c "from mpi4py import MPI; comm = MPI.COMM_WORLD; print(f'rank {comm.Get_rank()} / {comm.Get_size()}')"
 
   retraining-canary:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -75,6 +80,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
 
       - name: Install CI extras
         run: |
@@ -85,6 +92,7 @@ jobs:
         run: python scripts/ci/run_retraining_canary.py
 
   workflow-canary:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -94,6 +102,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+
+      - name: Restore Korali runtime cache
+        id: korali-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            _vega/korali/install
+            _vega/korali/env.sh
+            extern/korali/subprojects/packagecache
+          key: korali-${{ runner.os }}-py311-${{ hashFiles('extern/korali/**', 'scripts/vega/bootstrap_korali.sh', 'src/meso_uq/vega.py') }}
 
       - name: Install workflow canary system packages
         run: |
@@ -103,10 +123,15 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install pybind11 meson ninja
           pip install -e ".[ci,mpi]"
 
       - name: Bootstrap repo-local Korali
-        run: bash scripts/vega/bootstrap_korali.sh --jobs 2
+        if: steps.korali-cache.outputs.cache-hit != 'true'
+        run: bash scripts/vega/bootstrap_korali.sh --skip-python-build-deps
+
+      - name: Validate repo-local Korali runtime
+        run: test -f _vega/korali/env.sh
 
       - name: Run real CPU workflow canary
         shell: bash
