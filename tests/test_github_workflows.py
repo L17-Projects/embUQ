@@ -68,7 +68,7 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     action_refs = set(_uses_by_step(workflow).values())
     assert action_refs == {
         "actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7",
-        "actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd",
+        "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
         "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
         "actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f",
         "codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2",
@@ -101,7 +101,7 @@ def test_release_smoke_workflow_has_concurrency_timeouts_and_dist_artifact():
 
     action_refs = set(_uses_by_step(workflow).values())
     assert action_refs == {
-        "actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd",
+        "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
         "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
         "actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f",
     }
