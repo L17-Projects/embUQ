@@ -24,6 +24,7 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     assert workflow["permissions"] == {"contents": "read"}
     assert workflow["concurrency"]["cancel-in-progress"] is True
     assert "github.workflow" in workflow["concurrency"]["group"]
+    assert workflow["jobs"]["package-and-tests"]["permissions"] == {"contents": "read", "id-token": "write"}
 
     expected_timeouts = {
         "package-and-tests": 15,
@@ -34,6 +35,19 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     }
     for job_name, timeout in expected_timeouts.items():
         assert workflow["jobs"][job_name]["timeout-minutes"] == timeout
+
+    package_steps = workflow["jobs"]["package-and-tests"]["steps"]
+    coverage_upload = next(step for step in package_steps if step["name"] == "Upload coverage artifacts")
+    codecov_upload = next(step for step in package_steps if step["name"] == "Upload coverage to Codecov")
+    assert coverage_upload["if"] == "always()"
+    assert coverage_upload["uses"] == "actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f"
+    assert coverage_upload["with"]["name"] == "coverage-report"
+    assert coverage_upload["with"]["retention-days"] == 14
+    assert codecov_upload["uses"] == "codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2"
+    assert codecov_upload["with"]["use_oidc"] is True
+    assert codecov_upload["with"]["files"] == "coverage.xml"
+    assert codecov_upload["with"]["disable_search"] is True
+    assert codecov_upload["with"]["fail_ci_if_error"] is False
 
     workflow_steps = workflow["jobs"]["workflow-canary"]["steps"]
     workflow_summary = next(step for step in workflow_steps if step["name"] == "Summarize workflow canary outputs")
@@ -57,6 +71,7 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
         "actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd",
         "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
         "actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f",
+        "codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2",
     }
 
 

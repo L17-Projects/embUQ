@@ -60,6 +60,7 @@ System MPI libraries are still expected to be installed separately on the host.
 Install enough Python dependencies to run all committed pytest tests locally.
 
 This is the authoritative local test contract.
+It also includes the `coverage` CLI used by the local and GitHub-hosted coverage reporting path.
 
 ### `.[ci]`
 
@@ -70,6 +71,8 @@ At the moment, this intentionally matches the local pytest dependency surface cl
 ### `.[dev]`
 
 Install a broader development stack used for local development and debugging.
+
+This also includes the local coverage-reporting toolchain.
 
 ## Important note on Korali/backend expectations
 

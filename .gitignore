@@ -3,3 +3,8 @@ _vega/
 __pycache__/
 *.py[cod]
 *.egg-info/
+.coverage
+.venv-*/
+coverage.xml
+coverage.json
+coverage-summary.md

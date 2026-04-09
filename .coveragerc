@@ -1,0 +1,25 @@
+[run]
+branch = True
+source =
+    src/meso_uq
+    compression
+    indentation
+    inference
+    propagation
+    reduced
+    scripts
+omit =
+    */__pycache__/*
+    tests/*
+    extern/*
+    upstream/*
+    compression/evalkit/data/*
+    indentation/evalkit/data/*
+
+[report]
+exclude_also =
+    if __name__ == "__main__":
+    pragma: no cover
+precision = 1
+show_missing = True
+skip_empty = True

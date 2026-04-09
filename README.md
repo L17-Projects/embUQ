@@ -1,6 +1,7 @@
 # MesoUQ
 [![CI](https://github.com/BrieucB/MesoUQ/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BrieucB/MesoUQ/actions/workflows/ci.yml)
 [![Release Smoke](https://github.com/BrieucB/MesoUQ/actions/workflows/release-smoke.yml/badge.svg?branch=main)](https://github.com/BrieucB/MesoUQ/actions/workflows/release-smoke.yml)
+[![codecov](https://codecov.io/gh/BrieucB/MesoUQ/graph/badge.svg)](https://codecov.io/gh/BrieucB/MesoUQ)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](./pyproject.toml)
 [![Docs](https://img.shields.io/badge/docs-included-blueviolet.svg)](./docs/)
@@ -21,6 +22,8 @@ The release validation contract is intentionally split across two environments:
 
 - GitHub CI is the fast PR gate. It proves package/tests/docs health, one real CPU micro workflow lane, and one real public surrogate retraining smoke.
 - Vega remains the full workflow proof surface for the broader validation matrix, acceptance, production sanity, and hardware-specific backend claims.
+
+The GitHub CI test job also publishes line coverage for the committed Python surface across `src/meso_uq`, `compression`, `indentation`, `inference`, `propagation`, `reduced`, and `scripts`, excluding vendored code, tests, and data-only directories.
 
 ## Public workflow surface
 
@@ -54,6 +57,13 @@ Local pytest/test install:
 
 ```bash
 pip install -e ".[test]"
+```
+
+Local coverage run:
+
+```bash
+python -m coverage run -m pytest
+python -m coverage report --skip-covered
 ```
 
 CI / smoke-test install:
