@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 import torch
-from SALib.analyze import sobol
-from SALib.sample import saltelli
+from SALib.analyze import sobol as sobol_analyze
+from SALib.sample import sobol as sobol_sample
 
 
 def _evaluate_model(model, X, xshift, xscale, yshift, yscale):
@@ -16,14 +16,14 @@ def _evaluate_model(model, X, xshift, xscale, yshift, yscale):
 
 def run_sobol_over_axis(*, model, xshift, xscale, yshift, yscale, problem, fixed_axis_name, fixed_axis_values, evaluate_columns, n_samples=1024, calc_second_order=False):
     rows = []
-    sampled = saltelli.sample(problem, n_samples, calc_second_order=calc_second_order)
+    sampled = sobol_sample.sample(problem, n_samples, calc_second_order=calc_second_order)
     param_names = problem["names"]
     for axis_value in fixed_axis_values:
         df_inputs = pd.DataFrame(sampled, columns=param_names)
         df_inputs[fixed_axis_name] = axis_value
         X = df_inputs[evaluate_columns].to_numpy(float)
         Y = _evaluate_model(model, X, np.array(xshift), np.array(xscale), np.array(yshift), np.array(yscale))
-        Si = sobol.analyze(problem, Y, calc_second_order=calc_second_order, print_to_console=False)
+        Si = sobol_analyze.analyze(problem, Y, calc_second_order=calc_second_order, print_to_console=False)
         for i, name in enumerate(param_names):
             rows.append({"axis": axis_value, "parameter": name, "index_type": "S1", "value": Si["S1"][i], "confidence": Si["S1_conf"][i]})
             rows.append({"axis": axis_value, "parameter": name, "index_type": "ST", "value": Si["ST"][i], "confidence": Si["ST_conf"][i]})

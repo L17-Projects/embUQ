@@ -74,6 +74,12 @@ Surrogate / model-selection utilities:
 pip install -e ".[surrogate]"
 ```
 
+Sensitivity utilities:
+
+```bash
+pip install -e ".[sensitivity]"
+```
+
 MPI support:
 
 ```bash

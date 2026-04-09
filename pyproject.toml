@@ -40,10 +40,17 @@ surrogate = [
   "scipy>=1.10",
   "torch>=2.0",
 ]
+sensitivity = [
+  "SALib>=1.4",
+  "pandas>=2.0",
+  "scipy>=1.10",
+  "torch>=2.0",
+]
 mpi = [
   "mpi4py>=3.1",
 ]
 test = [
+  "SALib>=1.4",
   "build>=1.0",
   "matplotlib>=3.7",
   "pandas>=2.0",
@@ -52,6 +59,7 @@ test = [
   "torch>=2.0",
 ]
 ci = [
+  "SALib>=1.4",
   "build>=1.0",
   "matplotlib>=3.7",
   "pandas>=2.0",
@@ -60,6 +68,7 @@ ci = [
   "torch>=2.0",
 ]
 dev = [
+  "SALib>=1.4",
   "build>=1.0",
   "matplotlib>=3.7",
   "pandas>=2.0",

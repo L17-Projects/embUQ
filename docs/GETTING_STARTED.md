@@ -35,7 +35,7 @@ python -m pip install -e .
 Then install the extras that match your task surface. For example:
 
 ```bash
-python -m pip install -e ".[surrogate,plot]"
+python -m pip install -e ".[surrogate,sensitivity,plot]"
 python -m pip install -e ".[mpi]"
 ```
 

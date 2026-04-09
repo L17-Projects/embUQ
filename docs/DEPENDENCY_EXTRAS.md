@@ -34,6 +34,17 @@ Includes:
 - `scipy`
 - `torch`
 
+### `.[sensitivity]`
+
+Install the sensitivity-analysis stack used by the public Sobol utilities.
+
+Includes:
+
+- `SALib`
+- `pandas`
+- `scipy`
+- `torch`
+
 ### `.[mpi]`
 
 Install the MPI Python layer used by the MPI smoke path.
