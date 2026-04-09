@@ -3,8 +3,16 @@
 import argparse
 import os
 import pickle
+import sys
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+if str(REPO_ROOT) not in sys.path:
+    # Allow direct script execution from a source checkout.
+    sys.path.insert(0, str(REPO_ROOT))
 
 from meso_uq.sensitivity import build_problem, run_sobol_over_axis
 from compression.surrogate.sensitivity.scripts.prior import comp_variables
