@@ -5,6 +5,8 @@ This directory hosts the public documentation set for the `v0.1.0` release line.
 ## Start here
 
 - `../README.md` for the root overview and install extras
+- `../CONTRIBUTING.md` for the contribution and provenance policy
+- `../SECURITY.md` for the public security-reporting policy
 - `INSTALL.md` for the practical editable-install contract
 - `RELEASE_NOTES_v0.1.0.md` for the release summary
 - `DEPENDENCY_EXTRAS.md` for the install-extras contract

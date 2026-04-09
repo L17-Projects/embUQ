@@ -40,6 +40,14 @@ A good PR should:
 - keep docs and code consistent
 - preserve the release-grade structure of the public repo
 
+Review ownership for the release line is tracked in `.github/CODEOWNERS`.
+Automated dependency maintenance is tracked in `.github/dependabot.yml`.
+
+## Security issues
+
+Do not use a public bug report for a suspected vulnerability.
+Follow the private-first reporting path in `SECURITY.md`.
+
 ## Documentation expectations
 
 If a PR adds a new public workflow surface, it should usually also update at least one of:

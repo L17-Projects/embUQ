@@ -1,0 +1,14 @@
+# Default owner for the public release line.
+* @BrieucB
+
+# Release-governing surfaces stay explicit for future handoff.
+/.github/ @BrieucB
+/docs/ @BrieucB
+/scripts/ @BrieucB
+/src/ @BrieucB
+/tests/ @BrieucB
+/compression/ @BrieucB
+/indentation/ @BrieucB
+/inference/ @BrieucB
+/propagation/ @BrieucB
+/reduced/ @BrieucB
