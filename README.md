@@ -167,6 +167,7 @@ Start here:
 - `docs/RELEASE_NOTES_v0.1.0.md`
 - `docs/DEPENDENCY_EXTRAS.md`
 - `docs/VALIDATION_MATRIX.md`
+- `docs/WORKSTATION_ACCEPTANCE_CHECKLIST.md`
 - `docs/VEGA_ACCEPTANCE_COMMAND.md`
 - `docs/VEGA_ACCEPTANCE_CHECKLIST.md`
 - `docs/VEGA_BOOTSTRAP.md`
@@ -175,6 +176,7 @@ Start here:
 - `docs/HPC_GPU_BATCHED_REDUCED_INDENTATION.md`
 - `docs/SURROGATE_MODEL_SELECTION.md`
 - `docs/PROPAGATION_EXECUTION.md`
+- `examples/reports/workstation_acceptance_report.example.json`
 
 ## Governance
 

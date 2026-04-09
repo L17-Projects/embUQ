@@ -63,6 +63,7 @@ jobs:
           test -f SECURITY.md
           test -f docs/README.md
           test -f docs/VALIDATION_MATRIX.md
+          test -f docs/WORKSTATION_ACCEPTANCE_CHECKLIST.md
           test -f docs/VEGA_ACCEPTANCE_CHECKLIST.md
           test -f .github/CODEOWNERS
           test -f .github/dependabot.yml
