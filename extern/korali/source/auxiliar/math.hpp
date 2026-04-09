@@ -16,6 +16,7 @@
 #define KORALI_EPSILON 0.00000000001
 
 #include <cmath>
+#include <cstdint>
 #include <gsl/gsl_sf.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_rng.h>
@@ -589,4 +590,3 @@ void byteToHexPair(char *dst, const uint8_t byte);
 */
 size_t checksum(void *buffer, size_t len, unsigned int seed);
 } // namespace korali
-
