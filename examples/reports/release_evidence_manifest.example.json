@@ -1,0 +1,24 @@
+{
+  "release": "v0.1.0",
+  "status": "ready",
+  "candidate_commit": "3be8f4ccbc55d90d4ed58141c8268718fbd841d6",
+  "claims": {
+    "native_cuda_phase2_public_claim": false
+  },
+  "github_ci": {
+    "ci_workflow_url": "https://github.com/BrieucB/MesoUQ/actions/runs/24182978893",
+    "release_smoke_url": "https://github.com/BrieucB/MesoUQ/actions/runs/24182978877"
+  },
+  "reports": {
+    "vega_validation_matrix": "/tmp/mesouq_release_evidence/vega/validation_matrix/workflow_matrix_report.json",
+    "vega_acceptance": "/tmp/mesouq_release_evidence/vega/acceptance/vega_acceptance_report.json",
+    "vega_production_sanity": "/tmp/mesouq_release_evidence/vega/production_sanity/production_sanity_report.json",
+    "workstation_acceptance": "/tmp/mesouq_release_evidence/workstation/workstation_acceptance_report.json"
+  },
+  "documents": {
+    "release_notes": "docs/RELEASE_NOTES_v0.1.0.md",
+    "validation_matrix": "docs/VALIDATION_MATRIX.md",
+    "workstation_acceptance_checklist": "docs/WORKSTATION_ACCEPTANCE_CHECKLIST.md",
+    "security_policy": "SECURITY.md"
+  }
+}
