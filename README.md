@@ -25,6 +25,8 @@ The release validation contract is intentionally split across two environments:
 
 The GitHub CI test job also publishes line coverage for the committed Python surface across `src/meso_uq`, `compression`, `indentation`, `inference`, `propagation`, `reduced`, and `scripts`, excluding vendored code, tests, and data-only directories.
 
+For this private repo, Codecov uploads support either GitHub OIDC or a repository secret named `CODECOV_TOKEN`. The README badge itself also needs the private badge token from Codecov's `Badges & Graphs` settings appended to the badge URL query string before it will render real coverage instead of `unknown`.
+
 ## Public workflow surface
 
 The current public release surface includes:

@@ -44,9 +44,12 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     assert coverage_upload["with"]["name"] == "coverage-report"
     assert coverage_upload["with"]["retention-days"] == 14
     assert codecov_upload["uses"] == "codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2"
-    assert codecov_upload["with"]["use_oidc"] is True
+    assert codecov_upload["with"]["token"] == "${{ secrets.CODECOV_TOKEN }}"
+    assert codecov_upload["with"]["use_oidc"] == "${{ secrets.CODECOV_TOKEN == '' }}"
+    assert codecov_upload["with"]["slug"] == "BrieucB/MesoUQ"
     assert codecov_upload["with"]["files"] == "coverage.xml"
     assert codecov_upload["with"]["disable_search"] is True
+    assert codecov_upload["with"]["codecov_yml_path"] == "codecov.yml"
     assert codecov_upload["with"]["fail_ci_if_error"] is False
 
     workflow_steps = workflow["jobs"]["workflow-canary"]["steps"]

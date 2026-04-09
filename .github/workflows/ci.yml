@@ -77,9 +77,12 @@ jobs:
         if: always() && hashFiles('coverage.xml') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
         with:
-          use_oidc: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
+          slug: BrieucB/MesoUQ
           files: coverage.xml
           disable_search: true
+          codecov_yml_path: codecov.yml
           fail_ci_if_error: false
 
   docs:
