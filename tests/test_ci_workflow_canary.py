@@ -3,6 +3,8 @@ import json
 import sys
 from pathlib import Path
 
+import yaml
+
 
 def _load_module(path: Path, name: str):
     spec = importlib.util.spec_from_file_location(name, path)
@@ -58,3 +60,18 @@ def test_workflow_canary_runner_writes_report_and_checks_artifacts(tmp_path, mon
     assert report["status"] == "passed"
     assert report["selection"] == "compression:reduced-model:validation"
     assert Path(report["artifacts"]["posterior_plot"]).exists()
+
+
+def test_ci_workflow_canary_config_uses_multiple_public_diameters():
+    repo_root = Path(__file__).resolve().parents[1]
+    config_path = repo_root / "reduced" / "configs" / "ci" / "ci_canary_config_compression.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+
+    diameters = config["emb_diameters"]
+    assert len(diameters) >= 2
+
+    for diameter in diameters:
+        data_file = repo_root / "compression" / "evalkit" / "data" / f"compression_data_{diameter}um.dat"
+        surrogate_dir = repo_root / "compression" / "surrogate" / "diameters" / f"{diameter}um"
+        assert data_file.exists()
+        assert surrogate_dir.is_dir()

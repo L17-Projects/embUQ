@@ -2,6 +2,7 @@
 
 emb_diameters:
   - 2.1
+  - 2.9
 
 experiment: compression
 data_dir: compression/evalkit/data
