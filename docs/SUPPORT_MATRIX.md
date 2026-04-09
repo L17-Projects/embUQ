@@ -25,6 +25,8 @@ For this repo, validation must be split into:
 - manual GPU workstation validation
 - HPC / Vega acceptance validation
 
+The canonical workstation record is documented in `WORKSTATION_ACCEPTANCE_CHECKLIST.md`.
+
 ## Required-at-release execution targets
 
 The release contract requires real execution support for:

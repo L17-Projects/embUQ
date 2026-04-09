@@ -96,6 +96,7 @@ def test_release_smoke_workflow_has_concurrency_timeouts_and_dist_artifact():
     docs_run = docs_check["run"]
     assert "test -f CONTRIBUTING.md" in docs_run
     assert "test -f SECURITY.md" in docs_run
+    assert "test -f docs/WORKSTATION_ACCEPTANCE_CHECKLIST.md" in docs_run
     assert "test -f .github/CODEOWNERS" in docs_run
     assert "test -f .github/dependabot.yml" in docs_run
 
