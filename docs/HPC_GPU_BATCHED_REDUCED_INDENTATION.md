@@ -50,7 +50,7 @@ source _vega/korali/env.sh
 python scripts/vega/doctor_vega.py --strict
 ```
 
-For more detail on the bootstrap path, see [VEGA_BOOTSTRAP.md](/ceph/hpc/home/benvegnenb/dev/MesoUQ_fresh_clone_2026-04-08/docs/VEGA_BOOTSTRAP.md).
+For more detail on the bootstrap path, see [VEGA_BOOTSTRAP.md](VEGA_BOOTSTRAP.md).
 
 ## Recommended execution path
 
