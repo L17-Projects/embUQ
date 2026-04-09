@@ -17,6 +17,9 @@ jobs:
   package-and-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.0
@@ -36,8 +39,48 @@ jobs:
       - name: Build package metadata
         run: python -m build --sdist --wheel
 
-      - name: Run unit tests
-        run: pytest
+      - name: Run unit tests with coverage
+        shell: bash
+        run: |
+          set +e
+          python -m coverage run -m pytest
+          test_status=$?
+          python -m coverage report --skip-covered
+          python -m coverage xml -o coverage.xml
+          python -m coverage json -o coverage.json
+          exit $test_status
+
+      - name: Summarize coverage report
+        if: always()
+        shell: bash
+        run: |
+          if [ -f coverage.json ]; then
+            python scripts/ci/summarize_coverage.py --json-path coverage.json --markdown-path coverage-summary.md
+            cat coverage-summary.md >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "coverage.json not found" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            coverage.json
+            coverage-summary.md
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload coverage to Codecov
+        if: always() && hashFiles('coverage.xml') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+        with:
+          use_oidc: true
+          files: coverage.xml
+          disable_search: true
+          fail_ci_if_error: false
 
   docs:
     runs-on: ubuntu-latest
