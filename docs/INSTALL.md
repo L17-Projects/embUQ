@@ -82,7 +82,7 @@ For Vega, the supported path is repo-managed and clone-local:
 - install it under `_vega/korali/install`
 - source `_vega/korali/env.sh`
 
-Use [VEGA_BOOTSTRAP.md](/ceph/hpc/home/benvegnenb/dev/MesoUQ_fresh_clone_2026-04-08/docs/VEGA_BOOTSTRAP.md) for the exact bootstrap commands.
+Use [VEGA_BOOTSTRAP.md](VEGA_BOOTSTRAP.md) for the exact bootstrap commands.
 
 ## Convenience environment files
 

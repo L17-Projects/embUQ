@@ -13,7 +13,9 @@ These checks are expected to run on GitHub-hosted Ubuntu:
 - validation-runner smoke
 - Vega-acceptance-wrapper smoke
 - MPI smoke
-- docs presence / link-oriented checks
+- one real CPU workflow canary for `compression:reduced-model:validation`
+- one real public surrogate retraining smoke
+- docs link-oriented checks
 
 ## 2. Manual GPU / workstation validation
 
@@ -43,6 +45,11 @@ These checks require the real target environment:
 ## Notes
 
 The public CI layer is intentionally smaller than the full release contract because some required workflows are hardware-specific.
+
+That split is deliberate:
+
+- GitHub CI is the fast merge gate with one real workflow lane and one real retraining lane.
+- Vega remains the authoritative surface for the wider validation matrix, acceptance, production sanity, and hardware-specific backend proof.
 
 Those hardware-specific checks must still be recorded in-repo so the release does not depend on undocumented tribal knowledge.
 

@@ -15,6 +15,13 @@ MesoUQ is a public software line for Bayesian uncertainty quantification and cal
 
 The repository exposes a release-oriented workflow surface for compression and indentation calibration, hierarchical inference, surrogate retraining and model selection, MAP extraction, plotting, propagation, a public Vega validation matrix, Vega-first acceptance, and supporting operator utilities.
 
+## Validation split
+
+The release validation contract is intentionally split across two environments:
+
+- GitHub CI is the fast PR gate. It proves package/tests/docs health, one real CPU micro workflow lane, and one real public surrogate retraining smoke.
+- Vega remains the full workflow proof surface for the broader validation matrix, acceptance, production sanity, and hardware-specific backend claims.
+
 ## Public workflow surface
 
 The current public release surface includes:
@@ -76,6 +83,15 @@ pip install -e ".[mpi]"
 See `docs/DEPENDENCY_EXTRAS.md` for the full extras contract and the remaining Korali/backend caveats.
 
 For a fresh Vega clone, the supported bootstrap path is documented in `docs/VEGA_BOOTSTRAP.md` and builds vendored `extern/korali/` into repo-local `_vega/`.
+
+## GitHub CI real canaries
+
+The default GitHub CI lane now includes two real canaries:
+
+- one CPU workflow lane for `compression:reduced-model:validation`, driven by `reduced/configs/ci/ci_canary_config_compression.yaml`
+- one public surrogate retraining smoke, driven by `compression/surrogate/ci/retraining_smoke.yaml`
+
+These are intentionally much smaller than the Vega validation matrix, but they still run the public entrypoints and assert real artifacts.
 
 ## First Vega validation
 

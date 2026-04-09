@@ -2,6 +2,8 @@
 
 This page documents the public Vega validation-matrix surface.
 
+GitHub CI now carries a smaller real-canary layer for one CPU workflow lane and one surrogate retraining smoke. This Vega matrix remains the broader proof surface and should not be collapsed into the GitHub-hosted merge gate.
+
 ## Goal
 
 The validation matrix proves that a clean clone can execute the shipped public validation workflows without manual path repair.
