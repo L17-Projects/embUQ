@@ -9,6 +9,7 @@ This directory provides a small public example bundle built from the canonical p
 - `configs/compression_reduced.yaml`
 - `configs/indentation_reduced.yaml`
 - `reports/workstation_acceptance_report.example.json`
+- `reports/release_evidence_manifest.example.json`
 
 ## Purpose
 

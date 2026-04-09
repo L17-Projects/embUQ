@@ -62,6 +62,7 @@ jobs:
           test -f CONTRIBUTING.md
           test -f SECURITY.md
           test -f docs/README.md
+          test -f docs/RELEASE_EVIDENCE_CHECKLIST_v0.1.0.md
           test -f docs/VALIDATION_MATRIX.md
           test -f docs/WORKSTATION_ACCEPTANCE_CHECKLIST.md
           test -f docs/VEGA_ACCEPTANCE_CHECKLIST.md
