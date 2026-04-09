@@ -1,7 +1,7 @@
 # MesoUQ
 [![CI](https://github.com/BrieucB/MesoUQ/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BrieucB/MesoUQ/actions/workflows/ci.yml)
 [![Release Smoke](https://github.com/BrieucB/MesoUQ/actions/workflows/release-smoke.yml/badge.svg?branch=main)](https://github.com/BrieucB/MesoUQ/actions/workflows/release-smoke.yml)
-[![codecov](https://codecov.io/gh/BrieucB/MesoUQ/graph/badge.svg)](https://codecov.io/gh/BrieucB/MesoUQ)
+[![codecov](https://codecov.io/github/BrieucB/MesoUQ/graph/badge.svg?token=WNXV45WSWM)](https://codecov.io/github/BrieucB/MesoUQ)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](./pyproject.toml)
 [![Docs](https://img.shields.io/badge/docs-included-blueviolet.svg)](./docs/)
