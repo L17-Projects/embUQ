@@ -65,6 +65,34 @@ def _assert_artifacts_exist(artifacts: dict[str, str]) -> None:
         raise FileNotFoundError(f"Workflow canary completed but required artifacts are missing:\n{formatted}")
 
 
+def _run_logged_command(command: list[str], cwd: Path, output_root: Path) -> dict[str, str]:
+    stdout_log = output_root / "workflow_canary.stdout.log"
+    stderr_log = output_root / "workflow_canary.stderr.log"
+    result = subprocess.run(
+        command,
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+    )
+    stdout_log.write_text(result.stdout or "", encoding="utf-8")
+    stderr_log.write_text(result.stderr or "", encoding="utf-8")
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
+    if result.returncode != 0:
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            command,
+            output=result.stdout,
+            stderr=result.stderr,
+        )
+    return {
+        "stdout_log": str(stdout_log),
+        "stderr_log": str(stderr_log),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the GitHub CI real workflow canary and assert real artifacts.")
     parser.add_argument("--selection", default=DEFAULT_SELECTION)
@@ -97,13 +125,14 @@ def main(argv: list[str] | None = None) -> int:
         "--config-override",
         f"{args.selection}={config_path}",
     ]
-    subprocess.run(command, cwd=str(REPO_ROOT), check=True)
+    log_artifacts = _run_logged_command(command, REPO_ROOT, output_root)
 
     workflow_dir = output_root / selection_slug(selection)
     suite_summary_path = output_root / "workflow_suite_summary.json"
     datasets = _load_datasets(config_path, selection.experiment)
     artifacts = _required_artifacts(workflow_dir, datasets)
     artifacts["suite_summary"] = str(suite_summary_path)
+    artifacts.update(log_artifacts)
     _assert_artifacts_exist(artifacts)
 
     summary = json.loads((workflow_dir / "summary.json").read_text(encoding="utf-8"))

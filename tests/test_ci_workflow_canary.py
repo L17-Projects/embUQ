@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -20,7 +21,7 @@ def test_workflow_canary_runner_writes_report_and_checks_artifacts(tmp_path, mon
     module = _load_module(repo_root / "scripts" / "ci" / "run_workflow_canary.py", "run_workflow_canary_test")
     captured = {}
 
-    def fake_run(command, cwd=None, check=False):
+    def fake_run(command, cwd=None, capture_output=False, text=False):
         captured["command"] = command
         output_root = Path(command[command.index("--output-root") + 1])
         workflow_dir = output_root / "compression__reduced-model__validation"
@@ -49,6 +50,7 @@ def test_workflow_canary_runner_writes_report_and_checks_artifacts(tmp_path, mon
             json.dumps({"selection": "compression:reduced-model:validation"}),
             encoding="utf-8",
         )
+        return subprocess.CompletedProcess(command, 0, stdout="workflow ok\n", stderr="")
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
 
@@ -60,6 +62,8 @@ def test_workflow_canary_runner_writes_report_and_checks_artifacts(tmp_path, mon
     assert report["status"] == "passed"
     assert report["selection"] == "compression:reduced-model:validation"
     assert Path(report["artifacts"]["posterior_plot"]).exists()
+    assert Path(report["artifacts"]["stdout_log"]).read_text(encoding="utf-8") == "workflow ok\n"
+    assert Path(report["artifacts"]["stderr_log"]).read_text(encoding="utf-8") == ""
 
 
 def test_ci_workflow_canary_config_uses_multiple_public_diameters():
