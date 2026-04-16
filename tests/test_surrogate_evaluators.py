@@ -196,7 +196,7 @@ def test_compression_surrogate_batch_evaluates_chunked_cpu(
     out = surrogate.evaluate_compression_batch(theta, disp=[0.0, 1.0], d0=d0, chunk_size=1)
 
     assert out.shape == (2, 2)
-    assert out.tolist() == pytest.approx([[0.0, 1.0], [0.0, 0.5]])
+    np.testing.assert_allclose(out, np.array([[0.0, 1.0], [0.0, 0.5]], dtype=np.float32))
 
     empty = surrogate.evaluate_compression_batch(
         np.empty((0, 6), dtype=np.float32), disp=[0.0, 1.0], chunk_size=0
@@ -265,7 +265,7 @@ def test_indentation_surrogate_batch_evaluates_chunked_cpu(
     out = surrogate.evaluate_indentation_batch(theta, forces=[-1.0, 2.0], d0=d0, chunk_size=1)
 
     assert out.shape == (2, 2)
-    assert out.tolist() == pytest.approx([[0.0, 2.2], [0.0, 2.0]])
+    np.testing.assert_allclose(out, np.array([[0.0, 2.2], [0.0, 2.0]], dtype=np.float32))
 
     empty = surrogate.evaluate_indentation_batch(
         np.empty((0, 6), dtype=np.float32), forces=[-1.0, 2.0], chunk_size=0
