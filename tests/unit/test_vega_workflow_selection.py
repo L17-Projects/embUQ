@@ -25,22 +25,34 @@ def _repo_root() -> Path:
 def test_workflow_config_paths_resolve_across_model_family_and_profile() -> None:
     repo_root = _repo_root()
 
-    assert resolve_workflow_config_path(
-        repo_root,
-        VegaWorkflowSelection("compression", "full-model", "production"),
-    ) == repo_root / "inference" / "configs" / "production" / "inference_config_compression.yaml"
-    assert resolve_workflow_config_path(
-        repo_root,
-        VegaWorkflowSelection("indentation", "full-model", "validation"),
-    ) == repo_root / "inference" / "configs" / "validation" / "validation_config_indentation.yaml"
-    assert resolve_workflow_config_path(
-        repo_root,
-        VegaWorkflowSelection("compression", "reduced-model", "production"),
-    ) == repo_root / "reduced" / "configs" / "production" / "reduced_config_compression.yaml"
-    assert resolve_workflow_config_path(
-        repo_root,
-        VegaWorkflowSelection("indentation", "reduced-model", "validation"),
-    ) == repo_root / "reduced" / "configs" / "validation" / "validation_config_indentation.yaml"
+    assert (
+        resolve_workflow_config_path(
+            repo_root,
+            VegaWorkflowSelection("compression", "full-model", "production"),
+        )
+        == repo_root / "inference" / "configs" / "production" / "inference_config_compression.yaml"
+    )
+    assert (
+        resolve_workflow_config_path(
+            repo_root,
+            VegaWorkflowSelection("indentation", "full-model", "validation"),
+        )
+        == repo_root / "inference" / "configs" / "validation" / "validation_config_indentation.yaml"
+    )
+    assert (
+        resolve_workflow_config_path(
+            repo_root,
+            VegaWorkflowSelection("compression", "reduced-model", "production"),
+        )
+        == repo_root / "reduced" / "configs" / "production" / "reduced_config_compression.yaml"
+    )
+    assert (
+        resolve_workflow_config_path(
+            repo_root,
+            VegaWorkflowSelection("indentation", "reduced-model", "validation"),
+        )
+        == repo_root / "reduced" / "configs" / "validation" / "validation_config_indentation.yaml"
+    )
 
 
 def test_workflow_output_root_separates_model_family_from_profile() -> None:
@@ -116,7 +128,14 @@ def test_build_inference_command_handles_phase2_mpirun_only() -> None:
         output_root=output_root,
         cpu_ranks=4,
     )
-    assert command[:4] == ["mpirun", "--oversubscribe", "-np", "4"]
+    assert command[:6] == [
+        "mpirun",
+        "--bind-to",
+        "none",
+        "--oversubscribe",
+        "-np",
+        "4",
+    ]
     assert str(repo_root / "inference" / "scripts" / "run_phase_2.py") in command
 
 
@@ -127,15 +146,169 @@ def test_build_propagation_command_resolves_public_script() -> None:
     output_root = resolve_workflow_output_root(repo_root, selection)
     command = build_propagation_command(repo_root, "phase3b", "python", config_path, output_root)
 
-    assert resolve_propagation_driver(repo_root, "phase3b") == repo_root / "propagation" / "scripts" / "run_phase3b_propagation.py"
+    assert (
+        resolve_propagation_driver(repo_root, "phase3b")
+        == repo_root / "propagation" / "scripts" / "run_phase3b_propagation.py"
+    )
     assert command[0] == "python"
     assert command[1] == str(repo_root / "propagation" / "scripts" / "run_phase3b_propagation.py")
 
 
 def test_load_workflow_datasets_reads_selected_experiment_only() -> None:
     repo_root = _repo_root()
-    config_path = repo_root / "inference" / "configs" / "validation" / "validation_config_compression.yaml"
+    config_path = (
+        repo_root / "inference" / "configs" / "validation" / "validation_config_compression.yaml"
+    )
     datasets = load_workflow_datasets(repo_root, config_path, "compression")
 
     assert datasets
     assert all(name.startswith("compression_") for _, name in datasets)
+
+
+def test_build_inference_command_phase2_single_rank_uses_direct_python() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "validation")
+    command = build_inference_command(
+        repo_root,
+        selection,
+        stage="phase2",
+        python_bin="python",
+        config_path=resolve_workflow_config_path(repo_root, selection),
+        output_root=resolve_workflow_output_root(repo_root, selection),
+        cpu_ranks=1,
+    )
+
+    assert command[0] == "python"
+    assert "--device" not in command
+
+
+def test_build_inference_command_phase1_cpu_uses_mpi_and_device_flag() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "reduced-model", "production")
+    command = build_inference_command(
+        repo_root,
+        selection,
+        stage="phase1",
+        python_bin="python",
+        config_path=resolve_workflow_config_path(repo_root, selection),
+        output_root=resolve_workflow_output_root(repo_root, selection),
+        cpu_ranks=1,
+        device="cpu",
+        restart=True,
+        dry_run=True,
+    )
+
+    assert command[:5] == ["mpirun", "--bind-to", "none", "-np", "1"]
+    assert "--device" in command
+    assert command[command.index("--device") + 1] == "cpu"
+    assert "--restart" in command
+    assert "--dry_run" in command
+
+
+def test_build_inference_command_phase1_gpu_skips_mpi() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("indentation", "full-model", "validation")
+    command = build_inference_command(
+        repo_root,
+        selection,
+        stage="phase1",
+        python_bin="python",
+        config_path=resolve_workflow_config_path(repo_root, selection),
+        output_root=resolve_workflow_output_root(repo_root, selection),
+        device="gpu",
+    )
+
+    assert command[0] == "python"
+    assert "mpirun" not in command
+    assert command[-2:] == ["--device", "gpu"]
+
+
+def test_build_inference_command_phase3b_cpu_uses_mpi_and_device_flag() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "production")
+    command = build_inference_command(
+        repo_root,
+        selection,
+        stage="phase3b",
+        python_bin="python",
+        config_path=resolve_workflow_config_path(repo_root, selection),
+        output_root=resolve_workflow_output_root(repo_root, selection),
+        device="cpu",
+    )
+
+    assert command[:5] == ["mpirun", "--bind-to", "none", "-np", "1"]
+    assert command[-2:] == ["--device", "cpu"]
+
+
+def test_build_propagation_command_phase3b_includes_device_flag() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("indentation", "full-model", "production")
+    command = build_propagation_command(
+        repo_root,
+        "phase3b",
+        "python",
+        resolve_workflow_config_path(repo_root, selection),
+        resolve_workflow_output_root(repo_root, selection),
+        device="gpu",
+    )
+
+    assert command[-2:] == ["--device", "gpu"]
+
+
+def test_build_propagation_command_phase1_omits_device_flag() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "validation")
+    command = build_propagation_command(
+        repo_root,
+        "phase1",
+        "python",
+        resolve_workflow_config_path(repo_root, selection),
+        resolve_workflow_output_root(repo_root, selection),
+    )
+
+    assert "--device" not in command
+
+
+def test_build_inference_command_rejects_non_phase2_cpu_ranks() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "validation")
+    with pytest.raises(ValueError, match="cpu_ranks is only supported for phase2"):
+        build_inference_command(
+            repo_root,
+            selection,
+            stage="phase1",
+            python_bin="python",
+            config_path=resolve_workflow_config_path(repo_root, selection),
+            output_root=resolve_workflow_output_root(repo_root, selection),
+            cpu_ranks=2,
+        )
+
+
+def test_build_inference_command_rejects_restart_outside_phase1() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "validation")
+    with pytest.raises(ValueError, match="restart is only supported for phase1"):
+        build_inference_command(
+            repo_root,
+            selection,
+            stage="phase2",
+            python_bin="python",
+            config_path=resolve_workflow_config_path(repo_root, selection),
+            output_root=resolve_workflow_output_root(repo_root, selection),
+            restart=True,
+        )
+
+
+def test_build_inference_command_rejects_dry_run_outside_phase1() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "validation")
+    with pytest.raises(ValueError, match="dry_run is only supported for phase1"):
+        build_inference_command(
+            repo_root,
+            selection,
+            stage="phase3b",
+            python_bin="python",
+            config_path=resolve_workflow_config_path(repo_root, selection),
+            output_root=resolve_workflow_output_root(repo_root, selection),
+            dry_run=True,
+        )

@@ -29,6 +29,7 @@ PROFILE="${PROFILE:-validation}"
 STAGE="${STAGE:-phase3b}"
 OUTPUT_DIR="${OUTPUT_DIR:-}"
 CONFIG_PATH="${CONFIG_PATH:-}"
+DEVICE="${DEVICE:-cpu}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 
 module purge
@@ -47,4 +48,4 @@ if [[ -n "${CONFIG_PATH}" ]]; then
   common_args+=(--config "${CONFIG_PATH}")
 fi
 
-python scripts/vega/run_propagation.py "${common_args[@]}"
+python scripts/vega/run_propagation.py "${common_args[@]}" --device "${DEVICE}"
