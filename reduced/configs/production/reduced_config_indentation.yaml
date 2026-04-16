@@ -34,14 +34,14 @@ prior_d0: [-0.5, 0.5]
 prior_sigma: [0.0, 1.0]
 
 hbi_pop_size: 50000
-hbi_burn_in: 1
+hbi_burn_in: 0
 hbi_target_cov: 0.6
-hbi_covariance_scaling: 0.02
+hbi_covariance_scaling: 0.04
 
 phase3b_pop_size: 50000
 phase3b_max_gen: -1
-phase3b_target_cov: 0.6
-phase3b_covariance_scaling: 0.02
+phase3b_target_cov: 0.8
+phase3b_covariance_scaling: 0.04
 
 hyperprior_mu_Yt: [100000.0, 50000000.0]
 hyperprior_sigma_Yt: [0.0, 50000000.0]

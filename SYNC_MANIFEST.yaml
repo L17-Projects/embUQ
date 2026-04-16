@@ -1,7 +1,7 @@
 primary_source:
   repository: BrieucB/UQ_DPD
-  branch: vega/gpu-batching
-  reconcile_missing_master_commits: true
+  branch: master
+  reconcile_missing_master_commits: false
 
 layout:
   package_root: src/meso_uq
