@@ -2,6 +2,8 @@ from pathlib import Path
 
 import yaml
 
+UPLOAD_ARTIFACT_SHA = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+
 
 def _load_workflow(name: str):
     repo_root = Path(__file__).resolve().parents[1]
@@ -24,7 +26,10 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     assert workflow["permissions"] == {"contents": "read"}
     assert workflow["concurrency"]["cancel-in-progress"] is True
     assert "github.workflow" in workflow["concurrency"]["group"]
-    assert workflow["jobs"]["package-and-tests"]["permissions"] == {"contents": "read", "id-token": "write"}
+    assert workflow["jobs"]["package-and-tests"]["permissions"] == {
+        "contents": "read",
+        "id-token": "write",
+    }
 
     expected_timeouts = {
         "package-and-tests": 15,
@@ -37,13 +42,19 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
         assert workflow["jobs"][job_name]["timeout-minutes"] == timeout
 
     package_steps = workflow["jobs"]["package-and-tests"]["steps"]
-    coverage_upload = next(step for step in package_steps if step["name"] == "Upload coverage artifacts")
-    codecov_upload = next(step for step in package_steps if step["name"] == "Upload coverage to Codecov")
+    coverage_upload = next(
+        step for step in package_steps if step["name"] == "Upload coverage artifacts"
+    )
+    codecov_upload = next(
+        step for step in package_steps if step["name"] == "Upload coverage to Codecov"
+    )
     assert coverage_upload["if"] == "always()"
-    assert coverage_upload["uses"] == "actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f"
+    assert coverage_upload["uses"] == UPLOAD_ARTIFACT_SHA
     assert coverage_upload["with"]["name"] == "coverage-report"
     assert coverage_upload["with"]["retention-days"] == 14
-    assert codecov_upload["uses"] == "codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2"
+    assert (
+        codecov_upload["uses"] == "codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2"
+    )
     assert codecov_upload["with"]["token"] == "${{ secrets.CODECOV_TOKEN }}"
     assert codecov_upload["with"]["use_oidc"] == "${{ secrets.CODECOV_TOKEN == '' }}"
     assert codecov_upload["with"]["slug"] == "BrieucB/MesoUQ"
@@ -53,18 +64,24 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     assert codecov_upload["with"]["fail_ci_if_error"] is False
 
     workflow_steps = workflow["jobs"]["workflow-canary"]["steps"]
-    workflow_summary = next(step for step in workflow_steps if step["name"] == "Summarize workflow canary outputs")
-    workflow_upload = next(step for step in workflow_steps if step["name"] == "Upload workflow canary artifacts")
+    workflow_summary = next(
+        step for step in workflow_steps if step["name"] == "Summarize workflow canary outputs"
+    )
+    workflow_upload = next(
+        step for step in workflow_steps if step["name"] == "Upload workflow canary artifacts"
+    )
     assert workflow_summary["if"] == "always()"
     assert workflow_upload["if"] == "always()"
-    assert workflow_upload["uses"] == "actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f"
+    assert workflow_upload["uses"] == UPLOAD_ARTIFACT_SHA
     assert workflow_upload["with"]["path"] == "_ci/workflow_canary"
     assert workflow_upload["with"]["retention-days"] == 14
 
     retraining_steps = workflow["jobs"]["retraining-canary"]["steps"]
-    retraining_upload = next(step for step in retraining_steps if step["name"] == "Upload retraining canary artifacts")
+    retraining_upload = next(
+        step for step in retraining_steps if step["name"] == "Upload retraining canary artifacts"
+    )
     assert retraining_upload["if"] == "always()"
-    assert retraining_upload["uses"] == "actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f"
+    assert retraining_upload["uses"] == UPLOAD_ARTIFACT_SHA
     assert retraining_upload["with"]["path"] == "_ci/surrogate_retraining"
     assert retraining_upload["with"]["retention-days"] == 14
 
@@ -73,7 +90,7 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
         "actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7",
         "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
         "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
-        "actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f",
+        UPLOAD_ARTIFACT_SHA,
         "codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2",
     }
 
@@ -88,14 +105,20 @@ def test_release_smoke_workflow_has_concurrency_timeouts_and_dist_artifact():
     assert workflow["jobs"]["docs-link-check"]["timeout-minutes"] == 5
 
     release_steps = workflow["jobs"]["release-smoke"]["steps"]
-    release_upload = next(step for step in release_steps if step["name"] == "Upload release smoke dist artifacts")
+    release_upload = next(
+        step for step in release_steps if step["name"] == "Upload release smoke dist artifacts"
+    )
     assert release_upload["if"] == "always()"
-    assert release_upload["uses"] == "actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f"
+    assert release_upload["uses"] == UPLOAD_ARTIFACT_SHA
     assert release_upload["with"]["path"] == "dist"
     assert release_upload["with"]["retention-days"] == 14
 
     docs_steps = workflow["jobs"]["docs-link-check"]["steps"]
-    docs_check = next(step for step in docs_steps if step["name"] == "Validate release docs and governance metadata")
+    docs_check = next(
+        step
+        for step in docs_steps
+        if step["name"] == "Validate release docs and governance metadata"
+    )
     docs_run = docs_check["run"]
     assert "test -f CONTRIBUTING.md" in docs_run
     assert "test -f SECURITY.md" in docs_run
@@ -108,5 +131,5 @@ def test_release_smoke_workflow_has_concurrency_timeouts_and_dist_artifact():
     assert action_refs == {
         "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
         "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
-        "actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f",
+        UPLOAD_ARTIFACT_SHA,
     }
