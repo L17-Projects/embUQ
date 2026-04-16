@@ -25,22 +25,34 @@ def _repo_root() -> Path:
 def test_workflow_config_paths_resolve_across_model_family_and_profile() -> None:
     repo_root = _repo_root()
 
-    assert resolve_workflow_config_path(
-        repo_root,
-        VegaWorkflowSelection("compression", "full-model", "production"),
-    ) == repo_root / "inference" / "configs" / "production" / "inference_config_compression.yaml"
-    assert resolve_workflow_config_path(
-        repo_root,
-        VegaWorkflowSelection("indentation", "full-model", "validation"),
-    ) == repo_root / "inference" / "configs" / "validation" / "validation_config_indentation.yaml"
-    assert resolve_workflow_config_path(
-        repo_root,
-        VegaWorkflowSelection("compression", "reduced-model", "production"),
-    ) == repo_root / "reduced" / "configs" / "production" / "reduced_config_compression.yaml"
-    assert resolve_workflow_config_path(
-        repo_root,
-        VegaWorkflowSelection("indentation", "reduced-model", "validation"),
-    ) == repo_root / "reduced" / "configs" / "validation" / "validation_config_indentation.yaml"
+    assert (
+        resolve_workflow_config_path(
+            repo_root,
+            VegaWorkflowSelection("compression", "full-model", "production"),
+        )
+        == repo_root / "inference" / "configs" / "production" / "inference_config_compression.yaml"
+    )
+    assert (
+        resolve_workflow_config_path(
+            repo_root,
+            VegaWorkflowSelection("indentation", "full-model", "validation"),
+        )
+        == repo_root / "inference" / "configs" / "validation" / "validation_config_indentation.yaml"
+    )
+    assert (
+        resolve_workflow_config_path(
+            repo_root,
+            VegaWorkflowSelection("compression", "reduced-model", "production"),
+        )
+        == repo_root / "reduced" / "configs" / "production" / "reduced_config_compression.yaml"
+    )
+    assert (
+        resolve_workflow_config_path(
+            repo_root,
+            VegaWorkflowSelection("indentation", "reduced-model", "validation"),
+        )
+        == repo_root / "reduced" / "configs" / "validation" / "validation_config_indentation.yaml"
+    )
 
 
 def test_workflow_output_root_separates_model_family_from_profile() -> None:
@@ -116,7 +128,14 @@ def test_build_inference_command_handles_phase2_mpirun_only() -> None:
         output_root=output_root,
         cpu_ranks=4,
     )
-    assert command[:4] == ["mpirun", "--oversubscribe", "-np", "4"]
+    assert command[:6] == [
+        "mpirun",
+        "--bind-to",
+        "none",
+        "--oversubscribe",
+        "-np",
+        "4",
+    ]
     assert str(repo_root / "inference" / "scripts" / "run_phase_2.py") in command
 
 
@@ -127,14 +146,19 @@ def test_build_propagation_command_resolves_public_script() -> None:
     output_root = resolve_workflow_output_root(repo_root, selection)
     command = build_propagation_command(repo_root, "phase3b", "python", config_path, output_root)
 
-    assert resolve_propagation_driver(repo_root, "phase3b") == repo_root / "propagation" / "scripts" / "run_phase3b_propagation.py"
+    assert (
+        resolve_propagation_driver(repo_root, "phase3b")
+        == repo_root / "propagation" / "scripts" / "run_phase3b_propagation.py"
+    )
     assert command[0] == "python"
     assert command[1] == str(repo_root / "propagation" / "scripts" / "run_phase3b_propagation.py")
 
 
 def test_load_workflow_datasets_reads_selected_experiment_only() -> None:
     repo_root = _repo_root()
-    config_path = repo_root / "inference" / "configs" / "validation" / "validation_config_compression.yaml"
+    config_path = (
+        repo_root / "inference" / "configs" / "validation" / "validation_config_compression.yaml"
+    )
     datasets = load_workflow_datasets(repo_root, config_path, "compression")
 
     assert datasets
