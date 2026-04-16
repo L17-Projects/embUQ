@@ -25,7 +25,9 @@ from meso_uq.vega_workflows import (  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run public propagation on Vega with explicit workflow selection.")
+    parser = argparse.ArgumentParser(
+        description="Run public propagation on Vega with explicit workflow selection."
+    )
     parser.add_argument("--experiment", choices=VALID_EXPERIMENTS, required=True)
     parser.add_argument("--model-family", choices=VALID_MODEL_FAMILIES, required=True)
     parser.add_argument("--profile", choices=VALID_PROFILES, required=True)
@@ -33,6 +35,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", type=str, default=None)
     parser.add_argument("--output-dir", type=str, default=None)
     parser.add_argument("--python-bin", type=str, default=sys.executable)
+    parser.add_argument(
+        "--device",
+        choices=["cpu", "gpu"],
+        default="cpu",
+        help="Surrogate device: cpu (default) or gpu (cuda)",
+    )
     args = parser.parse_args(argv)
 
     selection = VegaWorkflowSelection(args.experiment, args.model_family, args.profile)
@@ -40,7 +48,9 @@ def main(argv: list[str] | None = None) -> int:
     output_root = resolve_workflow_output_root(REPO_ROOT, selection, args.output_dir)
     output_root.mkdir(parents=True, exist_ok=True)
 
-    command = build_propagation_command(REPO_ROOT, args.stage, args.python_bin, config_path, output_root)
+    command = build_propagation_command(
+        REPO_ROOT, args.stage, args.python_bin, config_path, output_root, device=args.device
+    )
 
     print(f"Experiment:    {selection.experiment}")
     print(f"Model family:  {selection.model_family}")

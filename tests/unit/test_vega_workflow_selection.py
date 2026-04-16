@@ -129,7 +129,14 @@ def test_build_inference_command_handles_phase2_mpirun_only() -> None:
         output_root=output_root,
         cpu_ranks=4,
     )
-    assert command[:6] == ["mpirun", "--bind-to", "none", "--oversubscribe", "-np", "4"]
+    assert command[:6] == [
+        "mpirun",
+        "--bind-to",
+        "none",
+        "--oversubscribe",
+        "-np",
+        "4",
+    ]
     assert str(repo_root / "inference" / "scripts" / "run_phase_2.py") in command
 
 

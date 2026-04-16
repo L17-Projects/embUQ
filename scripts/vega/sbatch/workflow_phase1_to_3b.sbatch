@@ -28,6 +28,7 @@ PROFILE="${PROFILE:-validation}"
 OUTPUT_DIR="${OUTPUT_DIR:-}"
 CONFIG_PATH="${CONFIG_PATH:-}"
 PHASE2_CPU_RANKS="${PHASE2_CPU_RANKS:-1}"
+DEVICE="${DEVICE:-gpu}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 
 module purge
@@ -46,6 +47,6 @@ if [[ -n "${CONFIG_PATH}" ]]; then
   common_args+=(--config "${CONFIG_PATH}")
 fi
 
-python scripts/vega/run_inference_stage.py "${common_args[@]}" --stage phase1
+python scripts/vega/run_inference_stage.py "${common_args[@]}" --stage phase1 --device "${DEVICE}"
 python scripts/vega/run_inference_stage.py "${common_args[@]}" --stage phase2 --cpu-ranks "${PHASE2_CPU_RANKS}"
-python scripts/vega/run_inference_stage.py "${common_args[@]}" --stage phase3b
+python scripts/vega/run_inference_stage.py "${common_args[@]}" --stage phase3b --device "${DEVICE}"
