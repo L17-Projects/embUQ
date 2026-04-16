@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(here, "../../src"))
 from meso_uq.workflow_acceleration import expand_parameter_vector, get_fixed_parameters
 
 _CONFIG_CACHE: Dict[str, Dict[str, Any]] = {}
-_SURROGATE_CACHE: Dict[Tuple[str, float], Any] = {}
+_SURROGATE_CACHE: Dict[Tuple[str, float, str], Any] = {}
 _SURROGATE_PATH_ADDED = False
 
 
@@ -66,25 +66,28 @@ def _load_config(project_root: str) -> Dict[str, Any]:
     return _CONFIG_CACHE[key]
 
 
-def _build_surrogate(project_root: str, diameter_um: float) -> Any:
+def _build_surrogate(project_root: str, diameter_um: float, device: str = "cpu") -> Any:
     global _SURROGATE_PATH_ADDED
     if not _SURROGATE_PATH_ADDED:
         sys.path.insert(0, os.path.join(project_root, "compression", "surrogate"))
         _SURROGATE_PATH_ADDED = True
-    surrogate_path = os.path.join(project_root, f"compression/surrogate/diameters/{diameter_um}um/trained")
+    surrogate_path = os.path.join(
+        project_root, f"compression/surrogate/diameters/{diameter_um}um/trained"
+    )
     from evaluate import Surrogate
-    return Surrogate(surrogate_path)
+
+    return Surrogate(surrogate_path, device=device)
 
 
-def _get_surrogate(project_root: str, diameter_um: float) -> Any:
-    key = (project_root, diameter_um)
+def _get_surrogate(project_root: str, diameter_um: float, device: str = "cpu") -> Any:
+    key = (project_root, diameter_um, device)
     if key not in _SURROGATE_CACHE:
-        _SURROGATE_CACHE[key] = _build_surrogate(project_root, diameter_um)
+        _SURROGATE_CACHE[key] = _build_surrogate(project_root, diameter_um, device=device)
     return _SURROGATE_CACHE[key]
 
 
-def preload_compression_surrogate(diameter_um: float) -> None:
-    _get_surrogate(_resolve_project_root(), diameter_um)
+def preload_compression_surrogate(diameter_um: float, device: str = "cpu") -> None:
+    _get_surrogate(_resolve_project_root(), diameter_um, device=device)
 
 
 def _load_run_equil():
@@ -93,12 +96,16 @@ def _load_run_equil():
     return run_equil
 
 
-def compute_compression_surrogate(sample: Dict[str, Any], displ: List[float], diameter_um: float) -> None:
+def compute_compression_surrogate(
+    sample: Dict[str, Any], displ: List[float], diameter_um: float
+) -> None:
     project_root = _resolve_project_root()
     config = _load_config(project_root)
     if config.get("debug", 0) >= 1:
         print(f"Running from function {inspect.currentframe().f_code.co_name} in script {__file__}")
-    params = expand_parameter_vector(sample["Parameters"], fixed_params=get_fixed_parameters(config))
+    params = expand_parameter_vector(
+        sample["Parameters"], fixed_params=get_fixed_parameters(config)
+    )
     Yt, kb, b1, b2, a3, a4, d0, sigma = params.tolist()
     surrogate = _get_surrogate(project_root, diameter_um)
     displ_corrected = [max(0.0, d - d0) for d in displ]
@@ -107,7 +114,40 @@ def compute_compression_surrogate(sample: Dict[str, Any], displ: List[float], di
     sample["Standard Deviation"] = [sigma * val for val in forces]
 
 
-def compute_compression(sample: Dict[str, Any], displ: List[float], diameter_um: float, init_compression_path: Optional[str] = None) -> None:
+def compute_compression_surrogate_batch(
+    sample: Dict[str, Any],
+    displ: List[float],
+    diameter_um: float,
+    device: str = "cuda",
+    particle_batch_size: int = 2048,
+) -> None:
+    """Batch surrogate evaluation for GPU-batch TMCMC."""
+    project_root = _resolve_project_root()
+    batch_params = np.asarray(sample["Batch Parameters"], dtype=np.float32)
+    if batch_params.ndim != 2:
+        raise ValueError(f"Expected 2D batch params, got {batch_params.shape}")
+    if batch_params.shape[1] == 8:
+        theta, d0, sigma = batch_params[:, :6], batch_params[:, 6], batch_params[:, 7]
+    elif batch_params.shape[1] == 7:
+        theta = batch_params[:, :6]
+        d0 = np.zeros(batch_params.shape[0], dtype=np.float32)
+        sigma = batch_params[:, 6]
+    else:
+        raise ValueError(f"Expected 7 or 8 params, got {batch_params.shape[1]}")
+    surrogate = _get_surrogate(project_root, diameter_um, device=device)
+    forces = surrogate.evaluate_compression_batch(
+        theta, disp=displ, d0=d0, chunk_size=particle_batch_size
+    )
+    sample["Batch Reference Evaluations"] = forces.tolist()
+    sample["Batch Standard Deviation"] = (sigma[:, None] * forces).tolist()
+
+
+def compute_compression(
+    sample: Dict[str, Any],
+    displ: List[float],
+    diameter_um: float,
+    init_compression_path: Optional[str] = None,
+) -> None:
     cwd = os.getcwd()
     project_root = None
     for possible_root in [cwd, os.path.dirname(cwd), os.path.dirname(os.path.dirname(cwd))]:
@@ -116,9 +156,16 @@ def compute_compression(sample: Dict[str, Any], displ: List[float], diameter_um:
             break
     if project_root is None:
         raise RuntimeError(f"Could not find project root (compression/src) from {cwd}")
-    with open(os.path.join(project_root, "inference/configs/production/inference_config_compression.yaml"), "rb") as f:
+    with open(
+        os.path.join(
+            project_root, "inference/configs/production/inference_config_compression.yaml"
+        ),
+        "rb",
+    ) as f:
         config = yaml.load(f, Loader=yaml.CLoader)
-    params = expand_parameter_vector(sample["Parameters"], fixed_params=get_fixed_parameters(config))
+    params = expand_parameter_vector(
+        sample["Parameters"], fixed_params=get_fixed_parameters(config)
+    )
     Yt, kb, b1, b2, a3, a4, d0_offset, sig = params.tolist()
     theta = [Yt, kb, b1, b2, a3, a4]
     try:
@@ -136,7 +183,9 @@ def compute_compression(sample: Dict[str, Any], displ: List[float], diameter_um:
     last_d = 0.0
     source_compression_path = os.path.join(project_root, "compression", "src") + "/"
     if init_compression_path is None:
-        init_compression_path = os.path.join(project_root, f"_init_compression_{diameter_um}um") + "/"
+        init_compression_path = (
+            os.path.join(project_root, f"_init_compression_{diameter_um}um") + "/"
+        )
     elif not init_compression_path.endswith("/"):
         init_compression_path = init_compression_path + "/"
     run_equil = _load_run_equil()
@@ -150,9 +199,25 @@ def compute_compression(sample: Dict[str, Any], displ: List[float], diameter_um:
         simnum = "00001"
         list_simu_path.append(simu_path)
         if rank == 0:
-            prepare_simulation_parameters(source_compression_path, init_compression_path, simu_path, simnum, d - last_d, theta, diameter_um)
+            prepare_simulation_parameters(
+                source_compression_path,
+                init_compression_path,
+                simu_path,
+                simnum,
+                d - last_d,
+                theta,
+                diameter_um,
+            )
         comm.Barrier()
-        run_equil(source_path=init_compression_path, simu_path=simu_path, simnum=simnum, equil=False, restart=True if n_ref >= 1 else False, restart_path=list_simu_path[-2] if n_ref >= 1 else None, comm=comm)
+        run_equil(
+            source_path=init_compression_path,
+            simu_path=simu_path,
+            simnum=simnum,
+            equil=False,
+            restart=True if n_ref >= 1 else False,
+            restart_path=list_simu_path[-2] if n_ref >= 1 else None,
+            comm=comm,
+        )
         comm.Barrier()
         df_canti = pd.read_csv(simu_path + "pinning/cantilever.csv", delimiter=",")
         df_plate = pd.read_csv(simu_path + "pinning/plate.csv", delimiter=",")
@@ -164,19 +229,30 @@ def compute_compression(sample: Dict[str, Any], displ: List[float], diameter_um:
     sample["Standard Deviation"] = [sig for _ in measured_forces]
 
 
-def adjust_simu_params(sample_param: Dict[str, float], filename_1_simu: str, filename_2_simu: str) -> None:
+def adjust_simu_params(
+    sample_param: Dict[str, float], filename_1_simu: str, filename_2_simu: str
+) -> None:
     for fname in [filename_1_simu, filename_2_simu]:
-        with open(fname, 'r') as file:
+        with open(fname, "r") as file:
             parameters = yaml.load(file, Loader=yaml.CLoader)
         for p in sample_param:
             parameters[p] = float(sample_param[p])
-        with open(fname, 'w') as file:
+        with open(fname, "w") as file:
             yaml.dump(parameters, file)
 
 
-def prepare_simulation_parameters(source_compression_path: str, init_compression_path: str, simu_path: str, simnum: str, displacement: float, theta: List[float], diameter_um: float) -> None:
+def prepare_simulation_parameters(
+    source_compression_path: str,
+    init_compression_path: str,
+    simu_path: str,
+    simnum: str,
+    displacement: float,
+    theta: List[float],
+    diameter_um: float,
+) -> None:
     sys.path.insert(0, source_compression_path)
     from parameters import write_parameters
+
     os.system(f"mkdir -p {simu_path}")
     os.system(f"mkdir -p {simu_path}/mesh/")
     os.system(f"mkdir -p {simu_path}/force/")
@@ -185,7 +261,9 @@ def prepare_simulation_parameters(source_compression_path: str, init_compression
     os.system(f"mkdir -p {simu_path}/pinning/")
     os.system(f"cp {source_compression_path}mesh/cantilever.off {simu_path}mesh/cantilever.off")
     os.system(f"cp {source_compression_path}mesh/rigid_coords.txt {simu_path}mesh/rigid_coords.txt")
-    os.system(f"cp {source_compression_path}mesh/rigid_coords_reflected.txt {simu_path}mesh/rigid_coords_reflected.txt")
+    os.system(
+        f"cp {source_compression_path}mesh/rigid_coords_reflected.txt {simu_path}mesh/rigid_coords_reflected.txt"
+    )
     os.system(f"cp -r {init_compression_path}parameter/ {simu_path}")
     os.system(f"cp -r {source_compression_path}gas_vesicle {simu_path}")
     os.system(f"cp -r {source_compression_path}microbubble {simu_path}")
@@ -194,6 +272,12 @@ def prepare_simulation_parameters(source_compression_path: str, init_compression
     filename_2_simu = simu_path + "parameter/parameters-default" + simnum + "eq.yaml"
     filename_3_simu = simu_path + "parameter/parameters.prms" + simnum + ".yaml"
     filename_4_simu = simu_path + "parameter/parameters" + simnum + ".yaml"
-    adjust_simu_params({"disp": displacement, "Yt": Yt, "Yl": Yt, "b1": b1, "b2": b2, "a3": a3, "a4": a4}, filename_1_simu, filename_2_simu)
+    adjust_simu_params(
+        {"disp": displacement, "Yt": Yt, "Yl": Yt, "b1": b1, "b2": b2, "a3": a3, "a4": a4},
+        filename_1_simu,
+        filename_2_simu,
+    )
     write_parameters(source_path=init_compression_path, simu_path=simu_path, simnum=simnum)
-    adjust_simu_params({"kb": kb, "b1": b1, "b2": b2, "a3": a3, "a4": a4}, filename_3_simu, filename_4_simu)
+    adjust_simu_params(
+        {"kb": kb, "b1": b1, "b2": b2, "a3": a3, "a4": a4}, filename_3_simu, filename_4_simu
+    )

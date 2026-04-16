@@ -42,6 +42,34 @@ def configure_korali_conduit(
         return
 
 
+def configure_device_conduit(engine, *, device: str, mpi_ranks: int = 1) -> None:
+    """Configure Korali conduit from --device flag.
+
+    device="gpu"  -> Sequential conduit (no config; Korali default). Do NOT call setMPIComm.
+    device="cpu"  -> Distributed when mpi_ranks > 1; Sequential when mpi_ranks == 1.
+    """
+    if device == "gpu":
+        return  # Sequential conduit by omission
+    if device == "cpu":
+        if mpi_ranks > 1:
+            engine["Conduit"]["Type"] = "Distributed"
+            engine["Conduit"]["Ranks Per Worker"] = 1
+        return
+    raise ValueError(f"--device must be 'cpu' or 'gpu', got '{device}'")
+
+
+def configure_gpu_batch_sub_experiment(sub, batch_model_fn, single_model_fn) -> None:
+    """Apply triple-set required for GPU-batch Phase 3b sub-experiments.
+
+    Korali Reference::supportsEvaluateBatch() checks both
+    _useBatchEvaluation != 0 AND _batchComputationalModel != _computationalModel.
+    All three must be set or it falls back to serial calls.
+    """
+    sub["Problem"]["Use Batch Evaluation"] = True
+    sub["Problem"]["Batch Computational Model"] = batch_model_fn
+    sub["Problem"]["Computational Model"] = single_model_fn
+
+
 def to_korali_path(path: str, base_dir: Optional[str] = None) -> str:
     if not path:
         return path
@@ -79,11 +107,11 @@ def default_variable_names(num_params: int) -> list[str]:
 def get_fixed_parameters(config: Mapping[str, object]) -> dict[str, float]:
     fixed_params = config.get("fixed_params") or {}
     if not isinstance(fixed_params, Mapping):
-        raise ValueError(f"Expected fixed_params to be a mapping, got {type(fixed_params).__name__}")
+        raise ValueError(
+            f"Expected fixed_params to be a mapping, got {type(fixed_params).__name__}"
+        )
     return {
-        name: float(fixed_params[name])
-        for name in FIXABLE_PARAMETER_ORDER
-        if name in fixed_params
+        name: float(fixed_params[name]) for name in FIXABLE_PARAMETER_ORDER if name in fixed_params
     }
 
 
@@ -109,7 +137,9 @@ def expand_reduced_parameters(
     if params.ndim == 1:
         params = params.reshape(1, -1)
     if params.ndim != 2 or params.shape[1] != 4:
-        raise ValueError(f"Expected reduced parameter array of shape [batch, 4], got {params.shape}")
+        raise ValueError(
+            f"Expected reduced parameter array of shape [batch, 4], got {params.shape}"
+        )
 
     if fixed_params is None:
         fixed_params = {"b1": 0.0, "b2": 0.0, "a3": 0.0, "a4": 0.0}
@@ -165,7 +195,9 @@ def phase1_prior_specs(
     return [(name, _bounds_for(name)) for name in active_variable_names(config)]
 
 
-def phase2_hyperprior_specs(config: Mapping[str, object]) -> list[tuple[str, Sequence[float], Sequence[float]]]:
+def phase2_hyperprior_specs(
+    config: Mapping[str, object]
+) -> list[tuple[str, Sequence[float], Sequence[float]]]:
     def _required(key: str):
         if key not in config:
             raise KeyError(f"Missing required hyperprior bound '{key}'")

@@ -16,8 +16,14 @@ sys.path.insert(0, str(PROJECT_ROOT / "compression" / "evalkit"))
 sys.path.insert(0, str(PROJECT_ROOT / "indentation"))
 sys.path.insert(0, str(PROJECT_ROOT / "indentation" / "evalkit"))
 
-from compression.evalkit.posterior_compression import compute_compression_surrogate
-from indentation.evalkit.posterior_indentation import compute_indentation_surrogate
+from compression.evalkit.posterior_compression import (
+    compute_compression_surrogate,
+    preload_compression_surrogate,
+)
+from indentation.evalkit.posterior_indentation import (
+    compute_indentation_surrogate,
+    preload_indentation_surrogate,
+)
 from meso_uq.experiments import load_experiments
 from meso_uq.postprocess.propagation import propagate_run_directory
 
@@ -32,9 +38,17 @@ def _reference_csv_for_experiment(exp, diameter_um: float, output_dir: Path) -> 
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run lightweight propagation from Phase 3b posterior samples")
+    parser = argparse.ArgumentParser(
+        description="Run lightweight propagation from Phase 3b posterior samples"
+    )
     parser.add_argument("--config", required=True)
     parser.add_argument("--output-dir", default="_setup")
+    parser.add_argument(
+        "--device",
+        choices=["cpu", "gpu"],
+        default="cpu",
+        help="Surrogate device: cpu (default) or gpu (cuda)",
+    )
     args = parser.parse_args()
 
     config_path = Path(args.config)
@@ -50,6 +64,16 @@ def main() -> int:
         config = yaml.load(handle, Loader=yaml.CLoader)
     experiments = [exp for exp in load_experiments(config, PROJECT_ROOT) if exp.enabled]
 
+    for exp in experiments:
+        preload_map = {
+            "compression": preload_compression_surrogate,
+            "indentation": preload_indentation_surrogate,
+        }
+        preload_fn = preload_map.get(exp.name)
+        if preload_fn is not None:
+            for diameter_um in exp.diameters:
+                preload_fn(diameter_um, device=args.device)
+
     eval_map = {
         "compression": lambda sample, pts, d: compute_compression_surrogate(sample, pts, d),
         "indentation": lambda sample, pts, d: compute_indentation_surrogate(sample, pts, d),
@@ -58,9 +82,13 @@ def main() -> int:
     for exp in experiments:
         for diameter_um in exp.diameters:
             run_dir = output_root / "results_phase_3b" / exp.dataset_name(diameter_um)
-            summary_csv = output_root / "propagation_phase3b" / exp.dataset_name(diameter_um) / "summary.csv"
+            summary_csv = (
+                output_root / "propagation_phase3b" / exp.dataset_name(diameter_um) / "summary.csv"
+            )
             reference_points = exp.get_reference_points(diameter_um)
-            evaluate = lambda sample, pts, name=exp.name, d=diameter_um: eval_map[name](sample, pts, d)
+            evaluate = lambda sample, pts, name=exp.name, d=diameter_um: eval_map[name](
+                sample, pts, d
+            )
             result = propagate_run_directory(
                 run_dir,
                 reference_points=reference_points,

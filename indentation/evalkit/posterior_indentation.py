@@ -17,7 +17,7 @@ from indentation.evalkit.tools import dated_print
 from meso_uq.workflow_acceleration import expand_parameter_vector, get_fixed_parameters
 
 _CONFIG_CACHE: Dict[str, Dict[str, Any]] = {}
-_SURROGATE_CACHE: Dict[Tuple[str, float], Any] = {}
+_SURROGATE_CACHE: Dict[Tuple[str, float, str], Any] = {}
 _SURROGATE_PATH_ADDED = False
 _DUMP_FLAG: bool | None = None
 
@@ -58,25 +58,28 @@ def _load_config(project_root: str) -> Dict[str, Any]:
     return _CONFIG_CACHE[key]
 
 
-def _build_surrogate(project_root: str, diameter_um: float) -> Any:
+def _build_surrogate(project_root: str, diameter_um: float, device: str = "cpu") -> Any:
     global _SURROGATE_PATH_ADDED
     if not _SURROGATE_PATH_ADDED:
         sys.path.insert(0, os.path.join(project_root, "indentation", "surrogate"))
         _SURROGATE_PATH_ADDED = True
-    surrogate_path = os.path.join(project_root, f"indentation/surrogate/diameters/{diameter_um}um/trained")
+    surrogate_path = os.path.join(
+        project_root, f"indentation/surrogate/diameters/{diameter_um}um/trained"
+    )
     from evaluate import Surrogate
-    return Surrogate(surrogate_path)
+
+    return Surrogate(surrogate_path, device=device)
 
 
-def _get_surrogate(project_root: str, diameter_um: float) -> Any:
-    key = (project_root, diameter_um)
+def _get_surrogate(project_root: str, diameter_um: float, device: str = "cpu") -> Any:
+    key = (project_root, diameter_um, device)
     if key not in _SURROGATE_CACHE:
-        _SURROGATE_CACHE[key] = _build_surrogate(project_root, diameter_um)
+        _SURROGATE_CACHE[key] = _build_surrogate(project_root, diameter_um, device=device)
     return _SURROGATE_CACHE[key]
 
 
-def preload_indentation_surrogate(diameter_um: float) -> None:
-    _get_surrogate(_resolve_project_root(), diameter_um)
+def preload_indentation_surrogate(diameter_um: float, device: str = "cpu") -> None:
+    _get_surrogate(_resolve_project_root(), diameter_um, device=device)
 
 
 def _get_dump_flag() -> bool:
@@ -86,11 +89,15 @@ def _get_dump_flag() -> bool:
     return _DUMP_FLAG
 
 
-def compute_indentation_surrogate(sample: Dict[str, Any], forces: List[float], diameter_um: float) -> None:
+def compute_indentation_surrogate(
+    sample: Dict[str, Any], forces: List[float], diameter_um: float
+) -> None:
     project_root = _resolve_project_root()
     dump = _get_dump_flag()
     config = _load_config(project_root)
-    params = expand_parameter_vector(sample["Parameters"], fixed_params=get_fixed_parameters(config))
+    params = expand_parameter_vector(
+        sample["Parameters"], fixed_params=get_fixed_parameters(config)
+    )
     Yt, kb, b1, b2, a3, a4, d0, sigma = params.tolist()
     surrogate = _get_surrogate(project_root, diameter_um)
     displacements = surrogate.evaluate_indentation(x=[Yt, kb, b1, b2, a3, a4], forces=forces)
@@ -100,22 +107,60 @@ def compute_indentation_surrogate(sample: Dict[str, Any], forces: List[float], d
     except Exception:
         comm = MPI.COMM_WORLD
     if dump and comm.Get_rank() == 0:
-        print(f"[Korali] Indentation surrogate [D={diameter_um}um] | Yt={Yt:.0f}, kb={kb:.0f}, b1={b1:.2f}, b2={b2:.2f}, a3={a3:.2f}, a4={a4:.2f}, d0={d0:.4f}")
+        print(
+            f"[Korali] Indentation surrogate [D={diameter_um}um] | Yt={Yt:.0f}, kb={kb:.0f}, b1={b1:.2f}, b2={b2:.2f}, a3={a3:.2f}, a4={a4:.2f}, d0={d0:.4f}"
+        )
     sample["Reference Evaluations"] = displacements
     sample["Standard Deviation"] = (sigma * np.asarray(displacements)).tolist()
 
 
+def compute_indentation_surrogate_batch(
+    sample: Dict[str, Any],
+    forces: List[float],
+    diameter_um: float,
+    device: str = "cuda",
+    particle_batch_size: int = 2048,
+) -> None:
+    """Batch surrogate evaluation for GPU-batch TMCMC."""
+    project_root = _resolve_project_root()
+    batch_params = np.asarray(sample["Batch Parameters"], dtype=np.float32)
+    if batch_params.ndim != 2:
+        raise ValueError(f"Expected 2D batch params, got {batch_params.shape}")
+    if batch_params.shape[1] == 8:
+        theta, d0, sigma = batch_params[:, :6], batch_params[:, 6], batch_params[:, 7]
+    elif batch_params.shape[1] == 7:
+        theta = batch_params[:, :6]
+        d0 = np.zeros(batch_params.shape[0], dtype=np.float32)
+        sigma = batch_params[:, 6]
+    else:
+        raise ValueError(f"Expected 7 or 8 params, got {batch_params.shape[1]}")
+    surrogate = _get_surrogate(project_root, diameter_um, device=device)
+    displacements = surrogate.evaluate_indentation_batch(
+        theta, forces=forces, d0=d0, chunk_size=particle_batch_size
+    )
+    sample["Batch Reference Evaluations"] = displacements.tolist()
+    sample["Batch Standard Deviation"] = (sigma[:, None] * displacements).tolist()
+
+
 def adjust_simu_params(sample_param, filename_1_simu, filename_2_simu):
     for fname in [filename_1_simu, filename_2_simu]:
-        with open(fname, 'r') as file:
+        with open(fname, "r") as file:
             parameters = yaml.load(file, Loader=yaml.CLoader)
         for p in sample_param:
             parameters[p] = float(sample_param[p])
-        with open(fname, 'w') as file:
+        with open(fname, "w") as file:
             yaml.dump(parameters, file)
 
 
-def prepare_simulation_parameters(source_indentation_path: str, init_indentation_path: str, simu_path: str, simnum: str, displacement: float, theta: List[float], diameter_um: float) -> None:
+def prepare_simulation_parameters(
+    source_indentation_path: str,
+    init_indentation_path: str,
+    simu_path: str,
+    simnum: str,
+    displacement: float,
+    theta: List[float],
+    diameter_um: float,
+) -> None:
     from indentation.src.parameters import write_parameters
 
     os.system(f"mkdir -p {simu_path}")
@@ -130,14 +175,24 @@ def prepare_simulation_parameters(source_indentation_path: str, init_indentation
     filename_2_simu = simu_path + "parameter/parameters-default" + simnum + "eq.yaml"
     filename_3_simu = simu_path + "parameter/parameters.prms" + simnum + ".yaml"
     filename_4_simu = simu_path + "parameter/parameters" + simnum + ".yaml"
-    adjust_simu_params({"disp": displacement, "Yt": Yt, "Yl": Yt, "b1": b1, "b2": b2, "a3": a3, "a4": a4}, filename_1_simu, filename_2_simu)
+    adjust_simu_params(
+        {"disp": displacement, "Yt": Yt, "Yl": Yt, "b1": b1, "b2": b2, "a3": a3, "a4": a4},
+        filename_1_simu,
+        filename_2_simu,
+    )
     write_parameters(source_path=init_indentation_path, simu_path=simu_path, simnum=simnum)
-    adjust_simu_params({"kb": kb, "b1": b1, "b2": b2, "a3": a3, "a4": a4}, filename_3_simu, filename_4_simu)
+    adjust_simu_params(
+        {"kb": kb, "b1": b1, "b2": b2, "a3": a3, "a4": a4}, filename_3_simu, filename_4_simu
+    )
 
 
-def compute_indentation(sample, X, *, project_root=None, diameter_um=None, init_indentation_path=None):
-    raise NotImplementedError("Direct Mirheo indentation is intentionally deferred in this public import slice; use compute_indentation_surrogate for the current workflow path.")
+def compute_indentation(
+    sample, X, *, project_root=None, diameter_um=None, init_indentation_path=None
+):
+    raise NotImplementedError(
+        "Direct Mirheo indentation is intentionally deferred in this public import slice; use compute_indentation_surrogate for the current workflow path."
+    )
 
 
 def Delta_Reissner_1pole(ka, kb, F, R0):
-    return (R0 * F / (8.0 * np.sqrt(ka * kb)))
+    return R0 * F / (8.0 * np.sqrt(ka * kb))

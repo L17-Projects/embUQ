@@ -31,6 +31,7 @@ class VegaWorkflowSelection:
         if self.profile not in VALID_PROFILES:
             raise ValueError(f"Unsupported profile: {self.profile}")
 
+
 def _resolve_repo_path(repo_root: Path | str, value: str | Path | None) -> Path | None:
     if value is None:
         return None
@@ -52,8 +53,7 @@ def parse_selection(value: str) -> VegaWorkflowSelection:
     parts = value.split(":")
     if len(parts) != 3:
         raise ValueError(
-            "Workflow selection must use experiment:model-family:profile. "
-            f"Got: {value}"
+            "Workflow selection must use experiment:model-family:profile. " f"Got: {value}"
         )
     return VegaWorkflowSelection(parts[0], parts[1], parts[2])
 
@@ -106,7 +106,14 @@ def resolve_workflow_output_root(
     resolved = _resolve_repo_path(repo_root, output_dir)
     if resolved is not None:
         return resolved
-    return (repo_root / "_vega" / "runs" / selection.experiment / selection.model_family / selection.profile).resolve()
+    return (
+        repo_root
+        / "_vega"
+        / "runs"
+        / selection.experiment
+        / selection.model_family
+        / selection.profile
+    ).resolve()
 
 
 def resolve_inference_stage_driver(
@@ -147,7 +154,9 @@ def resolve_map_stage_input_root(output_root: Path | str, stage: str) -> Path:
     return output_root / ("results_phase_1" if stage == "phase1" else "results_phase_3b")
 
 
-def resolve_map_output_root(output_root: Path | str, stage: str, maps_dir: str | Path | None = None) -> Path:
+def resolve_map_output_root(
+    output_root: Path | str, stage: str, maps_dir: str | Path | None = None
+) -> Path:
     output_root = Path(output_root).resolve()
     resolved = _resolve_repo_path(output_root, maps_dir)
     if resolved is not None:
@@ -174,7 +183,9 @@ def load_workflow_datasets(
             entries.append((float(diameter), spec.dataset_name(diameter)))
 
     if not entries:
-        raise ValueError(f"No enabled datasets found for experiment '{experiment}' in {config_path}")
+        raise ValueError(
+            f"No enabled datasets found for experiment '{experiment}' in {config_path}"
+        )
     return entries
 
 
@@ -210,28 +221,53 @@ def build_inference_command(
     profiling: bool = False,
     restart: bool = False,
     dry_run: bool = False,
+    device: str = "cpu",
 ) -> list[str]:
     driver = resolve_inference_stage_driver(repo_root, stage, selection.model_family)
     config_path = Path(config_path).resolve()
     output_root = Path(output_root).resolve()
 
     if stage != "phase2" and cpu_ranks != 1:
-        raise ValueError(f"cpu_ranks is only supported for phase2, got stage={stage} cpu_ranks={cpu_ranks}")
+        raise ValueError(
+            f"cpu_ranks is only supported for phase2, got stage={stage} cpu_ranks={cpu_ranks}"
+        )
     if stage != "phase1" and restart:
         raise ValueError("restart is only supported for phase1")
     if stage != "phase1" and dry_run:
         raise ValueError("dry_run is only supported for phase1")
 
-    base_command = [python_bin, str(driver), "--config", str(config_path), "--output-dir", str(output_root)]
+    base_command = [
+        python_bin,
+        str(driver),
+        "--config",
+        str(config_path),
+        "--output-dir",
+        str(output_root),
+    ]
     if profiling:
         base_command.append("--profiling")
     if stage == "phase1" and restart:
         base_command.append("--restart")
     if stage == "phase1" and dry_run:
         base_command.append("--dry_run")
-    if stage == "phase2" and cpu_ranks > 1:
-        return ["mpirun", "--oversubscribe", "-np", str(cpu_ranks), *base_command]
-    return base_command
+    if stage == "phase2":
+        if cpu_ranks > 1:
+            return [
+                "mpirun",
+                "--bind-to",
+                "none",
+                "--oversubscribe",
+                "-np",
+                str(cpu_ranks),
+                *base_command,
+            ]
+        return base_command
+    # phase1 and phase3b: device-aware
+    base_command.extend(["--device", device])
+    if device == "gpu":
+        return base_command
+    # cpu: Distributed MPI
+    return ["mpirun", "--bind-to", "none", "-np", str(cpu_ranks), *base_command]
 
 
 def build_propagation_command(
@@ -240,9 +276,20 @@ def build_propagation_command(
     python_bin: str,
     config_path: Path | str,
     output_root: Path | str,
+    device: str = "cpu",
 ) -> list[str]:
     driver = resolve_propagation_driver(repo_root, stage)
-    return [python_bin, str(driver), "--config", str(Path(config_path).resolve()), "--output-dir", str(Path(output_root).resolve())]
+    cmd = [
+        python_bin,
+        str(driver),
+        "--config",
+        str(Path(config_path).resolve()),
+        "--output-dir",
+        str(Path(output_root).resolve()),
+    ]
+    if stage == "phase3b":
+        cmd.extend(["--device", device])
+    return cmd
 
 
 def format_command(command: list[str]) -> str:
