@@ -20,7 +20,30 @@ class _IndentationModel:
         return inputs[:, -1:].clone()
 
 
-def test_compression_surrogate_evaluates_and_clips_negative_values(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+class _ModelWithTorchHooks:
+    def __init__(self) -> None:
+        self.to_calls: list[str] = []
+        self.eval_calls = 0
+        self.buffers: dict[str, tuple[torch.Tensor, bool]] = {}
+
+    def to(self, device: torch.device):
+        self.to_calls.append(str(device))
+        return self
+
+    def eval(self):
+        self.eval_calls += 1
+        return self
+
+    def register_buffer(self, name: str, tensor: torch.Tensor, persistent: bool = True) -> None:
+        self.buffers[name] = (tensor, persistent)
+
+    def __call__(self, inputs: torch.Tensor) -> torch.Tensor:
+        return inputs[:, -1:].clone()
+
+
+def test_compression_surrogate_evaluates_and_clips_negative_values(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     captured = {}
 
     def fake_load_model_states(path: str):
@@ -46,7 +69,9 @@ def test_compression_surrogate_evaluates_and_clips_negative_values(monkeypatch: 
     assert surrogate.evaluate_compression([10.0, 20.0, 1.0, 2.0, 3.0, 4.0], []) == []
 
 
-def test_indentation_surrogate_uses_fallback_weights_name(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_indentation_surrogate_uses_fallback_weights_name(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     fallback = tmp_path / "microbubble_disp_BEST.pkl"
     fallback.write_text("weights", encoding="utf-8")
     captured = {}
@@ -77,3 +102,65 @@ def test_indentation_surrogate_uses_fallback_weights_name(monkeypatch: pytest.Mo
 def test_indentation_surrogate_requires_weights_file(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="Could not find indentation surrogate weights"):
         indentation_evaluate.Surrogate(str(tmp_path))
+
+
+def test_compression_surrogate_initialization_moves_and_registers_tensors(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    model = _ModelWithTorchHooks()
+
+    def fake_load_model_states(path: str):
+        return (
+            model,
+            np.zeros(7),
+            np.ones(7),
+            np.array([0.0]),
+            np.array([1.0]),
+        )
+
+    monkeypatch.setattr(compression_evaluate, "load_model_states", fake_load_model_states)
+
+    compression_evaluate.Surrogate(str(tmp_path), device="cpu")
+
+    assert model.to_calls == ["cpu"]
+    assert model.eval_calls == 1
+    assert set(model.buffers) == {
+        "mesouq_cp_xscale",
+        "mesouq_cp_xshift",
+        "mesouq_cp_yscale",
+        "mesouq_cp_yshift",
+    }
+    assert all(not persistent for _, persistent in model.buffers.values())
+    assert all(tensor.device.type == "cpu" for tensor, _ in model.buffers.values())
+
+
+def test_indentation_surrogate_initialization_moves_and_registers_tensors(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fallback = tmp_path / "microbubble_disp_BEST.pkl"
+    fallback.write_text("weights", encoding="utf-8")
+    model = _ModelWithTorchHooks()
+
+    def fake_load_model_states(path: str):
+        return (
+            model,
+            np.zeros(7),
+            np.ones(7),
+            np.array([0.0]),
+            np.array([1.0]),
+        )
+
+    monkeypatch.setattr(indentation_evaluate, "load_model_states", fake_load_model_states)
+
+    indentation_evaluate.Surrogate(str(tmp_path), device="cpu")
+
+    assert model.to_calls == ["cpu"]
+    assert model.eval_calls == 1
+    assert set(model.buffers) == {
+        "mesouq_xshift",
+        "mesouq_xscale",
+        "mesouq_yshift",
+        "mesouq_yscale",
+    }
+    assert all(not persistent for _, persistent in model.buffers.values())
+    assert all(tensor.device.type == "cpu" for tensor, _ in model.buffers.values())
