@@ -25,7 +25,9 @@ from meso_uq.vega_workflows import (  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run one public inference stage on Vega with explicit workflow selection.")
+    parser = argparse.ArgumentParser(
+        description="Run one public inference stage on Vega with explicit workflow selection."
+    )
     parser.add_argument("--experiment", choices=VALID_EXPERIMENTS, required=True)
     parser.add_argument("--model-family", choices=VALID_MODEL_FAMILIES, required=True)
     parser.add_argument("--profile", choices=VALID_PROFILES, required=True)
@@ -37,6 +39,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--profiling", action="store_true", default=False)
     parser.add_argument("--restart", action="store_true", default=False)
     parser.add_argument("--dry-run", action="store_true", default=False)
+    parser.add_argument(
+        "--device",
+        choices=["cpu", "gpu"],
+        default="cpu",
+        help="cpu: Distributed MPI; gpu: Sequential GPU-batch (single rank)",
+    )
     args = parser.parse_args(argv)
 
     selection = VegaWorkflowSelection(args.experiment, args.model_family, args.profile)
@@ -55,6 +63,7 @@ def main(argv: list[str] | None = None) -> int:
         profiling=args.profiling,
         restart=args.restart,
         dry_run=args.dry_run,
+        device=args.device,
     )
 
     print(f"Experiment:    {selection.experiment}")
