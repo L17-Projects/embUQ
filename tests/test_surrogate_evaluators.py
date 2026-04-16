@@ -164,3 +164,143 @@ def test_indentation_surrogate_initialization_moves_and_registers_tensors(
     }
     assert all(not persistent for _, persistent in model.buffers.values())
     assert all(tensor.device.type == "cpu" for tensor, _ in model.buffers.values())
+
+
+def test_compression_surrogate_batch_evaluates_chunked_cpu(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    model = _ModelWithTorchHooks()
+
+    def fake_load_model_states(path: str):
+        return (
+            model,
+            np.zeros(7),
+            np.ones(7),
+            np.array([0.0]),
+            np.array([1.0]),
+        )
+
+    monkeypatch.setattr(compression_evaluate, "load_model_states", fake_load_model_states)
+    surrogate = compression_evaluate.Surrogate(str(tmp_path), device="cpu")
+    if not hasattr(surrogate, "evaluate_compression_batch"):
+        pytest.skip("Batch compression evaluator not available on this branch.")
+
+    theta = np.array(
+        [
+            [10.0, 20.0, 1.0, 2.0, 3.0, 4.0],
+            [11.0, 21.0, 1.1, 2.1, 3.1, 4.1],
+        ],
+        dtype=np.float32,
+    )
+    d0 = np.array([0.0, 0.5], dtype=np.float32)
+    out = surrogate.evaluate_compression_batch(theta, disp=[0.0, 1.0], d0=d0, chunk_size=1)
+
+    assert out.shape == (2, 2)
+    assert out.tolist() == pytest.approx([[0.0, 1.0], [0.0, 0.5]])
+
+    empty = surrogate.evaluate_compression_batch(
+        np.empty((0, 6), dtype=np.float32), disp=[0.0, 1.0], chunk_size=0
+    )
+    assert empty.shape == (0, 2)
+
+
+def test_compression_surrogate_batch_validates_input_shapes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    model = _ModelWithTorchHooks()
+
+    def fake_load_model_states(path: str):
+        return (
+            model,
+            np.zeros(7),
+            np.ones(7),
+            np.array([0.0]),
+            np.array([1.0]),
+        )
+
+    monkeypatch.setattr(compression_evaluate, "load_model_states", fake_load_model_states)
+    surrogate = compression_evaluate.Surrogate(str(tmp_path), device="cpu")
+    if not hasattr(surrogate, "evaluate_compression_batch"):
+        pytest.skip("Batch compression evaluator not available on this branch.")
+
+    with pytest.raises(ValueError, match="Expected parameter array of shape"):
+        surrogate.evaluate_compression_batch(np.ones((2, 5), dtype=np.float32), disp=[0.0, 1.0])
+    with pytest.raises(ValueError, match="Expected 1D displacement array"):
+        surrogate.evaluate_compression_batch(np.ones((2, 6), dtype=np.float32), disp=[[0.0, 1.0]])
+    with pytest.raises(ValueError, match="Expected d0 shape"):
+        surrogate.evaluate_compression_batch(
+            np.ones((2, 6), dtype=np.float32), disp=[0.0, 1.0], d0=np.array([0.0], dtype=np.float32)
+        )
+
+
+def test_indentation_surrogate_batch_evaluates_chunked_cpu(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fallback = tmp_path / "microbubble_disp_BEST.pkl"
+    fallback.write_text("weights", encoding="utf-8")
+    model = _ModelWithTorchHooks()
+
+    def fake_load_model_states(path: str):
+        return (
+            model,
+            np.zeros(7),
+            np.ones(7),
+            np.array([0.0]),
+            np.array([1.0]),
+        )
+
+    monkeypatch.setattr(indentation_evaluate, "load_model_states", fake_load_model_states)
+    surrogate = indentation_evaluate.Surrogate(str(tmp_path), device="cpu")
+    if not hasattr(surrogate, "evaluate_indentation_batch"):
+        pytest.skip("Batch indentation evaluator not available on this branch.")
+
+    theta = np.array(
+        [
+            [10.0, 20.0, 1.0, 2.0, 3.0, 4.0],
+            [11.0, 21.0, 1.1, 2.1, 3.1, 4.1],
+        ],
+        dtype=np.float32,
+    )
+    d0 = np.array([0.2, 0.0], dtype=np.float32)
+    out = surrogate.evaluate_indentation_batch(theta, forces=[-1.0, 2.0], d0=d0, chunk_size=1)
+
+    assert out.shape == (2, 2)
+    assert out.tolist() == pytest.approx([[0.0, 2.2], [0.0, 2.0]])
+
+    empty = surrogate.evaluate_indentation_batch(
+        np.empty((0, 6), dtype=np.float32), forces=[-1.0, 2.0], chunk_size=0
+    )
+    assert empty.shape == (0, 2)
+
+
+def test_indentation_surrogate_batch_validates_input_shapes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fallback = tmp_path / "microbubble_disp_BEST.pkl"
+    fallback.write_text("weights", encoding="utf-8")
+    model = _ModelWithTorchHooks()
+
+    def fake_load_model_states(path: str):
+        return (
+            model,
+            np.zeros(7),
+            np.ones(7),
+            np.array([0.0]),
+            np.array([1.0]),
+        )
+
+    monkeypatch.setattr(indentation_evaluate, "load_model_states", fake_load_model_states)
+    surrogate = indentation_evaluate.Surrogate(str(tmp_path), device="cpu")
+    if not hasattr(surrogate, "evaluate_indentation_batch"):
+        pytest.skip("Batch indentation evaluator not available on this branch.")
+
+    with pytest.raises(ValueError, match="Expected parameter array of shape"):
+        surrogate.evaluate_indentation_batch(np.ones((2, 5), dtype=np.float32), forces=[0.0, 1.0])
+    with pytest.raises(ValueError, match="Expected 1D force array"):
+        surrogate.evaluate_indentation_batch(np.ones((2, 6), dtype=np.float32), forces=[[0.0, 1.0]])
+    with pytest.raises(ValueError, match="Expected d0 shape"):
+        surrogate.evaluate_indentation_batch(
+            np.ones((2, 6), dtype=np.float32),
+            forces=[0.0, 1.0],
+            d0=np.array([0.0], dtype=np.float32),
+        )

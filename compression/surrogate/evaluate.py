@@ -38,6 +38,11 @@ class Surrogate:
         self.cp_xshift_t = torch.as_tensor(self.cp_xshift, dtype=torch.float32, device=self.device)
         self.cp_yscale_t = torch.as_tensor(self.cp_yscale, dtype=torch.float32, device=self.device)
         self.cp_yshift_t = torch.as_tensor(self.cp_yshift, dtype=torch.float32, device=self.device)
+        if hasattr(self.cp, "register_buffer"):
+            self.cp.register_buffer("mesouq_cp_xscale", self.cp_xscale_t, persistent=False)
+            self.cp.register_buffer("mesouq_cp_xshift", self.cp_xshift_t, persistent=False)
+            self.cp.register_buffer("mesouq_cp_yscale", self.cp_yscale_t, persistent=False)
+            self.cp.register_buffer("mesouq_cp_yshift", self.cp_yshift_t, persistent=False)
         self.base_dir = base_dir
         self._pinned_params_buf: Optional[torch.Tensor] = None
         self._pinned_d0_buf: Optional[torch.Tensor] = None
