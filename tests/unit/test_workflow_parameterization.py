@@ -1,10 +1,13 @@
+import numpy as np
 import pytest
 
 from meso_uq.workflow_acceleration import (
     active_hierarchical_variable_names,
     active_variable_names,
     configure_device_conduit,
+    configure_gpu_batch_sub_experiment,
     expand_parameter_vector,
+    expand_reduced_parameters,
     get_fixed_parameters,
     phase1_prior_specs,
     phase2_hyperprior_specs,
@@ -98,3 +101,24 @@ def test_configure_device_conduit_handles_gpu_cpu_and_invalid_device() -> None:
 def test_get_fixed_parameters_rejects_non_mapping() -> None:
     with pytest.raises(ValueError, match="Expected fixed_params to be a mapping"):
         get_fixed_parameters({"fixed_params": ["b1", 0.0]})
+
+
+def test_configure_gpu_batch_sub_experiment_sets_required_problem_keys() -> None:
+    sub_experiment = {"Problem": {}}
+
+    def batch_model(*_args, **_kwargs) -> None:
+        return None
+
+    def single_model(*_args, **_kwargs) -> None:
+        return None
+
+    configure_gpu_batch_sub_experiment(sub_experiment, batch_model, single_model)
+
+    assert sub_experiment["Problem"]["Use Batch Evaluation"] is True
+    assert sub_experiment["Problem"]["Batch Computational Model"] is batch_model
+    assert sub_experiment["Problem"]["Computational Model"] is single_model
+
+
+def test_expand_reduced_parameters_rejects_invalid_shape() -> None:
+    with pytest.raises(ValueError, match="Expected reduced parameter array of shape"):
+        expand_reduced_parameters(np.ones((2, 3), dtype=np.float32))
