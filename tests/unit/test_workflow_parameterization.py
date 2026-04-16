@@ -3,6 +3,7 @@ import pytest
 from meso_uq.workflow_acceleration import (
     active_hierarchical_variable_names,
     active_variable_names,
+    configure_device_conduit,
     expand_parameter_vector,
     get_fixed_parameters,
     phase1_prior_specs,
@@ -70,10 +71,30 @@ def test_phase2_hyperprior_specs_drop_fixed_parameters(full_config):
 
 
 def test_expand_parameter_vector_handles_reduced_legacy_and_full():
-    reduced = expand_parameter_vector([10.0, 20.0, 0.5, 0.1], fixed_params={"b1": 1.0, "b2": 2.0, "a3": 3.0, "a4": 4.0})
+    reduced = expand_parameter_vector(
+        [10.0, 20.0, 0.5, 0.1], fixed_params={"b1": 1.0, "b2": 2.0, "a3": 3.0, "a4": 4.0}
+    )
     legacy = expand_parameter_vector([10.0, 20.0, 1.0, 2.0, 3.0, 4.0, 0.1])
     full = expand_parameter_vector([10.0, 20.0, 1.0, 2.0, 3.0, 4.0, 0.5, 0.1])
 
     assert reduced.tolist() == pytest.approx([10.0, 20.0, 1.0, 2.0, 3.0, 4.0, 0.5, 0.1])
     assert legacy.tolist() == pytest.approx([10.0, 20.0, 1.0, 2.0, 3.0, 4.0, 0.0, 0.1])
     assert full.tolist() == pytest.approx([10.0, 20.0, 1.0, 2.0, 3.0, 4.0, 0.5, 0.1])
+
+
+def test_configure_device_conduit_handles_gpu_cpu_and_invalid_device() -> None:
+    gpu_engine = {"Conduit": {}}
+    configure_device_conduit(gpu_engine, device="gpu", mpi_ranks=8)
+    assert gpu_engine == {"Conduit": {}}
+
+    cpu_engine = {"Conduit": {}}
+    configure_device_conduit(cpu_engine, device="cpu", mpi_ranks=2)
+    assert cpu_engine["Conduit"] == {"Type": "Distributed", "Ranks Per Worker": 1}
+
+    with pytest.raises(ValueError, match="--device must be 'cpu' or 'gpu'"):
+        configure_device_conduit(cpu_engine, device="tpu", mpi_ranks=1)
+
+
+def test_get_fixed_parameters_rejects_non_mapping() -> None:
+    with pytest.raises(ValueError, match="Expected fixed_params to be a mapping"):
+        get_fixed_parameters({"fixed_params": ["b1", 0.0]})

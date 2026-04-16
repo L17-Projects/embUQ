@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+import meso_uq.vega_workflows as vega_workflows
 from meso_uq.vega_workflows import (
     VegaWorkflowSelection,
     build_inference_command,
@@ -25,22 +26,34 @@ def _repo_root() -> Path:
 def test_workflow_config_paths_resolve_across_model_family_and_profile() -> None:
     repo_root = _repo_root()
 
-    assert resolve_workflow_config_path(
-        repo_root,
-        VegaWorkflowSelection("compression", "full-model", "production"),
-    ) == repo_root / "inference" / "configs" / "production" / "inference_config_compression.yaml"
-    assert resolve_workflow_config_path(
-        repo_root,
-        VegaWorkflowSelection("indentation", "full-model", "validation"),
-    ) == repo_root / "inference" / "configs" / "validation" / "validation_config_indentation.yaml"
-    assert resolve_workflow_config_path(
-        repo_root,
-        VegaWorkflowSelection("compression", "reduced-model", "production"),
-    ) == repo_root / "reduced" / "configs" / "production" / "reduced_config_compression.yaml"
-    assert resolve_workflow_config_path(
-        repo_root,
-        VegaWorkflowSelection("indentation", "reduced-model", "validation"),
-    ) == repo_root / "reduced" / "configs" / "validation" / "validation_config_indentation.yaml"
+    assert (
+        resolve_workflow_config_path(
+            repo_root,
+            VegaWorkflowSelection("compression", "full-model", "production"),
+        )
+        == repo_root / "inference" / "configs" / "production" / "inference_config_compression.yaml"
+    )
+    assert (
+        resolve_workflow_config_path(
+            repo_root,
+            VegaWorkflowSelection("indentation", "full-model", "validation"),
+        )
+        == repo_root / "inference" / "configs" / "validation" / "validation_config_indentation.yaml"
+    )
+    assert (
+        resolve_workflow_config_path(
+            repo_root,
+            VegaWorkflowSelection("compression", "reduced-model", "production"),
+        )
+        == repo_root / "reduced" / "configs" / "production" / "reduced_config_compression.yaml"
+    )
+    assert (
+        resolve_workflow_config_path(
+            repo_root,
+            VegaWorkflowSelection("indentation", "reduced-model", "validation"),
+        )
+        == repo_root / "reduced" / "configs" / "validation" / "validation_config_indentation.yaml"
+    )
 
 
 def test_workflow_output_root_separates_model_family_from_profile() -> None:
@@ -127,18 +140,51 @@ def test_build_propagation_command_resolves_public_script() -> None:
     output_root = resolve_workflow_output_root(repo_root, selection)
     command = build_propagation_command(repo_root, "phase3b", "python", config_path, output_root)
 
-    assert resolve_propagation_driver(repo_root, "phase3b") == repo_root / "propagation" / "scripts" / "run_phase3b_propagation.py"
+    assert (
+        resolve_propagation_driver(repo_root, "phase3b")
+        == repo_root / "propagation" / "scripts" / "run_phase3b_propagation.py"
+    )
     assert command[0] == "python"
     assert command[1] == str(repo_root / "propagation" / "scripts" / "run_phase3b_propagation.py")
 
 
 def test_load_workflow_datasets_reads_selected_experiment_only() -> None:
     repo_root = _repo_root()
-    config_path = repo_root / "inference" / "configs" / "validation" / "validation_config_compression.yaml"
+    config_path = (
+        repo_root / "inference" / "configs" / "validation" / "validation_config_compression.yaml"
+    )
     datasets = load_workflow_datasets(repo_root, config_path, "compression")
 
     assert datasets
     assert all(name.startswith("compression_") for _, name in datasets)
+
+
+def test_load_workflow_datasets_raises_when_experiment_has_no_enabled_entries(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("experiments: []\n", encoding="utf-8")
+
+    class _Spec:
+        def __init__(self, *, enabled: bool, name: str):
+            self.enabled = enabled
+            self.name = name
+            self.diameters = [2.5]
+
+        def dataset_name(self, diameter: float) -> str:
+            return f"{self.name}_{diameter:.1f}um"
+
+    monkeypatch.setattr(
+        vega_workflows,
+        "load_experiments",
+        lambda config, repo_root: [
+            _Spec(enabled=False, name="compression"),
+            _Spec(enabled=True, name="indentation"),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="No enabled datasets found for experiment 'compression'"):
+        load_workflow_datasets(_repo_root(), config_path, "compression")
 
 
 def test_build_inference_command_phase2_single_rank_uses_direct_python() -> None:
