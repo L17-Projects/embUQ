@@ -101,8 +101,11 @@ def test_phase3b_main_forwards_device_and_paths(monkeypatch):
 
     monkeypatch.setattr(module, "run_phase_3b", _fake_run_phase_3b)
 
-    module.main(
+    monkeypatch.setattr(
+        sys,
+        "argv",
         [
+            "run_phase_3b.py",
             "--profiling",
             "--config",
             "phase3b.yaml",
@@ -110,8 +113,9 @@ def test_phase3b_main_forwards_device_and_paths(monkeypatch):
             "results",
             "--device",
             "gpu",
-        ]
+        ],
     )
+    module.main([])
 
     assert captured == {
         "profiling": True,
