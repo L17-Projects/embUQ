@@ -21,10 +21,12 @@ def _install_phase3b_backend_stubs():
 
     compression_module = types.ModuleType("compression.evalkit.posterior_compression")
     compression_module.compute_compression_surrogate = lambda *args, **kwargs: None
+    compression_module.compute_compression_surrogate_batch = lambda *args, **kwargs: None
     sys.modules.setdefault("compression.evalkit.posterior_compression", compression_module)
 
     indentation_module = types.ModuleType("indentation.evalkit.posterior_indentation")
     indentation_module.compute_indentation_surrogate = lambda *args, **kwargs: None
+    indentation_module.compute_indentation_surrogate_batch = lambda *args, **kwargs: None
     sys.modules.setdefault("indentation.evalkit.posterior_indentation", indentation_module)
 
 
