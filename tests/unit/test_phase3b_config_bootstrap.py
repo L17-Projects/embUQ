@@ -87,3 +87,35 @@ def test_run_phase3b_requires_phase1_results(monkeypatch, tmp_path):
         module.run_phase_3b(config_path=str(config_path), output_dir=str(output_root))
 
     assert excinfo.value.code == 1
+
+
+def test_phase3b_main_forwards_device_and_paths(monkeypatch):
+    module = _load_phase3b_module()
+    captured = {}
+
+    def _fake_run_phase_3b(profiling=False, config_path=None, output_dir="_setup", device="cpu"):
+        captured["profiling"] = profiling
+        captured["config_path"] = config_path
+        captured["output_dir"] = output_dir
+        captured["device"] = device
+
+    monkeypatch.setattr(module, "run_phase_3b", _fake_run_phase_3b)
+
+    module.main(
+        [
+            "--profiling",
+            "--config",
+            "phase3b.yaml",
+            "--output-dir",
+            "results",
+            "--device",
+            "gpu",
+        ]
+    )
+
+    assert captured == {
+        "profiling": True,
+        "config_path": "phase3b.yaml",
+        "output_dir": "results",
+        "device": "gpu",
+    }
