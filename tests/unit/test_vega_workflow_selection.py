@@ -163,3 +163,107 @@ def test_load_workflow_datasets_reads_selected_experiment_only() -> None:
 
     assert datasets
     assert all(name.startswith("compression_") for _, name in datasets)
+
+
+def test_build_inference_command_phase2_single_rank_uses_direct_python() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "validation")
+    command = build_inference_command(
+        repo_root,
+        selection,
+        stage="phase2",
+        python_bin="python",
+        config_path=resolve_workflow_config_path(repo_root, selection),
+        output_root=resolve_workflow_output_root(repo_root, selection),
+        cpu_ranks=1,
+    )
+
+    assert command[0] == "python"
+    assert "--device" not in command
+
+
+def test_build_inference_command_phase1_cpu_uses_mpi_and_device_flag() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "reduced-model", "production")
+    command = build_inference_command(
+        repo_root,
+        selection,
+        stage="phase1",
+        python_bin="python",
+        config_path=resolve_workflow_config_path(repo_root, selection),
+        output_root=resolve_workflow_output_root(repo_root, selection),
+        cpu_ranks=1,
+        device="cpu",
+        restart=True,
+        dry_run=True,
+    )
+
+    assert command[:5] == ["mpirun", "--bind-to", "none", "-np", "1"]
+    assert "--device" in command
+    assert command[command.index("--device") + 1] == "cpu"
+    assert "--restart" in command
+    assert "--dry_run" in command
+
+
+def test_build_inference_command_phase1_gpu_skips_mpi() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("indentation", "full-model", "validation")
+    command = build_inference_command(
+        repo_root,
+        selection,
+        stage="phase1",
+        python_bin="python",
+        config_path=resolve_workflow_config_path(repo_root, selection),
+        output_root=resolve_workflow_output_root(repo_root, selection),
+        device="gpu",
+    )
+
+    assert command[0] == "python"
+    assert "mpirun" not in command
+    assert command[-2:] == ["--device", "gpu"]
+
+
+def test_build_inference_command_phase3b_cpu_uses_mpi_and_device_flag() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "production")
+    command = build_inference_command(
+        repo_root,
+        selection,
+        stage="phase3b",
+        python_bin="python",
+        config_path=resolve_workflow_config_path(repo_root, selection),
+        output_root=resolve_workflow_output_root(repo_root, selection),
+        device="cpu",
+    )
+
+    assert command[:5] == ["mpirun", "--bind-to", "none", "-np", "1"]
+    assert command[-2:] == ["--device", "cpu"]
+
+
+def test_build_propagation_command_phase3b_includes_device_flag() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("indentation", "full-model", "production")
+    command = build_propagation_command(
+        repo_root,
+        "phase3b",
+        "python",
+        resolve_workflow_config_path(repo_root, selection),
+        resolve_workflow_output_root(repo_root, selection),
+        device="gpu",
+    )
+
+    assert command[-2:] == ["--device", "gpu"]
+
+
+def test_build_propagation_command_phase1_omits_device_flag() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "validation")
+    command = build_propagation_command(
+        repo_root,
+        "phase1",
+        "python",
+        resolve_workflow_config_path(repo_root, selection),
+        resolve_workflow_output_root(repo_root, selection),
+    )
+
+    assert "--device" not in command
