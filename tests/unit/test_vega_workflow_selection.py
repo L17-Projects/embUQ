@@ -243,3 +243,48 @@ def test_build_propagation_command_phase1_omits_device_flag() -> None:
     )
 
     assert "--device" not in command
+
+
+def test_build_inference_command_rejects_non_phase2_cpu_ranks() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "validation")
+    with pytest.raises(ValueError, match="cpu_ranks is only supported for phase2"):
+        build_inference_command(
+            repo_root,
+            selection,
+            stage="phase1",
+            python_bin="python",
+            config_path=resolve_workflow_config_path(repo_root, selection),
+            output_root=resolve_workflow_output_root(repo_root, selection),
+            cpu_ranks=2,
+        )
+
+
+def test_build_inference_command_rejects_restart_outside_phase1() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "validation")
+    with pytest.raises(ValueError, match="restart is only supported for phase1"):
+        build_inference_command(
+            repo_root,
+            selection,
+            stage="phase2",
+            python_bin="python",
+            config_path=resolve_workflow_config_path(repo_root, selection),
+            output_root=resolve_workflow_output_root(repo_root, selection),
+            restart=True,
+        )
+
+
+def test_build_inference_command_rejects_dry_run_outside_phase1() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "validation")
+    with pytest.raises(ValueError, match="dry_run is only supported for phase1"):
+        build_inference_command(
+            repo_root,
+            selection,
+            stage="phase3b",
+            python_bin="python",
+            config_path=resolve_workflow_config_path(repo_root, selection),
+            output_root=resolve_workflow_output_root(repo_root, selection),
+            dry_run=True,
+        )
