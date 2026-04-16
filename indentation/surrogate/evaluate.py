@@ -28,8 +28,10 @@ class Surrogate:
         self.yshift = np.array(self.yshift)
         self.yscale = np.array(self.yscale)
         self.device = torch.device(device)
-        self.model = self.model.to(self.device)
-        self.model.eval()
+        if hasattr(self.model, "to"):
+            self.model = self.model.to(self.device)
+        if hasattr(self.model, "eval"):
+            self.model.eval()
         self.xshift_t = torch.as_tensor(self.xshift, dtype=torch.float32, device=self.device)
         self.xscale_t = torch.as_tensor(self.xscale, dtype=torch.float32, device=self.device)
         self.yshift_t = torch.as_tensor(self.yshift, dtype=torch.float32, device=self.device)

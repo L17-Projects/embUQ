@@ -18,8 +18,10 @@ class Surrogate:
         self.cp_yscale = np.array(self.cp_yscale)
         self.cp_yshift = np.array(self.cp_yshift)
         self.device = torch.device(device)
-        self.cp = self.cp.to(self.device)
-        self.cp.eval()
+        if hasattr(self.cp, "to"):
+            self.cp = self.cp.to(self.device)
+        if hasattr(self.cp, "eval"):
+            self.cp.eval()
         self.cp_xscale_t = torch.as_tensor(self.cp_xscale, dtype=torch.float32, device=self.device)
         self.cp_xshift_t = torch.as_tensor(self.cp_xshift, dtype=torch.float32, device=self.device)
         self.cp_yscale_t = torch.as_tensor(self.cp_yscale, dtype=torch.float32, device=self.device)
