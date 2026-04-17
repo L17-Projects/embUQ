@@ -99,10 +99,14 @@ For Vega-first operation, the repo now also ships split helpers under `scripts/v
 These helpers expose experiment, model family, run profile, and stage explicitly so the operator surface does not overload the word `reduced`.
 
 The production complete scripts orchestrate:
-1. Phase 1 on GPU
-2. Phase 2 on CPU MPI ranks
-3. Phase 3b on exclusive GPU
+1. Phase 1 on GPU (GPU-batched surrogate, Sequential Korali conduit)
+2. Phase 2 on CPU MPI ranks (**CPU-MPI only** — Phase 2 is not CUDA-native)
+3. Phase 3b on exclusive GPU (GPU-batched surrogate, Sequential Korali conduit)
 4. Propagation phase 3b on CPU (`--mem=4000`)
+
+**Phase 2 backend note:** Phase 2 (`Hierarchical/Psi`) is CPU-MPI only. No native-CUDA Phase 2
+runtime is validated or supported in the current release. GPU batching applies to Phase 1,
+Phase 3b, and propagation where applicable — not to Phase 2.
 
 Default production lanes:
 - `scripts/vega/sbatch/production/complete_inference_compression.sbatch`
@@ -118,6 +122,18 @@ In particular, the public line now includes focused execution-level slices for:
 - `Hierarchical/Theta`
 - `TMCMC`
 - `Hierarchical/Psi`
+
+## 9. Local workstation validation (o369 / non-SLURM)
+
+For local workstation runs (non-SLURM, e.g. `o369`), see `docs/WORKSTATION_LOCAL_WORKFLOWS.md`.
+
+Local validation targets four lanes: `(compression, indentation) × (full-model, reduced-model)`.
+
+Low-load guidance for local runs:
+- Use **max 9 CPUs** for Phase 2 MPI ranks.
+- Keep **>2 GB RAM free** at all times.
+- Use the `validation` profile (reduced-cost configs), not `production`.
+- GPU batching applies to Phase 1, Phase 3b, and propagation — not Phase 2 (CPU-MPI only).
 
 ## Suggested usage pattern for new users
 
