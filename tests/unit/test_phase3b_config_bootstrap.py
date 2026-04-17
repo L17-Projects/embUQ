@@ -21,10 +21,12 @@ def _install_phase3b_backend_stubs():
 
     compression_module = types.ModuleType("compression.evalkit.posterior_compression")
     compression_module.compute_compression_surrogate = lambda *args, **kwargs: None
+    compression_module.compute_compression_surrogate_batch = lambda *args, **kwargs: None
     sys.modules.setdefault("compression.evalkit.posterior_compression", compression_module)
 
     indentation_module = types.ModuleType("indentation.evalkit.posterior_indentation")
     indentation_module.compute_indentation_surrogate = lambda *args, **kwargs: None
+    indentation_module.compute_indentation_surrogate_batch = lambda *args, **kwargs: None
     sys.modules.setdefault("indentation.evalkit.posterior_indentation", indentation_module)
 
 
@@ -85,3 +87,39 @@ def test_run_phase3b_requires_phase1_results(monkeypatch, tmp_path):
         module.run_phase_3b(config_path=str(config_path), output_dir=str(output_root))
 
     assert excinfo.value.code == 1
+
+
+def test_phase3b_main_forwards_device_and_paths(monkeypatch):
+    module = _load_phase3b_module()
+    captured = {}
+
+    def _fake_run_phase_3b(profiling=False, config_path=None, output_dir="_setup", device="cpu"):
+        captured["profiling"] = profiling
+        captured["config_path"] = config_path
+        captured["output_dir"] = output_dir
+        captured["device"] = device
+
+    monkeypatch.setattr(module, "run_phase_3b", _fake_run_phase_3b)
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_phase_3b.py",
+            "--profiling",
+            "--config",
+            "phase3b.yaml",
+            "--output-dir",
+            "results",
+            "--device",
+            "gpu",
+        ],
+    )
+    module.main([])
+
+    assert captured == {
+        "profiling": True,
+        "config_path": "phase3b.yaml",
+        "output_dir": "results",
+        "device": "gpu",
+    }

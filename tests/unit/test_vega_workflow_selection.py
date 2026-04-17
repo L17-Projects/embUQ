@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+import meso_uq.vega_workflows as vega_workflows
 from meso_uq.vega_workflows import (
     VegaWorkflowSelection,
     build_inference_command,
@@ -163,6 +164,34 @@ def test_load_workflow_datasets_reads_selected_experiment_only() -> None:
 
     assert datasets
     assert all(name.startswith("compression_") for _, name in datasets)
+
+
+def test_load_workflow_datasets_raises_when_experiment_has_no_enabled_entries(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("experiments: []\n", encoding="utf-8")
+
+    class _Spec:
+        def __init__(self, *, enabled: bool, name: str):
+            self.enabled = enabled
+            self.name = name
+            self.diameters = [2.5]
+
+        def dataset_name(self, diameter: float) -> str:
+            return f"{self.name}_{diameter:.1f}um"
+
+    monkeypatch.setattr(
+        vega_workflows,
+        "load_experiments",
+        lambda config, repo_root: [
+            _Spec(enabled=False, name="compression"),
+            _Spec(enabled=True, name="indentation"),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="No enabled datasets found for experiment 'compression'"):
+        load_workflow_datasets(_repo_root(), config_path, "compression")
 
 
 def test_build_inference_command_phase2_single_rank_uses_direct_python() -> None:

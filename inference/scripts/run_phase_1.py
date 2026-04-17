@@ -20,21 +20,24 @@ sys.path.insert(0, str(PROJECT_ROOT / "indentation" / "evalkit"))
 from compression.evalkit.posterior_compression import (
     compute_compression,
     compute_compression_surrogate,
+    compute_compression_surrogate_batch,
     preload_compression_surrogate,
 )
 from compression.evalkit.tools import datedPrint, prepareCompression
+from indentation.evalkit.posterior_indentation import (
+    compute_indentation_surrogate,
+    compute_indentation_surrogate_batch,
+    preload_indentation_surrogate,
+)
+from indentation.evalkit.prepare_env import prepareIndentation
 from meso_uq.config import resolve_inference_config_path
 from meso_uq.experiments import load_experiments
 from meso_uq.workflow_acceleration import (
+    configure_device_conduit,
     configure_korali_conduit,
     phase1_prior_specs,
     to_korali_path,
 )
-from indentation.evalkit.posterior_indentation import (
-    compute_indentation_surrogate,
-    preload_indentation_surrogate,
-)
-from indentation.evalkit.prepare_env import prepareIndentation
 
 
 def _align_reference_data(ref_points, ref_data, exp_name, rank):
@@ -104,8 +107,14 @@ def _apply_compression_dry_run(experiments, rank: int) -> None:
             continue
         for diameter_um in exp.diameters:
             filenames = [
-                PROJECT_ROOT / f"_init_compression_{diameter_um}um" / "parameter" / "parameters-default00001.yaml",
-                PROJECT_ROOT / f"_init_compression_{diameter_um}um" / "parameter" / "parameters-default00001eq.yaml",
+                PROJECT_ROOT
+                / f"_init_compression_{diameter_um}um"
+                / "parameter"
+                / "parameters-default00001.yaml",
+                PROJECT_ROOT
+                / f"_init_compression_{diameter_um}um"
+                / "parameter"
+                / "parameters-default00001eq.yaml",
             ]
             for filename in filenames:
                 if not filename.exists():
@@ -125,6 +134,7 @@ def run_inference(
     dry_run: bool = False,
     config_path: str = None,
     output_dir: str = "_setup",
+    device: str = "cpu",
 ):
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -155,23 +165,26 @@ def run_inference(
         for exp in experiments:
             preload_fn = preload_map.get(exp.name)
             if preload_fn is None:
-                raise ValueError(f"No surrogate preload function registered for experiment '{exp.name}'")
+                raise ValueError(
+                    f"No surrogate preload function registered for experiment '{exp.name}'"
+                )
             for diameter_um in exp.diameters:
-                preload_fn(diameter_um)
-        comm.Barrier()
+                preload_fn(diameter_um, device=device)
+        if device == "cpu":
+            comm.Barrier()
 
     k = korali.Engine()
-    k.setMPIComm(MPI.COMM_WORLD)
-    configure_korali_conduit(
-        k,
-        mpi_ranks=comm.Get_size(),
-        ranks_per_worker=1 if use_surrogate else 2,
-        concurrent_jobs=1,
-    )
+    if device == "cpu":
+        k.setMPIComm(MPI.COMM_WORLD)
+    configure_device_conduit(k, device=device, mpi_ranks=comm.Get_size())
 
     compute_surrogate_map = {
         "compression": compute_compression_surrogate,
         "indentation": compute_indentation_surrogate,
+    }
+    compute_batch_map = {
+        "compression": compute_compression_surrogate_batch,
+        "indentation": compute_indentation_surrogate_batch,
     }
     compute_mirheo_map = {
         "compression": compute_compression,
@@ -194,10 +207,14 @@ def run_inference(
                 exp_name = exp.dataset_name(diameter_um)
                 experiment_root = phase1_root / exp_name
                 e = korali.Experiment()
-                e["File Output"]["Path"] = to_korali_path(str(experiment_root), base_dir=str(PROJECT_ROOT))
+                e["File Output"]["Path"] = to_korali_path(
+                    str(experiment_root), base_dir=str(PROJECT_ROOT)
+                )
                 found = e.loadState(str(experiment_root / "latest"))
                 if not found:
-                    raise FileNotFoundError(f"No previous state found for {exp_name} under {experiment_root}")
+                    raise FileNotFoundError(
+                        f"No previous state found for {exp_name} under {experiment_root}"
+                    )
                 compute_model = resolve_compute_model(exp.name)
                 reference_points = exp.get_reference_points(diameter_um)
                 reference_data = e["Problem"].get("Reference Data")
@@ -209,15 +226,26 @@ def run_inference(
                         rank,
                     )
                     e["Problem"]["Reference Data"] = reference_data
-                e["Problem"]["Computational Model"] = (
-                    lambda sampleData, d=diameter_um, model=compute_model, pts=reference_points: model(
-                        sampleData, pts, d
+                if device == "gpu" and use_surrogate:
+                    batch_fn = compute_batch_map[exp.name]
+                    e["Problem"]["Use Batch Evaluation"] = True
+                    e["Problem"]["Batch Computational Model"] = (
+                        lambda s, d=diameter_um, pts=reference_points, dev=device, fn=batch_fn: fn(
+                            s, pts, d, device=dev
+                        )
                     )
-                )
+                else:
+                    e["Problem"]["Computational Model"] = (
+                        lambda sampleData, d=diameter_um, model=compute_model, pts=reference_points: model(
+                            sampleData, pts, d
+                        )
+                    )
                 e_list.append(e)
                 if rank == 0:
                     model_label = "surrogate" if use_surrogate else "Mirheo"
-                    datedPrint(f"[Korali] Resuming {exp_name} with {model_label} model from {experiment_root}")
+                    datedPrint(
+                        f"[Korali] Resuming {exp_name} with {model_label} model from {experiment_root}"
+                    )
     else:
         with _working_directory(PROJECT_ROOT):
             _prepare_experiment_environment(experiments, rank)
@@ -256,11 +284,20 @@ def run_inference(
                     exp_name,
                     rank,
                 )
-                e["Problem"]["Computational Model"] = (
-                    lambda sampleData, d=diameter_um, model=compute_model, pts=reference_points: model(
-                        sampleData, pts, d
+                if device == "gpu" and use_surrogate:
+                    batch_fn = compute_batch_map[exp.name]
+                    e["Problem"]["Use Batch Evaluation"] = True
+                    e["Problem"]["Batch Computational Model"] = (
+                        lambda s, d=diameter_um, pts=reference_points, dev=device, fn=batch_fn: fn(
+                            s, pts, d, device=dev
+                        )
                     )
-                )
+                else:
+                    e["Problem"]["Computational Model"] = (
+                        lambda sampleData, d=diameter_um, model=compute_model, pts=reference_points: model(
+                            sampleData, pts, d
+                        )
+                    )
                 e["Problem"]["Type"] = "Bayesian/Reference"
                 e["Problem"]["Likelihood Model"] = "Normal"
                 e["Problem"]["Reference Data"] = reference_data
@@ -311,6 +348,12 @@ def main(argv):
     parser.add_argument("--dry_run", action="store_true", default=False)
     parser.add_argument("--config", type=str, default=None)
     parser.add_argument("--output-dir", type=str, default="_setup")
+    parser.add_argument(
+        "--device",
+        choices=["cpu", "gpu"],
+        default="cpu",
+        help="cpu: Distributed MPI conduit; gpu: Sequential GPU-batch conduit (single rank)",
+    )
     args = parser.parse_args()
 
     run_inference(
@@ -319,6 +362,7 @@ def main(argv):
         dry_run=args.dry_run,
         config_path=args.config,
         output_dir=args.output_dir,
+        device=args.device,
     )
 
 

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from __future__ import annotations
+
 import gc
 import os
 import sys
@@ -15,12 +17,23 @@ sys.path.insert(0, os.path.join(project_root, "compression", "evalkit"))
 sys.path.insert(0, os.path.join(project_root, "indentation"))
 sys.path.insert(0, os.path.join(project_root, "indentation", "evalkit"))
 
-from compression.evalkit.posterior_compression import compute_compression_surrogate
+from compression.evalkit.posterior_compression import (
+    compute_compression_surrogate,
+    compute_compression_surrogate_batch,
+)
 from compression.evalkit.tools import datedPrint
+from indentation.evalkit.posterior_indentation import (
+    compute_indentation_surrogate,
+    compute_indentation_surrogate_batch,
+)
 from meso_uq.config import resolve_inference_config_path
 from meso_uq.experiments import load_experiments
-from meso_uq.workflow_acceleration import configure_korali_conduit, to_korali_path
-from indentation.evalkit.posterior_indentation import compute_indentation_surrogate
+from meso_uq.workflow_acceleration import (
+    configure_device_conduit,
+    configure_gpu_batch_sub_experiment,
+    configure_korali_conduit,
+    to_korali_path,
+)
 
 
 def _resolve_config_path(config_path: str | None) -> Path:
@@ -60,13 +73,26 @@ def _align_sub_reference(sub, ref_points, exp_name, rank):
     if len(ref_points) != len(ref_data):
         min_len = min(len(ref_points), len(ref_data))
         if rank == 0:
-            datedPrint(f"[Phase 3b] WARNING: Reference points/data length mismatch for {exp_name} (points={len(ref_points)}, data={len(ref_data)}). Trimming to {min_len}.")
+            datedPrint(
+                f"[Phase 3b] WARNING: Reference points/data length mismatch for {exp_name} (points={len(ref_points)}, data={len(ref_data)}). Trimming to {min_len}."
+            )
         sub["Problem"]["Reference Data"] = ref_data[:min_len]
         return ref_points[:min_len]
     return ref_points
 
 
-def run_phase_3b_dataset(experiment_name: str, diameter_um: float, reference_points: list, compute_model, pop_size: int, max_gen: int, target_cov: float, output_root: Path, profiling: bool = False):
+def run_phase_3b_dataset(
+    experiment_name: str,
+    diameter_um: float,
+    reference_points: list,
+    compute_model,
+    pop_size: int,
+    max_gen: int,
+    target_cov: float,
+    output_root: Path,
+    profiling: bool = False,
+    device: str = "cpu",
+):
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     exp_name = f"{experiment_name}_{diameter_um}um"
@@ -87,8 +113,9 @@ def run_phase_3b_dataset(experiment_name: str, diameter_um: float, reference_poi
         raise FileNotFoundError(f"Phase 1 results not found for {exp_name}: {phase1_latest}")
 
     k = korali.Engine()
-    k.setMPIComm(MPI.COMM_WORLD)
-    configure_korali_conduit(k, mpi_ranks=comm.Get_size(), ranks_per_worker=1, concurrent_jobs=1)
+    if device == "cpu":
+        k.setMPIComm(MPI.COMM_WORLD)
+    configure_device_conduit(k, device=device, mpi_ranks=comm.Get_size())
 
     psi = korali.Experiment()
     sub = korali.Experiment()
@@ -100,7 +127,27 @@ def run_phase_3b_dataset(experiment_name: str, diameter_um: float, reference_poi
         raise RuntimeError(f"Failed to load Phase 1 state from {phase1_latest}")
 
     reference_points = _align_sub_reference(sub, reference_points, exp_name, rank)
-    sub["Problem"]["Computational Model"] = lambda sampleData, d=diameter_um, pts=reference_points, model=compute_model: model(sampleData, pts, d)
+    batch_fn_map = {
+        "compression": compute_compression_surrogate_batch,
+        "indentation": compute_indentation_surrogate_batch,
+    }
+    if device == "gpu":
+        batch_fn = batch_fn_map[experiment_name]
+        configure_gpu_batch_sub_experiment(
+            sub,
+            batch_model_fn=lambda s, d=diameter_um, pts=reference_points, dev=device, fn=batch_fn: fn(
+                s, pts, d, device=dev
+            ),
+            single_model_fn=lambda s, d=diameter_um, pts=reference_points, m=compute_model: m(
+                s, pts, d
+            ),
+        )
+    else:
+        sub["Problem"]["Computational Model"] = (
+            lambda sampleData, d=diameter_um, pts=reference_points, model=compute_model: model(
+                sampleData, pts, d
+            )
+        )
 
     if rank == 0:
         datedPrint(f"[Phase 3b] Loaded Phase 1 and Phase 2 states for {exp_name}")
@@ -142,7 +189,12 @@ def run_phase_3b_dataset(experiment_name: str, diameter_um: float, reference_poi
         datedPrint(f"[Phase 3b] Memory cleanup completed for {exp_name}")
 
 
-def run_phase_3b(profiling: bool = False, config_path: str = None, output_dir: str = "_setup"):
+def run_phase_3b(
+    profiling: bool = False,
+    config_path: str = None,
+    output_dir: str = "_setup",
+    device: str = "cpu",
+):
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     config_path_resolved = _resolve_config_path(config_path)
@@ -172,16 +224,23 @@ def run_phase_3b(profiling: bool = False, config_path: str = None, output_dir: s
 
     for exp in experiments:
         for diameter_um in exp.diameters:
-            phase1_latest = output_root / "results_phase_1" / exp.dataset_name(diameter_um) / "latest"
+            phase1_latest = (
+                output_root / "results_phase_1" / exp.dataset_name(diameter_um) / "latest"
+            )
             if not phase1_latest.exists():
                 if rank == 0:
-                    datedPrint(f"[Phase 3b] ERROR: Phase 1 results not found for {exp.name} {diameter_um} μm: {phase1_latest}")
+                    datedPrint(
+                        f"[Phase 3b] ERROR: Phase 1 results not found for {exp.name} {diameter_um} μm: {phase1_latest}"
+                    )
                 sys.exit(1)
 
     if rank == 0:
         datedPrint("[Phase 3b] Verified prerequisite Phase 1 and Phase 2 results")
 
-    compute_surrogate_map = {"compression": compute_compression_surrogate, "indentation": compute_indentation_surrogate}
+    compute_surrogate_map = {
+        "compression": compute_compression_surrogate,
+        "indentation": compute_indentation_surrogate,
+    }
     for exp in experiments:
         model = compute_surrogate_map[exp.name]
         for diameter_um in exp.diameters:
@@ -195,17 +254,30 @@ def run_phase_3b(profiling: bool = False, config_path: str = None, output_dir: s
                 target_cov=phase3b_target_cov,
                 output_root=output_root,
                 profiling=profiling,
+                device=device,
             )
 
 
 def main(argv):
     from argparse import ArgumentParser
+
     parser = ArgumentParser()
     parser.add_argument("--profiling", action="store_true", default=False)
     parser.add_argument("--config", type=str, default=None)
     parser.add_argument("--output-dir", type=str, default="_setup")
+    parser.add_argument(
+        "--device",
+        choices=["cpu", "gpu"],
+        default="cpu",
+        help="cpu: Distributed MPI conduit; gpu: Sequential GPU-batch conduit (single rank)",
+    )
     args = parser.parse_args()
-    run_phase_3b(profiling=args.profiling, config_path=args.config, output_dir=args.output_dir)
+    run_phase_3b(
+        profiling=args.profiling,
+        config_path=args.config,
+        output_dir=args.output_dir,
+        device=args.device,
+    )
 
 
 if __name__ == "__main__":
