@@ -50,6 +50,36 @@ jobs:
           python -m coverage json -o coverage.json
           exit $test_status
 
+      - name: Preserve head coverage report
+        if: always() && hashFiles('coverage.json') != ''
+        run: cp coverage.json coverage-head.json
+
+      - name: Compute base branch coverage
+        if: success() && github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          worktree_dir="../base-coverage-${{ github.run_id }}-${{ github.run_attempt }}"
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          git worktree add "$worktree_dir" "origin/${{ github.base_ref }}"
+          pushd "$worktree_dir"
+          pip install -e ".[test]"
+          python -m coverage run -m pytest
+          python -m coverage json -o coverage-base.json
+          popd
+          cp "$worktree_dir/coverage-base.json" coverage-base.json
+          git worktree remove "$worktree_dir" --force
+
+      - name: Enforce strict coverage increase
+        if: always() && github.event_name == 'pull_request' && hashFiles('coverage-head.json') != '' && hashFiles('coverage-base.json') != ''
+        shell: bash
+        run: |
+          python scripts/ci/check_coverage_increase.py \
+            --base-json coverage-base.json \
+            --head-json coverage-head.json \
+            --markdown-path coverage-delta.md
+          cat coverage-delta.md >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Summarize coverage report
         if: always()
         shell: bash
@@ -69,6 +99,9 @@ jobs:
           path: |
             coverage.xml
             coverage.json
+            coverage-head.json
+            coverage-base.json
+            coverage-delta.md
             coverage-summary.md
           if-no-files-found: warn
           retention-days: 14
