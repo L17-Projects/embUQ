@@ -57,13 +57,25 @@ def _extract_reference_data(sub):
         ref_data = sub["Problem"]["Reference Data"]
     except Exception:
         return None
+    if ref_data is None:
+        return None
+
+    # Prefer bounded index-based extraction when length is available.
+    try:
+        n_ref = len(ref_data)
+    except Exception:
+        n_ref = None
+
+    if n_ref is not None:
+        try:
+            return [ref_data[i] for i in range(n_ref)]
+        except Exception:
+            return None
+
     try:
         return list(ref_data)
     except Exception:
-        try:
-            return [ref_data[i] for i in range(len(ref_data))]
-        except Exception:
-            return None
+        return None
 
 
 def _align_sub_reference(sub, ref_points, exp_name, rank):
