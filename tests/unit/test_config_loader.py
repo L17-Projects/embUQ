@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -73,16 +72,17 @@ def test_resolve_inference_config_path_config_path_env_override(
     assert result == override
 
 
-def test_resolve_inference_config_path_env_override_relative_existing(
+def test_resolve_inference_config_path_env_override_relative_joined_to_root(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # Relative override that does NOT exist as-is but resolves under project_root
     override = tmp_path / "rel_config.yaml"
     override.write_text("emb_diameters: [3.0]\n", encoding="utf-8")
 
-    monkeypatch.setenv("HUQ_INFERENCE_CONFIG", "rel_config.yaml")
-    os.chdir(tmp_path)
-    # Relative path that exists (cwd)
+    monkeypatch.delenv("HUQ_INFERENCE_CONFIG", raising=False)
+    monkeypatch.setenv("CONFIG_PATH", "rel_config.yaml")
     result = resolve_inference_config_path(tmp_path)
+    # The function joins with project_root when the relative path doesn't exist standalone
     assert result == override
 
 

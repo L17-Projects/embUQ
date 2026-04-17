@@ -18,41 +18,7 @@ import pytest
 # ---------------------------------------------------------------------------
 
 
-class _FakeComm:
-    def Get_rank(self) -> int:
-        return 0
-
-    def Get_size(self) -> int:
-        return 1
-
-    def Barrier(self) -> None:
-        pass
-
-
-def _install_stubs() -> None:
-    sys.modules.setdefault("korali", types.ModuleType("korali"))
-
-    mpi4py_mod = types.ModuleType("mpi4py")
-    mpi4py_mod.MPI = types.SimpleNamespace(COMM_WORLD=_FakeComm())
-    sys.modules.setdefault("mpi4py", mpi4py_mod)
-
-    comp_mod = types.ModuleType("compression.evalkit.posterior_compression")
-    comp_mod.compute_compression_surrogate = lambda *a, **kw: None
-    comp_mod.compute_compression_surrogate_batch = lambda *a, **kw: None
-    sys.modules.setdefault("compression.evalkit.posterior_compression", comp_mod)
-
-    tools_mod = types.ModuleType("compression.evalkit.tools")
-    tools_mod.datedPrint = lambda msg: None
-    sys.modules.setdefault("compression.evalkit.tools", tools_mod)
-
-    ind_mod = types.ModuleType("indentation.evalkit.posterior_indentation")
-    ind_mod.compute_indentation_surrogate = lambda *a, **kw: None
-    ind_mod.compute_indentation_surrogate_batch = lambda *a, **kw: None
-    sys.modules.setdefault("indentation.evalkit.posterior_indentation", ind_mod)
-
-
 def _load_module():
-    _install_stubs()
     repo_root = Path(__file__).resolve().parents[2]
     for extra in [
         repo_root,
@@ -64,10 +30,36 @@ def _load_module():
         if str(extra) not in sys.path:
             sys.path.insert(0, str(extra))
 
+    # Stub heavy dependencies before loading the module
+    sys.modules.setdefault("korali", types.ModuleType("korali"))
+
+    mpi4py_mod = types.ModuleType("mpi4py")
+
+    class _FakeComm:
+        def Get_rank(self) -> int:
+            return 0
+
+        def Get_size(self) -> int:
+            return 1
+
+        def Barrier(self) -> None:
+            pass
+
+    mpi4py_mod.MPI = types.SimpleNamespace(COMM_WORLD=_FakeComm())
+    sys.modules.setdefault("mpi4py", mpi4py_mod)
+
+    comp_mod = types.ModuleType("compression.evalkit.posterior_compression")
+    comp_mod.compute_compression_surrogate = lambda *a, **kw: None
+    comp_mod.compute_compression_surrogate_batch = lambda *a, **kw: None
+    sys.modules.setdefault("compression.evalkit.posterior_compression", comp_mod)
+
+    ind_mod = types.ModuleType("indentation.evalkit.posterior_indentation")
+    ind_mod.compute_indentation_surrogate = lambda *a, **kw: None
+    ind_mod.compute_indentation_surrogate_batch = lambda *a, **kw: None
+    sys.modules.setdefault("indentation.evalkit.posterior_indentation", ind_mod)
+
     module_path = repo_root / "inference" / "scripts" / "run_phase_3b.py"
     key = "mesouq_test_phase3b_driver"
-    if key in sys.modules:
-        return sys.modules[key]
     spec = importlib.util.spec_from_file_location(key, module_path)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[key] = mod

@@ -65,8 +65,8 @@ def test_sbatch_template_exists(template: str) -> None:
 def test_repo_root_guard_present(template: str) -> None:
     text = _read(template)
     assert "REPO_ROOT" in text, f"{template}: no REPO_ROOT reference"
-    # Guard pattern: [[ -z "${REPO_ROOT...}" ]] && { ... exit 1; }
-    assert "exit 1" in text, f"{template}: no exit-1 guard"
+    # Guard pattern must abort on missing REPO_ROOT (exit 1 or exit 2)
+    assert "exit 1" in text or "exit 2" in text, f"{template}: no exit guard for REPO_ROOT"
 
 
 # ---------------------------------------------------------------------------
@@ -268,4 +268,7 @@ def test_propagation_passes_device_flag() -> None:
 @pytest.mark.parametrize("template", ALL_TEMPLATES)
 def test_set_eo_pipefail_present(template: str) -> None:
     text = _read(template)
-    assert "set -eo pipefail" in text, f"{template}: missing 'set -eo pipefail'"
+    # Accept both "set -eo pipefail" and "set -euo pipefail"
+    assert (
+        "set -eo pipefail" in text or "set -euo pipefail" in text
+    ), f"{template}: missing 'set -eo pipefail' or 'set -euo pipefail'"

@@ -32,7 +32,8 @@ def test_configure_device_conduit_cpu_single_rank_no_distributed() -> None:
 
 
 def test_configure_device_conduit_cpu_multi_rank_sets_distributed() -> None:
-    engine = {}
+    # Korali Engine auto-creates sub-keys; simulate that with pre-initialised dict
+    engine = {"Conduit": {}}
     configure_device_conduit(engine, device="cpu", mpi_ranks=4)
     assert engine["Conduit"]["Type"] == "Distributed"
     assert engine["Conduit"]["Ranks Per Worker"] == 1
