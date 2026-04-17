@@ -93,8 +93,22 @@ For Vega-first operation, the repo now also ships split helpers under `scripts/v
 - `run_propagation.py`
 - `extract_map.py`
 - `sbatch/*.sbatch`
+- `sbatch/production/complete_*.sbatch` (production multi-node orchestration)
+- `sbatch/production/phase*.sbatch` (child per-phase jobs used by complete scripts)
 
 These helpers expose experiment, model family, run profile, and stage explicitly so the operator surface does not overload the word `reduced`.
+
+The production complete scripts orchestrate:
+1. Phase 1 on GPU
+2. Phase 2 on CPU MPI ranks
+3. Phase 3b on exclusive GPU
+4. Propagation phase 3b on CPU (`--mem=4000`)
+
+Default production lanes:
+- `scripts/vega/sbatch/production/complete_inference_compression.sbatch`
+- `scripts/vega/sbatch/production/complete_inference_indentation.sbatch`
+- `scripts/vega/sbatch/production/complete_reduced_compression.sbatch`
+- `scripts/vega/sbatch/production/complete_reduced_indentation.sbatch`
 
 ## 8. Vendored Korali patch surface
 

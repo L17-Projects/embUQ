@@ -98,6 +98,16 @@ The following canned templates live under `scripts/vega/sbatch/`:
 - `workflow_propagation.sbatch`
 - `workflow_map.sbatch`
 - `validation_matrix.sbatch`
+- `production/complete_inference_compression.sbatch`
+- `production/complete_inference_indentation.sbatch`
+- `production/complete_reduced_compression.sbatch`
+- `production/complete_reduced_indentation.sbatch`
+- `production/phase1_gpu.sbatch`
+- `production/phase2_cpu.sbatch`
+- `production/phase3b_gpu.sbatch`
+- `production/propagation_phase3b.sbatch`
+- `production/validation_phase1_to_3b.sbatch`
+- `production/validation_propagation.sbatch`
 
 They assume:
 
@@ -107,6 +117,20 @@ They assume:
 
 Each template exposes `EXPERIMENT`, `MODEL_FAMILY`, and `PROFILE` at the shell-variable level so fresh-clone workflow jobs do not rely on editing Python code or guessing config paths.
 
-These checked-in templates target the Vega `dev` partition. Their time limits are capped to stay within the `dev` maximum wall clock.
+Top-level templates target the Vega `dev` partition for smoke/acceptance usage.
+The `production/complete_*` templates orchestrate multi-node production lanes by submitting child
+phase jobs (`phase1 -> phase2 -> phase3b -> propagation phase3b`) with explicit partition and memory
+settings.
+
+The production complete scripts require passing `REPO_ROOT` at submission time:
+
+```bash
+REPO_ROOT=$(pwd) sbatch scripts/vega/sbatch/production/complete_reduced_compression.sbatch
+```
+
+Useful production overrides:
+- `GPU_PARTITION=dev` to run GPU phases on `dev`
+- `PHASE3B_MEM_ARG="--mem=8000"` when `--exclusive` is too strict on `dev`
+- `RUN_TAG=<tag>` to control output/log folder naming
 
 When submitting with `sbatch`, run them from the repo root or set `REPO_ROOT` explicitly so the batch job can resolve the clone-local `_vega/` runtime correctly.
