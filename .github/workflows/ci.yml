@@ -51,8 +51,11 @@ jobs:
           exit $test_status
 
       - name: Preserve head coverage report
-        if: always() && hashFiles('coverage.json') != ''
-        run: cp coverage.json coverage-head.json
+        if: always()
+        shell: bash
+        run: |
+          test -f coverage.json
+          cp coverage.json coverage-head.json
 
       - name: Compute base branch coverage
         if: success() && github.event_name == 'pull_request'
@@ -60,20 +63,24 @@ jobs:
         run: |
           set -euo pipefail
           worktree_dir="../base-coverage-${{ github.run_id }}-${{ github.run_attempt }}"
-          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
-          git worktree add "$worktree_dir" "origin/${{ github.base_ref }}"
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          git fetch --no-tags --depth=1 origin "$base_sha"
+          git worktree add "$worktree_dir" "$base_sha"
           pushd "$worktree_dir"
           pip install -e ".[test]"
           python -m coverage run -m pytest
           python -m coverage json -o coverage-base.json
           popd
+          test -f "$worktree_dir/coverage-base.json"
           cp "$worktree_dir/coverage-base.json" coverage-base.json
           git worktree remove "$worktree_dir" --force
 
       - name: Enforce strict coverage increase
-        if: always() && github.event_name == 'pull_request' && hashFiles('coverage-head.json') != '' && hashFiles('coverage-base.json') != ''
+        if: success() && github.event_name == 'pull_request'
         shell: bash
         run: |
+          test -f coverage-head.json
+          test -f coverage-base.json
           python scripts/ci/check_coverage_increase.py \
             --base-json coverage-base.json \
             --head-json coverage-head.json \

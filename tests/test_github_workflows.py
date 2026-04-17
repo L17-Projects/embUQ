@@ -4,11 +4,7 @@ import yaml
 
 UPLOAD_ARTIFACT_SHA = "actions/upload-artifact@" "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
 CODECOV_ACTION_SHA = "codecov/codecov-action@" "57e3a136b779b570ffcdbf80b3bdc90e7fab3de2"
-COVERAGE_DELTA_IF = (
-    "always() && github.event_name == 'pull_request' "
-    "&& hashFiles('coverage-head.json') != '' "
-    "&& hashFiles('coverage-base.json') != ''"
-)
+COVERAGE_DELTA_IF = "success() && github.event_name == 'pull_request'"
 
 
 def _load_workflow(name: str):
@@ -54,7 +50,14 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     package_steps = workflow["jobs"]["package-and-tests"]["steps"]
     coverage_upload = _step_by_name(package_steps, "Upload coverage artifacts")
     codecov_upload = _step_by_name(package_steps, "Upload coverage to Codecov")
+    preserve_head = _step_by_name(package_steps, "Preserve head coverage report")
+    compute_base = _step_by_name(package_steps, "Compute base branch coverage")
     coverage_delta = _step_by_name(package_steps, "Enforce strict coverage increase")
+    assert preserve_head["if"] == "always()"
+    assert "test -f coverage.json" in preserve_head["run"]
+    assert compute_base["if"] == "success() && github.event_name == 'pull_request'"
+    assert "${{ github.event.pull_request.base.sha }}" in compute_base["run"]
+    assert "${{ github.base_ref }}" not in compute_base["run"]
     assert coverage_upload["if"] == "always()"
     assert coverage_upload["uses"] == UPLOAD_ARTIFACT_SHA
     assert coverage_upload["with"]["name"] == "coverage-report"
@@ -63,6 +66,8 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     assert "coverage-base.json" in coverage_upload["with"]["path"]
     assert "coverage-delta.md" in coverage_upload["with"]["path"]
     assert coverage_delta["if"] == COVERAGE_DELTA_IF
+    assert "test -f coverage-head.json" in coverage_delta["run"]
+    assert "test -f coverage-base.json" in coverage_delta["run"]
     assert "check_coverage_increase.py" in coverage_delta["run"]
     assert codecov_upload["uses"] == CODECOV_ACTION_SHA
     assert codecov_upload["with"]["token"] == "${{ secrets.CODECOV_TOKEN }}"
