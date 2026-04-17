@@ -132,7 +132,6 @@ def test_build_inference_command_phase1_cpu_multi_rank_device_flag() -> None:
         config_path=resolve_workflow_config_path(repo_root, selection),
         output_root=resolve_workflow_output_root(repo_root, selection),
         device="cpu",
-        cpu_ranks=None,
     )
 
     assert "mpirun" in command
