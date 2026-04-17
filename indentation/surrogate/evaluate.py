@@ -20,6 +20,13 @@ def _append_jsonl(path: str, payload: str) -> None:
         handle.write("\n")
 
 
+def _resolve_torch_device(device: str) -> torch.device:
+    normalized = device.strip().lower()
+    if normalized == "gpu":
+        normalized = "cuda"
+    return torch.device(normalized)
+
+
 class Surrogate:
     def __init__(self, base_dir: str, device: str = "cpu") -> None:
         model_path = None
@@ -39,7 +46,7 @@ class Surrogate:
         self.xscale = np.array(self.xscale)
         self.yshift = np.array(self.yshift)
         self.yscale = np.array(self.yscale)
-        self.device = torch.device(device)
+        self.device = _resolve_torch_device(device)
         if hasattr(self.model, "to"):
             self.model = self.model.to(self.device)
         if hasattr(self.model, "eval"):
