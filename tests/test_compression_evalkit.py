@@ -56,7 +56,9 @@ def test_generate_compression_data_skips_initial_rows(tmp_path: Path):
     assert np.allclose(interpolated[:, 1], [4.0, 5.0, 6.0, 7.0])
 
 
-def test_convert_to_dpd_units_writes_expected_reference_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_convert_to_dpd_units_writes_expected_reference_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     init_root = tmp_path / "_init_compression_2.1um"
     param_file = init_root / "parameter" / "parameters-default00001.yaml"
     _write_compression_params(param_file)
@@ -86,3 +88,64 @@ def test_convert_to_force_from_dpd_units_uses_explicit_template(tmp_path: Path):
 def test_prepare_compression_rejects_unknown_diameter():
     with pytest.raises(ValueError, match="No data file mapped"):
         tools.prepareCompression(9.9)
+
+
+def test_prepare_compression_with_mocked_pipeline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    project_root = tmp_path / "project"
+    source_dir = project_root / "compression" / "src"
+    data_dir = project_root / "compression" / "evalkit" / "data"
+    source_dir.mkdir(parents=True)
+    data_dir.mkdir(parents=True)
+    (data_dir / "data_1.csv").write_text(
+        "# h1\n# h2\n# h3\n0.1,1.0\n0.2,2.0\n0.3,3.0\n0.4,4.0\n",
+        encoding="utf-8",
+    )
+
+    (source_dir / "generate.py").write_text(
+        "def generate_sim(**kwargs):\n    return None\n",
+        encoding="utf-8",
+    )
+    (source_dir / "parameters.py").write_text(
+        "from pathlib import Path\n"
+        "import yaml\n"
+        "def write_parameters(source_path, simu_path, simnum):\n"
+        "    path = Path(simu_path) / 'parameter' / f'parameters-default{simnum}.yaml'\n"
+        "    path.parent.mkdir(parents=True, exist_ok=True)\n"
+        "    path.write_text(yaml.dump({'ul': 1.0e-7}), encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+
+    called = {"interp": False, "convert": False}
+    monkeypatch.chdir(project_root)
+    monkeypatch.setattr(tools.os, "system", lambda cmd: 0)
+    monkeypatch.setattr(
+        tools,
+        "generateCompressionData",
+        lambda data_file, init_path: called.__setitem__("interp", True),
+    )
+    monkeypatch.setattr(
+        tools,
+        "convertToDPDUnits",
+        lambda data_file, init_path, diameter: called.__setitem__("convert", True),
+    )
+
+    tools.prepareCompression(2.1)
+
+    params = yaml.safe_load(
+        (
+            project_root / "_init_compression_2.1um" / "parameter" / "parameters-default00001.yaml"
+        ).read_text(encoding="utf-8")
+    )
+    assert params["radp"] == pytest.approx(10.5)
+    assert params["Lx"] == pytest.approx(26.0)
+    assert called["interp"] is True
+    assert called["convert"] is True
+
+
+def test_prepare_compression_raises_when_project_root_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(tools, "__file__", str(tmp_path / "compression" / "evalkit" / "tools.py"))
+    with pytest.raises(RuntimeError, match="Could not find project root"):
+        tools.prepareCompression(2.1)

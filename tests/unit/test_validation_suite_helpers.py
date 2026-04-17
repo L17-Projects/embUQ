@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -209,3 +210,67 @@ def test_write_derived_config_no_population_keeps_original(tmp_path: Path) -> No
 
     result = mod._write_derived_config(base, output, population_size=None)
     assert result["pop_size"] == 1000
+
+
+def test_main_writes_suite_summary_and_applies_config_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mod = _load_module()
+    output_root = tmp_path / "suite"
+    override = tmp_path / "override.yaml"
+    override.write_text("pop_size: 12\n", encoding="utf-8")
+    captured = {}
+
+    def _fake_run_workflow(**kwargs):
+        captured["kwargs"] = kwargs
+        return {
+            "workflow": "compression__full-model__validation",
+            "workflow_base_name": "compression:full-model:validation",
+            "elapsed_seconds": 0.1,
+            "step_timings": [],
+        }
+
+    monkeypatch.setattr(mod, "run_workflow", _fake_run_workflow)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_validation_suite.py",
+            "--workflows",
+            "compression:full-model:validation",
+            "--output-root",
+            str(output_root),
+            "--config-override",
+            f"compression:full-model:validation={override}",
+        ],
+    )
+
+    rc = mod.main()
+    assert rc == 0
+    assert captured["kwargs"]["workflow_spec"]["config"] == override
+    summary_file = output_root / "workflow_suite_summary.json"
+    assert summary_file.exists()
+    payload = json.loads(summary_file.read_text(encoding="utf-8"))
+    assert payload[0]["workflow_base_name"] == "compression:full-model:validation"
+
+
+def test_main_rejects_invalid_config_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mod = _load_module()
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_validation_suite.py",
+            "--workflows",
+            "compression:full-model:validation",
+            "--output-root",
+            str(tmp_path),
+            "--config-override",
+            "bad-format-without-equals",
+        ],
+    )
+
+    with pytest.raises(ValueError, match="Invalid --config-override"):
+        mod.main()
