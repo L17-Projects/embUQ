@@ -2,7 +2,9 @@ from pathlib import Path
 
 import yaml
 
-UPLOAD_ARTIFACT_SHA = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+UPLOAD_ARTIFACT_SHA = "actions/upload-artifact@" "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+CODECOV_ACTION_SHA = "codecov/codecov-action@" "57e3a136b779b570ffcdbf80b3bdc90e7fab3de2"
+COVERAGE_DELTA_IF = "success() && github.event_name == 'pull_request'"
 
 
 def _load_workflow(name: str):
@@ -18,6 +20,10 @@ def _uses_by_step(workflow):
             if "uses" in step:
                 mapping[step["name"]] = step["uses"]
     return mapping
+
+
+def _step_by_name(steps, step_name: str):
+    return next(step for step in steps if step["name"] == step_name)
 
 
 def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
@@ -42,19 +48,28 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
         assert workflow["jobs"][job_name]["timeout-minutes"] == timeout
 
     package_steps = workflow["jobs"]["package-and-tests"]["steps"]
-    coverage_upload = next(
-        step for step in package_steps if step["name"] == "Upload coverage artifacts"
-    )
-    codecov_upload = next(
-        step for step in package_steps if step["name"] == "Upload coverage to Codecov"
-    )
+    coverage_upload = _step_by_name(package_steps, "Upload coverage artifacts")
+    codecov_upload = _step_by_name(package_steps, "Upload coverage to Codecov")
+    preserve_head = _step_by_name(package_steps, "Preserve head coverage report")
+    compute_base = _step_by_name(package_steps, "Compute base branch coverage")
+    coverage_delta = _step_by_name(package_steps, "Enforce strict coverage increase")
+    assert preserve_head["if"] == "always()"
+    assert "test -f coverage.json" in preserve_head["run"]
+    assert compute_base["if"] == "success() && github.event_name == 'pull_request'"
+    assert "${{ github.event.pull_request.base.sha }}" in compute_base["run"]
+    assert "${{ github.base_ref }}" not in compute_base["run"]
     assert coverage_upload["if"] == "always()"
     assert coverage_upload["uses"] == UPLOAD_ARTIFACT_SHA
     assert coverage_upload["with"]["name"] == "coverage-report"
     assert coverage_upload["with"]["retention-days"] == 14
-    assert (
-        codecov_upload["uses"] == "codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2"
-    )
+    assert "coverage-head.json" in coverage_upload["with"]["path"]
+    assert "coverage-base.json" in coverage_upload["with"]["path"]
+    assert "coverage-delta.md" in coverage_upload["with"]["path"]
+    assert coverage_delta["if"] == COVERAGE_DELTA_IF
+    assert "test -f coverage-head.json" in coverage_delta["run"]
+    assert "test -f coverage-base.json" in coverage_delta["run"]
+    assert "check_coverage_increase.py" in coverage_delta["run"]
+    assert codecov_upload["uses"] == CODECOV_ACTION_SHA
     assert codecov_upload["with"]["token"] == "${{ secrets.CODECOV_TOKEN }}"
     assert codecov_upload["with"]["use_oidc"] == "${{ secrets.CODECOV_TOKEN == '' }}"
     assert codecov_upload["with"]["slug"] == "BrieucB/MesoUQ"
@@ -64,12 +79,8 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     assert codecov_upload["with"]["fail_ci_if_error"] is False
 
     workflow_steps = workflow["jobs"]["workflow-canary"]["steps"]
-    workflow_summary = next(
-        step for step in workflow_steps if step["name"] == "Summarize workflow canary outputs"
-    )
-    workflow_upload = next(
-        step for step in workflow_steps if step["name"] == "Upload workflow canary artifacts"
-    )
+    workflow_summary = _step_by_name(workflow_steps, "Summarize workflow canary outputs")
+    workflow_upload = _step_by_name(workflow_steps, "Upload workflow canary artifacts")
     assert workflow_summary["if"] == "always()"
     assert workflow_upload["if"] == "always()"
     assert workflow_upload["uses"] == UPLOAD_ARTIFACT_SHA
@@ -77,9 +88,7 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     assert workflow_upload["with"]["retention-days"] == 14
 
     retraining_steps = workflow["jobs"]["retraining-canary"]["steps"]
-    retraining_upload = next(
-        step for step in retraining_steps if step["name"] == "Upload retraining canary artifacts"
-    )
+    retraining_upload = _step_by_name(retraining_steps, "Upload retraining canary artifacts")
     assert retraining_upload["if"] == "always()"
     assert retraining_upload["uses"] == UPLOAD_ARTIFACT_SHA
     assert retraining_upload["with"]["path"] == "_ci/surrogate_retraining"
@@ -91,7 +100,7 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
         "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
         "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
         UPLOAD_ARTIFACT_SHA,
-        "codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2",
+        CODECOV_ACTION_SHA,
     }
 
 
@@ -105,9 +114,7 @@ def test_release_smoke_workflow_has_concurrency_timeouts_and_dist_artifact():
     assert workflow["jobs"]["docs-link-check"]["timeout-minutes"] == 5
 
     release_steps = workflow["jobs"]["release-smoke"]["steps"]
-    release_upload = next(
-        step for step in release_steps if step["name"] == "Upload release smoke dist artifacts"
-    )
+    release_upload = _step_by_name(release_steps, "Upload release smoke dist artifacts")
     assert release_upload["if"] == "always()"
     assert release_upload["uses"] == UPLOAD_ARTIFACT_SHA
     assert release_upload["with"]["path"] == "dist"
