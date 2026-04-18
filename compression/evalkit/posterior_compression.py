@@ -19,7 +19,11 @@ here = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(here, "../.."))
 sys.path.insert(0, os.path.join(here, "../../src"))
 
-from meso_uq.workflow_acceleration import expand_parameter_vector, get_fixed_parameters
+from meso_uq.workflow_acceleration import (
+    expand_parameter_vector,
+    expand_reduced_parameters,
+    get_fixed_parameters,
+)
 
 _CONFIG_CACHE: Dict[str, Dict[str, Any]] = {}
 _SURROGATE_CACHE: Dict[Tuple[str, float, str], Any] = {}
@@ -123,6 +127,8 @@ def compute_compression_surrogate_batch(
 ) -> None:
     """Batch surrogate evaluation for GPU-batch TMCMC."""
     project_root = _resolve_project_root()
+    config = _load_config(project_root)
+    fixed_params = get_fixed_parameters(config)
     batch_params = np.asarray(sample["Batch Parameters"], dtype=np.float32)
     if batch_params.ndim != 2:
         raise ValueError(f"Expected 2D batch params, got {batch_params.shape}")
@@ -132,8 +138,11 @@ def compute_compression_surrogate_batch(
         theta = batch_params[:, :6]
         d0 = np.zeros(batch_params.shape[0], dtype=np.float32)
         sigma = batch_params[:, 6]
+    elif batch_params.shape[1] == 4:
+        expanded = expand_reduced_parameters(batch_params, fixed_params=fixed_params or None)
+        theta, d0, sigma = expanded[:, :6], expanded[:, 6], expanded[:, 7]
     else:
-        raise ValueError(f"Expected 7 or 8 params, got {batch_params.shape[1]}")
+        raise ValueError(f"Expected 4, 7, or 8 params, got {batch_params.shape[1]}")
     surrogate = _get_surrogate(project_root, diameter_um, device=device)
     forces = surrogate.evaluate_compression_batch(
         theta, disp=displ, d0=d0, chunk_size=particle_batch_size

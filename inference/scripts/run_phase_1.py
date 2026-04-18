@@ -234,6 +234,11 @@ def run_inference(
                             s, pts, d, device=dev
                         )
                     )
+                    e["Problem"]["Computational Model"] = (
+                        lambda sampleData, d=diameter_um, model=compute_model, pts=reference_points: model(
+                            sampleData, pts, d
+                        )
+                    )
                 else:
                     e["Problem"]["Computational Model"] = (
                         lambda sampleData, d=diameter_um, model=compute_model, pts=reference_points: model(
@@ -290,6 +295,11 @@ def run_inference(
                     e["Problem"]["Batch Computational Model"] = (
                         lambda s, d=diameter_um, pts=reference_points, dev=device, fn=batch_fn: fn(
                             s, pts, d, device=dev
+                        )
+                    )
+                    e["Problem"]["Computational Model"] = (
+                        lambda sampleData, d=diameter_um, model=compute_model, pts=reference_points: model(
+                            sampleData, pts, d
                         )
                     )
                 else:
