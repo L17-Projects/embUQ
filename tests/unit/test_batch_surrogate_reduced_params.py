@@ -1,6 +1,14 @@
 from __future__ import annotations
 
+import sys
+import types
+
 import numpy as np
+
+sys.modules.setdefault("korali", types.ModuleType("korali"))
+_mpi4py_mod = types.ModuleType("mpi4py")
+_mpi4py_mod.MPI = types.SimpleNamespace(COMM_WORLD=types.SimpleNamespace())
+sys.modules.setdefault("mpi4py", _mpi4py_mod)
 
 from compression.evalkit import posterior_compression
 from indentation.evalkit import posterior_indentation
