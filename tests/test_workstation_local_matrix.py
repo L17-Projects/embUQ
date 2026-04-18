@@ -2,6 +2,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 
 def _load_module(path: Path, name: str):
     spec = importlib.util.spec_from_file_location(name, path)
@@ -103,3 +105,229 @@ def test_local_workstation_runner_invokes_matrix_with_gpu_devices_and_writes_rep
     assert report["compatibility_warnings"] == []
     assert report["runtime_notes"] == ["note"]
     assert not report["missing_outputs"]
+
+
+def test_prepend_pythonpath_handles_empty_duplicate_and_prepend(monkeypatch, tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        "run_local_validation_matrix_prepend",
+    )
+
+    env = {}
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+
+    module._prepend_pythonpath(env, first)
+    assert env["PYTHONPATH"] == str(first)
+
+    module._prepend_pythonpath(env, first)
+    assert env["PYTHONPATH"] == str(first)
+
+    module._prepend_pythonpath(env, second)
+    assert env["PYTHONPATH"] == f"{second}:{first}"
+
+
+def test_resolve_selections_supports_explicit_and_all_lanes(monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        "run_local_validation_matrix_resolve",
+    )
+
+    explicit = module._resolve_selections(["compression:full-model:validation"], all_lanes=False)
+    assert len(explicit) == 1
+    assert explicit[0].experiment == "compression"
+
+    expanded = module._resolve_selections([], all_lanes=True)
+    assert len(expanded) == 4
+
+
+def test_resolve_selections_rejects_non_validation_profile():
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        "run_local_validation_matrix_non_validation",
+    )
+
+    with pytest.raises(ValueError):
+        module._resolve_selections(["compression:full-model:production"], all_lanes=False)
+
+
+def test_build_runtime_env_handles_probe_outcomes(monkeypatch, tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        "run_local_validation_matrix_runtime_env",
+    )
+
+    monkeypatch.setattr(module, "_discover_repo_local_korali_site", lambda: tmp_path / "korali")
+    monkeypatch.setattr(module, "_probe_korali_engine", lambda python_bin, env: (True, ""))
+    env_ok, notes_ok = module._build_runtime_env("python")
+    assert "Using repo-local Korali runtime path" in notes_ok[0]
+    assert str(tmp_path / "korali") in env_ok.get("PYTHONPATH", "")
+
+    monkeypatch.setattr(module, "_discover_repo_local_korali_site", lambda: None)
+    monkeypatch.setattr(
+        module,
+        "_probe_korali_engine",
+        lambda python_bin, env: (False, "plain failure"),
+    )
+    env_fail, notes_fail = module._build_runtime_env("python")
+    assert any(
+        "not found under _vega/korali/install/lib/python*/site-packages" in note
+        for note in notes_fail
+    )
+    assert any(
+        "Korali probe failed before workflow run: plain failure" in note for note in notes_fail
+    )
+    assert isinstance(env_fail, dict)
+
+
+def test_build_runtime_env_retries_user_site_on_mpi4py_error(monkeypatch, tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        "run_local_validation_matrix_runtime_retry",
+    )
+
+    user_site = tmp_path / "user-site"
+    user_site.mkdir(parents=True)
+    monkeypatch.setattr(module, "_discover_repo_local_korali_site", lambda: None)
+    monkeypatch.setattr(module.site, "getusersitepackages", lambda: str(user_site))
+
+    calls = {"count": 0}
+
+    def _probe(python_bin, env):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return False, "Could not load mpi4py API."
+        return True, ""
+
+    monkeypatch.setattr(module, "_probe_korali_engine", _probe)
+    env, notes = module._build_runtime_env("python")
+    assert calls["count"] == 2
+    assert str(user_site) in env.get("PYTHONPATH", "")
+    assert any("Prepended user-site packages" in note for note in notes)
+
+
+def test_derive_validation_smoke_config_rejects_non_mapping_yaml(monkeypatch, tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        "run_local_validation_matrix_bad_yaml",
+    )
+
+    bad_config = tmp_path / "bad.yaml"
+    bad_config.write_text("- not-a-mapping\n", encoding="utf-8")
+    monkeypatch.setattr(
+        module, "resolve_workflow_config_path", lambda repo_root, selection: bad_config
+    )
+
+    selection = module.parse_selection("compression:full-model:validation")
+    with pytest.raises(ValueError):
+        module._derive_validation_smoke_config(selection, tmp_path / "out", {"pop_size": 8})
+
+
+def test_collect_and_validate_overlay_paths_reports_missing(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        "run_local_validation_matrix_overlays",
+    )
+
+    overlays = module._collect_overlay_paths(
+        {
+            "compression:full-model:validation": {
+                "datasets": {
+                    "compression_2.1um": {
+                        "propagation_phase3b": {"plot": str(tmp_path / "missing_prop.png")},
+                        "map_phase3b": {},
+                    }
+                }
+            }
+        }
+    )
+    missing = module._validate_overlay_outputs(overlays)
+    assert any("missing map_vs_reference overlays" in entry for entry in missing)
+    assert any("missing file" in entry for entry in missing)
+
+
+def test_main_rejects_invalid_phase2_cpu_ranks(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        "run_local_validation_matrix_invalid_ranks",
+    )
+
+    with pytest.raises(ValueError):
+        module.main(["--output-root", str(tmp_path / "out"), "--phase2-cpu-ranks", "0"])
+
+
+def test_main_returns_matrix_returncode_on_subprocess_failure(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        "run_local_validation_matrix_subprocess_fail",
+    )
+
+    monkeypatch.setattr(
+        module, "_build_runtime_env", lambda _python_bin: ({"PYTHONPATH": "x"}, ["note"])
+    )
+    monkeypatch.setattr(module, "render_production_sanity_plots", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        module.subprocess,
+        "run",
+        lambda *args, **kwargs: _Result(returncode=7, stdout="bad", stderr="fail"),
+    )
+
+    rc = module.main(
+        [
+            "--output-root",
+            str(tmp_path / "o369_fail"),
+            "--python-bin",
+            "python",
+            "--selection",
+            "compression:full-model:validation",
+        ]
+    )
+    assert rc == 7
+
+
+def test_main_returns_one_when_overlays_are_missing(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        "run_local_validation_matrix_missing_outputs",
+    )
+
+    monkeypatch.setattr(
+        module, "_build_runtime_env", lambda _python_bin: ({"PYTHONPATH": "x"}, ["note"])
+    )
+    monkeypatch.setattr(module.subprocess, "run", lambda *args, **kwargs: _Result(returncode=0))
+    monkeypatch.setattr(
+        module,
+        "render_production_sanity_plots",
+        lambda *args, **kwargs: {
+            "compression:full-model:validation": {
+                "datasets": {
+                    "compression_2.1um": {
+                        "propagation_phase3b": {},
+                        "map_phase3b": {},
+                    }
+                }
+            }
+        },
+    )
+
+    rc = module.main(
+        [
+            "--output-root",
+            str(tmp_path / "o369_missing"),
+            "--python-bin",
+            "python",
+            "--selection",
+            "compression:full-model:validation",
+        ]
+    )
+    assert rc == 1
