@@ -7,7 +7,20 @@ import numpy as np
 
 sys.modules.setdefault("korali", types.ModuleType("korali"))
 _mpi4py_mod = types.ModuleType("mpi4py")
-_mpi4py_mod.MPI = types.SimpleNamespace(COMM_WORLD=types.SimpleNamespace())
+
+
+class _FakeComm:
+    def Get_rank(self) -> int:
+        return 0
+
+    def Get_size(self) -> int:
+        return 1
+
+    def Barrier(self) -> None:
+        return None
+
+
+_mpi4py_mod.MPI = types.SimpleNamespace(COMM_WORLD=_FakeComm())
 sys.modules.setdefault("mpi4py", _mpi4py_mod)
 
 from compression.evalkit import posterior_compression
