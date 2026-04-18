@@ -41,6 +41,14 @@ class _ModelWithTorchHooks:
         return inputs[:, -1:].clone()
 
 
+def test_compression_resolve_torch_device_maps_gpu_alias_to_cuda() -> None:
+    assert compression_evaluate._resolve_torch_device("gpu").type == "cuda"
+
+
+def test_indentation_resolve_torch_device_maps_gpu_alias_to_cuda() -> None:
+    assert indentation_evaluate._resolve_torch_device("gpu").type == "cuda"
+
+
 def test_compression_surrogate_evaluates_and_clips_negative_values(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

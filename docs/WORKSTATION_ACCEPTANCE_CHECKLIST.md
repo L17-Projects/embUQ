@@ -72,6 +72,20 @@ The required step names are:
 - `phase3b_gpu_batched`
 - `map_extraction_and_plotting`
 
+## Phase backend contract
+
+- **Phase 1**: GPU-batched surrogate (Sequential Korali conduit) when `--device gpu`.
+- **Phase 2**: **CPU-MPI only.** No native-CUDA Phase 2 is validated for this release line.
+- **Phase 3b**: GPU-batched surrogate (Sequential Korali conduit) when `--device gpu`.
+- **Propagation**: GPU surrogate where applicable.
+
+## Low-load guidance
+
+- Use **at most 9 CPUs** for Phase 2 MPI workers.
+- Keep **>2 GB RAM free** at all times during a run.
+- Do not run competing compilation or large data-transfer jobs concurrently.
+- Use validation-profile configs (reduced cost), not production configs, for acceptance runs.
+
 ## Practical guidance
 
 - Prefer the shipped validation configs or explicit reduced-cost overrides over ad hoc unpublished settings.
