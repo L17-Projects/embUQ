@@ -6,11 +6,14 @@ from meso_uq.workflow_acceleration import (
     active_variable_names,
     configure_device_conduit,
     configure_gpu_batch_sub_experiment,
+    configure_korali_conduit,
     expand_parameter_vector,
     expand_reduced_parameters,
     get_fixed_parameters,
     phase1_prior_specs,
     phase2_hyperprior_specs,
+    require_single_rank,
+    to_korali_path,
 )
 
 
@@ -122,3 +125,43 @@ def test_configure_gpu_batch_sub_experiment_sets_required_problem_keys() -> None
 def test_expand_reduced_parameters_rejects_invalid_shape() -> None:
     with pytest.raises(ValueError, match="Expected reduced parameter array of shape"):
         expand_reduced_parameters(np.ones((2, 3), dtype=np.float32))
+
+
+def test_require_single_rank_accepts_single_rank_comm() -> None:
+    class _Comm:
+        @staticmethod
+        def Get_size() -> int:
+            return 1
+
+    require_single_rank(_Comm(), context="phase")
+
+
+def test_require_single_rank_rejects_multi_rank_comm() -> None:
+    class _Comm:
+        @staticmethod
+        def Get_size() -> int:
+            return 2
+
+    with pytest.raises(ValueError, match="requires a single MPI rank"):
+        require_single_rank(_Comm(), context="phase")
+
+
+def test_configure_korali_conduit_handles_single_and_multi_rank() -> None:
+    single = {"Conduit": {}}
+    configure_korali_conduit(single, mpi_ranks=1)
+    assert "Conduit" not in single
+
+    multi = {}
+    configure_korali_conduit(multi, mpi_ranks=4, ranks_per_worker=2)
+    assert multi["Conduit"]["Type"] == "Distributed"
+    assert multi["Conduit"]["Ranks Per Worker"] == 2
+
+
+def test_to_korali_path_handles_relative_and_value_error_fallback(monkeypatch) -> None:
+    assert to_korali_path("relative/path") == "relative/path"
+
+    monkeypatch.setattr(
+        "meso_uq.workflow_acceleration.os.path.relpath",
+        lambda *_a, **_k: (_ for _ in ()).throw(ValueError("x")),
+    )
+    assert to_korali_path("/abs/path", base_dir="/abs") == "/abs/path"
