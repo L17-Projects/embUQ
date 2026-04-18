@@ -65,6 +65,12 @@ def validate_report(report: dict[str, Any], check_files: bool = True) -> list[st
         return errors
 
     for sel in selections:
+        if not isinstance(sel, str):
+            errors.append(
+                "selection entries must be strings in experiment:model-family:profile form; "
+                f"got {type(sel).__name__}"
+            )
+            continue
         if sel not in overlays:
             errors.append(f"selection '{sel}' missing from overlays")
             continue
@@ -115,9 +121,12 @@ def main(argv: list[str] | None = None) -> int:
 
     status = report.get("status", "unknown")
     selections = report.get("selections", [])
+    selection_text = (
+        ", ".join(str(selection) for selection in selections) if selections else "(none)"
+    )
     print(f"Report:     {args.report}")
     print(f"Status:     {status}")
-    print(f"Selections: {', '.join(selections) if selections else '(none)'}")
+    print(f"Selections: {selection_text}")
 
     if errors:
         print(f"\nValidation FAILED ({len(errors)} error(s)):")

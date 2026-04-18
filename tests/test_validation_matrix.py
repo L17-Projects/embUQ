@@ -31,7 +31,9 @@ def _selection_dataset(command: list[str]) -> str:
 
 def test_workflow_matrix_runner_writes_machine_readable_report(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
-    module = _load_module(repo_root / "scripts" / "vega" / "run_workflow_matrix.py", "workflow_matrix_test")
+    module = _load_module(
+        repo_root / "scripts" / "vega" / "run_workflow_matrix.py", "workflow_matrix_test"
+    )
 
     def fake_run(command, cwd=None, text=False, capture_output=False, check=False):
         script_name = Path(command[1]).name
@@ -42,7 +44,9 @@ def test_workflow_matrix_runner_writes_machine_readable_report(tmp_path, monkeyp
             stage = _arg_value(command, "--stage")
             manifest_root = output_root / ("map_phase1" if stage == "phase1" else "map_phase3b")
             manifest_root.mkdir(parents=True, exist_ok=True)
-            manifest_name = "phase1_map_manifest.json" if stage == "phase1" else "phase3b_map_manifest.json"
+            manifest_name = (
+                "phase1_map_manifest.json" if stage == "phase1" else "phase3b_map_manifest.json"
+            )
             manifest_path = manifest_root / manifest_name
             manifest_path.write_text(
                 json.dumps(
@@ -56,7 +60,9 @@ def test_workflow_matrix_runner_writes_machine_readable_report(tmp_path, monkeyp
                 ),
                 encoding="utf-8",
             )
-            (manifest_root / f"{dataset_name}.csv").write_text("parameter,value\nYt,1.0\n", encoding="utf-8")
+            (manifest_root / f"{dataset_name}.csv").write_text(
+                "parameter,value\nYt,1.0\n", encoding="utf-8"
+            )
         elif script_name == "run_propagation.py":
             summary_csv = output_root / "propagation_phase3b" / dataset_name / "summary.csv"
             summary_csv.parent.mkdir(parents=True, exist_ok=True)
@@ -109,7 +115,9 @@ def test_workflow_matrix_runner_writes_machine_readable_report(tmp_path, monkeyp
 
 def test_workflow_matrix_runner_accepts_explicit_override_selector(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
-    module = _load_module(repo_root / "scripts" / "vega" / "run_workflow_matrix.py", "workflow_matrix_override_test")
+    module = _load_module(
+        repo_root / "scripts" / "vega" / "run_workflow_matrix.py", "workflow_matrix_override_test"
+    )
 
     def fake_run(command, cwd=None, text=False, capture_output=False, check=False):
         return _Result(0, stdout="ok\n")
@@ -139,9 +147,59 @@ def test_workflow_matrix_runner_accepts_explicit_override_selector(tmp_path, mon
     assert report["selections"][0]["config"] == str(override_path.resolve())
 
 
-def test_validation_matrix_wrapper_delegates_to_workflow_matrix_with_validation_profile(tmp_path, monkeypatch):
+def test_workflow_matrix_forwards_requested_devices(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
-    module = _load_module(repo_root / "scripts" / "vega" / "run_validation_matrix.py", "validation_matrix_wrapper_test")
+    module = _load_module(
+        repo_root / "scripts" / "vega" / "run_workflow_matrix.py", "workflow_matrix_device_test"
+    )
+    captured: list[list[str]] = []
+
+    def fake_run(command, cwd=None, text=False, capture_output=False, check=False):
+        captured.append(command)
+        return _Result(0, stdout="ok\n")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    matrix_root = tmp_path / "matrix"
+    rc = module.main(
+        [
+            "--selection",
+            "compression:full-model:validation",
+            "--output-root",
+            str(matrix_root),
+            "--inference-device",
+            "gpu",
+            "--propagation-device",
+            "gpu",
+            "--skip-phase1-map",
+            "--skip-phase3b-map",
+        ]
+    )
+
+    assert rc == 0
+    phase1_command = next(
+        cmd for cmd in captured if "--stage" in cmd and cmd[cmd.index("--stage") + 1] == "phase1"
+    )
+    phase3b_command = next(
+        cmd for cmd in captured if "--stage" in cmd and cmd[cmd.index("--stage") + 1] == "phase3b"
+    )
+    propagation_command = next(cmd for cmd in captured if Path(cmd[1]).name == "run_propagation.py")
+    assert "--device" in phase1_command
+    assert phase1_command[phase1_command.index("--device") + 1] == "gpu"
+    assert "--device" in phase3b_command
+    assert phase3b_command[phase3b_command.index("--device") + 1] == "gpu"
+    assert "--device" in propagation_command
+    assert propagation_command[propagation_command.index("--device") + 1] == "gpu"
+
+
+def test_validation_matrix_wrapper_delegates_to_workflow_matrix_with_validation_profile(
+    tmp_path, monkeypatch
+):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "vega" / "run_validation_matrix.py",
+        "validation_matrix_wrapper_test",
+    )
     captured = {}
 
     def fake_run(command, cwd=None, check=False):

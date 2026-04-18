@@ -97,6 +97,18 @@ def test_validate_report_selection_missing_from_overlays():
     assert any("missing from overlays" in e for e in errors)
 
 
+def test_validate_report_non_string_selection_is_reported(tmp_path):
+    module = _load_module()
+    report = {
+        "status": "passed",
+        "selections": [{"bad": "value"}],
+        "phase2_backend_contract": "cpu_mpi_only",
+        "overlays": {},
+    }
+    errors = module.validate_report(report, check_files=False)
+    assert any("selection entries must be strings" in error for error in errors)
+
+
 def test_validate_report_no_propagation_plots():
     module = _load_module()
     sel = "compression:full-model:validation"

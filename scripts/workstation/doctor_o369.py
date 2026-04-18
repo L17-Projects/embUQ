@@ -33,6 +33,14 @@ def _tag(level: str, msg: str) -> str:
     return f"[{level}] {msg}"
 
 
+def _path_is_within(candidate: Path, root: Path) -> bool:
+    try:
+        candidate.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
 def check_korali_install() -> tuple[str, str]:
     if KORALI_INSTALL.is_dir():
         return _PASS, f"Korali install dir found: {KORALI_INSTALL}"
@@ -68,13 +76,14 @@ def check_korali_import(python_bin: str = sys.executable) -> tuple[str, str]:
         return _FAIL, f"`import korali` failed: {detail}"
 
     korali_file = result.stdout.strip()
-    expected_prefix = str(KORALI_INSTALL)
-    if korali_file.startswith(expected_prefix):
-        return _PASS, f"korali resolves inside _vega/korali/install: {korali_file}"
+    resolved_korali_path = Path(korali_file).resolve()
+    expected_root = KORALI_INSTALL.resolve()
+    if _path_is_within(resolved_korali_path, expected_root):
+        return _PASS, f"korali resolves inside _vega/korali/install: {resolved_korali_path}"
     return _WARN, (
         f"korali found but NOT under _vega/korali/install.\n"
-        f"  Found:    {korali_file}\n"
-        f"  Expected: {expected_prefix}/..."
+        f"  Found:    {resolved_korali_path}\n"
+        f"  Expected: {expected_root}/..."
     )
 
 

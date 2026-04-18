@@ -105,6 +105,23 @@ def test_check_korali_import_resolves_outside_install(tmp_path, monkeypatch):
     assert "NOT under" in msg
 
 
+def test_check_korali_import_install_backup_path_is_not_treated_as_inside(tmp_path, monkeypatch):
+    module = _load_module()
+    korali_dir = tmp_path / "_vega" / "korali" / "install"
+    monkeypatch.setattr(module, "KORALI_INSTALL", korali_dir)
+
+    fake_result = MagicMock()
+    fake_result.returncode = 0
+    fake_result.stdout = str(tmp_path / "_vega" / "korali" / "install_backup" / "korali.py") + "\n"
+    fake_result.stderr = ""
+
+    with patch("subprocess.run", return_value=fake_result):
+        level, msg = module.check_korali_import(python_bin=sys.executable)
+
+    assert level == "WARN"
+    assert "NOT under" in msg
+
+
 def test_check_korali_import_fails_import(monkeypatch):
     module = _load_module()
     fake_result = MagicMock()

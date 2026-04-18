@@ -55,7 +55,9 @@ def _capture_step(name: str, command: list[str], logs_root: Path) -> dict[str, o
     stdout_path = logs_root / f"{name}.stdout.log"
     stderr_path = logs_root / f"{name}.stderr.log"
     start = time.perf_counter()
-    result = subprocess.run(command, cwd=str(REPO_ROOT), text=True, capture_output=True, check=False)
+    result = subprocess.run(
+        command, cwd=str(REPO_ROOT), text=True, capture_output=True, check=False
+    )
     elapsed = time.perf_counter() - start
     stdout_path.write_text(result.stdout or "", encoding="utf-8")
     stderr_path.write_text(result.stderr or "", encoding="utf-8")
@@ -94,6 +96,8 @@ def _build_selection_commands(
     python_bin: str,
     phase2_cpu_ranks: int,
     config_override: Path | None,
+    inference_device: str,
+    propagation_device: str,
     *,
     skip_phase1_map: bool,
     skip_phase3b_map: bool,
@@ -147,14 +151,23 @@ def _build_selection_commands(
     ]
 
     commands: list[tuple[str, list[str]]] = [
-        ("phase1", [*inference_base, "--stage", "phase1"]),
+        ("phase1", [*inference_base, "--stage", "phase1", "--device", inference_device]),
     ]
     if not skip_phase1_map:
         commands.append(("map_phase1", [*map_base, "--stage", "phase1"]))
-    commands.append(("phase2", [*inference_base, "--stage", "phase2", "--cpu-ranks", str(phase2_cpu_ranks)]))
-    commands.append(("phase3b", [*inference_base, "--stage", "phase3b"]))
+    commands.append(
+        ("phase2", [*inference_base, "--stage", "phase2", "--cpu-ranks", str(phase2_cpu_ranks)])
+    )
+    commands.append(
+        ("phase3b", [*inference_base, "--stage", "phase3b", "--device", inference_device])
+    )
     if not skip_phase3b_propagation:
-        commands.append(("propagation_phase3b", [*propagation_base, "--stage", "phase3b"]))
+        commands.append(
+            (
+                "propagation_phase3b",
+                [*propagation_base, "--stage", "phase3b", "--device", propagation_device],
+            )
+        )
     if not skip_phase3b_map:
         commands.append(("map_phase3b", [*map_base, "--stage", "phase3b"]))
     return commands
@@ -162,8 +175,12 @@ def _build_selection_commands(
 
 def _selection_artifacts(selection_output_root: Path) -> dict[str, str]:
     return {
-        "phase1_map_manifest": str(selection_output_root / "map_phase1" / "phase1_map_manifest.json"),
-        "phase3b_map_manifest": str(selection_output_root / "map_phase3b" / "phase3b_map_manifest.json"),
+        "phase1_map_manifest": str(
+            selection_output_root / "map_phase1" / "phase1_map_manifest.json"
+        ),
+        "phase3b_map_manifest": str(
+            selection_output_root / "map_phase3b" / "phase3b_map_manifest.json"
+        ),
         "phase3b_propagation_root": str(selection_output_root / "propagation_phase3b"),
     }
 
@@ -186,14 +203,25 @@ def _deduplicate(selections: Iterable[VegaWorkflowSelection]) -> list[VegaWorkfl
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run a fresh-clone Vega workflow matrix with explicit model-family/profile axes.")
-    parser.add_argument("--selection", action="append", default=[], help="Explicit selection in experiment:model-family:profile form.")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Run a fresh-clone Vega workflow matrix with explicit model-family/profile axes."
+        )
+    )
+    parser.add_argument(
+        "--selection",
+        action="append",
+        default=[],
+        help="Explicit selection in experiment:model-family:profile form.",
+    )
     parser.add_argument("--experiments", nargs="+", choices=VALID_EXPERIMENTS, default=None)
     parser.add_argument("--model-families", nargs="+", choices=VALID_MODEL_FAMILIES, default=None)
     parser.add_argument("--profiles", nargs="+", choices=VALID_PROFILES, default=None)
     parser.add_argument("--output-root", type=str, default=str(DEFAULT_OUTPUT_ROOT))
     parser.add_argument("--python-bin", type=str, default=sys.executable)
     parser.add_argument("--phase2-cpu-ranks", type=int, default=1)
+    parser.add_argument("--inference-device", choices=["cpu", "gpu"], default="cpu")
+    parser.add_argument("--propagation-device", choices=["cpu", "gpu"], default="cpu")
     parser.add_argument("--config-override", action="append", default=[])
     parser.add_argument("--continue-on-error", action="store_true", default=False)
     parser.add_argument("--skip-phase1-map", action="store_true", default=False)
@@ -209,15 +237,25 @@ def main(argv: list[str] | None = None) -> int:
     overrides = _config_overrides(args.config_override)
 
     explicit = [parse_selection(value) for value in args.selection]
-    experiments = args.experiments if args.experiments is not None else (list(VALID_EXPERIMENTS) if not explicit else [])
-    model_families = (
-        args.model_families if args.model_families is not None else (list(VALID_MODEL_FAMILIES) if not explicit else [])
+    experiments = (
+        args.experiments
+        if args.experiments is not None
+        else (list(VALID_EXPERIMENTS) if not explicit else [])
     )
-    profiles = args.profiles if args.profiles is not None else (["validation"] if not explicit else [])
+    model_families = (
+        args.model_families
+        if args.model_families is not None
+        else (list(VALID_MODEL_FAMILIES) if not explicit else [])
+    )
+    profiles = (
+        args.profiles if args.profiles is not None else (["validation"] if not explicit else [])
+    )
     expanded = expand_selection_matrix(experiments, model_families, profiles)
     selections = _deduplicate([*explicit, *expanded])
     if not selections:
-        raise ValueError("No workflow selections were resolved. Provide --selection or the matrix axes.")
+        raise ValueError(
+            "No workflow selections were resolved. Provide --selection or the matrix axes."
+        )
 
     report: dict[str, object] = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -243,6 +281,8 @@ def main(argv: list[str] | None = None) -> int:
             python_bin=args.python_bin,
             phase2_cpu_ranks=args.phase2_cpu_ranks,
             config_override=config_override,
+            inference_device=args.inference_device,
+            propagation_device=args.propagation_device,
             skip_phase1_map=args.skip_phase1_map,
             skip_phase3b_map=args.skip_phase3b_map,
             skip_phase3b_propagation=args.skip_phase3b_propagation,
@@ -263,7 +303,9 @@ def main(argv: list[str] | None = None) -> int:
             "output_root": str(selection_output_root),
             "artifacts": _selection_artifacts(selection_output_root),
             "steps": steps,
-            "status": "passed" if steps and all(step["returncode"] == 0 for step in steps) else "failed",
+            "status": (
+                "passed" if steps and all(step["returncode"] == 0 for step in steps) else "failed"
+            ),
         }
         summary_path = _selection_summary_path(matrix_root, selection)
         _write_selection_summary(summary_path, selection_summary)
