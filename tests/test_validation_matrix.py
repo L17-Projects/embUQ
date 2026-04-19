@@ -134,7 +134,6 @@ def test_workflow_matrix_runner_accepts_explicit_override_selector(tmp_path, mon
             str(matrix_root),
             "--config-override",
             f"compression:full-model:validation={override_path}",
-            "--skip-phase1-map",
             "--skip-phase3b-propagation",
             "--skip-phase3b-map",
         ]
@@ -169,7 +168,6 @@ def test_workflow_matrix_forwards_requested_devices(tmp_path, monkeypatch):
             "gpu",
             "--propagation-device",
             "gpu",
-            "--skip-phase1-map",
             "--skip-phase3b-map",
         ]
     )

@@ -81,7 +81,6 @@ def main(argv: list[str] | None = None) -> int:
         args.python_bin,
         "--phase2-cpu-ranks",
         str(args.phase2_cpu_ranks),
-        "--skip-phase1-map",
     ]
     for selection in selections:
         command.extend(["--selection", selection_key(selection)])

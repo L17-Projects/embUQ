@@ -60,7 +60,7 @@ def test_production_sanity_command_writes_override_configs_and_machine_readable_
     rc = module.main(["--output-root", str(output_root), "--python-bin", "python"])
 
     assert rc == 0
-    assert "--skip-phase1-map" in captured["command"]
+    assert "--run-phase1-map" not in captured["command"]
     assert "compression:full-model:production" in captured["command"]
 
     config_path = output_root / "configs" / "compression__full-model__production.yaml"

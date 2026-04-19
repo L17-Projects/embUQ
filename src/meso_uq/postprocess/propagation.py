@@ -50,8 +50,8 @@ def summarize_propagation_predictive(
     return pd.DataFrame(
         {
             "x": np.asarray(reference_points, dtype=float),
-            "mean": np.mean(values, axis=0),
-            "median": np.median(values, axis=0),
+            "mean": stats["mean"],
+            "median": stats["median"],
             "q05": stats["ci_90_lower"],
             "q95": stats["ci_90_upper"],
         }
