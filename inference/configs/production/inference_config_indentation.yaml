@@ -41,10 +41,10 @@ phase3b_max_gen: -1
 phase3b_target_cov: 0.8
 phase3b_covariance_scaling: 0.04
 
-hyperprior_mu_Yt: [100000.0, 1000000000.0]
-hyperprior_sigma_Yt: [0.0, 500000000.0]
-hyperprior_mu_kb: [400.0, 70000.0]
-hyperprior_sigma_kb: [0.0, 35000.0]
+hyperprior_mu_Yt: [100000.0, 50000000.0]
+hyperprior_sigma_Yt: [0.0, 50000000.0]
+hyperprior_mu_kb: [800.0, 50000.0]
+hyperprior_sigma_kb: [0.0, 500.0]
 hyperprior_mu_b1: [0.0, 3.0]
 hyperprior_sigma_b1: [0.0, 3.0]
 hyperprior_mu_b2: [0.0, 10.0]
@@ -60,4 +60,4 @@ out: out_hierarchical
 debug: 0
 dump: false
 map_n_displacements: 15
-description: "Production: Hierarchical TMCMC for indentation diameters"
+description: "paper-facing | full-model | indentation | o369 | 2026-04-18"

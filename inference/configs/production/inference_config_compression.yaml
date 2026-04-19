@@ -58,4 +58,4 @@ hyperprior_sigma_d0: [0.0, 0.3]
 out: out_hierarchical
 debug: 0
 dump: false
-description: "Production: Hierarchical TMCMC for all 3 compression diameters"
+description: "paper-facing | full-model | compression | o369 | 2026-04-18"

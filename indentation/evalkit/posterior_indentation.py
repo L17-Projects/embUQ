@@ -195,12 +195,247 @@ def prepare_simulation_parameters(
     )
 
 
-def compute_indentation(
-    sample, X, *, project_root=None, diameter_um=None, init_indentation_path=None
+def compute_indentation(  # pragma: no cover
+    sample,
+    X,
+    *,
+    project_root=None,
+    diameter_um=None,
+    init_indentation_path=None,
 ):
-    raise NotImplementedError(
-        "Direct Mirheo indentation is intentionally deferred in this public import slice; use compute_indentation_surrogate for the current workflow path."
+    """Run Mirheo DPD indentation simulations at the given sample parameters.
+
+    All Mirheo/h5py imports are deferred to inside this function so that the
+    module can be imported in environments where those packages are absent.
+    Requires: mirheo, h5py, mpi4py.
+    """
+    import fnmatch
+    import os
+    from datetime import datetime
+    from pathlib import Path
+
+    import h5py
+    import numpy as np
+    import yaml
+    from mpi4py import MPI
+
+    from indentation.src.equil import run_equil
+    from indentation.src.parameters import write_parameters
+
+    repo_root = Path(__file__).resolve().parents[2]
+    cfg_path = (
+        repo_root / "inference" / "configs" / "production" / "inference_config_indentation.yaml"
     )
+    with open(cfg_path, "rb") as f:
+        config = yaml.load(f, Loader=yaml.CLoader)
+
+    out = config["out"]
+    dump = bool(config.get("dump", False))
+
+    source_indentation_path = repo_root / "indentation" / "src"
+
+    if init_indentation_path is None:
+        if project_root is None or diameter_um is None:
+            init_indentation_path = "init_indentation/"
+        else:
+            init_indentation_path = (
+                os.path.join(project_root, f"_init_indentation_{diameter_um}um") + "/"
+            )
+    elif not init_indentation_path.endswith("/"):
+        init_indentation_path = init_indentation_path + "/"
+
+    from meso_uq.workflow_acceleration import expand_parameter_vector
+
+    full_params = expand_parameter_vector(sample["Parameters"])
+    Yt, kb, b1, b2, a3, a4, _d0, sig = full_params  # d0 not used by Mirheo
+    theta = [Yt, kb, b1, b2, a3, a4]
+    filename_param = ""
+    for p in theta:
+        filename_param += "%.2f" % (p) + "_"
+
+    try:
+        comm = korali.getWorkerMPIComm()
+    except TypeError:
+        comm = MPI.COMM_WORLD
+
+    rank = comm.Get_rank()
+
+    sample["Reference Evaluations"] = []
+    sample["Standard Deviation"] = []
+
+    n_ref = 0
+    list_simu_path = []
+    diam_vert = []
+    std_diam_vert = []
+    cnt = 0
+
+    if rank == 0 and dump:
+        os.system(f"mkdir -p {out}/Yt{Yt:.2f}_fulltraj/")
+
+    for Xi in X:
+        Xi = -Xi  # compression
+
+        folder = f"{out}/indentation/"
+        if rank == 0:
+            name = "n%d_%05d/" % (n_ref, np.random.randint(0, 99999))
+            name = filename_param + name
+            comm.send(name, dest=1, tag=0)
+        elif rank == 1:
+            name = comm.recv(source=0, tag=0)
+
+        simu_path = folder + name
+        simnum = "%05d" % 1
+        list_simu_path.append(simu_path)
+
+        if rank == 0:
+            os.system(f"mkdir -p {simu_path}")
+            os.system(f"mkdir -p {simu_path}/mesh/")
+            os.system(f"mkdir -p {simu_path}/force/")
+            os.system(f"mkdir -p {simu_path}/stats/")
+            os.system(f"mkdir -p {simu_path}/restart/")
+            os.system(f"mkdir -p {simu_path}/logs/")
+            os.system(f"mkdir -p {simu_path}/anchor/")
+            os.system(f"mkdir -p {simu_path}/particles/")
+            os.system(f"mkdir -p {simu_path}parameter/")
+
+            filename_1 = init_indentation_path + "parameter/parameters-default" + simnum + ".yaml"
+            filename_2 = init_indentation_path + "parameter/parameters-default" + simnum + "eq.yaml"
+            os.system(f"cp {filename_1} {simu_path}parameter/")
+            os.system(f"cp {filename_2} {simu_path}parameter/")
+            filename_1_simu = simu_path + "parameter/parameters-default" + simnum + ".yaml"
+            filename_2_simu = simu_path + "parameter/parameters-default" + simnum + "eq.yaml"
+
+            os.system(f"cp -r {source_indentation_path}/microbubble {simu_path}")
+
+            sample_param = {"Yt": Yt, "Yl": Yt, "force": Xi}
+            adjust_simu_params(sample_param, filename_1_simu, filename_2_simu)
+            write_parameters(source_path=init_indentation_path, simu_path=simu_path, simnum=simnum)
+
+            sample_param = {"kb": kb, "b1": b1, "b2": b2, "a3": a3, "a4": a4}
+            filename_3_simu = simu_path + "parameter/parameters.prms" + simnum + ".yaml"
+            filename_4_simu = simu_path + "parameter/parameters" + simnum + ".yaml"
+            adjust_simu_params(sample_param, filename_3_simu, filename_4_simu)
+
+        comm.Barrier()
+
+        hostname = os.uname()[1]
+        if rank == 0:
+            gpu_env = os.environ.get("CUDA_VISIBLE_DEVICES", "0")
+            dated_print(
+                f"[Korali] [{hostname}] [GPU nº{gpu_env}] | Running "
+                f"Yt={Yt}, kb={kb}, b1={b1}, b2={b2}, a3={a3}, a4={a4}, force={float(Xi)}"
+            )
+
+        flag = 1
+        nb_tries = 1
+        MAX_TRIES = 5
+        while flag == 1:
+            if nb_tries > MAX_TRIES:
+                raise RuntimeError(
+                    f"run_equil failed after {MAX_TRIES} attempts for simu_path={simu_path!r}"
+                )
+            try:
+                flag = run_equil(
+                    source_path=init_indentation_path,
+                    simu_path=simu_path,
+                    simnum=simnum,
+                    equil=False if n_ref >= 1 else True,
+                    restart=True if n_ref >= 1 else False,
+                    restart_path=list_simu_path[-2] if n_ref >= 1 else None,
+                    vacuum=False,
+                    comm=comm,
+                )
+            except Exception as e:
+                dated_print(f"[Mirheo] Error (try {nb_tries}): {e}")
+                nb_tries += 1
+
+        comm.Barrier()
+
+        filename_default = init_indentation_path + "parameter/parameters-default" + simnum + ".yaml"
+        with open(filename_default, "rb") as f:
+            parameters_default = yaml.load(f, Loader=yaml.CLoader)
+
+        stslik = parameters_default["stslik"]
+        pts_sampling = int(0.9 * stslik)
+
+        ind_min, ind_max = np.loadtxt(simu_path + "/ind_poles.txt")
+        ind_min = int(ind_min)
+        ind_max = int(ind_max)
+
+        xyzpath = simu_path + "/particles/"
+        xyz_files = np.sort(os.listdir(xyzpath))
+        xyz_files = fnmatch.filter(xyz_files, "emb*.h5")
+
+        time_steps = []
+        pos_top = []
+        pos_bot = []
+        for xyz in xyz_files:
+            r = h5py.File(xyzpath + xyz, "r")["position"][:]
+            pos_top.append(r[ind_max, 2])
+            pos_bot.append(r[ind_min, 2])
+            time_steps.append(cnt)
+            cnt += 1
+
+        pos_top = np.array(pos_top)
+        pos_bot = np.array(pos_bot)
+
+        final_dist = float(np.mean(pos_top[-pts_sampling:] - pos_bot[-pts_sampling:]))
+        std_dist = float(np.std(pos_top[-pts_sampling:] - pos_bot[-pts_sampling:]))
+
+        if rank == 0:
+            dated_print(
+                f"[Korali] [{hostname}] [GPU nº{gpu_env}] | "
+                f"Yt={Yt}, kb={kb}, b1={b1}, b2={b2}, a3={a3}, a4={a4}, "
+                f"force={float(Xi)}, short diameter={final_dist}, sig={sig}"
+            )
+
+        diam_vert.append(final_dist)
+        std_diam_vert.append(std_dist)
+        sample["Reference Evaluations"] += [final_dist]
+        sample["Standard Deviation"] += [sig * final_dist]
+        n_ref += 1
+
+        if dump and rank == 0:
+            os.system(f"cp -r {simu_path}trj_eq/sim{simnum}/* {out}/Yt{Yt:.2f}_fulltraj/")
+
+        comm.Barrier()
+
+    # Output data (uses last simu_path/simnum from the loop)
+    filename_simu = simu_path + "parameter/parameters00001.yaml"
+    with open(filename_simu, "r") as f:
+        data = yaml.load(f, Loader=yaml.FullLoader)
+    ka = data["ka"]
+
+    filename_default = simu_path + "parameter/parameters-default" + simnum + ".yaml"
+    with open(filename_default, "rb") as f:
+        parameters_default = yaml.load(f, Loader=yaml.CLoader)
+    radp = parameters_default["radp"]
+
+    if rank == 0:
+        with open(f"{out}/F_Delta.dat", "a") as f:
+            params = np.array([Yt, ka, kb, b1, b2, a3, a4, radp])
+            np.savetxt(
+                f,
+                np.concatenate([params, np.array(diam_vert), np.array(X)]).reshape(1, -1),
+            )
+
+    # Clean up
+    if rank == 0:
+        for path in list_simu_path:
+            os.system(f"rm -rf {path}restart/")
+            os.system(f"rm -f {path}commands.txt")
+            os.system(f"rm -f {path}posq.txt")
+            os.system(f"rm -f {path}run_HPC.sbatch")
+            os.system(f"rm -f {path}ind_poles.txt")
+            if not dump:
+                os.system(f"rm -rf {path}trj_eq/")
+                os.system(f"rm -rf {path}anchor/")
+                os.system(f"rm -rf {path}force/")
+                os.system(f"rm -rf {path}mesh/")
+                os.system(f"rm -rf {path}microbubble/")
+                os.system(f"rm -rf {path}particles/")
+                os.system(f"rm -rf {path}pin/")
+                os.system(f"rm -rf {path}stats/")
 
 
 def Delta_Reissner_1pole(ka, kb, F, R0):
