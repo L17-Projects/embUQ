@@ -53,4 +53,4 @@ out: out_reduced
 debug: 0
 dump: false
 
-description: "Reduced: Linear model (b1=b2=a3=a4=0), 4 free params: Yt, kb, d0, sigma"
+description: "paper-facing | reduced-model | compression | o369 | 2026-04-18"

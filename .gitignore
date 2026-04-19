@@ -8,3 +8,4 @@ __pycache__/
 coverage.xml
 coverage.json
 coverage-summary.md
+_init*/
