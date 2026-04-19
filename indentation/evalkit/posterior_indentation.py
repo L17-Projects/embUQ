@@ -244,7 +244,10 @@ def compute_indentation(  # pragma: no cover
     elif not init_indentation_path.endswith("/"):
         init_indentation_path = init_indentation_path + "/"
 
-    Yt, kb, b1, b2, a3, a4, sig = sample["Parameters"]
+    from meso_uq.workflow_acceleration import expand_parameter_vector
+
+    full_params = expand_parameter_vector(sample["Parameters"])
+    Yt, kb, b1, b2, a3, a4, _d0, sig = full_params  # d0 not used by Mirheo
     theta = [Yt, kb, b1, b2, a3, a4]
     filename_param = ""
     for p in theta:
@@ -325,7 +328,12 @@ def compute_indentation(  # pragma: no cover
 
         flag = 1
         nb_tries = 1
+        MAX_TRIES = 5
         while flag == 1:
+            if nb_tries > MAX_TRIES:
+                raise RuntimeError(
+                    f"run_equil failed after {MAX_TRIES} attempts for simu_path={simu_path!r}"
+                )
             try:
                 flag = run_equil(
                     source_path=init_indentation_path,
@@ -338,7 +346,6 @@ def compute_indentation(  # pragma: no cover
                     comm=comm,
                 )
             except Exception as e:
-                now = datetime.now()
                 dated_print(f"[Mirheo] Error (try {nb_tries}): {e}")
                 nb_tries += 1
 
