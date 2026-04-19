@@ -27,7 +27,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--phase2-cpu-ranks", type=int, default=1)
     parser.add_argument("--config-override", action="append", default=[])
     parser.add_argument("--continue-on-error", action="store_true", default=False)
-    parser.add_argument("--skip-phase1-map", action="store_true", default=False)
+    parser.add_argument("--run-phase1-map", action="store_true", default=False,
+                        help="Run the phase1 MAP extraction step (skipped by default).")
     parser.add_argument("--skip-phase3b-map", action="store_true", default=False)
     parser.add_argument("--skip-phase3b-propagation", action="store_true", default=False)
     args = parser.parse_args(argv)
@@ -55,8 +56,8 @@ def main(argv: list[str] | None = None) -> int:
         command.extend(["--config-override", item])
     if args.continue_on_error:
         command.append("--continue-on-error")
-    if args.skip_phase1_map:
-        command.append("--skip-phase1-map")
+    if args.run_phase1_map:
+        command.append("--run-phase1-map")
     if args.skip_phase3b_map:
         command.append("--skip-phase3b-map")
     if args.skip_phase3b_propagation:

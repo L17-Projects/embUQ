@@ -224,7 +224,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--propagation-device", choices=["cpu", "gpu"], default="cpu")
     parser.add_argument("--config-override", action="append", default=[])
     parser.add_argument("--continue-on-error", action="store_true", default=False)
-    parser.add_argument("--skip-phase1-map", action="store_true", default=False)
+    parser.add_argument("--run-phase1-map", action="store_true", default=False,
+                        help="Run the phase1 MAP extraction step (skipped by default).")
     parser.add_argument("--skip-phase3b-map", action="store_true", default=False)
     parser.add_argument("--skip-phase3b-propagation", action="store_true", default=False)
     args = parser.parse_args(argv)
@@ -283,7 +284,7 @@ def main(argv: list[str] | None = None) -> int:
             config_override=config_override,
             inference_device=args.inference_device,
             propagation_device=args.propagation_device,
-            skip_phase1_map=args.skip_phase1_map,
+            skip_phase1_map=not args.run_phase1_map,
             skip_phase3b_map=args.skip_phase3b_map,
             skip_phase3b_propagation=args.skip_phase3b_propagation,
         ):
