@@ -102,14 +102,12 @@ def test_workflow_matrix_runner_writes_machine_readable_report(tmp_path, monkeyp
     for entry in report["selections"]:
         assert [step["name"] for step in entry["steps"]] == [
             "phase1",
-            "map_phase1",
             "phase2",
             "phase3b",
             "propagation_phase3b",
             "map_phase3b",
         ]
         assert Path(entry["summary_path"]).exists()
-        assert Path(entry["artifacts"]["phase1_map_manifest"]).exists()
         assert Path(entry["artifacts"]["phase3b_map_manifest"]).exists()
 
 

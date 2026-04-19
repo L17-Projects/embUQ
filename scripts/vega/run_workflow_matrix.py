@@ -224,7 +224,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--propagation-device", choices=["cpu", "gpu"], default="cpu")
     parser.add_argument("--config-override", action="append", default=[])
     parser.add_argument("--continue-on-error", action="store_true", default=False)
-    parser.add_argument("--skip-phase1-map", action="store_true", default=False)
+    parser.add_argument("--skip-phase1-map", action="store_true", default=True)
     parser.add_argument("--skip-phase3b-map", action="store_true", default=False)
     parser.add_argument("--skip-phase3b-propagation", action="store_true", default=False)
     args = parser.parse_args(argv)

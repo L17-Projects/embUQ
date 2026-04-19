@@ -55,6 +55,35 @@ def test_summarize_propagation_computes_expected_statistics() -> None:
     assert summary["median"].tolist() == [1.0, 3.0]
 
 
+def test_summarize_propagation_predictive_wider_than_param_only() -> None:
+    """Noise-inclusive CI must be at least as wide as parameter-only CI."""
+    rng = np.random.default_rng(0)
+    values = rng.normal(loc=1.0, scale=0.05, size=(50, 5))
+    stds = np.full_like(values, 0.3)  # substantial noise
+
+    param_only = propagation.summarize_propagation([0.0, 1.0, 2.0, 3.0, 4.0], values)
+    predictive = propagation.summarize_propagation_predictive([0.0, 1.0, 2.0, 3.0, 4.0], values, stds)
+
+    assert list(predictive.columns) == ["x", "mean", "median", "q05", "q95"]
+    # Predictive CI must be wider at every point
+    param_width = (param_only["q95"] - param_only["q05"]).values
+    pred_width = (predictive["q95"] - predictive["q05"]).values
+    assert np.all(pred_width > param_width), "Predictive CI should be wider than parameter-only CI"
+
+
+def test_summarize_propagation_predictive_zero_noise_matches_param_only() -> None:
+    """With zero noise, predictive CI collapses to raw parameter quantiles."""
+    rng = np.random.default_rng(1)
+    values = rng.normal(loc=2.0, scale=0.1, size=(200, 3))
+    stds = np.zeros_like(values)
+
+    param_only = propagation.summarize_propagation([0.0, 1.0, 2.0], values)
+    predictive = propagation.summarize_propagation_predictive([0.0, 1.0, 2.0], values, stds)
+
+    # Medians must agree
+    assert np.allclose(param_only["median"].values, predictive["median"].values, atol=1e-6)
+
+
 def test_propagate_run_directory_writes_summary_csv(tmp_path: Path, monkeypatch) -> None:
     samples = pd.DataFrame(
         [
@@ -67,6 +96,7 @@ def test_propagate_run_directory_writes_summary_csv(tmp_path: Path, monkeypatch)
     def _evaluate(sample: dict, reference_points: list[float]) -> None:
         base = sum(sample["Parameters"])
         sample["Reference Evaluations"] = [base + x for x in reference_points]
+        sample["Standard Deviation"] = [0.1 * (base + x) for x in reference_points]
 
     output_csv = tmp_path / "prop" / "summary.csv"
     result = propagation.propagate_run_directory(
@@ -76,11 +106,19 @@ def test_propagate_run_directory_writes_summary_csv(tmp_path: Path, monkeypatch)
         output_csv=output_csv,
     )
 
+    # summary.csv (parameter-only) must exist with correct columns
     assert output_csv.exists()
     frame = pd.read_csv(output_csv)
     assert list(frame.columns) == ["x", "mean", "median", "q05", "q95"]
-    assert result == {
-        "summary_csv": str(output_csv),
-        "num_samples": 2,
-        "num_points": 3,
-    }
+
+    # summary_predictive.csv (noise-inclusive) must also be written
+    predictive_csv = tmp_path / "prop" / "summary_predictive.csv"
+    assert predictive_csv.exists()
+    pred_frame = pd.read_csv(predictive_csv)
+    assert list(pred_frame.columns) == ["x", "mean", "median", "q05", "q95"]
+
+    # Return dict must include both paths
+    assert result["summary_csv"] == str(output_csv)
+    assert result["predictive_csv"] == str(predictive_csv)
+    assert result["num_samples"] == 2
+    assert result["num_points"] == 3

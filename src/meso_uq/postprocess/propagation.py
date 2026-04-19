@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from .maps import load_posterior_samples
+from ..predictive_statistics import compute_interval_statistics
 
 
 def _evaluate_posterior_samples(samples_df: pd.DataFrame, *, evaluate_sample: Callable, reference_points: list[float]):
@@ -41,6 +42,22 @@ def summarize_propagation(reference_points: list[float], values: np.ndarray) -> 
     )
 
 
+def summarize_propagation_predictive(
+    reference_points: list[float], values: np.ndarray, stds: np.ndarray
+) -> pd.DataFrame:
+    """Posterior-predictive summary including observation noise (parameter uncertainty + sigma noise)."""
+    stats = compute_interval_statistics(values, stds, percentiles=(90,), include_observation_noise=True)
+    return pd.DataFrame(
+        {
+            "x": np.asarray(reference_points, dtype=float),
+            "mean": np.mean(values, axis=0),
+            "median": np.median(values, axis=0),
+            "q05": stats["ci_90_lower"],
+            "q95": stats["ci_90_upper"],
+        }
+    )
+
+
 def propagate_run_directory(
     run_dir: str | Path,
     *,
@@ -54,12 +71,21 @@ def propagate_run_directory(
         evaluate_sample=evaluate_sample,
         reference_points=reference_points,
     )
-    summary = summarize_propagation(reference_points, values)
     output_csv = Path(output_csv)
     output_csv.parent.mkdir(parents=True, exist_ok=True)
+
+    # Parameter-uncertainty-only summary (legacy, kept for traceability)
+    summary = summarize_propagation(reference_points, values)
     summary.to_csv(output_csv, index=False)
+
+    # Posterior-predictive summary: parameter uncertainty + observation noise
+    predictive_csv = output_csv.with_name(output_csv.stem + "_predictive.csv")
+    predictive = summarize_propagation_predictive(reference_points, values, stds)
+    predictive.to_csv(predictive_csv, index=False)
+
     return {
         "summary_csv": str(output_csv),
+        "predictive_csv": str(predictive_csv),
         "num_samples": int(values.shape[0]),
         "num_points": int(values.shape[1]),
     }
