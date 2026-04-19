@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import meso_uq.mirheo.paths as _paths_module
 from meso_uq.mirheo.paths import find_equil_script, verify_equil_drivers
 
 
@@ -40,3 +41,17 @@ def test_verify_equil_drivers_files_are_syntactically_valid():
     """py_compile must succeed — drivers must be valid Python."""
     result = verify_equil_drivers()
     assert len(result) == 2  # both checked without raising PyCompileError
+
+
+def test_find_equil_script_missing_file_raises_file_not_found(monkeypatch, tmp_path):
+    """FileNotFoundError when the equil.py is absent from disk."""
+    monkeypatch.setitem(_paths_module._EQUIL_PATHS, "compression", tmp_path / "nonexistent.py")
+    with pytest.raises(FileNotFoundError, match="equil.py not found"):
+        find_equil_script("compression")
+
+
+def test_verify_equil_drivers_missing_file_raises_file_not_found(monkeypatch, tmp_path):
+    """verify_equil_drivers raises FileNotFoundError if a driver is missing."""
+    monkeypatch.setitem(_paths_module._EQUIL_PATHS, "indentation", tmp_path / "gone.py")
+    with pytest.raises(FileNotFoundError, match="equil.py not found"):
+        verify_equil_drivers()
