@@ -146,3 +146,28 @@ def test_convert_manifest_empty_raises(tmp_path):
     manifest_path.write_text(json.dumps({"datasets": {}}))
     with pytest.raises(ValueError, match="no 'datasets'"):
         convert_manifest(manifest_path, tmp_path / "out")
+
+
+# ---------------------------------------------------------------------------
+# main() CLI
+# ---------------------------------------------------------------------------
+
+def _write_manifest(path: Path, datasets: dict) -> None:
+    path.write_text(json.dumps({"datasets": datasets}))
+
+
+def test_main_returns_zero_on_success(tmp_path):
+    from convert_map_manifest import main
+
+    manifest_path = tmp_path / "manifest.json"
+    _write_manifest(manifest_path, {"indentation_3.2um": _reduced_dataset()})
+    rc = main(["--manifest", str(manifest_path), "--output-dir", str(tmp_path / "out")])
+    assert rc == 0
+
+
+def test_main_returns_one_when_manifest_missing(tmp_path):
+    from convert_map_manifest import main
+
+    rc = main(["--manifest", str(tmp_path / "missing.json"),
+               "--output-dir", str(tmp_path / "out")])
+    assert rc == 1
