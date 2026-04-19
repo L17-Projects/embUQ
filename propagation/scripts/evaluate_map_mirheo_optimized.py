@@ -123,6 +123,11 @@ def setup_map_specific_init_dir(
                     params["numsteps_dt"] = int(old * numsteps_multiplier)
                     datedPrint(f"  {param_file}: numsteps_dt {old} → {params['numsteps_dt']}")
 
+                if "numsteps_eq" in params:
+                    old = params["numsteps_eq"]
+                    params["numsteps_eq"] = max(1, int(round(float(old) * numsteps_multiplier)))
+                    datedPrint(f"  {param_file}: numsteps_eq {old} → {params['numsteps_eq']}")
+
                 with open(filepath, "w") as f:
                     yaml.dump(
                         params, f, Dumper=yaml.CDumper, default_flow_style=False, sort_keys=False

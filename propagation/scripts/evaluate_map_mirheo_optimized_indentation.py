@@ -237,6 +237,10 @@ def main():
         diameter_um, d0_offset, args.n_displacements, args.extend_range
     )
 
+    # Preserve original params/names for JSON output before expanding for Mirheo
+    output_map_params = list(map_params)
+    output_param_names = list(param_names)
+
     # Expand 3-param reduced model [Yt, kb, d0] → 7-param [Yt, kb, 0, 0, 0, 0, d0]
     if len(map_params) == 3 and param_names == ["Yt", "kb", "d0"]:
         if rank == 0:
@@ -283,8 +287,8 @@ def main():
 
         result = {
             "diameter_um": diameter_um,
-            "map_parameters": map_params,
-            "parameter_names": param_names,
+            "map_parameters": output_map_params,
+            "parameter_names": output_param_names,
             "displacement_points": displacement_points.tolist(),
             "forces": forces.tolist(),
             "sample_id": map_data["sample_id"],
