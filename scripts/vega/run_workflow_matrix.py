@@ -102,6 +102,8 @@ def _build_selection_commands(
     skip_phase1_map: bool,
     skip_phase3b_map: bool,
     skip_phase3b_propagation: bool,
+    run_map_mirheo: bool,
+    map_mirheo_n_displacements: int,
 ) -> list[tuple[str, list[str]]]:
     inferred_config = resolve_workflow_config_path(REPO_ROOT, selection, config_override)
     config_args = ["--config", str(inferred_config)] if config_override is not None else []
@@ -170,6 +172,20 @@ def _build_selection_commands(
         )
     if not skip_phase3b_map:
         commands.append(("map_phase3b", [*map_base, "--stage", "phase3b"]))
+    if run_map_mirheo:
+        commands.append((
+            "map_mirheo",
+            [
+                python_bin,
+                str(REPO_ROOT / "scripts" / "vega" / "run_map_mirheo.py"),
+                "--experiment", selection.experiment,
+                "--model-family", selection.model_family,
+                "--profile", selection.profile,
+                "--output-dir", str(selection_output_root),
+                "--python-bin", python_bin,
+                "--n-displacements", str(map_mirheo_n_displacements),
+            ],
+        ))
     return commands
 
 
@@ -180,6 +196,9 @@ def _selection_artifacts(selection_output_root: Path) -> dict[str, str]:
         ),
         "phase3b_map_manifest": str(
             selection_output_root / "map_phase3b" / "phase3b_map_manifest.json"
+        ),
+        "map_mirheo_manifest": str(
+            selection_output_root / "map_mirheo" / "map_mirheo_manifest.json"
         ),
         "phase3b_propagation_root": str(selection_output_root / "propagation_phase3b"),
     }
@@ -228,6 +247,14 @@ def main(argv: list[str] | None = None) -> int:
                         help="Run the phase1 MAP extraction step (skipped by default).")
     parser.add_argument("--skip-phase3b-map", action="store_true", default=False)
     parser.add_argument("--skip-phase3b-propagation", action="store_true", default=False)
+    parser.add_argument(
+        "--run-map-mirheo", action="store_true", default=False,
+        help="Run MAP Mirheo DPD evaluation after map_phase3b (requires Mirheo on this host).",
+    )
+    parser.add_argument(
+        "--map-mirheo-n-displacements", type=int, default=15,
+        help="Number of displacement points for MAP Mirheo evaluation (default: 15).",
+    )
     args = parser.parse_args(argv)
 
     if args.phase2_cpu_ranks < 1:
@@ -287,6 +314,8 @@ def main(argv: list[str] | None = None) -> int:
             skip_phase1_map=not args.run_phase1_map,
             skip_phase3b_map=args.skip_phase3b_map,
             skip_phase3b_propagation=args.skip_phase3b_propagation,
+            run_map_mirheo=args.run_map_mirheo,
+            map_mirheo_n_displacements=args.map_mirheo_n_displacements,
         ):
             step = _capture_step(step_name, command, selection_logs_root)
             steps.append(step)
