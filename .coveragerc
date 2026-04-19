@@ -17,6 +17,8 @@ omit =
     indentation/evalkit/data/*
     compression/src/equil.py
     indentation/src/equil.py
+    propagation/scripts/evaluate_map_mirheo_optimized.py
+    propagation/scripts/evaluate_map_mirheo_optimized_indentation.py
 
 [report]
 exclude_also =
