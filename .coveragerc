@@ -19,6 +19,8 @@ omit =
     indentation/src/equil.py
     propagation/scripts/evaluate_map_mirheo_optimized.py
     propagation/scripts/evaluate_map_mirheo_optimized_indentation.py
+    scripts/postprocess/generate_map_overlay_figure.py
+    scripts/postprocess/generate_propagation_bands_figure.py
 
 [report]
 exclude_also =
