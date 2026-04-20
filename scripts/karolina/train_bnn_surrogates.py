@@ -6,6 +6,7 @@ import argparse
 import json
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -55,6 +56,123 @@ SPECS = [
         "dnn": REPO_ROOT / "indentation" / "surrogate" / "diameters" / "5.8um" / "trained" / "microbubble_displacement_BEST.pkl",
     },
 ]
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _read_json(path: Path) -> dict[str, object]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _write_report(path: Path, payload: dict[str, object]) -> None:
+    payload["updated_at"] = _now_iso()
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _run_map(report: dict[str, object]) -> dict[str, dict[str, object]]:
+    runs = report.get("runs", [])
+    if not isinstance(runs, list):
+        return {}
+    mapping: dict[str, dict[str, object]] = {}
+    for item in runs:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        if isinstance(name, str):
+            mapping[name] = item
+    return mapping
+
+
+def _load_report(path: Path, output_root: Path, args: argparse.Namespace) -> dict[str, object]:
+    if path.exists():
+        report = _read_json(path)
+        if "runs" not in report or not isinstance(report["runs"], list):
+            report["runs"] = []
+        report.setdefault("schema_version", 2)
+        report.setdefault("output_root", str(output_root))
+        report.setdefault("started_at", _now_iso())
+        report.setdefault("config", {})
+        report["config"] = {
+            "width": args.width,
+            "depth": args.depth,
+            "prior_scale": args.prior_scale,
+            "obs_noise": args.obs_noise,
+            "batch_size": args.batch_size,
+            "lr": args.lr,
+            "max_steps": args.max_steps,
+            "eval_every": args.eval_every,
+            "predictive_mc_samples": args.predictive_mc_samples,
+            "max_walltime_seconds": args.max_walltime_seconds,
+            "seed": args.seed,
+            "parity_tol": args.parity_tol,
+            "device": args.device,
+        }
+        return report
+    return {
+        "schema_version": 2,
+        "status": "created",
+        "output_root": str(output_root),
+        "started_at": _now_iso(),
+        "runs": [],
+        "config": {
+            "width": args.width,
+            "depth": args.depth,
+            "prior_scale": args.prior_scale,
+            "obs_noise": args.obs_noise,
+            "batch_size": args.batch_size,
+            "lr": args.lr,
+            "max_steps": args.max_steps,
+            "eval_every": args.eval_every,
+            "predictive_mc_samples": args.predictive_mc_samples,
+            "max_walltime_seconds": args.max_walltime_seconds,
+            "seed": args.seed,
+            "parity_tol": args.parity_tol,
+            "device": args.device,
+        },
+    }
+
+
+def _training_report_passed(path: Path) -> bool:
+    if not path.exists():
+        return False
+    try:
+        payload = _read_json(path)
+    except Exception:
+        return False
+    training = payload.get("training")
+    if not isinstance(training, dict):
+        return False
+    return bool(training.get("parity_passed", False))
+
+
+def _is_completed(spec: dict[str, Path | str], item_report: Path, run_entry: dict[str, object] | None) -> bool:
+    artifact_exists = Path(spec["out"]).exists()
+    report_passed = _training_report_passed(item_report)
+    run_passed = bool(run_entry and run_entry.get("status") == "passed")
+    return bool(artifact_exists and report_passed and (run_passed or run_entry is None))
+
+
+def _select_specs(
+    specs: list[dict[str, Path | str]],
+    *,
+    start_from: str | None,
+    only: list[str],
+) -> list[dict[str, Path | str]]:
+    selected = list(specs)
+    if only:
+        wanted = set(only)
+        selected = [spec for spec in selected if str(spec["name"]) in wanted]
+    if start_from is not None:
+        names = [str(spec["name"]) for spec in selected]
+        if start_from not in names:
+            raise ValueError(
+                f"--start-from={start_from!r} not found in selected specs. Available: {', '.join(names)}"
+            )
+        start_idx = names.index(start_from)
+        selected = selected[start_idx:]
+    return selected
 
 
 def _build_command(
@@ -136,19 +254,49 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--parity-tol", type=float, default=1.20)
     parser.add_argument("--device", default="cpu")
+    parser.add_argument(
+        "--resume",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Resume from existing per-diameter artifacts/reports and skip completed entries.",
+    )
+    parser.add_argument(
+        "--start-from",
+        default=None,
+        help="Start from this spec name (e.g. indentation_3.2um) within selected specs.",
+    )
+    parser.add_argument(
+        "--only",
+        action="append",
+        default=[],
+        help="Run only these spec names (repeatable).",
+    )
+    parser.add_argument(
+        "--state-path",
+        default=None,
+        help="Optional explicit path for matrix state JSON (default: <output-root>/bnn_training_matrix_report.json).",
+    )
     args = parser.parse_args(argv)
 
     output_root = Path(args.output_root).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
+    report_path = (
+        Path(args.state_path).resolve()
+        if args.state_path is not None
+        else output_root / "bnn_training_matrix_report.json"
+    )
+    report = _load_report(report_path, output_root, args)
+    runs_by_name = _run_map(report)
 
-    report: dict[str, object] = {
-        "status": "running",
-        "output_root": str(output_root),
-        "runs": [],
-    }
-    report_path = output_root / "bnn_training_matrix_report.json"
+    selected_specs = _select_specs(SPECS, start_from=args.start_from, only=list(args.only))
+    if not selected_specs:
+        raise ValueError("No specs selected to run.")
 
-    for spec in SPECS:
+    report["status"] = "running"
+    report["selected"] = [str(spec["name"]) for spec in selected_specs]
+    _write_report(report_path, report)
+
+    for spec in selected_specs:
         command, item_report = _build_command(
             python_bin=args.python_bin,
             spec=spec,
@@ -167,6 +315,49 @@ def main(argv: list[str] | None = None) -> int:
             parity_tol=args.parity_tol,
             device=args.device,
         )
+
+        name = str(spec["name"])
+        run_entry = runs_by_name.get(name)
+        if args.resume and _is_completed(spec, item_report, run_entry):
+            if run_entry is None:
+                run_entry = {
+                    "name": name,
+                    "artifact": str(spec["out"]),
+                    "report": str(item_report),
+                    "status": "passed",
+                    "skipped": True,
+                    "started_at": None,
+                    "finished_at": _now_iso(),
+                    "skip_reason": "already_completed",
+                }
+                report["runs"].append(run_entry)
+                runs_by_name[name] = run_entry
+            else:
+                run_entry["skipped"] = True
+                run_entry["skip_reason"] = "already_completed"
+                run_entry["status"] = "passed"
+            _write_report(report_path, report)
+            print(f"[BNN] Skipping {name}: already completed")
+            continue
+
+        if run_entry is None:
+            run_entry = {
+                "name": name,
+                "artifact": str(spec["out"]),
+                "report": str(item_report),
+            }
+            report["runs"].append(run_entry)
+            runs_by_name[name] = run_entry
+
+        run_entry["status"] = "running"
+        run_entry["started_at"] = _now_iso()
+        run_entry["finished_at"] = None
+        run_entry["skipped"] = False
+        run_entry.pop("skip_reason", None)
+        report["current"] = name
+        report.pop("failure", None)
+        _write_report(report_path, report)
+
         print(f"[BNN] Training {spec['name']}")
         print(f"[BNN] Command: {' '.join(command)}")
         try:
@@ -179,31 +370,35 @@ def main(argv: list[str] | None = None) -> int:
         except subprocess.TimeoutExpired as exc:
             report["status"] = "failed"
             report["failure"] = {
-                "name": spec["name"],
+                "name": name,
                 "reason": "timeout",
                 "seconds": exc.timeout,
             }
-            report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+            run_entry["status"] = "failed"
+            run_entry["finished_at"] = _now_iso()
+            run_entry["error"] = "timeout"
+            _write_report(report_path, report)
             raise
         except subprocess.CalledProcessError as exc:
             report["status"] = "failed"
             report["failure"] = {
-                "name": spec["name"],
+                "name": name,
                 "reason": "command_failed",
                 "returncode": exc.returncode,
                 "command": exc.cmd,
             }
-            report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+            run_entry["status"] = "failed"
+            run_entry["finished_at"] = _now_iso()
+            run_entry["error"] = f"returncode={exc.returncode}"
+            _write_report(report_path, report)
             raise
-        run_item = {
-            "name": spec["name"],
-            "artifact": str(spec["out"]),
-            "report": str(item_report),
-        }
-        report["runs"].append(run_item)
+        run_entry["status"] = "passed"
+        run_entry["finished_at"] = _now_iso()
+        _write_report(report_path, report)
 
     report["status"] = "passed"
-    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    report.pop("current", None)
+    _write_report(report_path, report)
     print(f"BNN training matrix report: {report_path}")
     return 0
 
