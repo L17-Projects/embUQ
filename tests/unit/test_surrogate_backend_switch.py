@@ -1,7 +1,35 @@
 from __future__ import annotations
 
+import sys
+import types
+
 import numpy as np
 import pytest
+
+# CI test extra installs neither Korali nor mpi4py. Stub only what the imported
+# posterior modules need at import/runtime for these unit tests.
+if "korali" not in sys.modules:
+    korali_stub = types.ModuleType("korali")
+
+    class _KoraliComm:
+        def Get_rank(self) -> int:
+            return 0
+
+    korali_stub.getWorkerMPIComm = lambda: _KoraliComm()
+    sys.modules["korali"] = korali_stub
+
+if "mpi4py" not in sys.modules:
+    mpi4py_stub = types.ModuleType("mpi4py")
+
+    class _MPIComm:
+        def Get_rank(self) -> int:
+            return 0
+
+    class _MPIStub:
+        COMM_WORLD = _MPIComm()
+
+    mpi4py_stub.MPI = _MPIStub
+    sys.modules["mpi4py"] = mpi4py_stub
 
 from compression.evalkit import posterior_compression as posterior_compression
 from indentation.evalkit import posterior_indentation as posterior_indentation
