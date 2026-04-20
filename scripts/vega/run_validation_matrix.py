@@ -16,6 +16,11 @@ DEFAULT_OUTPUT_ROOT = REPO_ROOT / "_vega" / "validation_matrix"
 
 
 def main(argv: list[str] | None = None) -> int:
+    print(
+        "WARNING: scripts/vega/run_validation_matrix.py is deprecated. "
+        "Use scripts/hpc/run_validation_matrix.py with HPC_SITE=vega|karolina.",
+        file=sys.stderr,
+    )
     parser = argparse.ArgumentParser(
         description="Run the public Vega validation matrix across the shipped validation workflows."
     )

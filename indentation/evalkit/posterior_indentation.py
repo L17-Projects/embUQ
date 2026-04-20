@@ -21,7 +21,7 @@ from meso_uq.workflow_acceleration import (
 )
 
 _CONFIG_CACHE: Dict[str, Dict[str, Any]] = {}
-_SURROGATE_CACHE: Dict[Tuple[str, float, str], Any] = {}
+_SURROGATE_CACHE: Dict[Tuple[str, float, str, str], Any] = {}
 _SURROGATE_PATH_ADDED = False
 _DUMP_FLAG: bool | None = None
 
@@ -62,7 +62,27 @@ def _load_config(project_root: str) -> Dict[str, Any]:
     return _CONFIG_CACHE[key]
 
 
-def _build_surrogate(project_root: str, diameter_um: float, device: str = "cpu") -> Any:
+def _resolve_surrogate_runtime(config: Dict[str, Any]) -> Tuple[str, int, int]:
+    surrogate_cfg = config.get("surrogate", {})
+    if surrogate_cfg is None:
+        surrogate_cfg = {}
+    if not isinstance(surrogate_cfg, dict):
+        raise ValueError("Expected 'surrogate' config section to be a mapping.")
+    backend = str(surrogate_cfg.get("backend", "dnn")).strip().lower()
+    if backend not in ("dnn", "bnn"):
+        raise ValueError(f"Unsupported surrogate backend '{backend}'. Expected 'dnn' or 'bnn'.")
+    predictive_mc_samples = int(surrogate_cfg.get("predictive_mc_samples", 32))
+    predictive_mc_chunk_size = int(surrogate_cfg.get("predictive_mc_chunk_size", 8))
+    if predictive_mc_samples < 1:
+        raise ValueError("surrogate.predictive_mc_samples must be >= 1.")
+    if predictive_mc_chunk_size < 1:
+        raise ValueError("surrogate.predictive_mc_chunk_size must be >= 1.")
+    return backend, predictive_mc_samples, predictive_mc_chunk_size
+
+
+def _build_surrogate(
+    project_root: str, diameter_um: float, device: str = "cpu", backend: str = "dnn"
+) -> Any:
     global _SURROGATE_PATH_ADDED
     if not _SURROGATE_PATH_ADDED:
         sys.path.insert(0, os.path.join(project_root, "indentation", "surrogate"))
@@ -70,20 +90,32 @@ def _build_surrogate(project_root: str, diameter_um: float, device: str = "cpu")
     surrogate_path = os.path.join(
         project_root, f"indentation/surrogate/diameters/{diameter_um}um/trained"
     )
-    from evaluate import Surrogate
+    if backend == "dnn":
+        from evaluate import Surrogate
 
-    return Surrogate(surrogate_path, device=device)
+        return Surrogate(surrogate_path, device=device)
+    if backend == "bnn":
+        from evaluate_bnn import Surrogate
+
+        return Surrogate(surrogate_path, device=device)
+    raise ValueError(f"Unsupported surrogate backend '{backend}'.")
 
 
-def _get_surrogate(project_root: str, diameter_um: float, device: str = "cpu") -> Any:
-    key = (project_root, diameter_um, device)
+def _get_surrogate(
+    project_root: str, diameter_um: float, device: str = "cpu", backend: str = "dnn"
+) -> Any:
+    key = (project_root, diameter_um, device, backend)
     if key not in _SURROGATE_CACHE:
-        _SURROGATE_CACHE[key] = _build_surrogate(project_root, diameter_um, device=device)
+        _SURROGATE_CACHE[key] = _build_surrogate(
+            project_root, diameter_um, device=device, backend=backend
+        )
     return _SURROGATE_CACHE[key]
 
 
-def preload_indentation_surrogate(diameter_um: float, device: str = "cpu") -> None:
-    _get_surrogate(_resolve_project_root(), diameter_um, device=device)
+def preload_indentation_surrogate(
+    diameter_um: float, device: str = "cpu", backend: str = "dnn"
+) -> None:
+    _get_surrogate(_resolve_project_root(), diameter_um, device=device, backend=backend)
 
 
 def _get_dump_flag() -> bool:
@@ -103,9 +135,25 @@ def compute_indentation_surrogate(
         sample["Parameters"], fixed_params=get_fixed_parameters(config)
     )
     Yt, kb, b1, b2, a3, a4, d0, sigma = params.tolist()
-    surrogate = _get_surrogate(project_root, diameter_um)
-    displacements = surrogate.evaluate_indentation(x=[Yt, kb, b1, b2, a3, a4], forces=forces)
-    displacements = np.maximum(0.0, np.asarray(displacements) + d0).tolist()
+    backend, predictive_mc_samples, predictive_mc_chunk_size = _resolve_surrogate_runtime(config)
+    surrogate = _get_surrogate(project_root, diameter_um, backend=backend)
+    if backend == "dnn":
+        displacements = surrogate.evaluate_indentation(x=[Yt, kb, b1, b2, a3, a4], forces=forces)
+        displacements = np.maximum(0.0, np.asarray(displacements) + d0)
+        sample["Reference Evaluations"] = displacements.tolist()
+        sample["Standard Deviation"] = (sigma * displacements).tolist()
+        return
+
+    disp_mean, disp_std = surrogate.evaluate_indentation(
+        x=[Yt, kb, b1, b2, a3, a4],
+        forces=forces,
+        predictive_mc_samples=predictive_mc_samples,
+        predictive_mc_chunk_size=predictive_mc_chunk_size,
+    )
+    disp_mean_arr = np.maximum(0.0, np.asarray(disp_mean, dtype=np.float64) + d0)
+    disp_std_arr = np.asarray(disp_std, dtype=np.float64)
+    obs_std_arr = sigma * np.abs(disp_mean_arr)
+    total_std_arr = np.sqrt(np.square(disp_std_arr) + np.square(obs_std_arr))
     try:
         comm = korali.getWorkerMPIComm()
     except Exception:
@@ -114,8 +162,8 @@ def compute_indentation_surrogate(
         print(
             f"[Korali] Indentation surrogate [D={diameter_um}um] | Yt={Yt:.0f}, kb={kb:.0f}, b1={b1:.2f}, b2={b2:.2f}, a3={a3:.2f}, a4={a4:.2f}, d0={d0:.4f}"
         )
-    sample["Reference Evaluations"] = displacements
-    sample["Standard Deviation"] = (sigma * np.asarray(displacements)).tolist()
+    sample["Reference Evaluations"] = disp_mean_arr.tolist()
+    sample["Standard Deviation"] = total_std_arr.tolist()
 
 
 def compute_indentation_surrogate_batch(
@@ -129,6 +177,7 @@ def compute_indentation_surrogate_batch(
     project_root = _resolve_project_root()
     config = _load_config(project_root)
     fixed_params = get_fixed_parameters(config)
+    backend, predictive_mc_samples, predictive_mc_chunk_size = _resolve_surrogate_runtime(config)
     batch_params = np.asarray(sample["Batch Parameters"], dtype=np.float32)
     if batch_params.ndim != 2:
         raise ValueError(f"Expected 2D batch params, got {batch_params.shape}")
@@ -143,12 +192,27 @@ def compute_indentation_surrogate_batch(
         theta, d0, sigma = expanded[:, :6], expanded[:, 6], expanded[:, 7]
     else:
         raise ValueError(f"Expected 4, 7, or 8 params, got {batch_params.shape[1]}")
-    surrogate = _get_surrogate(project_root, diameter_um, device=device)
-    displacements = surrogate.evaluate_indentation_batch(
-        theta, forces=forces, d0=d0, chunk_size=particle_batch_size
+    surrogate = _get_surrogate(project_root, diameter_um, device=device, backend=backend)
+    if backend == "dnn":
+        displacements = surrogate.evaluate_indentation_batch(
+            theta, forces=forces, d0=d0, chunk_size=particle_batch_size
+        )
+        sample["Batch Reference Evaluations"] = displacements.tolist()
+        sample["Batch Standard Deviation"] = (sigma[:, None] * displacements).tolist()
+        return
+
+    disp_mean, disp_std = surrogate.evaluate_indentation_batch(
+        theta,
+        forces=forces,
+        d0=d0,
+        chunk_size=particle_batch_size,
+        predictive_mc_samples=predictive_mc_samples,
+        predictive_mc_chunk_size=predictive_mc_chunk_size,
     )
-    sample["Batch Reference Evaluations"] = displacements.tolist()
-    sample["Batch Standard Deviation"] = (sigma[:, None] * displacements).tolist()
+    obs_std = sigma[:, None] * np.abs(disp_mean)
+    total_std = np.sqrt(np.square(disp_std) + np.square(obs_std))
+    sample["Batch Reference Evaluations"] = disp_mean.tolist()
+    sample["Batch Standard Deviation"] = total_std.tolist()
 
 
 def adjust_simu_params(sample_param, filename_1_simu, filename_2_simu):

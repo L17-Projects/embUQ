@@ -26,7 +26,7 @@ from meso_uq.workflow_acceleration import (
 )
 
 _CONFIG_CACHE: Dict[str, Dict[str, Any]] = {}
-_SURROGATE_CACHE: Dict[Tuple[str, float, str], Any] = {}
+_SURROGATE_CACHE: Dict[Tuple[str, float, str, str], Any] = {}
 _SURROGATE_PATH_ADDED = False
 
 
@@ -70,7 +70,27 @@ def _load_config(project_root: str) -> Dict[str, Any]:
     return _CONFIG_CACHE[key]
 
 
-def _build_surrogate(project_root: str, diameter_um: float, device: str = "cpu") -> Any:
+def _resolve_surrogate_runtime(config: Dict[str, Any]) -> Tuple[str, int, int]:
+    surrogate_cfg = config.get("surrogate", {})
+    if surrogate_cfg is None:
+        surrogate_cfg = {}
+    if not isinstance(surrogate_cfg, dict):
+        raise ValueError("Expected 'surrogate' config section to be a mapping.")
+    backend = str(surrogate_cfg.get("backend", "dnn")).strip().lower()
+    if backend not in ("dnn", "bnn"):
+        raise ValueError(f"Unsupported surrogate backend '{backend}'. Expected 'dnn' or 'bnn'.")
+    predictive_mc_samples = int(surrogate_cfg.get("predictive_mc_samples", 32))
+    predictive_mc_chunk_size = int(surrogate_cfg.get("predictive_mc_chunk_size", 8))
+    if predictive_mc_samples < 1:
+        raise ValueError("surrogate.predictive_mc_samples must be >= 1.")
+    if predictive_mc_chunk_size < 1:
+        raise ValueError("surrogate.predictive_mc_chunk_size must be >= 1.")
+    return backend, predictive_mc_samples, predictive_mc_chunk_size
+
+
+def _build_surrogate(
+    project_root: str, diameter_um: float, device: str = "cpu", backend: str = "dnn"
+) -> Any:
     global _SURROGATE_PATH_ADDED
     if not _SURROGATE_PATH_ADDED:
         sys.path.insert(0, os.path.join(project_root, "compression", "surrogate"))
@@ -78,20 +98,32 @@ def _build_surrogate(project_root: str, diameter_um: float, device: str = "cpu")
     surrogate_path = os.path.join(
         project_root, f"compression/surrogate/diameters/{diameter_um}um/trained"
     )
-    from evaluate import Surrogate
+    if backend == "dnn":
+        from evaluate import Surrogate
 
-    return Surrogate(surrogate_path, device=device)
+        return Surrogate(surrogate_path, device=device)
+    if backend == "bnn":
+        from evaluate_bnn import Surrogate
+
+        return Surrogate(surrogate_path, device=device)
+    raise ValueError(f"Unsupported surrogate backend '{backend}'.")
 
 
-def _get_surrogate(project_root: str, diameter_um: float, device: str = "cpu") -> Any:
-    key = (project_root, diameter_um, device)
+def _get_surrogate(
+    project_root: str, diameter_um: float, device: str = "cpu", backend: str = "dnn"
+) -> Any:
+    key = (project_root, diameter_um, device, backend)
     if key not in _SURROGATE_CACHE:
-        _SURROGATE_CACHE[key] = _build_surrogate(project_root, diameter_um, device=device)
+        _SURROGATE_CACHE[key] = _build_surrogate(
+            project_root, diameter_um, device=device, backend=backend
+        )
     return _SURROGATE_CACHE[key]
 
 
-def preload_compression_surrogate(diameter_um: float, device: str = "cpu") -> None:
-    _get_surrogate(_resolve_project_root(), diameter_um, device=device)
+def preload_compression_surrogate(
+    diameter_um: float, device: str = "cpu", backend: str = "dnn"
+) -> None:
+    _get_surrogate(_resolve_project_root(), diameter_um, device=device, backend=backend)
 
 
 def _load_run_equil():
@@ -111,11 +143,27 @@ def compute_compression_surrogate(
         sample["Parameters"], fixed_params=get_fixed_parameters(config)
     )
     Yt, kb, b1, b2, a3, a4, d0, sigma = params.tolist()
-    surrogate = _get_surrogate(project_root, diameter_um)
+    backend, predictive_mc_samples, predictive_mc_chunk_size = _resolve_surrogate_runtime(config)
+    surrogate = _get_surrogate(project_root, diameter_um, backend=backend)
     displ_corrected = [max(0.0, d - d0) for d in displ]
-    forces = surrogate.evaluate_compression(x=[Yt, kb, b1, b2, a3, a4], disp=displ_corrected)
-    sample["Reference Evaluations"] = forces
-    sample["Standard Deviation"] = [sigma * val for val in forces]
+    if backend == "dnn":
+        forces = surrogate.evaluate_compression(x=[Yt, kb, b1, b2, a3, a4], disp=displ_corrected)
+        sample["Reference Evaluations"] = forces
+        sample["Standard Deviation"] = [sigma * val for val in forces]
+        return
+
+    force_mean, force_std = surrogate.evaluate_compression(
+        x=[Yt, kb, b1, b2, a3, a4],
+        disp=displ_corrected,
+        predictive_mc_samples=predictive_mc_samples,
+        predictive_mc_chunk_size=predictive_mc_chunk_size,
+    )
+    force_mean_arr = np.asarray(force_mean, dtype=np.float64)
+    force_std_arr = np.asarray(force_std, dtype=np.float64)
+    obs_std_arr = sigma * np.abs(force_mean_arr)
+    total_std_arr = np.sqrt(np.square(force_std_arr) + np.square(obs_std_arr))
+    sample["Reference Evaluations"] = force_mean_arr.tolist()
+    sample["Standard Deviation"] = total_std_arr.tolist()
 
 
 def compute_compression_surrogate_batch(
@@ -129,6 +177,7 @@ def compute_compression_surrogate_batch(
     project_root = _resolve_project_root()
     config = _load_config(project_root)
     fixed_params = get_fixed_parameters(config)
+    backend, predictive_mc_samples, predictive_mc_chunk_size = _resolve_surrogate_runtime(config)
     batch_params = np.asarray(sample["Batch Parameters"], dtype=np.float32)
     if batch_params.ndim != 2:
         raise ValueError(f"Expected 2D batch params, got {batch_params.shape}")
@@ -143,12 +192,27 @@ def compute_compression_surrogate_batch(
         theta, d0, sigma = expanded[:, :6], expanded[:, 6], expanded[:, 7]
     else:
         raise ValueError(f"Expected 4, 7, or 8 params, got {batch_params.shape[1]}")
-    surrogate = _get_surrogate(project_root, diameter_um, device=device)
-    forces = surrogate.evaluate_compression_batch(
-        theta, disp=displ, d0=d0, chunk_size=particle_batch_size
+    surrogate = _get_surrogate(project_root, diameter_um, device=device, backend=backend)
+    if backend == "dnn":
+        forces = surrogate.evaluate_compression_batch(
+            theta, disp=displ, d0=d0, chunk_size=particle_batch_size
+        )
+        sample["Batch Reference Evaluations"] = forces.tolist()
+        sample["Batch Standard Deviation"] = (sigma[:, None] * forces).tolist()
+        return
+
+    force_mean, force_std = surrogate.evaluate_compression_batch(
+        theta,
+        disp=displ,
+        d0=d0,
+        chunk_size=particle_batch_size,
+        predictive_mc_samples=predictive_mc_samples,
+        predictive_mc_chunk_size=predictive_mc_chunk_size,
     )
-    sample["Batch Reference Evaluations"] = forces.tolist()
-    sample["Batch Standard Deviation"] = (sigma[:, None] * forces).tolist()
+    obs_std = sigma[:, None] * np.abs(force_mean)
+    total_std = np.sqrt(np.square(force_std) + np.square(obs_std))
+    sample["Batch Reference Evaluations"] = force_mean.tolist()
+    sample["Batch Standard Deviation"] = total_std.tolist()
 
 
 def compute_compression(

@@ -159,6 +159,11 @@ def _print_human(report: dict[str, object]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    print(
+        "WARNING: scripts/vega/doctor_vega.py is deprecated. "
+        "Use scripts/hpc/doctor_hpc.py with HPC_SITE=vega|karolina.",
+        file=sys.stderr,
+    )
     parser = argparse.ArgumentParser(description="Inspect the local Vega bootstrap/runtime surface.")
     parser.add_argument("--python-bin", default=sys.executable)
     parser.add_argument("--json", action="store_true", default=False)
