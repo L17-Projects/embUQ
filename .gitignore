@@ -9,3 +9,4 @@ coverage.xml
 coverage.json
 coverage-summary.md
 _init*/
+_*
