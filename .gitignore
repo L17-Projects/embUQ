@@ -10,3 +10,4 @@ coverage.json
 coverage-summary.md
 _init*/
 _*
+out_*

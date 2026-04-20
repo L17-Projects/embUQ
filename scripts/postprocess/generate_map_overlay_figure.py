@@ -28,6 +28,7 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
+from meso_uq.mirheo.radp import RADP_LOOKUP
 from meso_uq.postprocess.paper_figures import (
     COLORS,
     LINESTYLES,
@@ -65,29 +66,41 @@ def _load_reference(modality: str, diameter: str, length_factor: float, force_fa
 def _load_map_curve(result_json: Path, modality: str, length_factor: float, force_factor: float):
     """Return (x_phys, y_phys) for the MAP Mirheo simulation curve.
 
-    Displacement points in the result JSON are PRE-SHIFT; we add d0_offset
-    before converting so the curve aligns with the experimental x-axis.
+    For indentation:
+      - result["displacement_points"] is the FORCE grid (x-axis, DPD force units).
+      - result["forces"] is the SHORT DIAMETERS (DPD length units, model output).
+      - displacement [nm] = (D_initial − short_diameter + d0_offset) * length_factor
+        where D_initial = 2 * radp from RADP_LOOKUP.
+
+    For compression:
+      - displacement_points is the displacement grid (DPD length units).
+      - forces is the force output (DPD force units).
+      - d0_offset shifts the displacement before converting.
     """
     with open(result_json) as f:
         result = json.load(f)
 
-    displ_dpd = np.array(result["displacement_points"])
-    forces_dpd = np.array(result["forces"])
     d0_offset = float(result["grid_config"]["d0_offset"])
 
-    displ_shifted = displ_dpd + d0_offset
-
     if modality == "indentation":
-        # x = force [DPD→nN], y = displacement [DPD→nm]
+        force_grid_dpd = np.array(result["displacement_points"])  # force grid → x
+        short_diameters_dpd = np.array(result["forces"])          # short diameters → y
+        diameter_um = float(result["diameter_um"])
+        radp = RADP_LOOKUP["indentation"][diameter_um]
+        D_initial = 2.0 * radp
+        displacement_dpd = D_initial - short_diameters_dpd + d0_offset
         return (
-            forces_dpd * force_factor,
-            displ_shifted * length_factor,
+            force_grid_dpd * force_factor,      # x = Force [nN]
+            displacement_dpd * length_factor,   # y = Displacement [nm]
         )
     else:
-        # x = displacement [DPD→nm], y = force [DPD→nN]
+        # compression: displacement_points is the displacement grid (PRE-SHIFT)
+        displ_dpd = np.array(result["displacement_points"])
+        forces_dpd = np.array(result["forces"])
+        displ_shifted = displ_dpd + d0_offset
         return (
-            displ_shifted * length_factor,
-            forces_dpd * force_factor,
+            displ_shifted * length_factor,   # x = Displacement [nm]
+            forces_dpd * force_factor,       # y = Force [nN]
         )
 
 
@@ -136,17 +149,7 @@ def make_overlay_figure(
         ls = LINESTYLES[i]
         label = f"{diameter} μm"
 
-        # Reference data
-        try:
-            ref_x, ref_y = _load_reference(experiment, diameter, length_factor, force_factor)
-            ax.plot(ref_x, ref_y, linestyle="None", marker="o",
-                    markersize=3.4, markerfacecolor="white",
-                    markeredgewidth=1.1, markeredgecolor=color,
-                    label=f"{label} (exp.)")
-        except FileNotFoundError:
-            print(f"  WARNING: no reference data for {experiment} {diameter} μm")
-
-        # MAP Mirheo curve
+        # MAP Mirheo curve (drawn first so ref data appears on top)
         if diameter in result_by_diam:
             try:
                 map_x, map_y = _load_map_curve(result_by_diam[diameter], experiment,
@@ -157,6 +160,16 @@ def make_overlay_figure(
                 print(f"  WARNING: could not load MAP curve for {diameter} μm: {exc}")
         else:
             print(f"  WARNING: no passed MAP result for {experiment} {diameter} μm")
+
+        # Reference data (drawn on top of MAP curve)
+        try:
+            ref_x, ref_y = _load_reference(experiment, diameter, length_factor, force_factor)
+            ax.plot(ref_x, ref_y, linestyle="None", marker="o",
+                    markersize=3.4, markerfacecolor="white",
+                    markeredgewidth=1.1, markeredgecolor=color,
+                    label=f"{label} (exp.)")
+        except FileNotFoundError:
+            print(f"  WARNING: no reference data for {experiment} {diameter} μm")
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)

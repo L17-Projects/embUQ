@@ -107,6 +107,7 @@ def run_map_mirheo(
     n_displacements: int,
     mpi_ranks: int = MPI_RANKS,
     extra_args: list[str] | None = None,
+    model_family: str = "unknown",
 ) -> dict:
     """Run MAP Mirheo for all diameters.  Returns the summary manifest dict."""
     if extra_args is None:
@@ -170,6 +171,7 @@ def run_map_mirheo(
     summary = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "experiment": experiment,
+        "model_family": model_family,
         "manifest_path": str(manifest_path),
         "map_mirheo_dir": str(map_mirheo_dir),
         "n_displacements": n_displacements,
@@ -244,6 +246,7 @@ def main(argv: list[str] | None = None) -> int:
             n_displacements=args.n_displacements,
             mpi_ranks=args.mpi_ranks,
             extra_args=extra_args,
+            model_family=args.model_family,
         )
     except FileNotFoundError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
