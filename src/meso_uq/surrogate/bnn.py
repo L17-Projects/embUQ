@@ -181,17 +181,49 @@ class VariationalBNNPredictor:
         )
         pyro.clear_param_store()
         with torch.inference_mode():
-            guide(torch.zeros((1, int(payload["input_dim"])), dtype=torch.float32, device=self.device))
-        store = pyro.get_param_store()
-        for name, value in payload["pyro_param_values"].items():
-            if name not in store._params:
-                raise KeyError(f"Missing Pyro parameter '{name}' while loading BNN artifact.")
-            store._params[name] = torch.nn.Parameter(
-                torch.as_tensor(value, dtype=torch.float32, device=self.device)
+            guide(
+                torch.zeros((1, int(payload["input_dim"])), dtype=torch.float32, device=self.device),
+                torch.zeros((1, 1), dtype=torch.float32, device=self.device),
             )
+        store = pyro.get_param_store()
+        expected_names = set(store._params.keys())
+        param_constraints = {
+            name: store._constraints[name] for name in expected_names
+        }
+        loaded_names = set(payload["pyro_param_values"].keys())
+        missing = sorted(expected_names - loaded_names)
+        unexpected = sorted(loaded_names - expected_names)
+        if missing:
+            raise KeyError(
+                "Missing Pyro parameters while loading BNN artifact: " + ", ".join(missing)
+            )
+        if unexpected:
+            raise KeyError(
+                "Unexpected Pyro parameters while loading BNN artifact: " + ", ".join(unexpected)
+            )
+        param_values = {
+            name: torch.as_tensor(value, dtype=torch.float32, device=self.device).detach().clone()
+            for name, value in payload["pyro_param_values"].items()
+        }
+
+        def _restore_param_store() -> None:
+            pyro.clear_param_store()
+            local_store = pyro.get_param_store()
+            for name, value in param_values.items():
+                unconstrained = value.clone().detach()
+                unconstrained.requires_grad_(True)
+                local_store._params[name] = unconstrained
+                local_store._constraints[name] = param_constraints[name]
+                local_store._param_to_name[unconstrained] = name
+
+        _restore_param_store()
         output_site = str(payload.get("output_site", "_RETURN"))
 
         def _predictive(inputs: torch.Tensor, num_samples: int) -> Any:
+            # Pyro parameter store is process-global. Restore this predictor's
+            # parameters on each call so multiple diameter-specific models do not
+            # overwrite each other.
+            _restore_param_store()
             predictive = pyro.infer.Predictive(
                 model,
                 guide=guide,
