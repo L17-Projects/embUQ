@@ -4,6 +4,8 @@ import numpy as np
 import pytest
 import torch
 
+pytest.importorskip("pyro")
+
 from meso_uq.surrogate import bnn_training
 
 
