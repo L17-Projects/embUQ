@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+echo "WARNING: scripts/vega/bootstrap_korali.sh is a deprecated Vega-specific entrypoint." >&2
+echo "WARNING: use scripts/hpc/bootstrap_korali.sh with HPC_SITE=vega|karolina." >&2
+
 usage() {
   cat <<'EOF'
 Usage: bootstrap_korali.sh [--python-bin PYTHON] [--jobs N] [--reconfigure] [--native-cuda-batch] [--skip-python-build-deps]
