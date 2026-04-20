@@ -5,7 +5,7 @@ per-diameter result JSONs, converts DPD units to physical units, and overlays
 the MAP simulation curves on the experimental reference data.
 
 Produces:
-  figures/map_overlay_{model_family}.{pdf,png}
+  figures/map_overlay_{experiment}_{model_family}.{pdf,png}
 
 Usage:
   python3.8 scripts/postprocess/generate_map_overlay_figure.py \\
@@ -100,6 +100,9 @@ def make_overlay_figure(
     with open(manifest_path) as f:
         manifest = json.load(f)
 
+    model_family = manifest.get("model_family", "unknown")
+    manifest_dir = manifest_path.parent
+
     emb_yaml = emb_yaml_path(experiment, repo_root)
     length_factor, force_factor = load_scaling(emb_yaml)
 
@@ -110,18 +113,23 @@ def make_overlay_figure(
     configure_matplotlib()
     fig, ax = plt.subplots(figsize=(4.0, 3.2))
 
-    # Build a lookup: dataset_name → result_json path
+    # Build a lookup: dataset_name → result_json path (resolve relative paths
+    # against the manifest's directory so the script works regardless of cwd)
     result_by_diam: dict[str, Path] = {}
     for diam_result in manifest.get("diameters", []):
         if diam_result.get("status") != "passed":
             continue
         result_path = diam_result.get("result_json")
-        if result_path and Path(result_path).exists():
-            # extract diameter from dataset name, e.g. indentation_3.2um_result
-            name = diam_result["dataset_name"]  # e.g. indentation_3.2um
-            for diam in diameters:
-                if f"_{diam}um" in name:
-                    result_by_diam[diam] = Path(result_path)
+        if result_path:
+            result_abs = Path(result_path)
+            if not result_abs.is_absolute():
+                result_abs = (manifest_dir / result_abs).resolve()
+            if result_abs.exists():
+                # extract diameter from dataset name, e.g. indentation_3.2um
+                name = diam_result["dataset_name"]
+                for diam in diameters:
+                    if f"_{diam}um" in name:
+                        result_by_diam[diam] = result_abs
 
     for i, diameter in enumerate(diameters):
         color = colors[diameter]
@@ -157,7 +165,7 @@ def make_overlay_figure(
     ax.grid(True, alpha=0.25)
     fig.tight_layout()
 
-    stem = f"map_overlay_{experiment}"
+    stem = f"map_overlay_{experiment}_{model_family}"
     for ext in ("pdf", "png"):
         path = output_dir / f"{stem}.{ext}"
         fig.savefig(path, bbox_inches="tight", dpi=220 if ext == "png" else None)
