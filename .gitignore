@@ -14,3 +14,7 @@ out_*
 logs/
 AGENTS.md
 CLAUDE.md
+compression/surrogate/diameters/*/trained/*BNN*.pt
+compression/surrogate/diameters/*/trained/*BNN*_loss_hist.json
+indentation/surrogate/diameters/*/trained/*BNN*.pt
+indentation/surrogate/diameters/*/trained/*BNN*_loss_hist.json

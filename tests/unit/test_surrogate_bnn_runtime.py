@@ -29,3 +29,37 @@ def test_compression_bnn_surrogate_requires_artifact(tmp_path: Path) -> None:
 def test_indentation_bnn_surrogate_requires_artifact(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="indentation BNN artifact"):
         indentation_evaluate_bnn.Surrogate(str(tmp_path))
+
+
+def test_compression_bnn_surrogate_accepts_single_discovered_artifact(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    discovered = tmp_path / "my_custom_bnn.pt"
+    discovered.write_text("placeholder", encoding="utf-8")
+    captured: dict[str, str] = {}
+
+    class _DummyPredictor:
+        def __init__(self, artifact_path: str, *, device: str = "cpu") -> None:
+            captured["artifact"] = artifact_path
+            captured["device"] = device
+
+    monkeypatch.setattr(compression_evaluate_bnn, "VariationalBNNPredictor", _DummyPredictor)
+    compression_evaluate_bnn.Surrogate(str(tmp_path), device="cpu")
+    assert captured["artifact"] == str(discovered)
+
+
+def test_indentation_bnn_surrogate_accepts_single_discovered_artifact(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    discovered = tmp_path / "indentation_BNN_variant.pth"
+    discovered.write_text("placeholder", encoding="utf-8")
+    captured: dict[str, str] = {}
+
+    class _DummyPredictor:
+        def __init__(self, artifact_path: str, *, device: str = "cpu") -> None:
+            captured["artifact"] = artifact_path
+            captured["device"] = device
+
+    monkeypatch.setattr(indentation_evaluate_bnn, "VariationalBNNPredictor", _DummyPredictor)
+    indentation_evaluate_bnn.Surrogate(str(tmp_path), device="cpu")
+    assert captured["artifact"] == str(discovered)

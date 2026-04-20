@@ -22,6 +22,22 @@ def _resolve_artifact_path(base_dir: str) -> str:
         candidate = Path(base_dir) / filename
         if candidate.exists():
             return str(candidate)
+    discovered = sorted(
+        {
+            *Path(base_dir).glob("*BNN*.pt"),
+            *Path(base_dir).glob("*BNN*.pth"),
+            *Path(base_dir).glob("*bnn*.pt"),
+            *Path(base_dir).glob("*bnn*.pth"),
+        }
+    )
+    if len(discovered) == 1:
+        return str(discovered[0])
+    if len(discovered) > 1:
+        options = ", ".join(str(path.name) for path in discovered)
+        raise FileNotFoundError(
+            f"Found multiple indentation BNN artifacts under {base_dir}. "
+            f"Pass explicit path through config or keep one artifact. Candidates: {options}"
+        )
     joined = ", ".join(_ARTIFACT_CANDIDATES)
     raise FileNotFoundError(
         f"Could not find indentation BNN artifact under {base_dir}. Expected one of: {joined}"

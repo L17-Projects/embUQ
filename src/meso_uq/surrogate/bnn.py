@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Dict, Tuple
 
 import numpy as np
 import torch
+
+from .model import MLP
+
+_BNN_ARTIFACT_FORMAT = "mesouq_bnn_v1"
 
 
 def _resolve_torch_device(device: str) -> torch.device:
@@ -31,6 +35,86 @@ def _require_pyro() -> Any:
             "Install with: pip install -e '.[bnn]'"
         ) from exc
     return pyro
+
+
+def build_variational_components(
+    *,
+    input_dim: int,
+    width: int,
+    depth: int,
+    prior_scale: float,
+    obs_noise: float,
+    device: torch.device,
+) -> Tuple[Any, MLP, Callable[..., Any], Any]:
+    pyro = _require_pyro()
+    if input_dim < 1:
+        raise ValueError("input_dim must be >= 1.")
+    if width < 1:
+        raise ValueError("width must be >= 1.")
+    if depth < 1:
+        raise ValueError("depth must be >= 1.")
+    if prior_scale <= 0:
+        raise ValueError("prior_scale must be > 0.")
+    if obs_noise <= 0:
+        raise ValueError("obs_noise must be > 0.")
+
+    base_model = MLP(input_dims=input_dim, output_dims=1, hl_dims=[width] * depth).to(device)
+
+    def model(x: torch.Tensor, y: torch.Tensor | None = None) -> torch.Tensor:
+        priors = {}
+        for name, param in base_model.named_parameters():
+            priors[name] = pyro.distributions.Normal(
+                torch.zeros_like(param),
+                prior_scale * torch.ones_like(param),
+            ).to_event(param.dim())
+        lifted = pyro.random_module("module", base_model, priors)()
+        mean = lifted(x).squeeze(-1)
+        with pyro.plate("data", x.shape[0]):
+            pyro.sample(
+                "obs",
+                pyro.distributions.Normal(mean, obs_noise),
+                obs=None if y is None else y.squeeze(-1),
+            )
+        return mean.unsqueeze(-1)
+
+    guide = pyro.infer.autoguide.AutoDiagonalNormal(model)
+    return pyro, base_model, model, guide
+
+
+def make_artifact_payload(
+    *,
+    xshift: list[float],
+    xscale: list[float],
+    yshift: list[float],
+    yscale: list[float],
+    input_dim: int,
+    width: int,
+    depth: int,
+    prior_scale: float,
+    obs_noise: float,
+    pyro_param_values: Dict[str, torch.Tensor],
+    training_summary: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    serialized_params: Dict[str, torch.Tensor] = {}
+    for name, tensor in pyro_param_values.items():
+        serialized_params[str(name)] = torch.as_tensor(tensor).detach().cpu()
+    payload: Dict[str, Any] = {
+        "format": _BNN_ARTIFACT_FORMAT,
+        "input_dim": int(input_dim),
+        "width": int(width),
+        "depth": int(depth),
+        "prior_scale": float(prior_scale),
+        "obs_noise": float(obs_noise),
+        "output_site": "_RETURN",
+        "xshift": list(xshift),
+        "xscale": list(xscale),
+        "yshift": list(yshift),
+        "yscale": list(yscale),
+        "pyro_param_values": serialized_params,
+    }
+    if training_summary is not None:
+        payload["training"] = training_summary
+    return payload
 
 
 def _coerce_draws(draws: Any, n_points: int, *, device: torch.device) -> torch.Tensor:
@@ -69,21 +153,61 @@ class VariationalBNNPredictor:
         self._model = payload.get("model")
         self._guide = payload.get("guide")
         self._output_site = str(payload.get("output_site", "_RETURN"))
-
-        if not callable(self._predictive_fn):
+        self._predictive_cls = None
+        if str(payload.get("format", "")) == _BNN_ARTIFACT_FORMAT:
+            self._predictive_fn = self._predictive_from_format_v1(payload)
+        elif not callable(self._predictive_fn):
             if self._model is None or self._guide is None:
                 raise KeyError(
-                    "BNN artifact must provide either callable 'predictive' or both 'model' and 'guide'."
+                    "BNN artifact must provide either callable 'predictive', "
+                    "both 'model' and 'guide', or format='mesouq_bnn_v1'."
                 )
             pyro = _require_pyro()
             self._predictive_cls = pyro.infer.Predictive
-        else:
-            self._predictive_cls = None
 
         self._xshift_t = torch.as_tensor(payload["xshift"], dtype=torch.float32, device=self.device)
         self._xscale_t = torch.as_tensor(payload["xscale"], dtype=torch.float32, device=self.device)
         self._yshift_t = torch.as_tensor(payload["yshift"], dtype=torch.float32, device=self.device)
         self._yscale_t = torch.as_tensor(payload["yscale"], dtype=torch.float32, device=self.device)
+
+    def _predictive_from_format_v1(self, payload: Dict[str, Any]) -> Callable[..., Any]:
+        pyro, _, model, guide = build_variational_components(
+            input_dim=int(payload["input_dim"]),
+            width=int(payload["width"]),
+            depth=int(payload["depth"]),
+            prior_scale=float(payload["prior_scale"]),
+            obs_noise=float(payload["obs_noise"]),
+            device=self.device,
+        )
+        pyro.clear_param_store()
+        with torch.inference_mode():
+            guide(torch.zeros((1, int(payload["input_dim"])), dtype=torch.float32, device=self.device))
+        store = pyro.get_param_store()
+        for name, value in payload["pyro_param_values"].items():
+            if name not in store._params:
+                raise KeyError(f"Missing Pyro parameter '{name}' while loading BNN artifact.")
+            store._params[name] = torch.nn.Parameter(
+                torch.as_tensor(value, dtype=torch.float32, device=self.device)
+            )
+        output_site = str(payload.get("output_site", "_RETURN"))
+
+        def _predictive(inputs: torch.Tensor, num_samples: int) -> Any:
+            predictive = pyro.infer.Predictive(
+                model,
+                guide=guide,
+                num_samples=num_samples,
+                return_sites=(output_site,),
+            )
+            samples = predictive(inputs)
+            if output_site not in samples:
+                available = ", ".join(sorted(samples.keys()))
+                raise KeyError(
+                    f"Configured BNN output site '{output_site}' not found in predictive output. "
+                    f"Available sites: {available}"
+                )
+            return samples[output_site]
+
+        return _predictive
 
     def _run_predictive_chunk(self, inputs: torch.Tensor, num_samples: int) -> torch.Tensor:
         n_points = int(inputs.shape[0])
