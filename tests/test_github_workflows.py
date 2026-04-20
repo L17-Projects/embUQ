@@ -96,7 +96,7 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
 
     action_refs = set(_uses_by_step(workflow).values())
     assert action_refs == {
-        "actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7",
+        "actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae",
         "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
         "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
         UPLOAD_ARTIFACT_SHA,
