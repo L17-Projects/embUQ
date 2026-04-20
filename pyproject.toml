@@ -46,6 +46,9 @@ sensitivity = [
   "scipy>=1.15.3",
   "torch>=2.11.0",
 ]
+bnn = [
+  "pyro-ppl==1.9.1",
+]
 mpi = [
   "mpi4py>=4.1.1",
 ]
