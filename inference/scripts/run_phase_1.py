@@ -215,6 +215,7 @@ def run_inference(
                     raise FileNotFoundError(
                         f"No previous state found for {exp_name} under {experiment_root}"
                     )
+                e["File Output"]["Use Multiple Files"] = False
                 compute_model = resolve_compute_model(exp.name)
                 reference_points = exp.get_reference_points(diameter_um)
                 reference_data = e["Problem"].get("Reference Data")
@@ -332,6 +333,7 @@ def run_inference(
                     e["Variables"][i]["Prior Distribution"] = f"Prior {name}"
 
                 e["File Output"]["Frequency"] = 1
+                e["File Output"]["Use Multiple Files"] = False
                 e["File Output"]["Path"] = to_korali_path(
                     str(output_root / "results_phase_1" / exp_name),
                     base_dir=str(PROJECT_ROOT),

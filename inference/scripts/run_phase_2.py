@@ -103,6 +103,7 @@ def run_hierarchical_inference(profiling: bool = False, config_path: str = None,
     e["Console Output"]["Verbosity"] = "Detailed"
     results_phase_2 = output_root / "results_phase_2"
     e["File Output"]["Path"] = to_korali_path(str(results_phase_2), base_dir=project_root)
+    e["File Output"]["Use Multiple Files"] = False
     ensure_output_dir(str(results_phase_2))
 
     k = korali.Engine()
