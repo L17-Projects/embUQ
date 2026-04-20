@@ -221,8 +221,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    if args.mpi_ranks < 2:
-        print("ERROR: --mpi-ranks must be >= 2", file=sys.stderr)
+    if args.mpi_ranks != 2:
+        print("ERROR: --mpi-ranks must be exactly 2 (required by the Mirheo evaluate scripts)", file=sys.stderr)
         return 1
     if args.n_displacements < 1:
         print("ERROR: --n-displacements must be >= 1", file=sys.stderr)

@@ -189,7 +189,7 @@ def test_main_missing_manifest_returns_one(tmp_path):
     assert rc == 1
 
 
-def test_main_invalid_mpi_ranks_returns_one(tmp_path):
+def test_main_invalid_mpi_ranks_too_few_returns_one(tmp_path):
     from run_map_mirheo import main
     rc = main([
         "--experiment", "indentation",
@@ -197,6 +197,18 @@ def test_main_invalid_mpi_ranks_returns_one(tmp_path):
         "--profile", "production",
         "--output-dir", str(tmp_path),
         "--mpi-ranks", "1",
+    ])
+    assert rc == 1
+
+
+def test_main_invalid_mpi_ranks_too_many_returns_one(tmp_path):
+    from run_map_mirheo import main
+    rc = main([
+        "--experiment", "indentation",
+        "--model-family", "reduced-model",
+        "--profile", "production",
+        "--output-dir", str(tmp_path),
+        "--mpi-ranks", "4",
     ])
     assert rc == 1
 
