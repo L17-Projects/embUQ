@@ -210,12 +210,12 @@ def run_inference(
                 e["File Output"]["Path"] = to_korali_path(
                     str(experiment_root), base_dir=str(PROJECT_ROOT)
                 )
-                e["File Output"]["Use Multiple Files"] = False
                 found = e.loadState(str(experiment_root / "latest"))
                 if not found:
                     raise FileNotFoundError(
                         f"No previous state found for {exp_name} under {experiment_root}"
                     )
+                e["File Output"]["Use Multiple Files"] = False
                 compute_model = resolve_compute_model(exp.name)
                 reference_points = exp.get_reference_points(diameter_um)
                 reference_data = e["Problem"].get("Reference Data")
