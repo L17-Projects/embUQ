@@ -11,3 +11,4 @@ coverage-summary.md
 _init*/
 _*
 out_*
+logs/
