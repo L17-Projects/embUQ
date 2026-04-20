@@ -1,0 +1,19 @@
+#as a default it is ignored
+k0: 80		#number of layers
+
+den_fac: 1.0 #increase the density of points around GV # value den_fac = 1.0 is generally good # for small radii increase den_fac to 2 or more
+
+frac: 0.15	#cone height/height of the cylinder # find in literature
+
+cap: 0.0 	#capped cone # find in literature # try cap = 0.1
+
+staggered: True #True    #staggered circles ... True probably better
+
+#scale_space_advancing_front (using jet smoother)
+scale: 10		#scale iterations
+af1: 40.0 	#maximum facet length
+
+####
+# these are not read from here, but from parameters_default
+#radius: 2.0	
+#height: 14.28

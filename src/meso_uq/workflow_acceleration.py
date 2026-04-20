@@ -142,16 +142,16 @@ def expand_reduced_parameters(
         )
 
     if fixed_params is None:
-        fixed_params = {"b1": 0.0, "b2": 0.0, "a3": 0.0, "a4": 0.0}
+        fixed_params = {}
 
     expanded = np.column_stack(
         [
             params[:, 0],
             params[:, 1],
-            np.full(params.shape[0], float(fixed_params["b1"]), dtype=np.float32),
-            np.full(params.shape[0], float(fixed_params["b2"]), dtype=np.float32),
-            np.full(params.shape[0], float(fixed_params["a3"]), dtype=np.float32),
-            np.full(params.shape[0], float(fixed_params["a4"]), dtype=np.float32),
+            np.full(params.shape[0], float(fixed_params.get("b1", 0.0)), dtype=np.float32),
+            np.full(params.shape[0], float(fixed_params.get("b2", 0.0)), dtype=np.float32),
+            np.full(params.shape[0], float(fixed_params.get("a3", 0.0)), dtype=np.float32),
+            np.full(params.shape[0], float(fixed_params.get("a4", 0.0)), dtype=np.float32),
             params[:, 2],
             params[:, 3],
         ]
