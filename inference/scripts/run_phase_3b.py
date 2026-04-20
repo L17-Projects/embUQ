@@ -180,6 +180,7 @@ def run_phase_3b_dataset(
     e["Console Output"]["Verbosity"] = "Detailed"
     e["Console Output"]["Frequency"] = 1
     e["File Output"]["Frequency"] = 1
+    e["File Output"]["Use Multiple Files"] = False
     e["Store Sample Information"] = True
     if profiling:
         k["Profiling"]["Detail"] = "Full"

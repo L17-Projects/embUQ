@@ -271,6 +271,46 @@ def test_main_passes_retry_extra_args(tmp_path):
     assert any("--retry-attempt" in " ".join(cmd) for cmd in captured_cmds)
 
 
+def test_main_retry_attempt_forwards_extra_args(tmp_path):
+    """main() with --retry-attempt 1 builds extra_args and passes them through."""
+    from run_map_mirheo import main
+
+    manifest_dir = tmp_path / "map_phase3b"
+    manifest_dir.mkdir()
+    dataset = {
+        "Yt": 1e7, "kb": 1e4, "d0": 0.1, "sigma": 0.03,
+        "logLikelihood": 10.0, "logPrior": -5.0, "logPosterior": 5.0,
+        "diameter_um": 3.2, "run_dir": "/tmp/r", "output_csv": "/tmp/o.csv",
+    }
+    (manifest_dir / "phase3b_map_manifest.json").write_text(
+        json.dumps({"datasets": {"indentation_3.2um": dataset}})
+    )
+
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = ""
+    mock_result.stderr = ""
+
+    captured_cmds = []
+
+    def fake_run(cmd, **kwargs):
+        captured_cmds.append(cmd)
+        return mock_result
+
+    with patch("subprocess.run", side_effect=fake_run):
+        rc = main([
+            "--experiment", "indentation",
+            "--model-family", "reduced-model",
+            "--profile", "production",
+            "--output-dir", str(tmp_path),
+            "--python-bin", sys.executable,
+            "--n-displacements", "5",
+            "--retry-attempt", "1",
+        ])
+    assert rc == 0
+    assert any("--retry-attempt" in " ".join(str(a) for a in cmd) for cmd in captured_cmds)
+
+
 def test_main_passed_status_returns_zero(tmp_path):
     """main() returns 0 when all diameters pass."""
     from run_map_mirheo import main

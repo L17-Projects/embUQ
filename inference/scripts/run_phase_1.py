@@ -210,6 +210,7 @@ def run_inference(
                 e["File Output"]["Path"] = to_korali_path(
                     str(experiment_root), base_dir=str(PROJECT_ROOT)
                 )
+                e["File Output"]["Use Multiple Files"] = False
                 found = e.loadState(str(experiment_root / "latest"))
                 if not found:
                     raise FileNotFoundError(
@@ -332,6 +333,7 @@ def run_inference(
                     e["Variables"][i]["Prior Distribution"] = f"Prior {name}"
 
                 e["File Output"]["Frequency"] = 1
+                e["File Output"]["Use Multiple Files"] = False
                 e["File Output"]["Path"] = to_korali_path(
                     str(output_root / "results_phase_1" / exp_name),
                     base_dir=str(PROJECT_ROOT),
