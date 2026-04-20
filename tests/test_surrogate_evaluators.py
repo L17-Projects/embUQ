@@ -7,7 +7,9 @@ import pytest
 import torch
 
 from compression.surrogate import evaluate as compression_evaluate
+from compression.surrogate import evaluate_bnn as compression_evaluate_bnn
 from indentation.surrogate import evaluate as indentation_evaluate
+from indentation.surrogate import evaluate_bnn as indentation_evaluate_bnn
 
 
 class _CompressionModel:
@@ -312,3 +314,106 @@ def test_indentation_surrogate_batch_validates_input_shapes(
             forces=[0.0, 1.0],
             d0=np.array([0.0], dtype=np.float32),
         )
+
+
+def test_compression_bnn_surrogate_batch_honors_chunk_size(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifact = tmp_path / "microbubble_force_BNN.pt"
+    artifact.write_text("artifact", encoding="utf-8")
+    call_sizes: list[int] = []
+
+    class _FakeBNNPredictor:
+        def __init__(self, artifact_path: str, *, device: str = "cpu") -> None:
+            assert artifact_path == str(artifact)
+            assert device == "cpu"
+
+        def predict_mean_std(
+            self,
+            inputs: np.ndarray,
+            *,
+            predictive_mc_samples: int = 32,
+            predictive_mc_chunk_size: int = 8,
+        ) -> tuple[np.ndarray, np.ndarray]:
+            del predictive_mc_samples, predictive_mc_chunk_size
+            arr = np.asarray(inputs, dtype=np.float32)
+            call_sizes.append(int(arr.shape[0]))
+            return arr[:, -1], np.full(arr.shape[0], 0.25, dtype=np.float32)
+
+    monkeypatch.setattr(compression_evaluate_bnn, "VariationalBNNPredictor", _FakeBNNPredictor)
+    surrogate = compression_evaluate_bnn.Surrogate(str(tmp_path), device="cpu")
+
+    theta = np.array(
+        [
+            [10.0, 20.0, 1.0, 2.0, 3.0, 4.0],
+            [11.0, 21.0, 1.1, 2.1, 3.1, 4.1],
+            [12.0, 22.0, 1.2, 2.2, 3.2, 4.2],
+            [13.0, 23.0, 1.3, 2.3, 3.3, 4.3],
+            [14.0, 24.0, 1.4, 2.4, 3.4, 4.4],
+        ],
+        dtype=np.float32,
+    )
+    d0 = np.array([0.0, 0.5, 1.0, 1.5, 2.0], dtype=np.float32)
+    mean, std = surrogate.evaluate_compression_batch(theta, disp=[0.0, 1.0, 2.0], d0=d0, chunk_size=2)
+
+    assert call_sizes == [6, 6, 3]
+    expected = np.maximum(
+        0.0,
+        np.asarray([0.0, 1.0, 2.0], dtype=np.float32)[None, :] - d0[:, None],
+    )
+    np.testing.assert_allclose(mean, expected)
+    np.testing.assert_allclose(std, np.full((5, 3), 0.25, dtype=np.float32))
+
+
+def test_indentation_bnn_surrogate_batch_honors_chunk_size(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifact = tmp_path / "microbubble_displacement_BNN.pt"
+    artifact.write_text("artifact", encoding="utf-8")
+    call_sizes: list[int] = []
+
+    class _FakeBNNPredictor:
+        def __init__(self, artifact_path: str, *, device: str = "cpu") -> None:
+            assert artifact_path == str(artifact)
+            assert device == "cpu"
+
+        def predict_mean_std(
+            self,
+            inputs: np.ndarray,
+            *,
+            predictive_mc_samples: int = 32,
+            predictive_mc_chunk_size: int = 8,
+        ) -> tuple[np.ndarray, np.ndarray]:
+            del predictive_mc_samples, predictive_mc_chunk_size
+            arr = np.asarray(inputs, dtype=np.float32)
+            call_sizes.append(int(arr.shape[0]))
+            return arr[:, -1], np.full(arr.shape[0], 0.125, dtype=np.float32)
+
+    monkeypatch.setattr(indentation_evaluate_bnn, "VariationalBNNPredictor", _FakeBNNPredictor)
+    surrogate = indentation_evaluate_bnn.Surrogate(str(tmp_path), device="cpu")
+
+    theta = np.array(
+        [
+            [10.0, 20.0, 1.0, 2.0, 3.0, 4.0],
+            [11.0, 21.0, 1.1, 2.1, 3.1, 4.1],
+            [12.0, 22.0, 1.2, 2.2, 3.2, 4.2],
+            [13.0, 23.0, 1.3, 2.3, 3.3, 4.3],
+            [14.0, 24.0, 1.4, 2.4, 3.4, 4.4],
+        ],
+        dtype=np.float32,
+    )
+    d0 = np.array([0.2, 0.0, 1.0, 0.5, -0.1], dtype=np.float32)
+    mean, std = surrogate.evaluate_indentation_batch(
+        theta,
+        forces=[-1.0, 2.0],
+        d0=d0,
+        chunk_size=2,
+    )
+
+    assert call_sizes == [4, 4, 2]
+    expected = np.maximum(
+        0.0,
+        np.asarray([-1.0, 2.0], dtype=np.float32)[None, :] + d0[:, None],
+    )
+    np.testing.assert_allclose(mean, expected)
+    np.testing.assert_allclose(std, np.full((5, 2), 0.125, dtype=np.float32))

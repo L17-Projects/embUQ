@@ -113,15 +113,25 @@ class Surrogate:
             )
 
         n_particles, n_force = params.shape[0], force_arr.shape[0]
-        theta = np.repeat(params[:, None, :], n_force, axis=1)
-        inputs = np.concatenate(
-            [theta, np.repeat(force_arr[None, :, None], n_particles, axis=0)], axis=2
-        ).reshape(-1, 7)
-        mean_flat, std_flat = self.predictor.predict_mean_std(
-            inputs,
-            predictive_mc_samples=predictive_mc_samples,
-            predictive_mc_chunk_size=predictive_mc_chunk_size,
-        )
-        mean = np.maximum(0.0, mean_flat.reshape(n_particles, n_force) + d0_arr[:, None])
-        std = std_flat.reshape(n_particles, n_force)
+        requested_chunk_size = n_particles if chunk_size <= 0 else int(chunk_size)
+        mean = np.zeros((n_particles, n_force), dtype=np.float32)
+        std = np.zeros((n_particles, n_force), dtype=np.float32)
+        for start in range(0, n_particles, requested_chunk_size):
+            stop = min(start + requested_chunk_size, n_particles)
+            batch_size = stop - start
+            theta = np.repeat(params[start:stop, None, :], n_force, axis=1)
+            inputs = np.concatenate(
+                [theta, np.repeat(force_arr[None, :, None], batch_size, axis=0)], axis=2
+            ).reshape(-1, 7)
+            mean_flat, std_flat = self.predictor.predict_mean_std(
+                inputs,
+                predictive_mc_samples=predictive_mc_samples,
+                predictive_mc_chunk_size=predictive_mc_chunk_size,
+            )
+            mean[start:stop] = np.maximum(
+                0.0,
+                np.asarray(mean_flat, dtype=np.float32).reshape(batch_size, n_force)
+                + d0_arr[start:stop, None],
+            )
+            std[start:stop] = np.asarray(std_flat, dtype=np.float32).reshape(batch_size, n_force)
         return mean, std

@@ -110,15 +110,24 @@ class Surrogate:
                 np.zeros((0, n_disp), dtype=np.float32),
             )
 
-        disp_corr = np.maximum(disp_arr[None, :] - d0_arr[:, None], 0.0)
         n_particles, n_disp = params.shape[0], disp_arr.shape[0]
-        theta = np.repeat(params[:, None, :], n_disp, axis=1)
-        inputs = np.concatenate([theta, disp_corr[:, :, None]], axis=2).reshape(-1, 7)
-        mean_flat, std_flat = self.predictor.predict_mean_std(
-            inputs,
-            predictive_mc_samples=predictive_mc_samples,
-            predictive_mc_chunk_size=predictive_mc_chunk_size,
-        )
-        mean = np.maximum(0.0, mean_flat.reshape(n_particles, n_disp))
-        std = std_flat.reshape(n_particles, n_disp)
+        requested_chunk_size = n_particles if chunk_size <= 0 else int(chunk_size)
+        mean = np.zeros((n_particles, n_disp), dtype=np.float32)
+        std = np.zeros((n_particles, n_disp), dtype=np.float32)
+        for start in range(0, n_particles, requested_chunk_size):
+            stop = min(start + requested_chunk_size, n_particles)
+            batch_size = stop - start
+            disp_corr = np.maximum(disp_arr[None, :] - d0_arr[start:stop, None], 0.0)
+            theta = np.repeat(params[start:stop, None, :], n_disp, axis=1)
+            inputs = np.concatenate([theta, disp_corr[:, :, None]], axis=2).reshape(-1, 7)
+            mean_flat, std_flat = self.predictor.predict_mean_std(
+                inputs,
+                predictive_mc_samples=predictive_mc_samples,
+                predictive_mc_chunk_size=predictive_mc_chunk_size,
+            )
+            mean[start:stop] = np.maximum(
+                0.0,
+                np.asarray(mean_flat, dtype=np.float32).reshape(batch_size, n_disp),
+            )
+            std[start:stop] = np.asarray(std_flat, dtype=np.float32).reshape(batch_size, n_disp)
         return mean, std
