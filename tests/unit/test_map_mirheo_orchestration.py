@@ -237,6 +237,18 @@ def test_main_negative_retry_attempt_returns_one(tmp_path):
     assert rc == 1
 
 
+def test_main_invalid_timeout_seconds_returns_one(tmp_path):
+    from run_map_mirheo import main
+    rc = main([
+        "--experiment", "indentation",
+        "--model-family", "reduced-model",
+        "--profile", "production",
+        "--output-dir", str(tmp_path),
+        "--timeout-seconds", "0",
+    ])
+    assert rc == 1
+
+
 def test_main_passes_retry_extra_args(tmp_path):
     """With retry-attempt > 0, extra_args are forwarded to the evaluate script."""
     from run_map_mirheo import run_map_mirheo
@@ -309,6 +321,51 @@ def test_main_retry_attempt_forwards_extra_args(tmp_path):
         ])
     assert rc == 0
     assert any("--retry-attempt" in " ".join(str(a) for a in cmd) for cmd in captured_cmds)
+
+
+def test_main_numsteps_overrides_forwarded(tmp_path):
+    """main() forwards --numsteps and --numsteps-eq to evaluate scripts."""
+    from run_map_mirheo import main
+
+    manifest_dir = tmp_path / "map_phase3b"
+    manifest_dir.mkdir()
+    dataset = {
+        "Yt": 1e7, "kb": 1e4, "d0": 0.1, "sigma": 0.03,
+        "logLikelihood": 10.0, "logPrior": -5.0, "logPosterior": 5.0,
+        "diameter_um": 3.2, "run_dir": "/tmp/r", "output_csv": "/tmp/o.csv",
+    }
+    (manifest_dir / "phase3b_map_manifest.json").write_text(
+        json.dumps({"datasets": {"indentation_3.2um": dataset}})
+    )
+
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = ""
+    mock_result.stderr = ""
+
+    captured_cmds = []
+
+    def fake_run(cmd, **kwargs):
+        captured_cmds.append(cmd)
+        return mock_result
+
+    with patch("subprocess.run", side_effect=fake_run):
+        rc = main([
+            "--experiment", "indentation",
+            "--model-family", "reduced-model",
+            "--profile", "production",
+            "--output-dir", str(tmp_path),
+            "--python-bin", sys.executable,
+            "--n-displacements", "5",
+            "--numsteps", "5000",
+            "--numsteps-eq", "10000",
+        ])
+
+    assert rc == 0
+    assert captured_cmds
+    rendered = " ".join(str(a) for a in captured_cmds[0])
+    assert "--numsteps 5000" in rendered
+    assert "--numsteps-eq 10000" in rendered
 
 
 def test_main_passed_status_returns_zero(tmp_path):
