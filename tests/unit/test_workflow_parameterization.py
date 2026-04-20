@@ -127,6 +127,22 @@ def test_expand_reduced_parameters_rejects_invalid_shape() -> None:
         expand_reduced_parameters(np.ones((2, 3), dtype=np.float32))
 
 
+def test_expand_reduced_parameters_empty_fixed_params_defaults_to_zero() -> None:
+    """Regression: empty fixed_params dict must not raise KeyError on b1/b2/a3/a4."""
+    result = expand_reduced_parameters(
+        np.array([[10.0, 20.0, 0.5, 0.1]], dtype=np.float32),
+        fixed_params={},
+    )
+    assert result[0].tolist() == pytest.approx([10.0, 20.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.1])
+
+
+def test_expand_parameter_vector_with_empty_fixed_params_does_not_raise() -> None:
+    """Regression: get_fixed_parameters returns {} when no fixed_params in config;
+    expand_parameter_vector must still work for the reduced (4-param) case."""
+    result = expand_parameter_vector([10.0, 20.0, 0.5, 0.1], fixed_params={})
+    assert result.tolist() == pytest.approx([10.0, 20.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.1])
+
+
 def test_require_single_rank_accepts_single_rank_comm() -> None:
     class _Comm:
         @staticmethod
