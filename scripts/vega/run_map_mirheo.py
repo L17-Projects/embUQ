@@ -37,7 +37,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from convert_map_manifest import convert_manifest  # noqa: E402
 
-TIMEOUT_SECONDS = 1800  # 30 minutes per diameter
+TIMEOUT_SECONDS = 1800  # default: 30 minutes per diameter
 MPI_RANKS = 2
 
 
@@ -55,6 +55,7 @@ def _run_diameter(
     n_displacements: int,
     mpi_ranks: int,
     extra_args: list[str],
+    timeout_seconds: int,
 ) -> dict:
     """Run Mirheo evaluation for one diameter.  Returns a result dict."""
     eval_script = _evaluate_script(experiment)
@@ -74,7 +75,7 @@ def _run_diameter(
             cwd=str(REPO_ROOT),
             capture_output=True,
             text=True,
-            timeout=TIMEOUT_SECONDS,
+            timeout=timeout_seconds,
             check=False,
         )
         returncode = proc.returncode
@@ -108,6 +109,7 @@ def run_map_mirheo(
     mpi_ranks: int = MPI_RANKS,
     extra_args: list[str] | None = None,
     model_family: str = "unknown",
+    timeout_seconds: int = TIMEOUT_SECONDS,
 ) -> dict:
     """Run MAP Mirheo for all diameters.  Returns the summary manifest dict."""
     if extra_args is None:
@@ -155,6 +157,7 @@ def run_map_mirheo(
             n_displacements=n_displacements,
             mpi_ranks=mpi_ranks,
             extra_args=extra_args,
+            timeout_seconds=timeout_seconds,
         )
         status = "timed_out" if result["timed_out"] else (
             "passed" if result["returncode"] == 0 else "failed"
@@ -176,6 +179,7 @@ def run_map_mirheo(
         "map_mirheo_dir": str(map_mirheo_dir),
         "n_displacements": n_displacements,
         "mpi_ranks": mpi_ranks,
+        "timeout_seconds": timeout_seconds,
         "status": overall_status,
         "diameters": diameter_results,
     }
@@ -221,6 +225,18 @@ def main(argv: list[str] | None = None) -> int:
         "--dt-scale-factor", type=float, default=0.5,
         help="Passed through to the evaluate script"
     )
+    parser.add_argument(
+        "--timeout-seconds", type=int, default=TIMEOUT_SECONDS,
+        help=f"Per-diameter timeout for evaluate subprocesses (default: {TIMEOUT_SECONDS})"
+    )
+    parser.add_argument(
+        "--numsteps", type=int, default=None,
+        help="Optional override passed through to evaluate_map_mirheo_optimized*.py"
+    )
+    parser.add_argument(
+        "--numsteps-eq", type=int, default=None,
+        help="Optional override passed through to evaluate_map_mirheo_optimized*.py"
+    )
     args = parser.parse_args(argv)
 
     if args.mpi_ranks != 2:
@@ -232,11 +248,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.retry_attempt < 0:
         print("ERROR: --retry-attempt must be >= 0", file=sys.stderr)
         return 1
+    if args.timeout_seconds < 1:
+        print("ERROR: --timeout-seconds must be >= 1", file=sys.stderr)
+        return 1
 
     extra_args: list[str] = []
     if args.retry_attempt > 0:
         extra_args += ["--retry-attempt", str(args.retry_attempt),
                        "--dt-scale-factor", str(args.dt_scale_factor)]
+    if args.numsteps is not None:
+        extra_args += ["--numsteps", str(args.numsteps)]
+    if args.numsteps_eq is not None:
+        extra_args += ["--numsteps-eq", str(args.numsteps_eq)]
 
     try:
         summary = run_map_mirheo(
@@ -247,6 +270,7 @@ def main(argv: list[str] | None = None) -> int:
             mpi_ranks=args.mpi_ranks,
             extra_args=extra_args,
             model_family=args.model_family,
+            timeout_seconds=args.timeout_seconds,
         )
     except FileNotFoundError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
