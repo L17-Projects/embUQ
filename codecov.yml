@@ -1,6 +1,14 @@
 codecov:
   require_ci_to_pass: true
 
+ignore:
+  # Optional BNN runtime/training surfaces require the `pyro-ppl` extra,
+  # which is intentionally not part of the default CI test extra.
+  - "src/meso_uq/surrogate/bnn.py"
+  - "src/meso_uq/surrogate/bnn_training.py"
+  - "compression/surrogate/scripts/emb_train_bnn.py"
+  - "indentation/surrogate/scripts/emb_train_bnn.py"
+
 coverage:
   status:
     project:
