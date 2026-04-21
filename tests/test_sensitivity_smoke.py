@@ -18,6 +18,20 @@ class _LinearModel(torch.nn.Module):
         return values[:, :1] + 0.5 * values[:, 1:2]
 
 
+class _PredictorStub:
+    def predict_mean_std(
+        self,
+        values,
+        *,
+        predictive_mc_samples,
+        predictive_mc_chunk_size,
+    ):
+        arr = np.asarray(values, dtype=float)
+        mean = arr[:, 0] + 0.25 * arr[:, 1]
+        std = np.full_like(mean, 0.1)
+        return mean, std
+
+
 def _load_module(path: Path, name: str):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
@@ -63,6 +77,33 @@ def test_run_sobol_over_axis_returns_expected_shape():
         evaluate_columns=["Yt", "kb", "disp"],
         n_samples=64,
         calc_second_order=False,
+    )
+
+    assert isinstance(result, pd.DataFrame)
+    assert set(result["parameter"]) == {"Yt", "kb"}
+    assert set(result["index_type"]) == {"S1", "ST"}
+    assert set(result["axis"]) == {0.2, 0.8}
+    assert len(result) == 8
+
+
+def test_run_sobol_over_axis_supports_predictor_backend():
+    problem = build_problem(
+        [
+            VarConfig("Yt", UniformPrior(0.0, 1.0)),
+            VarConfig("kb", UniformPrior(0.0, 1.0)),
+        ]
+    )
+
+    result = run_sobol_over_axis(
+        predictor=_PredictorStub(),
+        problem=problem,
+        fixed_axis_name="disp",
+        fixed_axis_values=[0.2, 0.8],
+        evaluate_columns=["Yt", "kb", "disp"],
+        n_samples=64,
+        calc_second_order=False,
+        predictive_mc_samples=8,
+        predictive_mc_chunk_size=4,
     )
 
     assert isinstance(result, pd.DataFrame)
