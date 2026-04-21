@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 from typing import Any, Callable, Dict, Tuple
 
@@ -17,12 +16,10 @@ def _resolve_torch_device(device: str) -> torch.device:
     if normalized == "gpu":
         normalized = "cuda"
     if normalized == "cuda" and not torch.cuda.is_available():
-        warnings.warn(
-            "Requested CUDA for BNN surrogate, but CUDA is unavailable. Falling back to CPU.",
-            RuntimeWarning,
-            stacklevel=2,
+        raise RuntimeError(
+            "Requested CUDA for BNN surrogate, but CUDA is unavailable. "
+            "Use --device cpu to run on CPU, or ensure a GPU is visible to PyTorch."
         )
-        normalized = "cpu"
     return torch.device(normalized)
 
 
