@@ -19,6 +19,11 @@ fi
 RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/vega/sobol/${RUN_TAG}}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
+# MODEL_FAMILIES: space-separated families to run. Default: dnn bnn
+MODEL_FAMILIES="${MODEL_FAMILIES:-dnn bnn}"
+# SELECTIONS: space-separated <modality>_<diameter>um keys to restrict runs.
+# Leave empty to run all cases.
+SELECTIONS="${SELECTIONS:-}"
 
 module purge
 module load \
@@ -33,9 +38,17 @@ cd "${REPO_ROOT}"
 
 fail=0
 
+_want() {
+  local key="$1"
+  [[ -z "${SELECTIONS}" ]] && return 0
+  for s in ${SELECTIONS}; do [[ "$s" == "$key" ]] && return 0; done
+  return 1
+}
+
 # --- Compression (dnn + bnn) ---
-for fam in dnn bnn; do
+for fam in ${MODEL_FAMILIES}; do
   for d in 2.1 2.9 3.0; do
+    _want "compression_${d}um" || continue
     out="${OUTPUT_ROOT}/compression/${fam}/sobol_vs_disp_${d}um.csv"
     mkdir -p "$(dirname "$out")"
     if [[ "$fam" == "dnn" ]]; then
@@ -53,8 +66,9 @@ for fam in dnn bnn; do
 done
 
 # --- Indentation (dnn + bnn) ---
-for fam in dnn bnn; do
+for fam in ${MODEL_FAMILIES}; do
   for d in 3.2 3.4 5.8; do
+    _want "indentation_${d}um" || continue
     out="${OUTPUT_ROOT}/indentation/${fam}/sobol_vs_force_${d}um.csv"
     mkdir -p "$(dirname "$out")"
     if [[ "$fam" == "dnn" ]]; then

@@ -19,6 +19,23 @@ from pathlib import Path
 import pandas as pd
 
 
+def _df_to_md(df: pd.DataFrame, floatfmt: str = ".3f") -> str:
+    cols = list(df.columns)
+
+    def fmt(v: object) -> str:
+        if isinstance(v, float):
+            try:
+                return format(v, floatfmt)
+            except (ValueError, TypeError):
+                return str(v)
+        return str(v)
+
+    header = "| " + " | ".join(cols) + " |"
+    sep = "| " + " | ".join("---" for _ in cols) + " |"
+    body = ["| " + " | ".join(fmt(df.iloc[i][c]) for c in cols) + " |" for i in range(len(df))]
+    return "\n".join([header, sep] + body)
+
+
 _NUMERIC_TOL_PCT = 5.0  # max allowed relative deviation vs UQ_DPD reference (%)
 
 _REQUIRED_PARAMETERS = ["Yt", "kb", "b1", "b2", "a3", "a4"]
@@ -78,16 +95,11 @@ def _write_parity_report(path: Path, metrics: pd.DataFrame, figure_checks: list[
         "",
         "## Numeric comparison (DNN, median relative L2 error %)",
         "",
-        metrics[
-            [
-                "modality",
-                "diameter_um",
-                "mesouq_median_rel_l2_pct",
-                "uqdpd_median_rel_l2_pct",
-                "delta_rel_pct",
-                "parity_ok",
-            ]
-        ].to_markdown(index=False, floatfmt=".3f"),
+        _df_to_md(
+            metrics[["modality", "diameter_um", "mesouq_median_rel_l2_pct",
+                      "uqdpd_median_rel_l2_pct", "delta_rel_pct", "parity_ok"]],
+            floatfmt=".3f",
+        ),
         "",
         "## Figure style / presentation parity",
         "",

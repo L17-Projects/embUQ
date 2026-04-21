@@ -26,6 +26,24 @@ from pathlib import Path
 import pandas as pd
 
 
+def _df_to_md(df: pd.DataFrame, floatfmt: str = ".3f") -> str:
+    """Render a DataFrame as a plain GitHub-flavoured markdown table without tabulate."""
+    cols = list(df.columns)
+
+    def fmt(v: object) -> str:
+        if isinstance(v, float):
+            try:
+                return format(v, floatfmt)
+            except (ValueError, TypeError):
+                return str(v)
+        return str(v)
+
+    header = "| " + " | ".join(cols) + " |"
+    sep = "| " + " | ".join("---" for _ in cols) + " |"
+    body = ["| " + " | ".join(fmt(df.iloc[i][c]) for c in cols) + " |" for i in range(len(df))]
+    return "\n".join([header, sep] + body)
+
+
 def _load_summary(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path)
     required = {"modality", "surrogate_family", "diameter_um", "metric_rel_l2_pct"}
@@ -105,7 +123,7 @@ def _write_decision_md(
     lines += [
         "## Paired Comparison",
         "",
-        comp.to_markdown(index=False, floatfmt=".3f"),
+        _df_to_md(comp, floatfmt=".3f"),
         "",
         "### Decision rule",
         "GO requires ALL of:",

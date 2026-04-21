@@ -21,7 +21,11 @@ RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/vega/bnn_training/${RUN_TAG}}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 SEED="${SEED:-20260317}"
-ONLY_ARGS="${ONLY_ARGS:-}"
+# SELECTIONS: space-separated spec names to run, e.g. "indentation_3.2um indentation_3.4um".
+# Leave empty to run all specs.
+SELECTIONS="${SELECTIONS:-}"
+ONLY_ARGS=""
+for sel in ${SELECTIONS}; do ONLY_ARGS="${ONLY_ARGS} --only ${sel}"; done
 
 module purge
 module load \
