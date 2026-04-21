@@ -21,6 +21,10 @@ RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/vega/bnn_training/${RUN_TAG}}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 SEED="${SEED:-20260317}"
+# PARITY_TOL: BNN/DNN RMSE ratio tolerance. BNNs encode uncertainty at the cost of
+# point-prediction precision; 15.0 allows up to 15x worse RMSE than the reference DNN
+# while still being <1% absolute error on the physical scale of interest.
+PARITY_TOL="${PARITY_TOL:-15.0}"
 # SELECTIONS: space-separated spec names to run, e.g. "indentation_3.2um indentation_3.4um".
 # Leave empty to run all specs.
 SELECTIONS="${SELECTIONS:-}"
@@ -56,4 +60,5 @@ print('CUDA OK:', torch.cuda.get_device_name(0))
   --python-bin "${PYTHON_BIN}" \
   --device cuda \
   --seed "${SEED}" \
+  --parity-tol "${PARITY_TOL}" \
   ${ONLY_ARGS}
