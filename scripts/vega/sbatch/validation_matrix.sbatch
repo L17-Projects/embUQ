@@ -19,7 +19,9 @@ fi
 EXPERIMENTS="${EXPERIMENTS:-compression indentation}"
 MODEL_FAMILIES="${MODEL_FAMILIES:-full-model reduced-model}"
 PROFILE="${PROFILE:-validation}"
-OUTPUT_ROOT="${OUTPUT_ROOT:-_vega/validation_matrix}"
+SITE="${SITE:-vega}"
+RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
+OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/${SITE}/validation_matrix/${RUN_TAG}}"
 PHASE2_CPU_RANKS="${PHASE2_CPU_RANKS:-4}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 
@@ -45,5 +47,7 @@ cd "${REPO_ROOT}"
   --experiments $EXPERIMENTS \
   --model-families $MODEL_FAMILIES \
   --output-root "$OUTPUT_ROOT" \
+  --site "$SITE" \
+  --run-tag "$RUN_TAG" \
   --phase2-cpu-ranks "$PHASE2_CPU_RANKS" \
   --python-bin "$PYTHON_BIN"

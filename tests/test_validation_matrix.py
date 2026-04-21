@@ -227,3 +227,39 @@ def test_validation_matrix_wrapper_delegates_to_workflow_matrix_with_validation_
     assert "--profiles" in captured["command"]
     assert captured["command"][captured["command"].index("--profiles") + 1] == "validation"
     assert str(tmp_path / "validation") in captured["command"]
+
+
+def test_validation_matrix_wrapper_resolves_relative_output_root_from_repo_root(
+    tmp_path, monkeypatch
+):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "vega" / "run_validation_matrix.py",
+        "validation_matrix_wrapper_relative_output_test",
+    )
+    captured = {}
+
+    def fake_run(command, cwd=None, check=False):
+        captured["command"] = command
+        captured["cwd"] = cwd
+        return 0
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    monkeypatch.chdir(tmp_path)
+
+    rc = module.main(
+        [
+            "--selection",
+            "compression:full-model:validation",
+            "--output-root",
+            "tmp_validation",
+            "--python-bin",
+            "python",
+        ]
+    )
+
+    assert rc == 0
+    assert captured["cwd"] == str(repo_root)
+    assert _arg_value(captured["command"], "--output-root") == str(
+        (repo_root / "tmp_validation").resolve()
+    )

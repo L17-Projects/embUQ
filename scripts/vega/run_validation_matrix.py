@@ -9,10 +9,12 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
+
+from meso_uq.hpc_paths import default_runs_root, detect_hpc_site  # noqa: E402
 
 VALID_EXPERIMENTS = ("compression", "indentation")
 VALID_MODEL_FAMILIES = ("full-model", "reduced-model")
-DEFAULT_OUTPUT_ROOT = REPO_ROOT / "_vega" / "validation_matrix"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -27,7 +29,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--selection", action="append", default=[], help="Explicit selection in experiment:model-family:validation form.")
     parser.add_argument("--experiments", nargs="+", choices=VALID_EXPERIMENTS, default=None)
     parser.add_argument("--model-families", nargs="+", choices=VALID_MODEL_FAMILIES, default=None)
-    parser.add_argument("--output-root", type=str, default=str(DEFAULT_OUTPUT_ROOT))
+    parser.add_argument("--output-root", type=str, default=None)
+    parser.add_argument("--run-tag", type=str, default=None)
+    parser.add_argument("--site", choices=["vega", "karolina"], default=None)
     parser.add_argument("--python-bin", type=str, default=sys.executable)
     parser.add_argument("--phase2-cpu-ranks", type=int, default=1)
     parser.add_argument("--config-override", action="append", default=[])
@@ -37,6 +41,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--skip-phase3b-map", action="store_true", default=False)
     parser.add_argument("--skip-phase3b-propagation", action="store_true", default=False)
     args = parser.parse_args(argv)
+
+    resolved_site = args.site if args.site is not None else detect_hpc_site()
+    if args.output_root is not None:
+        candidate = Path(args.output_root).expanduser()
+        if not candidate.is_absolute():
+            candidate = REPO_ROOT / candidate
+        output_root = candidate.resolve()
+    else:
+        output_root = default_runs_root(
+            REPO_ROOT,
+            "validation_matrix",
+            site=resolved_site,
+            run_tag=args.run_tag,
+        )
 
     command = [args.python_bin, str(SCRIPT_DIR / "run_workflow_matrix.py")]
     for selection in args.selection:
@@ -50,15 +68,19 @@ def main(argv: list[str] | None = None) -> int:
             "--profiles",
             "validation",
             "--output-root",
-            args.output_root,
+            str(output_root),
             "--phase2-cpu-ranks",
             str(args.phase2_cpu_ranks),
             "--python-bin",
             args.python_bin,
+            "--site",
+            resolved_site,
         ]
     )
     for item in args.config_override:
         command.extend(["--config-override", item])
+    if args.run_tag is not None:
+        command.extend(["--run-tag", args.run_tag])
     if args.continue_on_error:
         command.append("--continue-on-error")
     if args.run_phase1_map:
@@ -69,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
         command.append("--skip-phase3b-propagation")
 
     print("Validation profile: validation")
-    print(f"Output root:         {Path(args.output_root).expanduser()}")
+    print(f"Output root:         {output_root}")
     print(f"Command:             {' '.join(command)}")
 
     subprocess.run(command, cwd=str(REPO_ROOT), check=True)

@@ -22,10 +22,13 @@ from typing import Any, Dict
 import pandas as pd
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from meso_uq.hpc_paths import default_runs_root, detect_hpc_site  # noqa: E402
 from meso_uq.vega_workflows import VegaWorkflowSelection, parse_selection, selection_key, selection_slug
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_OUTPUT_ROOT = PROJECT_ROOT.parent / "korali_gpu"
+DEFAULT_OUTPUT_ROOT = None
 DEFAULT_KORALI_PYTHONPATH = (
     PROJECT_ROOT.parent / "korali_gpu" / "local_install" / "usr" / "local" / "lib" / "python3.8" / "site-packages"
 )
@@ -297,7 +300,9 @@ def main() -> int:
         default=DEFAULT_WORKFLOWS,
         help="Validation workflow selections in experiment:model-family:profile form.",
     )
-    parser.add_argument("--output-root", type=str, default=str(DEFAULT_OUTPUT_ROOT))
+    parser.add_argument("--output-root", type=str, default=DEFAULT_OUTPUT_ROOT)
+    parser.add_argument("--run-tag", type=str, default=None)
+    parser.add_argument("--site", choices=["vega", "karolina"], default=None)
     parser.add_argument("--python-bin", type=str, default=sys.executable)
     parser.add_argument(
         "--korali-pythonpath",
@@ -320,7 +325,12 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    output_root = Path(args.output_root).resolve()
+    resolved_site = args.site if args.site is not None else detect_hpc_site()
+    output_root = (
+        Path(args.output_root).resolve()
+        if args.output_root is not None
+        else default_runs_root(PROJECT_ROOT, "validation_suite", site=resolved_site, run_tag=args.run_tag)
+    )
     output_root.mkdir(parents=True, exist_ok=True)
 
     config_overrides: dict[str, Path] = {}

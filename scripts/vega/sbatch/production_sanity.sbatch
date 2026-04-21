@@ -19,7 +19,9 @@ fi
 
 SELECTIONS="${SELECTIONS:-compression:full-model:production}"
 ALL_LANES="${ALL_LANES:-0}"
-OUTPUT_ROOT="${OUTPUT_ROOT:-_vega/production_sanity/default_lane}"
+SITE="${SITE:-vega}"
+RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
+OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/${SITE}/production_sanity/${RUN_TAG}}"
 PHASE2_CPU_RANKS="${PHASE2_CPU_RANKS:-2}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 
@@ -40,6 +42,8 @@ command=(
   "$PYTHON_BIN"
   scripts/vega/run_production_sanity.py
   --output-root "$OUTPUT_ROOT"
+  --site "$SITE"
+  --run-tag "$RUN_TAG"
   --phase2-cpu-ranks "$PHASE2_CPU_RANKS"
   --python-bin "$PYTHON_BIN"
 )

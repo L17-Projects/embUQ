@@ -11,6 +11,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
+from meso_uq.hpc_paths import detect_hpc_site  # noqa: E402
 from meso_uq.postprocess import extract_map_from_directory  # noqa: E402
 from meso_uq.vega_workflows import (  # noqa: E402
     VALID_EXPERIMENTS,
@@ -35,6 +36,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--stage", choices=VALID_MAP_STAGES, required=True)
     parser.add_argument("--config", type=str, default=None)
     parser.add_argument("--output-dir", type=str, default=None)
+    parser.add_argument("--run-tag", type=str, default=None)
+    parser.add_argument("--site", choices=["vega", "karolina"], default=None)
     parser.add_argument("--maps-dir", type=str, default=None)
     parser.add_argument("--dataset", type=str, default=None)
     parser.add_argument("--diameter", type=float, default=None)
@@ -43,7 +46,14 @@ def main(argv: list[str] | None = None) -> int:
 
     selection = VegaWorkflowSelection(args.experiment, args.model_family, args.profile)
     config_path = resolve_workflow_config_path(REPO_ROOT, selection, args.config)
-    output_root = resolve_workflow_output_root(REPO_ROOT, selection, args.output_dir)
+    resolved_site = args.site if args.site is not None else detect_hpc_site()
+    output_root = resolve_workflow_output_root(
+        REPO_ROOT,
+        selection,
+        args.output_dir,
+        run_tag=args.run_tag,
+        site=resolved_site,
+    )
     map_input_root = resolve_map_stage_input_root(output_root, args.stage)
     maps_root = resolve_map_output_root(output_root, args.stage, args.maps_dir)
     maps_root.mkdir(parents=True, exist_ok=True)

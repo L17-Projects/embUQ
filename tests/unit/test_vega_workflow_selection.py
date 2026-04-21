@@ -59,8 +59,20 @@ def test_workflow_config_paths_resolve_across_model_family_and_profile() -> None
 def test_workflow_output_root_separates_model_family_from_profile() -> None:
     repo_root = _repo_root()
     selection = VegaWorkflowSelection("compression", "reduced-model", "validation")
-    assert resolve_workflow_output_root(repo_root, selection) == (
-        repo_root / "_vega" / "runs" / "compression" / "reduced-model" / "validation"
+    assert resolve_workflow_output_root(
+        repo_root,
+        selection,
+        site="karolina",
+        run_tag="20260421_120000",
+    ) == (
+        repo_root
+        / "_runs"
+        / "karolina"
+        / "runs"
+        / "20260421_120000"
+        / "compression"
+        / "reduced-model"
+        / "validation"
     )
 
 

@@ -23,7 +23,11 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_OUTPUT_ROOT = PROJECT_ROOT.parent / "vega_acceptance"
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+from meso_uq.hpc_paths import default_runs_root, detect_hpc_site  # noqa: E402
+
+DEFAULT_OUTPUT_ROOT = None
 VALIDATION_RUNNER = PROJECT_ROOT / "scripts" / "vega" / "run_validation_suite.py"
 DEFAULT_WORKFLOWS = [
     "compression:reduced-model:validation",
@@ -82,7 +86,9 @@ def _environment_snapshot(python_bin: str, korali_pythonpath: str | None) -> dic
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the Vega-first MesoUQ acceptance command.")
-    parser.add_argument("--output-root", type=str, default=str(DEFAULT_OUTPUT_ROOT))
+    parser.add_argument("--output-root", type=str, default=DEFAULT_OUTPUT_ROOT)
+    parser.add_argument("--run-tag", type=str, default=None)
+    parser.add_argument("--site", choices=["vega", "karolina"], default=None)
     parser.add_argument("--python-bin", type=str, default=sys.executable)
     parser.add_argument("--korali-pythonpath", type=str, default=None)
     parser.add_argument(
@@ -99,7 +105,12 @@ def main() -> int:
     parser.add_argument("--config-override", action="append", default=[])
     args = parser.parse_args()
 
-    output_root = Path(args.output_root).resolve()
+    resolved_site = args.site if args.site is not None else detect_hpc_site()
+    output_root = (
+        Path(args.output_root).resolve()
+        if args.output_root is not None
+        else default_runs_root(PROJECT_ROOT, "acceptance", site=resolved_site, run_tag=args.run_tag)
+    )
     logs_dir = output_root / "logs"
     output_root.mkdir(parents=True, exist_ok=True)
     logs_dir.mkdir(parents=True, exist_ok=True)
@@ -128,7 +139,11 @@ def main() -> int:
         args.python_bin,
         "--cpu-ranks",
         str(args.cpu_ranks),
+        "--site",
+        resolved_site,
     ]
+    if args.run_tag is not None:
+        runner_cmd.extend(["--run-tag", args.run_tag])
     if args.korali_pythonpath:
         runner_cmd.extend(["--korali-pythonpath", args.korali_pythonpath])
     if args.population_size is not None:

@@ -10,7 +10,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-OUTPUT_ROOT_DEFAULT = REPO_ROOT / "_vega" / "bnn_training"
+sys.path.insert(0, str(REPO_ROOT / "src"))
+
+from meso_uq.hpc_paths import default_runs_root, detect_hpc_site  # noqa: E402
 
 SPECS = [
     {
@@ -240,7 +242,9 @@ def main(argv: list[str] | None = None) -> int:
         description="Train BNN surrogates for all EMB diameters with hard-stop on first failure."
     )
     parser.add_argument("--python-bin", default=sys.executable)
-    parser.add_argument("--output-root", default=str(OUTPUT_ROOT_DEFAULT))
+    parser.add_argument("--output-root", default=None)
+    parser.add_argument("--run-tag", default=None)
+    parser.add_argument("--site", choices=["vega", "karolina"], default=None)
     parser.add_argument("--width", type=int, default=64)
     parser.add_argument("--depth", type=int, default=3)
     parser.add_argument("--prior-scale", type=float, default=1.0)
@@ -278,7 +282,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    output_root = Path(args.output_root).resolve()
+    resolved_site = args.site if args.site is not None else detect_hpc_site()
+    output_root = (
+        Path(args.output_root).resolve()
+        if args.output_root is not None
+        else default_runs_root(REPO_ROOT, "bnn_training", site=resolved_site, run_tag=args.run_tag)
+    )
     output_root.mkdir(parents=True, exist_ok=True)
     report_path = (
         Path(args.state_path).resolve()
