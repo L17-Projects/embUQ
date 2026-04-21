@@ -14,6 +14,25 @@ from .cli import make_tensors
 from .model import load_model_states
 
 
+def _resolve_obs_noise_prior_scale(
+    *, obs_noise_prior_scale: float, obs_noise: float | None
+) -> float:
+    resolved = float(obs_noise_prior_scale)
+    if obs_noise is not None:
+        legacy = float(obs_noise)
+        if legacy <= 0:
+            raise ValueError("obs_noise must be > 0.")
+        if not np.isclose(resolved, 1.0) and not np.isclose(resolved, legacy):
+            raise ValueError(
+                "Received conflicting values for obs_noise_prior_scale and obs_noise. "
+                "Use one, or provide the same value for both."
+            )
+        resolved = legacy
+    if resolved <= 0:
+        raise ValueError("obs_noise_prior_scale must be > 0.")
+    return resolved
+
+
 def _split_like_dnn(
     Xz: torch.Tensor,
     yz: torch.Tensor,
@@ -127,6 +146,7 @@ def train_tabular_bnn_surrogate(
     depth: int = 3,
     prior_scale: float = 1.0,
     obs_noise_prior_scale: float = 1.0,
+    obs_noise: float | None = None,
     batch_size: int = 512,
     lr: float = 1e-3,
     max_steps: int = 2500,
@@ -149,6 +169,10 @@ def train_tabular_bnn_surrogate(
         raise ValueError("max_walltime_seconds must be >= 1.")
     if parity_tol <= 0:
         raise ValueError("parity_tol must be > 0.")
+    resolved_obs_noise_prior_scale = _resolve_obs_noise_prior_scale(
+        obs_noise_prior_scale=float(obs_noise_prior_scale),
+        obs_noise=obs_noise,
+    )
 
     Xz, yz, x_mu, x_sd, y_mu, y_sd = make_tensors(df, list(input_cols), target_col)
     X_phys = df[list(input_cols)].to_numpy(float)
@@ -171,7 +195,7 @@ def train_tabular_bnn_surrogate(
         width=int(width),
         depth=int(depth),
         prior_scale=float(prior_scale),
-        obs_noise_prior_scale=float(obs_noise_prior_scale),
+        obs_noise_prior_scale=resolved_obs_noise_prior_scale,
         device=device_t,
     )
     pyro.clear_param_store()
@@ -265,7 +289,7 @@ def train_tabular_bnn_surrogate(
         width=int(width),
         depth=int(depth),
         prior_scale=float(prior_scale),
-        obs_noise_prior_scale=float(obs_noise_prior_scale),
+        obs_noise_prior_scale=resolved_obs_noise_prior_scale,
         pyro_param_values=best_state,
         training_summary=training_summary,
     )

@@ -20,7 +20,13 @@ def main() -> None:
     parser.add_argument("--width", type=int, default=64)
     parser.add_argument("--depth", type=int, default=3)
     parser.add_argument("--prior-scale", type=float, default=1.0)
-    parser.add_argument("--obs-noise-prior-scale", type=float, default=1.0)
+    parser.add_argument(
+        "--obs-noise-prior-scale",
+        "--obs-noise",
+        dest="obs_noise_prior_scale",
+        type=float,
+        default=1.0,
+    )
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--max-steps", type=int, default=2500)
