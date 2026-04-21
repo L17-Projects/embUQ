@@ -46,3 +46,30 @@ def test_train_tabular_bnn_rejects_invalid_basic_parameters() -> None:
             max_steps=1,
             parity_tol=0.0,
         )
+    # Backward compatibility: legacy callers may still pass obs_noise.
+    with pytest.raises(ValueError, match="max_steps must be >= 1"):
+        bnn_training.train_tabular_bnn_surrogate(
+            df,
+            input_cols=["x"],
+            target_col="y",
+            out_path="out.pt",
+            dnn_reference_path="dnn.pkl",
+            max_steps=0,
+            obs_noise=0.2,
+        )
+
+
+def test_resolve_obs_noise_prior_scale_accepts_legacy_alias() -> None:
+    resolved = bnn_training._resolve_obs_noise_prior_scale(
+        obs_noise_prior_scale=1.0,
+        obs_noise=0.25,
+    )
+    assert resolved == pytest.approx(0.25)
+
+
+def test_resolve_obs_noise_prior_scale_rejects_conflicting_values() -> None:
+    with pytest.raises(ValueError, match="conflicting values"):
+        bnn_training._resolve_obs_noise_prior_scale(
+            obs_noise_prior_scale=0.5,
+            obs_noise=0.2,
+        )
