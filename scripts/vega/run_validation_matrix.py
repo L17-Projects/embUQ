@@ -43,11 +43,18 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     resolved_site = args.site if args.site is not None else detect_hpc_site()
-    output_root = (
-        Path(args.output_root).expanduser().resolve()
-        if args.output_root is not None
-        else default_runs_root(REPO_ROOT, "validation_matrix", site=resolved_site, run_tag=args.run_tag)
-    )
+    if args.output_root is not None:
+        candidate = Path(args.output_root).expanduser()
+        if not candidate.is_absolute():
+            candidate = REPO_ROOT / candidate
+        output_root = candidate.resolve()
+    else:
+        output_root = default_runs_root(
+            REPO_ROOT,
+            "validation_matrix",
+            site=resolved_site,
+            run_tag=args.run_tag,
+        )
 
     command = [args.python_bin, str(SCRIPT_DIR / "run_workflow_matrix.py")]
     for selection in args.selection:
