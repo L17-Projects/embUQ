@@ -84,8 +84,10 @@ def _run_diameter(
     except subprocess.TimeoutExpired as exc:
         timed_out = True
         returncode = -1
-        stdout = exc.stdout or ""
-        stderr = exc.stderr or ""
+        raw_out = exc.stdout or b""
+        raw_err = exc.stderr or b""
+        stdout = raw_out.decode("utf-8", errors="replace") if isinstance(raw_out, bytes) else raw_out
+        stderr = raw_err.decode("utf-8", errors="replace") if isinstance(raw_err, bytes) else raw_err
     elapsed = time.perf_counter() - start
 
     return {
