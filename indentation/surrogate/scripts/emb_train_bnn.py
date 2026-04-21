@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 
 from meso_uq.surrogate.bnn_training import train_tabular_bnn_surrogate
-from meso_uq.surrogate.cli import read_wide_curve_table
+from meso_uq.surrogate.group_holdout import read_indentation_table
 
 
 def main() -> None:
@@ -37,7 +37,7 @@ def main() -> None:
     out_path = Path(args.out).resolve()
     dnn_ref = Path(args.dnn_reference).resolve()
     report_path = Path(args.report_path).resolve() if args.report_path else None
-    df = read_wide_curve_table(str(data_path), curve_axis_name="F", value_name="disp")
+    df = read_indentation_table(str(data_path), disp_source="auto", rupture_ratio_threshold=2.0)
     result = train_tabular_bnn_surrogate(
         df,
         input_cols=["Yt", "kb", "b1", "b2", "a3", "a4", "F"],
