@@ -11,6 +11,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
+from meso_uq.hpc_paths import detect_hpc_site  # noqa: E402
 from meso_uq.vega_workflows import (  # noqa: E402
     VALID_EXPERIMENTS,
     VALID_INFERENCE_STAGES,
@@ -34,6 +35,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--stage", choices=VALID_INFERENCE_STAGES, required=True)
     parser.add_argument("--config", type=str, default=None)
     parser.add_argument("--output-dir", type=str, default=None)
+    parser.add_argument("--run-tag", type=str, default=None)
+    parser.add_argument("--site", choices=["vega", "karolina"], default=None)
     parser.add_argument("--python-bin", type=str, default=sys.executable)
     parser.add_argument("--cpu-ranks", type=int, default=1)
     parser.add_argument("--profiling", action="store_true", default=False)
@@ -49,7 +52,14 @@ def main(argv: list[str] | None = None) -> int:
 
     selection = VegaWorkflowSelection(args.experiment, args.model_family, args.profile)
     config_path = resolve_workflow_config_path(REPO_ROOT, selection, args.config)
-    output_root = resolve_workflow_output_root(REPO_ROOT, selection, args.output_dir)
+    resolved_site = args.site if args.site is not None else detect_hpc_site()
+    output_root = resolve_workflow_output_root(
+        REPO_ROOT,
+        selection,
+        args.output_dir,
+        run_tag=args.run_tag,
+        site=resolved_site,
+    )
     output_root.mkdir(parents=True, exist_ok=True)
 
     command = build_inference_command(

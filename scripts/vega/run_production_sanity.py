@@ -20,9 +20,8 @@ from meso_uq.production_sanity import (  # noqa: E402
     resolve_production_sanity_selections,
     write_production_smoke_config,
 )
+from meso_uq.hpc_paths import default_runs_root, detect_hpc_site  # noqa: E402
 from meso_uq.vega_workflows import format_command, selection_key  # noqa: E402
-
-DEFAULT_OUTPUT_ROOT = REPO_ROOT / "_vega" / "production_sanity"
 
 
 def _resolve_path(value: str | Path) -> Path:
@@ -48,7 +47,9 @@ def main(argv: list[str] | None = None) -> int:
         default=False,
         help="Run all production lanes across experiment and model-family axes.",
     )
-    parser.add_argument("--output-root", type=str, default=str(DEFAULT_OUTPUT_ROOT))
+    parser.add_argument("--output-root", type=str, default=None)
+    parser.add_argument("--run-tag", type=str, default=None)
+    parser.add_argument("--site", choices=["vega", "karolina"], default=None)
     parser.add_argument("--python-bin", type=str, default=sys.executable)
     parser.add_argument("--phase2-cpu-ranks", type=int, default=2)
     args = parser.parse_args(argv)
@@ -56,7 +57,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.phase2_cpu_ranks < 1:
         raise ValueError("--phase2-cpu-ranks must be a positive integer.")
 
-    output_root = _resolve_path(args.output_root)
+    resolved_site = args.site if args.site is not None else detect_hpc_site()
+    output_root = (
+        _resolve_path(args.output_root)
+        if args.output_root is not None
+        else default_runs_root(REPO_ROOT, "production_sanity", site=resolved_site, run_tag=args.run_tag)
+    )
     output_root.mkdir(parents=True, exist_ok=True)
     logs_root = output_root / "logs"
     logs_root.mkdir(parents=True, exist_ok=True)
@@ -81,7 +87,11 @@ def main(argv: list[str] | None = None) -> int:
         args.python_bin,
         "--phase2-cpu-ranks",
         str(args.phase2_cpu_ranks),
+        "--site",
+        resolved_site,
     ]
+    if args.run_tag is not None:
+        command.extend(["--run-tag", args.run_tag])
     for selection in selections:
         command.extend(["--selection", selection_key(selection)])
     for override in config_overrides:

@@ -18,7 +18,9 @@ if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
 fi
 
 SELECTIONS="${SELECTIONS:-compression:reduced-model:validation indentation:reduced-model:validation}"
-OUTPUT_ROOT="${OUTPUT_ROOT:-_vega/acceptance/default}"
+SITE="${SITE:-vega}"
+RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
+OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/${SITE}/acceptance/${RUN_TAG}}"
 CPU_RANKS="${CPU_RANKS:-1}"
 POPULATION_SIZE="${POPULATION_SIZE:-}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
@@ -40,6 +42,8 @@ command=(
   "$PYTHON_BIN"
   scripts/run_vega_acceptance.py
   --output-root "$OUTPUT_ROOT"
+  --site "$SITE"
+  --run-tag "$RUN_TAG"
   --cpu-ranks "$CPU_RANKS"
   --python-bin "$PYTHON_BIN"
   --workflows

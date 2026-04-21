@@ -15,6 +15,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
+from meso_uq.hpc_paths import default_runs_root, detect_hpc_site  # noqa: E402
 from meso_uq.vega_workflows import (  # noqa: E402
     VALID_EXPERIMENTS,
     VALID_MODEL_FAMILIES,
@@ -27,8 +28,6 @@ from meso_uq.vega_workflows import (  # noqa: E402
     selection_key,
     selection_slug,
 )
-
-DEFAULT_OUTPUT_ROOT = REPO_ROOT / "_vega" / "workflow_matrix"
 
 
 def _resolve_path(value: str | Path) -> Path:
@@ -236,7 +235,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--experiments", nargs="+", choices=VALID_EXPERIMENTS, default=None)
     parser.add_argument("--model-families", nargs="+", choices=VALID_MODEL_FAMILIES, default=None)
     parser.add_argument("--profiles", nargs="+", choices=VALID_PROFILES, default=None)
-    parser.add_argument("--output-root", type=str, default=str(DEFAULT_OUTPUT_ROOT))
+    parser.add_argument("--output-root", type=str, default=None)
+    parser.add_argument("--run-tag", type=str, default=None)
+    parser.add_argument("--site", choices=["vega", "karolina"], default=None)
     parser.add_argument("--python-bin", type=str, default=sys.executable)
     parser.add_argument("--phase2-cpu-ranks", type=int, default=1)
     parser.add_argument("--inference-device", choices=["cpu", "gpu"], default="cpu")
@@ -260,7 +261,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.phase2_cpu_ranks < 1:
         raise ValueError("--phase2-cpu-ranks must be a positive integer.")
 
-    matrix_root = _resolve_path(args.output_root)
+    resolved_site = args.site if args.site is not None else detect_hpc_site()
+    matrix_root = (
+        _resolve_path(args.output_root)
+        if args.output_root is not None
+        else default_runs_root(REPO_ROOT, "workflow_matrix", site=resolved_site, run_tag=args.run_tag)
+    )
     matrix_root.mkdir(parents=True, exist_ok=True)
     overrides = _config_overrides(args.config_override)
 
@@ -291,6 +297,8 @@ def main(argv: list[str] | None = None) -> int:
         "python_bin": args.python_bin,
         "phase2_cpu_ranks": args.phase2_cpu_ranks,
         "matrix_root": str(matrix_root),
+        "site": resolved_site,
+        "run_tag": matrix_root.name,
         "status": "running",
         "selections": [],
     }

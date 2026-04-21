@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,6 +9,7 @@ from typing import Iterable
 import yaml
 
 from meso_uq.experiments import load_experiments
+from meso_uq.hpc_paths import default_runs_root, detect_hpc_site
 
 VALID_EXPERIMENTS = ("compression", "indentation")
 VALID_MODEL_FAMILIES = ("full-model", "reduced-model")
@@ -101,15 +103,22 @@ def resolve_workflow_output_root(
     repo_root: Path | str,
     selection: VegaWorkflowSelection,
     output_dir: str | Path | None = None,
+    *,
+    run_tag: str | None = None,
+    site: str | None = None,
 ) -> Path:
     repo_root = Path(repo_root).resolve()
     resolved = _resolve_repo_path(repo_root, output_dir)
     if resolved is not None:
         return resolved
+    # Keep a stable way to reuse one run tag across multiple commands.
+    effective_tag = run_tag
+    if effective_tag is None:
+        env_tag = os.environ.get("MESOUQ_RUN_TAG", "").strip()
+        effective_tag = env_tag or None
+    effective_site = site if site is not None else detect_hpc_site()
     return (
-        repo_root
-        / "_vega"
-        / "runs"
+        default_runs_root(repo_root, "runs", site=effective_site, run_tag=effective_tag)
         / selection.experiment
         / selection.model_family
         / selection.profile
