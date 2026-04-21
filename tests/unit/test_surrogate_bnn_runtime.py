@@ -83,7 +83,7 @@ def test_variational_predictors_restore_own_pyro_param_store(
             width=width,
             depth=1,
             prior_scale=1.0,
-            obs_noise=0.1,
+            obs_noise_prior_scale=1.0,
             device=device,
         )
         with torch.inference_mode():
@@ -98,7 +98,7 @@ def test_variational_predictors_restore_own_pyro_param_store(
             width=width,
             depth=1,
             prior_scale=1.0,
-            obs_noise=0.1,
+            obs_noise_prior_scale=1.0,
             pyro_param_values={
                 name: value.detach().clone().cpu() for name, value in store._params.items()
             },

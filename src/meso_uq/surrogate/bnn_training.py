@@ -126,7 +126,7 @@ def train_tabular_bnn_surrogate(
     width: int = 64,
     depth: int = 3,
     prior_scale: float = 1.0,
-    obs_noise: float = 0.1,
+    obs_noise_prior_scale: float = 1.0,
     batch_size: int = 512,
     lr: float = 1e-3,
     max_steps: int = 2500,
@@ -171,7 +171,7 @@ def train_tabular_bnn_surrogate(
         width=int(width),
         depth=int(depth),
         prior_scale=float(prior_scale),
-        obs_noise=float(obs_noise),
+        obs_noise_prior_scale=float(obs_noise_prior_scale),
         device=device_t,
     )
     pyro.clear_param_store()
@@ -265,7 +265,7 @@ def train_tabular_bnn_surrogate(
         width=int(width),
         depth=int(depth),
         prior_scale=float(prior_scale),
-        obs_noise=float(obs_noise),
+        obs_noise_prior_scale=float(obs_noise_prior_scale),
         pyro_param_values=best_state,
         training_summary=training_summary,
     )

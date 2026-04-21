@@ -43,7 +43,7 @@ def build_variational_components(
     width: int,
     depth: int,
     prior_scale: float,
-    obs_noise: float,
+    obs_noise_prior_scale: float = 1.0,
     device: torch.device,
 ) -> Tuple[Any, MLP, Callable[..., Any], Any]:
     pyro = _require_pyro()
@@ -55,12 +55,14 @@ def build_variational_components(
         raise ValueError("depth must be >= 1.")
     if prior_scale <= 0:
         raise ValueError("prior_scale must be > 0.")
-    if obs_noise <= 0:
-        raise ValueError("obs_noise must be > 0.")
+    if obs_noise_prior_scale <= 0:
+        raise ValueError("obs_noise_prior_scale must be > 0.")
 
     base_model = MLP(input_dims=input_dim, output_dims=1, hl_dims=[width] * depth).to(device)
+    _obs_noise_scale_t = torch.tensor(obs_noise_prior_scale, dtype=torch.float32, device=device)
 
     def model(x: torch.Tensor, y: torch.Tensor | None = None) -> torch.Tensor:
+        obs_noise = pyro.sample("obs_noise", pyro.distributions.HalfNormal(_obs_noise_scale_t))
         priors = {}
         for name, param in base_model.named_parameters():
             priors[name] = pyro.distributions.Normal(
@@ -91,7 +93,7 @@ def make_artifact_payload(
     width: int,
     depth: int,
     prior_scale: float,
-    obs_noise: float,
+    obs_noise_prior_scale: float = 1.0,
     pyro_param_values: Dict[str, torch.Tensor],
     training_summary: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
@@ -104,7 +106,7 @@ def make_artifact_payload(
         "width": int(width),
         "depth": int(depth),
         "prior_scale": float(prior_scale),
-        "obs_noise": float(obs_noise),
+        "obs_noise_prior_scale": float(obs_noise_prior_scale),
         "output_site": "_RETURN",
         "xshift": list(xshift),
         "xscale": list(xscale),
@@ -171,12 +173,19 @@ class VariationalBNNPredictor:
         self._yscale_t = torch.as_tensor(payload["yscale"], dtype=torch.float32, device=self.device)
 
     def _predictive_from_format_v1(self, payload: Dict[str, Any]) -> Callable[..., Any]:
+        # Support both old artifacts (obs_noise fixed float) and new (obs_noise_prior_scale latent).
+        # Old artifacts have fixed obs_noise; treat the stored value as the prior scale so loading
+        # does not crash, though parameter-count mismatch will still fail for old format artifacts
+        # (which is acceptable — retrain on fresh clones).
+        obs_noise_prior_scale = float(
+            payload.get("obs_noise_prior_scale", payload.get("obs_noise", 1.0))
+        )
         pyro, _, model, guide = build_variational_components(
             input_dim=int(payload["input_dim"]),
             width=int(payload["width"]),
             depth=int(payload["depth"]),
             prior_scale=float(payload["prior_scale"]),
-            obs_noise=float(payload["obs_noise"]),
+            obs_noise_prior_scale=obs_noise_prior_scale,
             device=self.device,
         )
         pyro.clear_param_store()
