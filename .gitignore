@@ -5,6 +5,7 @@ __pycache__/
 *.egg-info/
 .coverage
 .venv-*/
+.venv/
 coverage.xml
 coverage.json
 coverage-summary.md

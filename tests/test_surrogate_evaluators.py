@@ -365,6 +365,51 @@ def test_compression_bnn_surrogate_batch_honors_chunk_size(
     np.testing.assert_allclose(std, np.full((5, 3), 0.25, dtype=np.float32))
 
 
+def test_compression_bnn_surrogate_scalar_eval_clips_and_forwards_mc_args(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifact = tmp_path / "microbubble_force_BNN.pt"
+    artifact.write_text("artifact", encoding="utf-8")
+    calls = {"n": 0}
+
+    class _FakeBNNPredictor:
+        def __init__(self, artifact_path: str, *, device: str = "cpu") -> None:
+            assert artifact_path == str(artifact)
+            assert device == "cpu"
+
+        def predict_mean_std(
+            self,
+            inputs: np.ndarray,
+            *,
+            predictive_mc_samples: int = 32,
+            predictive_mc_chunk_size: int = 8,
+        ) -> tuple[np.ndarray, np.ndarray]:
+            calls["n"] += 1
+            arr = np.asarray(inputs, dtype=np.float32)
+            assert arr.shape == (3, 7)
+            assert predictive_mc_samples == 11
+            assert predictive_mc_chunk_size == 5
+            return np.asarray([-1.0, 0.5, 2.0], dtype=np.float32), np.full(3, 0.3, dtype=np.float32)
+
+    monkeypatch.setattr(compression_evaluate_bnn, "VariationalBNNPredictor", _FakeBNNPredictor)
+    surrogate = compression_evaluate_bnn.Surrogate(str(tmp_path), device="cpu")
+
+    mean, std = surrogate.evaluate_compression(
+        [10.0, 20.0, 1.0, 2.0, 3.0, 4.0],
+        [0.0, 1.0, 2.0],
+        predictive_mc_samples=11,
+        predictive_mc_chunk_size=5,
+    )
+    assert calls["n"] == 1
+    np.testing.assert_allclose(np.asarray(mean, dtype=np.float32), np.asarray([0.0, 0.5, 2.0], dtype=np.float32))
+    np.testing.assert_allclose(np.asarray(std, dtype=np.float32), np.full(3, 0.3, dtype=np.float32))
+
+    mean_empty, std_empty = surrogate.evaluate_compression([10.0, 20.0, 1.0, 2.0, 3.0, 4.0], [])
+    assert mean_empty == []
+    assert std_empty == []
+    assert calls["n"] == 1
+
+
 def test_indentation_bnn_surrogate_batch_honors_chunk_size(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

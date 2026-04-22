@@ -99,6 +99,13 @@ def _snapshot_pyro_params(pyro: Any) -> Dict[str, torch.Tensor]:
     return snap
 
 
+def _snapshot_module_state(module: Any) -> Dict[str, torch.Tensor]:
+    snap: Dict[str, torch.Tensor] = {}
+    for name, tensor in module.state_dict().items():
+        snap[str(name)] = torch.as_tensor(tensor).detach().cpu().clone()
+    return snap
+
+
 def _restore_pyro_params(pyro: Any, snapshot: Dict[str, torch.Tensor], device: torch.device) -> None:
     store = pyro.get_param_store()
     for name, value in snapshot.items():
@@ -190,7 +197,7 @@ def train_tabular_bnn_surrogate(
     y_train = y_train.to(device_t)
     X_val = X_val.to(device_t)
 
-    pyro, _, model, guide = build_variational_components(
+    pyro, base_model, model, guide = build_variational_components(
         input_dim=len(input_cols),
         width=int(width),
         depth=int(depth),
@@ -207,6 +214,7 @@ def train_tabular_bnn_surrogate(
     )
 
     best_state = _snapshot_pyro_params(pyro)
+    best_guide_state = _snapshot_module_state(guide)
     best_val_rmse = float("inf")
     best_step = 0
     train_losses: list[float] = []
@@ -231,6 +239,7 @@ def train_tabular_bnn_surrogate(
                 best_val_rmse = val_rmse
                 best_step = step
                 best_state = _snapshot_pyro_params(pyro)
+                best_guide_state = _snapshot_module_state(guide)
 
         elapsed = time.monotonic() - start
         if elapsed >= int(max_walltime_seconds):
@@ -238,6 +247,7 @@ def train_tabular_bnn_surrogate(
             break
 
     _restore_pyro_params(pyro, best_state, device_t)
+    guide.load_state_dict(best_guide_state, strict=True)
 
     mean_norm, std_norm = _predictive_mean_std(
         pyro,
@@ -291,6 +301,11 @@ def train_tabular_bnn_surrogate(
         prior_scale=float(prior_scale),
         obs_noise_prior_scale=resolved_obs_noise_prior_scale,
         pyro_param_values=best_state,
+        base_model_state_dict={
+            name: tensor.detach().cpu().clone()
+            for name, tensor in base_model.state_dict().items()
+        },
+        guide_state_dict=best_guide_state,
         training_summary=training_summary,
     )
 
