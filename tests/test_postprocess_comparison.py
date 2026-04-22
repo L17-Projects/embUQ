@@ -106,6 +106,28 @@ def test_comparison_missing_columns_raises(tmp_path: Path) -> None:
         mod._load_summary(bad_csv)
 
 
+def test_comparison_nogo_for_incomplete_pairs_and_low_bnn_wins(tmp_path: Path) -> None:
+    mod = _load_module(POSTPROCESS / "generate_surrogate_comparison.py", "gen_comparison_incomplete")
+    rows = []
+    for modality, diameters in [("compression", ["2.1", "2.9", "3.0"]), ("indentation", ["3.2", "3.4", "5.8"])]:
+        for diam in diameters:
+            # DNN-only rows force incomplete pairing and bnn_wins=0.
+            rows.append({
+                "modality": modality,
+                "surrogate_family": "dnn",
+                "diameter_um": diam,
+                "metric_rel_l2_pct": 2.0,
+                "summary_path": "",
+            })
+    csv = tmp_path / "summary_incomplete.csv"
+    pd.DataFrame(rows).to_csv(csv, index=False)
+    comp = mod._build_comparison(mod._load_summary(csv))
+    verdict, reasons = mod._decision(comp)
+    assert verdict == "NO-GO"
+    assert any("paired runs completed" in r for r in reasons)
+    assert any("better or equal" in r for r in reasons)
+
+
 # ---------------------------------------------------------------------------
 # generate_uqdpd_parity_report.py
 # ---------------------------------------------------------------------------
@@ -170,6 +192,19 @@ def test_parity_main_writes_files(tmp_path: Path, monkeypatch) -> None:
     assert "PASS" in md
 
 
+def test_parity_loaders_missing_columns_raise(tmp_path: Path) -> None:
+    mod = _load_module(POSTPROCESS / "generate_uqdpd_parity_report.py", "gen_parity_loader_errors")
+    bad_mesouq = tmp_path / "bad_mesouq.csv"
+    bad_uqdpd = tmp_path / "bad_uqdpd.csv"
+    pd.DataFrame([{"foo": 1}]).to_csv(bad_mesouq, index=False)
+    pd.DataFrame([{"bar": 2}]).to_csv(bad_uqdpd, index=False)
+
+    with pytest.raises(ValueError, match="MesoUQ summary CSV missing columns"):
+        mod._load_mesouq(bad_mesouq)
+    with pytest.raises(ValueError, match="UQ_DPD reference CSV missing columns"):
+        mod._load_uqdpd(bad_uqdpd)
+
+
 # ---------------------------------------------------------------------------
 # generate_final_report.py
 # ---------------------------------------------------------------------------
@@ -202,3 +237,27 @@ def test_final_report_bnn_status_from_json(tmp_path: Path) -> None:
     assert mod.main(["--run-root", str(tmp_path), "--output-dir", str(out_dir)]) == 0
     text = (out_dir / "final_report.md").read_text()
     assert "PASSED" in text
+
+
+def test_final_report_handles_unreadable_bnn_status_and_verdict_extraction(tmp_path: Path) -> None:
+    mod = _load_module(POSTPROCESS / "generate_final_report.py", "gen_final_report_unreadable")
+    bnn_dir = tmp_path / "bnn_training"
+    out_dir = tmp_path / "comparison"
+    bnn_dir.mkdir(parents=True)
+    out_dir.mkdir(parents=True)
+
+    # Invalid JSON exercises the unreadable-status fallback branch.
+    (bnn_dir / "bnn_training_matrix_report.json").write_text("{not-json", encoding="utf-8")
+    (out_dir / "bnn_insertion_decision.md").write_text(
+        "# BNN Insertion Decision\n\n**Verdict: GO**\n", encoding="utf-8"
+    )
+    # Existing file without the keyword exercises the UNKNOWN path.
+    (out_dir / "uq_dpd_parity_report.md").write_text(
+        "# UQ_DPD Parity Report\n\nNo explicit verdict here.\n", encoding="utf-8"
+    )
+
+    assert mod.main(["--run-root", str(tmp_path), "--output-dir", str(out_dir)]) == 0
+    text = (out_dir / "final_report.md").read_text(encoding="utf-8")
+    assert "FAIL (unreadable)" in text
+    assert "**Verdict: GO**" in text
+    assert "**UNKNOWN**" in text
