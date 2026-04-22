@@ -45,8 +45,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--device",
         choices=["cpu", "gpu"],
-        default="cpu",
-        help="cpu: Distributed MPI; gpu: Sequential GPU-batch (single rank)",
+        default="gpu",
+        help="gpu (default): Sequential GPU-batch (single rank); cpu: Distributed MPI",
     )
     args = parser.parse_args(argv)
 

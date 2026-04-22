@@ -62,17 +62,17 @@ def main(argv: list[str] | None = None) -> int:
     comparison_dir = run_root / "comparison"
     holdout_l2_csv = figures_holdout / "surrogate_holdout_l2_summary.csv"
 
-    failures = 0
-
-    failures += _run(
+    rc = _run(
         [py, str(POSTPROCESS / "generate_surrogate_holdout_l2_figure.py"),
          "--input-root", str(holdout_input),
          "--output-dir", str(figures_holdout),
          "--metric", args.metric],
         "Holdout L2 figure",
     )
+    if rc != 0:
+        return rc
 
-    failures += _run(
+    rc = _run(
         [py, str(POSTPROCESS / "generate_surrogate_sensitivity_figure.py"),
          "--input-root", str(sobol_input),
          "--output-dir", str(figures_sobol),
@@ -80,32 +80,37 @@ def main(argv: list[str] | None = None) -> int:
          "--parameters", "Yt", "kb", "b1", "b2", "a3", "a4"],
         "Sensitivity figure",
     )
+    if rc != 0:
+        return rc
 
-    failures += _run(
+    rc = _run(
         [py, str(POSTPROCESS / "generate_surrogate_comparison.py"),
          "--input-csv", str(holdout_l2_csv),
          "--output-dir", str(comparison_dir)],
         "Family comparison + BNN decision",
     )
+    # Rollout gate: stop immediately when BNN insertion is NO-GO.
+    if rc != 0:
+        return rc
 
-    failures += _run(
+    rc = _run(
         [py, str(POSTPROCESS / "generate_uqdpd_parity_report.py"),
          "--mesouq-summary-csv", str(holdout_l2_csv),
          "--uqdpd-reference-csv", args.uqdpd_reference_csv,
          "--output-dir", str(comparison_dir)],
         "UQ_DPD parity report",
     )
+    if rc != 0:
+        return rc
 
-    failures += _run(
+    rc = _run(
         [py, str(POSTPROCESS / "generate_final_report.py"),
          "--run-root", str(run_root),
          "--output-dir", str(comparison_dir)],
         "Final report",
     )
-
-    if failures:
-        print(f"\n{failures} postprocessing step(s) failed.", file=sys.stderr)
-        return 1
+    if rc != 0:
+        return rc
     print("\nAll postprocessing steps completed successfully.")
     return 0
 

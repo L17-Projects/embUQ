@@ -257,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-walltime-seconds", type=int, default=1200)
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--parity-tol", type=float, default=1.20)
-    parser.add_argument("--device", default="cpu")
+    parser.add_argument("--device", default="cuda")
     parser.add_argument(
         "--resume",
         action=argparse.BooleanOptionalAction,

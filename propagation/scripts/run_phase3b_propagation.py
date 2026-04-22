@@ -28,6 +28,18 @@ from meso_uq.experiments import load_experiments
 from meso_uq.postprocess.propagation import propagate_run_directory
 
 
+def _resolve_surrogate_backend(config: dict) -> str:
+    surrogate_cfg = config.get("surrogate", {})
+    if surrogate_cfg is None:
+        surrogate_cfg = {}
+    if not isinstance(surrogate_cfg, dict):
+        raise ValueError("Expected 'surrogate' config section to be a mapping.")
+    backend = str(surrogate_cfg.get("backend", "dnn")).strip().lower()
+    if backend not in {"dnn", "bnn"}:
+        raise ValueError(f"Unsupported surrogate backend '{backend}'. Expected 'dnn' or 'bnn'.")
+    return backend
+
+
 def _reference_csv_for_experiment(exp, diameter_um: float, output_dir: Path) -> Path:
     data_file = exp.data_file(diameter_um)
     reference_df = pd.read_csv(data_file, sep=r"\s+", engine="python", comment="#")
@@ -63,6 +75,7 @@ def main() -> int:
     with open(config_path, "rb") as handle:
         config = yaml.load(handle, Loader=yaml.CLoader)
     experiments = [exp for exp in load_experiments(config, PROJECT_ROOT) if exp.enabled]
+    surrogate_backend = _resolve_surrogate_backend(config)
 
     for exp in experiments:
         preload_map = {
@@ -72,11 +85,15 @@ def main() -> int:
         preload_fn = preload_map.get(exp.name)
         if preload_fn is not None:
             for diameter_um in exp.diameters:
-                preload_fn(diameter_um, device=args.device)
+                preload_fn(diameter_um, device=args.device, backend=surrogate_backend)
 
     eval_map = {
-        "compression": lambda sample, pts, d: compute_compression_surrogate(sample, pts, d),
-        "indentation": lambda sample, pts, d: compute_indentation_surrogate(sample, pts, d),
+        "compression": lambda sample, pts, d: compute_compression_surrogate(
+            sample, pts, d, device=args.device
+        ),
+        "indentation": lambda sample, pts, d: compute_indentation_surrogate(
+            sample, pts, d, device=args.device
+        ),
     }
 
     for exp in experiments:

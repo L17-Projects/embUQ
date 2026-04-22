@@ -20,11 +20,13 @@ sys.path.insert(0, os.path.join(project_root, "indentation", "evalkit"))
 from compression.evalkit.posterior_compression import (
     compute_compression_surrogate,
     compute_compression_surrogate_batch,
+    preload_compression_surrogate,
 )
 from compression.evalkit.tools import datedPrint
 from indentation.evalkit.posterior_indentation import (
     compute_indentation_surrogate,
     compute_indentation_surrogate_batch,
+    preload_indentation_surrogate,
 )
 from meso_uq.config import resolve_inference_config_path
 from meso_uq.experiments import load_experiments
@@ -34,6 +36,18 @@ from meso_uq.workflow_acceleration import (
     configure_korali_conduit,
     to_korali_path,
 )
+
+
+def _resolve_surrogate_backend(config: dict) -> str:
+    surrogate_cfg = config.get("surrogate", {})
+    if surrogate_cfg is None:
+        surrogate_cfg = {}
+    if not isinstance(surrogate_cfg, dict):
+        raise ValueError("Expected 'surrogate' config section to be a mapping.")
+    backend = str(surrogate_cfg.get("backend", "dnn")).strip().lower()
+    if backend not in {"dnn", "bnn"}:
+        raise ValueError(f"Unsupported surrogate backend '{backend}'. Expected 'dnn' or 'bnn'.")
+    return backend
 
 
 def _resolve_config_path(config_path: str | None) -> Path:
@@ -150,14 +164,14 @@ def run_phase_3b_dataset(
             batch_model_fn=lambda s, d=diameter_um, pts=reference_points, dev=device, fn=batch_fn: fn(
                 s, pts, d, device=dev
             ),
-            single_model_fn=lambda s, d=diameter_um, pts=reference_points, m=compute_model: m(
-                s, pts, d
+            single_model_fn=lambda s, d=diameter_um, pts=reference_points, dev=device, m=compute_model: m(
+                s, pts, d, device=dev
             ),
         )
     else:
         sub["Problem"]["Computational Model"] = (
-            lambda sampleData, d=diameter_um, pts=reference_points, model=compute_model: model(
-                sampleData, pts, d
+            lambda sampleData, d=diameter_um, pts=reference_points, dev=device, model=compute_model: model(
+                sampleData, pts, d, device=dev
             )
         )
 
@@ -216,6 +230,17 @@ def run_phase_3b(
     os.environ["HUQ_INFERENCE_CONFIG"] = str(config_path_resolved)
     output_root = _resolve_output_root(output_dir)
     experiments = [exp for exp in load_experiments(config, Path(project_root)) if exp.enabled]
+    surrogate_backend = _resolve_surrogate_backend(config)
+    preload_map = {
+        "compression": preload_compression_surrogate,
+        "indentation": preload_indentation_surrogate,
+    }
+    for exp in experiments:
+        preload_fn = preload_map.get(exp.name)
+        if preload_fn is None:
+            raise ValueError(f"No surrogate preload function registered for experiment '{exp.name}'")
+        for diameter_um in exp.diameters:
+            preload_fn(diameter_um, device=device, backend=surrogate_backend)
     phase3b_pop_size = config.get("phase3b_pop_size", 10000)
     phase3b_max_gen = config.get("phase3b_max_gen", -1)
     phase3b_target_cov = config.get("phase3b_target_cov", 0.6)

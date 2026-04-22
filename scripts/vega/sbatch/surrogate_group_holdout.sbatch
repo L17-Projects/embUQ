@@ -22,6 +22,7 @@ OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/vega/surrogate_group_holdout/${RUN_TAG}}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 MODEL_FAMILIES="${MODEL_FAMILIES:-dnn bnn}"
 SELECTIONS="${SELECTIONS:-}"
+DEVICE="${DEVICE:-gpu}"
 
 module purge
 module load \
@@ -39,5 +40,6 @@ cd "${REPO_ROOT}"
   --output-root "${OUTPUT_ROOT}" \
   --run-tag "${RUN_TAG}" \
   --python-bin "${PYTHON_BIN}" \
+  --device "${DEVICE}" \
   $(for fam in ${MODEL_FAMILIES}; do printf -- "--surrogate-family %s " "${fam}"; done) \
   $(for sel in ${SELECTIONS}; do printf -- "--only %s " "${sel}"; done)

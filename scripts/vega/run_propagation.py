@@ -41,8 +41,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--device",
         choices=["cpu", "gpu"],
-        default="cpu",
-        help="Surrogate device: cpu (default) or gpu (cuda)",
+        default="gpu",
+        help="Surrogate device: gpu (default, cuda) or cpu",
     )
     args = parser.parse_args(argv)
 

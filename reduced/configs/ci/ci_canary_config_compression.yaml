@@ -11,6 +11,10 @@ surrogate_dir: compression/surrogate/diameters
 
 frac_diam: 0.2
 use_surrogate: true
+surrogate:
+  backend: dnn
+  predictive_mc_samples: 16
+  predictive_mc_chunk_size: 4
 
 fixed_params:
   b1: 0.0
