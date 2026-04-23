@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -39,11 +40,31 @@ from convert_map_manifest import convert_manifest  # noqa: E402
 
 TIMEOUT_SECONDS = 1800  # default: 30 minutes per diameter
 MPI_RANKS = 2
+MPI_ENV_EXPORTS = (
+    "PATH",
+    "PYTHONPATH",
+    "LD_LIBRARY_PATH",
+    "CUDA_VISIBLE_DEVICES",
+    "HDF5_DIR",
+    "EBROOTHDF5",
+    "MESOUQ_MIRHEO_SRC",
+    "MIRHEO_SOURCE_ROOT",
+    "MIRHEO_BUILD_DIR",
+    "MIRHEO_INSTALL_PREFIX",
+)
 
 
 def _evaluate_script(experiment: str) -> Path:
     name = f"evaluate_map_mirheo_optimized{'_' + experiment if experiment == 'indentation' else ''}.py"
     return REPO_ROOT / "propagation" / "scripts" / name
+
+
+def _mpirun_export_args() -> list[str]:
+    args: list[str] = []
+    for name in MPI_ENV_EXPORTS:
+        if os.environ.get(name):
+            args.extend(["-x", name])
+    return args
 
 
 def _run_diameter(
@@ -60,7 +81,7 @@ def _run_diameter(
     """Run Mirheo evaluation for one diameter.  Returns a result dict."""
     eval_script = _evaluate_script(experiment)
     command = [
-        "mpirun", "--oversubscribe", "-n", str(mpi_ranks),
+        "mpirun", "--oversubscribe", * _mpirun_export_args(), "-n", str(mpi_ranks),
         python_bin, str(eval_script),
         "--map-file", str(map_json),
         "--output", str(result_json),

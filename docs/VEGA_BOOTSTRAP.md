@@ -11,6 +11,7 @@ The supported path is:
 - use the repo checkout as the anchor
 - place all Vega-specific state under `_vega/`
 - build vendored `extern/korali/` into `_vega/korali/install`
+- build Mirheo from the locked external source path into `_vega/mirheo/`
 - source the generated `_vega/korali/env.sh` before running workflows
 
 ## Recommended module stack
@@ -22,7 +23,9 @@ module load \
   openmpi/4.1.2.1 \
   CUDA/12.2.2 \
   GSL/2.7-GCC-12.2.0 \
-  Eigen/3.4.0-GCCcore-12.2.0
+  Eigen/3.4.0-GCCcore-12.2.0 \
+  CMake/3.24.3-GCCcore-12.2.0 \
+  HDF5/1.14.0-gompi-2022b
 ```
 
 ## Python environment
@@ -38,6 +41,7 @@ pip install pybind11 meson ninja
 ```
 
 The helper script below can also install `pybind11`, `meson`, and `ninja` into the active environment automatically.
+The Mirheo bootstrap helper installs `h5py` into the active environment automatically, because the Vega `h5py` module variants do not match the current Python/Korali stack.
 
 That editable install now includes the mesh-preparation dependency `trimesh`, which is required by the public Phase 1 workflow bootstrap for compression and indentation.
 
@@ -58,6 +62,12 @@ The doctor reports:
 - whether `korali` is resolving from an external user-global path instead of repo-local `_vega/`
 
 If you already have a user-global Korali on `PYTHONPATH`, the doctor will report it as contamination that should be replaced by the repo-local install.
+
+If you also need MAP Mirheo workflows, use the Mirheo-aware doctor mode:
+
+```bash
+python scripts/vega/doctor_vega.py --with-mirheo
+```
 
 ## Build vendored Korali
 
@@ -82,14 +92,54 @@ Optional flags:
 
 If `--jobs` is omitted, the helper uses `SLURM_CPUS_PER_TASK` on an allocated node and otherwise caps itself conservatively on a login node.
 
+## Build repo-local Mirheo from the locked source path
+
+The Mirheo source default is tracked in [`extern/mirheo.lock.json`](../extern/mirheo.lock.json). Today that lock points to:
+
+- `/ceph/hpc/home/eubrieucb/software/Mirheo`
+
+You can override it temporarily with `MESOUQ_MIRHEO_SRC=/abs/path/to/Mirheo` or `--source /abs/path/to/Mirheo`.
+
+```bash
+bash scripts/vega/bootstrap_mirheo.sh --jobs 8
+```
+
+Default behavior:
+
+- resolves Mirheo from `extern/mirheo.lock.json`
+- builds it into `_vega/mirheo/build`
+- installs CMake outputs into `_vega/mirheo/install`
+- installs the Python package into the active venv
+- writes `_vega/mirheo/env.sh`
+- records `_vega/mirheo/source_snapshot.json`
+- records `_vega/logs/bootstrap_mirheo.log`
+
+Supported MAP Mirheo micro-canary floor on Vega:
+
+- `--n-displacements 1`
+- `--numsteps 200`
+- `--numsteps-eq 200`
+
+Lower values are outside the supported sanity/canary contract and can trigger payload-level instability.
+
+Optional flags:
+
+- `--python-bin /abs/path/python`
+- `--source /abs/path/to/Mirheo`
+- `--jobs N`
+- `--reconfigure`
+- `--skip-python-deps`
+
 ## Activate the repo-local runtime
 
 ```bash
 source _vega/korali/env.sh
-python scripts/vega/doctor_vega.py --strict
+source _vega/mirheo/env.sh
+python scripts/vega/doctor_vega.py --strict --with-mirheo
 ```
 
 The generated env script intentionally replaces inherited `PYTHONPATH` entries so the repo-local Korali install wins over any preexisting user-global Korali.
+The Mirheo env script records the resolved source path, repo-local build/install locations, and the source snapshot manifest used for reproducibility.
 
 ## Next steps
 

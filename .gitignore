@@ -13,6 +13,8 @@ _init*/
 _*
 out_*
 logs/
+mesouq-map-mirheo-*.out
+mesouq-map-mirheo-*.err
 AGENTS.md
 CLAUDE.md
 compression/surrogate/diameters/*/trained/*BNN*_loss_hist.json

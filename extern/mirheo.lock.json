@@ -1,0 +1,9 @@
+{
+  "source_path": "/ceph/hpc/home/eubrieucb/software/Mirheo",
+  "provenance": "temporary-path-lock",
+  "notes": [
+    "Canonical upstream repo URL and commit pin were not available when this lock was created.",
+    "Bootstrap scripts resolve Mirheo from this path by default, unless MESOUQ_MIRHEO_SRC or --source overrides it.",
+    "Each bootstrap records a deterministic source-tree SHA256 snapshot under _vega/mirheo/source_snapshot.json."
+  ]
+}

@@ -16,7 +16,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from meso_uq.vega import DEFAULT_VEGA_MODULES, find_external_korali_entries, get_vega_paths
+from meso_uq.vega import (
+    DEFAULT_VEGA_MIRHEO_MODULES,
+    DEFAULT_VEGA_MODULES,
+    find_external_korali_entries,
+    get_vega_paths,
+    load_mirheo_source_lock,
+    resolve_mirheo_source,
+)
 
 
 def _command_path(name: str) -> str:
@@ -46,20 +53,24 @@ def _check(name: str, status: str, details: str) -> dict[str, str]:
     return {"name": name, "status": status, "details": details}
 
 
-def collect_diagnostics(python_bin: str) -> dict[str, object]:
+def collect_diagnostics(python_bin: str, *, with_mirheo: bool = False) -> dict[str, object]:
     paths = get_vega_paths(REPO_ROOT)
     checks: list[dict[str, str]] = []
+    recommended_modules = list(DEFAULT_VEGA_MIRHEO_MODULES if with_mirheo else DEFAULT_VEGA_MODULES)
 
     loaded_modules = os.environ.get("LOADEDMODULES", "")
     checks.append(
         _check(
             "loaded_modules",
             "ok" if loaded_modules else "warn",
-            loaded_modules or f"empty; recommended stack: {' '.join(DEFAULT_VEGA_MODULES)}",
+            loaded_modules or f"empty; recommended stack: {' '.join(recommended_modules)}",
         )
     )
 
-    for command in ("python", "mpicxx", "nvcc", "pkg-config", "meson", "ninja"):
+    required_commands = ["python", "mpicxx", "nvcc", "pkg-config", "meson", "ninja"]
+    if with_mirheo:
+        required_commands.extend(["cmake", "make", "h5dump"])
+    for command in required_commands:
         resolved = _command_path(command)
         checks.append(
             _check(
@@ -79,7 +90,10 @@ def collect_diagnostics(python_bin: str) -> dict[str, object]:
             )
         )
 
-    for module_name in ("meso_uq", "mpi4py", "pybind11", "mesonbuild"):
+    python_modules = ["meso_uq", "mpi4py", "pybind11", "mesonbuild"]
+    if with_mirheo:
+        python_modules.extend(["h5py", "mirheo"])
+    for module_name in python_modules:
         origin = _python_module_spec(module_name)
         checks.append(
             _check(
@@ -129,20 +143,59 @@ def collect_diagnostics(python_bin: str) -> dict[str, object]:
         )
     )
 
+    if with_mirheo:
+        mirheo_lock = load_mirheo_source_lock(REPO_ROOT)
+        checks.append(
+            _check(
+                "mirheo_lock",
+                "ok" if paths.mirheo_source_lock.is_file() else "warn",
+                str(paths.mirheo_source_lock if paths.mirheo_source_lock.is_file() else mirheo_lock["source_path"]),
+            )
+        )
+        try:
+            mirheo_source = resolve_mirheo_source(REPO_ROOT)
+            source_status = "ok" if mirheo_source.is_dir() else "warn"
+            source_details = str(mirheo_source)
+        except Exception as exc:  # pragma: no cover - defensive path
+            source_status = "warn"
+            source_details = str(exc)
+            mirheo_source = None
+        checks.append(_check("mirheo_source", source_status, source_details))
+        checks.append(
+            _check(
+                "repo_local_mirheo_env_script",
+                "ok" if paths.mirheo_env_script.is_file() else "warn",
+                str(paths.mirheo_env_script),
+            )
+        )
+        checks.append(
+            _check(
+                "repo_local_mirheo_snapshot",
+                "ok" if paths.mirheo_snapshot_path.is_file() else "warn",
+                str(paths.mirheo_snapshot_path),
+            )
+        )
+
     return {
         "repo_root": str(paths.repo_root),
         "python_bin": python_bin,
         "python_version": platform.python_version(),
         "hostname": platform.node(),
-        "recommended_modules": list(DEFAULT_VEGA_MODULES),
+        "recommended_modules": recommended_modules,
         "paths": {
             "vega_root": str(paths.vega_root),
             "korali_source": str(paths.korali_source),
             "korali_prefix": str(paths.korali_prefix),
             "korali_site_packages": str(paths.korali_site_packages),
             "korali_env_script": str(paths.korali_env_script),
+            "mirheo_source_lock": str(paths.mirheo_source_lock),
+            "mirheo_build_dir": str(paths.mirheo_build_dir),
+            "mirheo_prefix": str(paths.mirheo_prefix),
+            "mirheo_env_script": str(paths.mirheo_env_script),
+            "mirheo_snapshot_path": str(paths.mirheo_snapshot_path),
         },
         "checks": checks,
+        "with_mirheo": with_mirheo,
     }
 
 
@@ -168,9 +221,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--python-bin", default=sys.executable)
     parser.add_argument("--json", action="store_true", default=False)
     parser.add_argument("--strict", action="store_true", default=False)
+    parser.add_argument(
+        "--with-mirheo",
+        action="store_true",
+        default=False,
+        help="Include repo-local Mirheo bootstrap/runtime checks in addition to the core Korali checks.",
+    )
     args = parser.parse_args(argv)
 
-    report = collect_diagnostics(args.python_bin)
+    report = collect_diagnostics(args.python_bin, with_mirheo=args.with_mirheo)
     if args.json:
         print(json.dumps(report, indent=2))
     else:

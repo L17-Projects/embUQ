@@ -69,18 +69,20 @@ Indentation Sobol sensitivity:
 Lightweight design generation:
 - `sampling/run_LHS.py`
 
-This surface is intentionally focused on analysis/design support and does not yet include the heavier Mirheo execution layer.
+This surface also feeds the MAP Mirheo execution layer used by the paper-facing workflow.
 
 ## 6. MAP extraction and plotting
 
 MAP extraction:
 - `scripts/postprocess/extract_phase1_map.py`
 - `scripts/postprocess/extract_phase3b_map.py`
+- `scripts/vega/run_map_mirheo.py`
 
 Plotting/postprocessing:
 - `propagation/scripts/plot_validation_overlay.py`
 - `propagation/scripts/plot_d0_correlations.py`
 - `propagation/scripts/plot_posterior_marginals.py`
+- `scripts/postprocess/generate_map_overlay_figure.py`
 
 Shared postprocessing helpers live under `src/meso_uq/postprocess/`.
 
@@ -100,13 +102,20 @@ These helpers expose experiment, model family, run profile, and stage explicitly
 
 The production complete scripts orchestrate:
 1. Phase 1 on GPU (GPU-batched surrogate, Sequential Korali conduit)
-2. Phase 2 on CPU MPI ranks (**CPU-MPI only** — Phase 2 is not CUDA-native)
+2. Phase 2 with `phase2_backend=native-cuda` by default for `production` lanes
+3. Phase 2 fallback on CPU MPI remains available through `--phase2-backend cpu-mpi`
 3. Phase 3b on exclusive GPU (GPU-batched surrogate, Sequential Korali conduit)
-4. Propagation phase 3b on CPU (`--mem=4000`)
+4. Propagation phase 3b on GPU in the production wrappers shipped for the HUQ-EMB rebuild path
 
-**Phase 2 backend note:** Phase 2 (`Hierarchical/Psi`) is CPU-MPI only. No native-CUDA Phase 2
-runtime is validated or supported in the current release. GPU batching applies to Phase 1,
-Phase 3b, and propagation where applicable — not to Phase 2.
+**Phase 2 backend note:** the public Phase 2 entrypoint now exposes an explicit backend switch:
+`--phase2-backend {cpu-mpi,native-cuda}`. The current branch contract sets
+`production -> native-cuda` and `validation -> cpu-mpi` by default. Runtime validation of the
+native-CUDA production path is tracked separately and must still pass on the target hardware
+before it can be treated as operationally proven.
+
+**GPU partition note:** the Vega orchestration now routes GPU jobs by strict walltime policy:
+jobs with runtime strictly `<00:30:00` go to `dev`; jobs with runtime `>=00:30:00` go to `gpu`.
+That policy also applies to MAP Mirheo jobs.
 
 Default production lanes:
 - `scripts/vega/sbatch/production/complete_inference_compression.sbatch`
@@ -123,6 +132,27 @@ In particular, the public line now includes focused execution-level slices for:
 - `TMCMC`
 - `Hierarchical/Psi`
 
+## 8b. External Mirheo bootstrap surface
+
+Mirheo is not vendored under `extern/`. The current contract is:
+
+- source path lock in `extern/mirheo.lock.json`
+- repo-local build/install state under `_vega/mirheo/`
+- Python package install into the active repo-local venv
+- source snapshot manifest at `_vega/mirheo/source_snapshot.json`
+
+Canonical bootstrap entrypoint:
+- `scripts/hpc/bootstrap_mirheo.sh`
+
+Current default source lock:
+- `/ceph/hpc/home/eubrieucb/software/Mirheo`
+
+Supported MAP Mirheo micro-canary contract on Vega:
+- `n_displacements=1`
+- `numsteps=200`
+- `numsteps_eq=200`
+- strict `<00:30:00 => dev` routing still applies
+
 ## 9. Local workstation validation (o369 / non-SLURM)
 
 For local workstation runs (non-SLURM, e.g. `o369`), see `docs/WORKSTATION_LOCAL_WORKFLOWS.md`.
@@ -130,10 +160,11 @@ For local workstation runs (non-SLURM, e.g. `o369`), see `docs/WORKSTATION_LOCAL
 Local validation targets four lanes: `(compression, indentation) × (full-model, reduced-model)`.
 
 Low-load guidance for local runs:
-- Use **max 9 CPUs** for Phase 2 MPI ranks.
+- Use **max 9 CPUs** for Phase 2 only when running the CPU-MPI backend.
 - Keep **>2 GB RAM free** at all times.
 - Use the `validation` profile (reduced-cost configs), not `production`.
-- GPU batching applies to Phase 1, Phase 3b, and propagation — not Phase 2 (CPU-MPI only).
+- The local validation runner currently exercises the validation-profile default
+  `phase2_backend=cpu-mpi`; native-CUDA Phase 2 validation is tracked separately.
 
 ## Suggested usage pattern for new users
 

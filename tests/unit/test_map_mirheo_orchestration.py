@@ -77,6 +77,21 @@ def test_evaluate_script_path_compression():
     assert path.suffix == ".py"
 
 
+def test_mpirun_export_args_forwards_runtime_env(monkeypatch):
+    from run_map_mirheo import _mpirun_export_args
+
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/tmp/lib")
+    monkeypatch.setenv("MESOUQ_MIRHEO_SRC", "/tmp/Mirheo")
+    monkeypatch.delenv("HDF5_DIR", raising=False)
+
+    args = _mpirun_export_args()
+
+    assert "-x" in args
+    assert "LD_LIBRARY_PATH" in args
+    assert "MESOUQ_MIRHEO_SRC" in args
+    assert "HDF5_DIR" not in args
+
+
 def test_map_mirheo_manifest_schema(tmp_path):
     """Verify the written summary manifest has the expected top-level keys."""
     from run_map_mirheo import run_map_mirheo

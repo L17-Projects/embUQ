@@ -3,14 +3,19 @@ from pathlib import Path
 from meso_uq.vega import (
     build_runtime_pythonpath,
     find_external_korali_entries,
+    gather_mirheo_source_snapshot,
     get_vega_paths,
+    load_mirheo_source_lock,
+    render_mirheo_env_script,
     render_korali_env_script,
+    resolve_mirheo_source,
 )
 
 
 def _make_repo(tmp_path: Path) -> Path:
     repo_root = tmp_path / "repo"
     (repo_root / "extern" / "korali").mkdir(parents=True)
+    (repo_root / "extern").mkdir(exist_ok=True)
     (repo_root / "src").mkdir()
     (repo_root / "pyproject.toml").write_text("[project]\nname='mesouq'\n", encoding="utf-8")
     return repo_root
@@ -23,6 +28,8 @@ def test_vega_paths_use_repo_local_visible_state(tmp_path):
     assert paths.vega_root == repo_root / "_vega"
     assert paths.korali_prefix == repo_root / "_vega" / "korali" / "install"
     assert paths.korali_env_script == repo_root / "_vega" / "korali" / "env.sh"
+    assert paths.mirheo_prefix == repo_root / "_vega" / "mirheo" / "install"
+    assert paths.mirheo_env_script == repo_root / "_vega" / "mirheo" / "env.sh"
 
 
 def test_build_runtime_pythonpath_prefers_repo_local_korali(tmp_path):
@@ -74,3 +81,51 @@ def test_render_korali_env_script_uses_deterministic_pythonpath(tmp_path):
     assert str(paths.korali_site_packages) in env_script
     assert f"{repo_root / 'src'}:{repo_root}" in env_script
     assert "replaces inherited PYTHONPATH" in env_script
+
+
+def test_resolve_mirheo_source_uses_repo_lock(tmp_path, monkeypatch):
+    repo_root = _make_repo(tmp_path)
+    source_root = tmp_path / "mirheo-src"
+    source_root.mkdir()
+    (repo_root / "extern" / "mirheo.lock.json").write_text(
+        f'{{"source_path": "{source_root}"}}',
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("MESOUQ_MIRHEO_SRC", raising=False)
+
+    resolved = resolve_mirheo_source(repo_root)
+
+    assert resolved == source_root.resolve()
+    assert load_mirheo_source_lock(repo_root)["source_path"] == str(source_root)
+
+
+def test_render_mirheo_env_script_exports_local_paths(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    paths = get_vega_paths(repo_root)
+    source_root = tmp_path / "Mirheo"
+    source_root.mkdir()
+
+    env_script = render_mirheo_env_script(
+        paths,
+        source_root=source_root,
+        snapshot_path=paths.mirheo_snapshot_path,
+    )
+
+    assert "MESOUQ_MIRHEO_SRC" in env_script
+    assert str(source_root.resolve()) in env_script
+    assert str(paths.mirheo_build_dir) in env_script
+    assert str(paths.mirheo_snapshot_path) in env_script
+
+
+def test_gather_mirheo_source_snapshot_ignores_build_artifacts(tmp_path):
+    source_root = tmp_path / "Mirheo"
+    (source_root / "mirheo").mkdir(parents=True)
+    (source_root / "build").mkdir()
+    (source_root / "mirheo" / "__init__.py").write_text("value = 1\n", encoding="utf-8")
+    (source_root / "build" / "junk.txt").write_text("ignored\n", encoding="utf-8")
+
+    snapshot = gather_mirheo_source_snapshot(source_root)
+
+    assert snapshot["file_count"] == 1
+    assert snapshot["total_bytes"] == len("value = 1\n")
+    assert snapshot["tree_sha256"]
