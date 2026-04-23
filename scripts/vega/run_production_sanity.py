@@ -89,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
         str(args.phase2_cpu_ranks),
         "--site",
         resolved_site,
+        "--skip-release-manifest",
     ]
     if args.run_tag is not None:
         command.extend(["--run-tag", args.run_tag])
