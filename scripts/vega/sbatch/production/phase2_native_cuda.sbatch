@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --partition=cpu
-#SBATCH --ntasks=64
-#SBATCH --mem=256000
+#SBATCH --partition=gpu
+#SBATCH --ntasks=1
+#SBATCH --gres=gpu:1
 #SBATCH --time=06:00:00
 
 set -eo pipefail
@@ -14,9 +14,6 @@ module load Python/3.10.8-GCCcore-12.2.0 openmpi/4.1.2.1 CUDA/12.2.2 \
 source "${REPO_ROOT}/_vega/venv/bin/activate"
 source "${REPO_ROOT}/_vega/korali/env.sh"
 
-# Korali GPU builds may require libcuda.so.1 symbol resolution on CPU nodes.
-export LD_LIBRARY_PATH="/cvmfs/sling.si/modules/el7/software/CUDA/12.6.0/targets/x86_64-linux/lib/stubs:${LD_LIBRARY_PATH:-}"
-
 cd "${REPO_ROOT}"
 
 EXPERIMENT="${EXPERIMENT:-compression}"
@@ -24,9 +21,13 @@ MODEL_FAMILY="${MODEL_FAMILY:-full-model}"
 PROFILE="${PROFILE:-production}"
 RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
-PHASE2_CPU_RANKS="${PHASE2_CPU_RANKS:-64}"
-PHASE2_BACKEND="${PHASE2_BACKEND:-cpu-mpi}"
+PHASE2_BACKEND="${PHASE2_BACKEND:-native-cuda}"
 OUTPUT_DIR="${OUTPUT_DIR:-_runs/${EXPERIMENT}/${RUN_TAG}/production/setup}"
+
+if [[ "${PHASE2_BACKEND}" != "native-cuda" ]]; then
+  echo "ERROR: phase2_native_cuda.sbatch requires PHASE2_BACKEND=native-cuda; got '${PHASE2_BACKEND}'" >&2
+  exit 1
+fi
 
 if [[ -z "${CONFIG_PATH:-}" ]]; then
   echo "ERROR: CONFIG_PATH not set" >&2
@@ -39,7 +40,6 @@ python scripts/vega/run_inference_stage.py \
   --profile "${PROFILE}" \
   --stage phase2 \
   --phase2-backend "${PHASE2_BACKEND}" \
-  --cpu-ranks "${PHASE2_CPU_RANKS}" \
   --python-bin "${PYTHON_BIN}" \
   --config "${CONFIG_PATH}" \
   --output-dir "${OUTPUT_DIR}"

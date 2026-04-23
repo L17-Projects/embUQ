@@ -39,6 +39,7 @@ hbi_pop_size: 50000
 hbi_burn_in: 0
 hbi_target_cov: 0.6
 hbi_covariance_scaling: 0.04
+phase2_backend: native-cuda
 
 phase3b_pop_size: 50000
 phase3b_max_gen: -1

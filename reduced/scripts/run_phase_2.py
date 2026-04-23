@@ -22,9 +22,19 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default=str(DEFAULT_CONFIG))
     parser.add_argument("--output-dir", type=str, default="_setup")
+    parser.add_argument("--profiling", action="store_true", default=False)
+    parser.add_argument(
+        "--phase2-backend",
+        choices=["cpu-mpi", "native-cuda"],
+        default=None,
+    )
     args = parser.parse_args()
 
     cmd = [sys.executable, str(MAIN_DRIVER), "--config", args.config, "--output-dir", args.output_dir]
+    if args.profiling:
+        cmd.append("--profiling")
+    if args.phase2_backend is not None:
+        cmd.extend(["--phase2-backend", args.phase2_backend])
     return subprocess.call(cmd, cwd=str(PROJECT_ROOT))
 
 

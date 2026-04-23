@@ -18,6 +18,7 @@ SBATCH_DIR = Path(__file__).resolve().parents[1] / "scripts" / "vega" / "sbatch"
 PHASE_TEMPLATES = [
     "phase1_gpu.sbatch",
     "phase2_cpu.sbatch",
+    "phase2_native_cuda.sbatch",
     "phase3b_gpu.sbatch",
     "propagation_phase3b.sbatch",
 ]
@@ -135,11 +136,12 @@ def test_complete_orchestrators_reference_phase_sbatch_files(template: str) -> N
     text = _read(template)
     for child in (
         "phase1_gpu.sbatch",
-        "phase2_cpu.sbatch",
         "phase3b_gpu.sbatch",
         "propagation_phase3b.sbatch",
     ):
         assert child in text, f"{template}: no reference to child script {child}"
+    assert "phase2_native_cuda.sbatch" in text
+    assert "phase2_cpu.sbatch" in text
 
 
 # ---------------------------------------------------------------------------
@@ -150,8 +152,10 @@ def test_complete_orchestrators_reference_phase_sbatch_files(template: str) -> N
 @pytest.mark.parametrize("template", COMPLETE_ORCHESTRATORS)
 def test_complete_orchestrators_gpu_partition_for_phase1_and_phase3b(template: str) -> None:
     text = _read(template)
-    # GPU_PARTITION variable should be used for GPU job submissions
-    assert "GPU_PARTITION" in text, f"{template}: GPU_PARTITION not set or referenced"
+    assert "route_gpu_partition" in text, f"{template}: missing GPU partition router"
+    assert "PHASE1_GPU_PARTITION" in text
+    assert "PHASE3B_GPU_PARTITION" in text
+    assert "PROP3B_GPU_PARTITION" in text
 
 
 # ---------------------------------------------------------------------------
@@ -205,6 +209,23 @@ def test_phase2_cpu_passes_cpu_ranks() -> None:
     text = _read("phase2_cpu.sbatch")
     assert "--cpu-ranks" in text
     assert "PHASE2_CPU_RANKS" in text
+    assert "--phase2-backend" in text
+
+
+def test_phase2_native_cuda_partition_is_gpu() -> None:
+    text = _read("phase2_native_cuda.sbatch")
+    assert "#SBATCH --partition=gpu" in text
+    assert "#SBATCH --ntasks=1" in text
+    assert "--gres=gpu:1" in text
+
+
+def test_phase2_native_cuda_enforces_backend_and_calls_stage2() -> None:
+    text = _read("phase2_native_cuda.sbatch")
+    assert "PHASE2_BACKEND" in text
+    assert "native-cuda" in text
+    assert "run_inference_stage.py" in text
+    assert "--stage phase2" in text
+    assert "--phase2-backend" in text
 
 
 # ---------------------------------------------------------------------------
@@ -238,9 +259,9 @@ def test_phase3b_gpu_passes_device_flag() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_propagation_partition_is_cpu() -> None:
+def test_propagation_partition_is_gpu() -> None:
     text = _read("propagation_phase3b.sbatch")
-    assert "#SBATCH --partition=cpu" in text
+    assert "#SBATCH --partition=gpu" in text
 
 
 def test_propagation_mem_matches_orchestrator_budget() -> None:

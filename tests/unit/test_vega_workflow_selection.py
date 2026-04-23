@@ -221,6 +221,59 @@ def test_build_inference_command_phase2_single_rank_uses_direct_python() -> None
 
     assert command[0] == "python"
     assert "--device" not in command
+    assert command[-2:] == ["--phase2-backend", "cpu-mpi"]
+
+
+def test_build_inference_command_phase2_production_defaults_to_native_cuda() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "production")
+    command = build_inference_command(
+        repo_root,
+        selection,
+        stage="phase2",
+        python_bin="python",
+        config_path=resolve_workflow_config_path(repo_root, selection),
+        output_root=resolve_workflow_output_root(repo_root, selection),
+        cpu_ranks=1,
+    )
+
+    assert command[0] == "python"
+    assert "mpirun" not in command
+    assert command[-2:] == ["--phase2-backend", "native-cuda"]
+
+
+def test_build_inference_command_phase2_production_cpu_mpi_override_uses_mpirun() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "production")
+    command = build_inference_command(
+        repo_root,
+        selection,
+        stage="phase2",
+        python_bin="python",
+        config_path=resolve_workflow_config_path(repo_root, selection),
+        output_root=resolve_workflow_output_root(repo_root, selection),
+        cpu_ranks=4,
+        phase2_backend="cpu-mpi",
+    )
+
+    assert command[:6] == ["mpirun", "--bind-to", "none", "--oversubscribe", "-np", "4"]
+    assert command[-2:] == ["--phase2-backend", "cpu-mpi"]
+
+
+def test_build_inference_command_phase2_native_cuda_rejects_multi_rank() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "production")
+    with pytest.raises(ValueError, match="native-cuda backend requires cpu_ranks=1"):
+        build_inference_command(
+            repo_root,
+            selection,
+            stage="phase2",
+            python_bin="python",
+            config_path=resolve_workflow_config_path(repo_root, selection),
+            output_root=resolve_workflow_output_root(repo_root, selection),
+            cpu_ranks=2,
+            phase2_backend="native-cuda",
+        )
 
 
 def test_build_inference_command_phase1_cpu_uses_mpi_and_device_flag() -> None:
@@ -296,7 +349,7 @@ def test_build_propagation_command_phase3b_includes_device_flag() -> None:
     assert command[-2:] == ["--device", "gpu"]
 
 
-def test_build_propagation_command_phase1_omits_device_flag() -> None:
+def test_build_propagation_command_phase1_includes_device_flag() -> None:
     repo_root = _repo_root()
     selection = VegaWorkflowSelection("compression", "full-model", "validation")
     command = build_propagation_command(
@@ -307,7 +360,7 @@ def test_build_propagation_command_phase1_omits_device_flag() -> None:
         resolve_workflow_output_root(repo_root, selection),
     )
 
-    assert "--device" not in command
+    assert command[-2:] == ["--device", "cpu"]
 
 
 def test_build_inference_command_rejects_non_phase2_cpu_ranks() -> None:
@@ -352,4 +405,19 @@ def test_build_inference_command_rejects_dry_run_outside_phase1() -> None:
             config_path=resolve_workflow_config_path(repo_root, selection),
             output_root=resolve_workflow_output_root(repo_root, selection),
             dry_run=True,
+        )
+
+
+def test_build_inference_command_rejects_phase2_backend_outside_phase2() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "validation")
+    with pytest.raises(ValueError, match="phase2_backend is only supported for phase2"):
+        build_inference_command(
+            repo_root,
+            selection,
+            stage="phase1",
+            python_bin="python",
+            config_path=resolve_workflow_config_path(repo_root, selection),
+            output_root=resolve_workflow_output_root(repo_root, selection),
+            phase2_backend="cpu-mpi",
         )

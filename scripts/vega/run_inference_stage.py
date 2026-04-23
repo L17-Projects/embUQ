@@ -16,6 +16,7 @@ from meso_uq.vega_workflows import (  # noqa: E402
     VALID_EXPERIMENTS,
     VALID_INFERENCE_STAGES,
     VALID_MODEL_FAMILIES,
+    VALID_PHASE2_BACKENDS,
     VALID_PROFILES,
     VegaWorkflowSelection,
     build_inference_command,
@@ -39,6 +40,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--site", choices=["vega", "karolina"], default=None)
     parser.add_argument("--python-bin", type=str, default=sys.executable)
     parser.add_argument("--cpu-ranks", type=int, default=1)
+    parser.add_argument(
+        "--phase2-backend",
+        choices=VALID_PHASE2_BACKENDS,
+        default=None,
+        help="Phase 2 backend: production defaults to native-cuda; validation defaults to cpu-mpi.",
+    )
     parser.add_argument("--profiling", action="store_true", default=False)
     parser.add_argument("--restart", action="store_true", default=False)
     parser.add_argument("--dry-run", action="store_true", default=False)
@@ -74,6 +81,7 @@ def main(argv: list[str] | None = None) -> int:
         restart=args.restart,
         dry_run=args.dry_run,
         device=args.device,
+        phase2_backend=args.phase2_backend,
     )
 
     print(f"Experiment:    {selection.experiment}")

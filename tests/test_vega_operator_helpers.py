@@ -75,6 +75,8 @@ def test_run_inference_stage_builds_phase2_command_with_profile_and_model_family
     assert captured["cwd"] == str(repo_root)
     assert captured["command"][:6] == ["mpirun", "--bind-to", "none", "--oversubscribe", "-np", "4"]
     assert str(repo_root / "inference" / "scripts" / "run_phase_2.py") in captured["command"]
+    assert "--phase2-backend" in captured["command"]
+    assert captured["command"][-1] == "cpu-mpi"
     assert (
         str(
             repo_root
@@ -85,6 +87,45 @@ def test_run_inference_stage_builds_phase2_command_with_profile_and_model_family
         )
         in captured["command"]
     )
+
+
+def test_run_inference_stage_phase2_production_defaults_to_native_cuda(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "vega" / "run_inference_stage.py",
+        "run_inference_stage_production_phase2_native_cuda_test",
+    )
+    captured = {}
+
+    def fake_run(command, cwd=None, check=False):
+        captured["command"] = command
+        captured["cwd"] = cwd
+        return 0
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    rc = module.main(
+        [
+            "--experiment",
+            "compression",
+            "--model-family",
+            "full-model",
+            "--profile",
+            "production",
+            "--stage",
+            "phase2",
+            "--output-dir",
+            str(tmp_path / "run"),
+            "--python-bin",
+            "python",
+        ]
+    )
+
+    assert rc == 0
+    assert captured["cwd"] == str(repo_root)
+    assert captured["command"][0] == "python"
+    assert "mpirun" not in captured["command"]
+    assert captured["command"][-2:] == ["--phase2-backend", "native-cuda"]
 
 
 def test_run_propagation_uses_explicit_stage_wrapper(tmp_path, monkeypatch):
@@ -165,7 +206,7 @@ def test_run_inference_stage_uses_reduced_phase1_wrapper(tmp_path, monkeypatch):
 
     assert rc == 0
     assert captured["cwd"] == str(repo_root)
-    assert captured["command"][6] == str(repo_root / "reduced" / "scripts" / "run_phase_1.py")
+    assert captured["command"][1] == str(repo_root / "reduced" / "scripts" / "run_phase_1.py")
     assert "--restart" in captured["command"]
     assert "--dry_run" in captured["command"]
     assert (

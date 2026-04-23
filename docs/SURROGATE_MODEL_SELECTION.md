@@ -19,10 +19,14 @@ Compression:
 
 ```bash
 python compression/surrogate/scripts/emb_model_select.py TRAINING_TABLE.dat \
-  --output-dir trained/model_selection \
-  --widths 32,64,128 \
-  --depths 2,3,4
+  --output-dir trained/model_selection
 ```
+
+By default, compression now runs the 12-architecture paper sweep:
+
+`32x2,32x3,32x4,64x2,64x3,64x4,64x5,128x2,128x3,128x4,256x2,256x3`
+
+You can override this with `--architectures WIDTHxDEPTH,...`.
 
 Indentation:
 

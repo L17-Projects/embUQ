@@ -23,6 +23,7 @@ def grid_search_tabular_surrogate(
     output_dir,
     widths: Sequence[int],
     depths: Sequence[int],
+    architectures: Sequence[tuple[int, int]] | None = None,
     batch_size: int = 128,
     lr: float = 5e-4,
     max_epoch: int = 100,
@@ -34,11 +35,19 @@ def grid_search_tabular_surrogate(
     depths = _as_int_list(depths)
     if not widths or not depths:
         raise ValueError("widths and depths must be non-empty")
+    if architectures is not None and len(architectures) == 0:
+        raise ValueError("architectures must be non-empty when provided")
+
+    arch_pairs = (
+        [(int(width), int(depth)) for width, depth in architectures]
+        if architectures is not None
+        else list(product(widths, depths))
+    )
 
     rows = []
     best = None
 
-    for width, depth in product(widths, depths):
+    for width, depth in arch_pairs:
         model_path = output_dir / f"model_w{width}_d{depth}.pkl"
         result = train_tabular_surrogate(
             df,

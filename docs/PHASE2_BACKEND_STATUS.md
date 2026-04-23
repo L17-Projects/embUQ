@@ -1,55 +1,65 @@
 # Phase 2 backend status
 
-This note clarifies the current public status of **Phase 2** in `MesoUQ`.
+This note describes the current branch-level `Phase 2` contract in `MesoUQ`.
 
-## What the public workflow currently does
+## Public entrypoint
 
-The current public Phase 2 entrypoint is `inference/scripts/run_phase_2.py`.
+The public `Phase 2` entrypoint remains:
 
-That script:
+- `inference/scripts/run_phase_2.py`
 
-- loads Phase 1 sub-experiments,
-- constructs a `Hierarchical/Psi` Korali experiment,
-- runs TMCMC through the standard Korali Python path,
-- sets `Ranks Per Worker = 1`.
+That entrypoint now exposes an explicit runtime switch:
 
-At the public workflow level, there is currently **no explicit runtime switch** that selects a native-CUDA backend path from `run_phase_2.py`.
+- `--phase2-backend cpu-mpi`
+- `--phase2-backend native-cuda`
 
-## What the vendored Korali build surface exposes
+If no explicit override is provided, the current workflow defaults are:
 
-The vendored `extern/korali/meson_options.txt` does define a `native_cuda_batch` Meson option.
+- `production` profile: `native-cuda`
+- `validation` profile: `cpu-mpi`
 
-The vendored `extern/korali/meson.build` also contains conditional logic for:
+## Current runtime behavior
 
-- CUDA driver headers and libraries,
-- NVRTC,
-- the `_KORALI_USE_CUDA_BATCH` configuration define.
+For `phase2_backend=native-cuda`, `run_phase_2.py` now:
 
-So the build surface acknowledges a native-CUDA-oriented backend option.
+- requires a single MPI rank,
+- configures a Sequential Korali conduit,
+- enables batch evaluation,
+- selects `Batch Evaluation Backend = NativeCuda`,
+- checks repo-local Meson metadata when available to verify that Korali was built with
+  `native_cuda_batch` enabled.
 
-## What the public operator documentation currently says
+For `phase2_backend=cpu-mpi`, the entrypoint keeps the MPI path available as an explicit fallback.
 
-The current public HPC workflow guide says:
+## Build surface
 
-- `Phase 1`: GPU batched
-- `Phase 2`: CPU MPI
-- `Phase 3b`: GPU batched
+The repo-local Korali build still depends on the vendored build surface exposing:
 
-and explicitly states that Korali itself remains a CPU/MPI library for that workflow.
+- the `native_cuda_batch` Meson option,
+- CUDA driver / NVRTC linkage,
+- the corresponding Korali native-CUDA batch path.
 
-## Honest public conclusion
+## Honest current conclusion
 
-As of this PR22 slice, the public repository should be understood as follows:
+The code-level backend contract is now implemented in the public workflow spine:
 
-- the **supported documented workflow** still treats Phase 2 as **CPU MPI**,
-- the vendored Korali subtree exposes a **native-CUDA build option**,
-- but the public repo does **not yet provide a validated, supported native-CUDA Phase 2 execution contract**.
+- `Phase 2` supports `cpu-mpi` and `native-cuda`,
+- production orchestration defaults to `native-cuda`,
+- validation orchestration defaults to `cpu-mpi`.
 
-That means native-CUDA Phase 2 should currently be treated as an **experimental backend direction**, not as a finished public feature.
+What is still separate from the contract is runtime proof:
 
-## What PR22 should achieve incrementally
+- target-hardware canaries still need to confirm that the native-CUDA path runs cleanly,
+- downstream `Phase 3b` and postprocess steps must consume those outputs correctly,
+- release/audit evidence must capture that result honestly.
 
-A truthful PR22 pass should therefore do two things:
+Until that runtime evidence exists, the branch can truthfully claim an implemented native-CUDA
+operator path, but not a finished audit pass for the full HUQ-EMB rebuild.
 
-1. document the gap clearly,
-2. define an acceptance checklist for the hardware-specific validation needed before Phase 2 can be claimed as a supported native-CUDA path.
+## Validation surface
+
+The hardware-facing validation checklist remains:
+
+- `docs/VEGA_PHASE2_NATIVE_CUDA_CHECKLIST.md`
+
+That checklist is the place to record the actual canary evidence and any failure modes.

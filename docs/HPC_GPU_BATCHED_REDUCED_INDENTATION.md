@@ -6,8 +6,8 @@ This guide describes the current supported operator path for the reduced-model i
 
 - clone-local runtime rooted under `_vega/`
 - vendored `extern/korali/` bootstrap only
-- single-node SLURM jobs on the Vega `dev` partition
-- one GPU for surrogate-backed `Phase 1` and `Phase 3b`
+- single-node SLURM jobs on Vega with the strict GPU partition policy
+- one GPU for surrogate-backed `Phase 1`, native-CUDA `Phase 2`, `Phase 3b`, and propagation where applicable
 - workflow path:
   - `Phase 1`
   - `Phase 2`
@@ -20,11 +20,13 @@ This guide describes the current supported operator path for the reduced-model i
 For this workflow, the current documented backend contract is:
 
 - `Phase 1`: GPU-batched surrogate path
-- `Phase 2`: CPU MPI using the current documented Korali state
+- `Phase 2`: `native-cuda` by default for `production`; `cpu-mpi` remains an explicit fallback
 - `Phase 3b`: GPU-batched surrogate path
-- propagation, MAP extraction, and plotting: CPU-side postprocess work
+- propagation: GPU surrogate path in the production wrappers
+- MAP extraction and plotting: CPU-side postprocess work
 
-This is why the supported bootstrap path builds vendored Korali with MPI support, but does not claim a validated native-CUDA `Phase 2` lane.
+The supported bootstrap path still builds vendored Korali with MPI support because the CPU-MPI
+fallback remains part of the public operator surface.
 
 ## Bootstrap the repo-local runtime
 
@@ -74,6 +76,7 @@ python scripts/vega/run_inference_stage.py \
   --model-family reduced-model \
   --profile production \
   --stage phase2 \
+  --phase2-backend native-cuda \
   --cpu-ranks 4
 ```
 
@@ -123,6 +126,11 @@ Relevant templates:
 - `workflow_propagation.sbatch`
 - `workflow_map.sbatch`
 
+The strict GPU partition rule is:
+
+- runtime strictly `<00:30:00` -> `dev`
+- runtime `>=00:30:00` -> `gpu`
+
 ## Output locations
 
 By default, the reduced-model indentation workflow lands under:
@@ -151,7 +159,10 @@ Rebuild or reinstall `mpi4py` after loading the same MPI module stack used for t
 
 ### GPU utilization looks low during `Phase 2`
 
-That is expected. `Phase 2` is currently a CPU MPI stage in the documented public workflow.
+That depends on the selected backend:
+
+- `cpu-mpi`: low GPU utilization is expected
+- `native-cuda`: GPU visibility should be present; if not, treat it as a backend/runtime issue
 
 ### GPU utilization looks bursty during `Phase 1` or `Phase 3b`
 
