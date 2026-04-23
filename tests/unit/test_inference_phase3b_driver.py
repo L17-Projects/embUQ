@@ -51,11 +51,13 @@ def _load_module():
     comp_mod = types.ModuleType("compression.evalkit.posterior_compression")
     comp_mod.compute_compression_surrogate = lambda *a, **kw: None
     comp_mod.compute_compression_surrogate_batch = lambda *a, **kw: None
+    comp_mod.preload_compression_surrogate = lambda *a, **kw: None
     sys.modules.setdefault("compression.evalkit.posterior_compression", comp_mod)
 
     ind_mod = types.ModuleType("indentation.evalkit.posterior_indentation")
     ind_mod.compute_indentation_surrogate = lambda *a, **kw: None
     ind_mod.compute_indentation_surrogate_batch = lambda *a, **kw: None
+    ind_mod.preload_indentation_surrogate = lambda *a, **kw: None
     sys.modules.setdefault("indentation.evalkit.posterior_indentation", ind_mod)
 
     module_path = repo_root / "inference" / "scripts" / "run_phase_3b.py"
