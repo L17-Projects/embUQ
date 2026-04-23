@@ -10,6 +10,7 @@ Checks:
   - Report is valid JSON with required top-level keys.
   - `status` is a recognised value.
   - `selections` is a non-empty list.
+  - `phase2_backend_contract` and `phase2_backend_effective` are recognised.
   - `overlays` contains entries for every declared selection.
   - Propagation and MAP overlay files exist on disk for each selection.
 
@@ -29,8 +30,11 @@ REQUIRED_KEYS = {
     "selections",
     "overlays",
     "phase2_backend_contract",
+    "phase2_backend_effective",
 }
 ALLOWED_STATUSES = {"passed", "failed", "partial"}
+ALLOWED_PHASE2_BACKEND_CONTRACTS = {"dual_backend"}
+ALLOWED_PHASE2_BACKENDS = {"cpu-mpi", "native-cuda"}
 
 
 def _load_report(path: Path) -> dict[str, Any]:
@@ -53,6 +57,20 @@ def validate_report(report: dict[str, Any], check_files: bool = True) -> list[st
     status = report["status"]
     if status not in ALLOWED_STATUSES:
         errors.append(f"status '{status}' not in {sorted(ALLOWED_STATUSES)}")
+
+    backend_contract = report["phase2_backend_contract"]
+    if backend_contract not in ALLOWED_PHASE2_BACKEND_CONTRACTS:
+        errors.append(
+            "phase2_backend_contract "
+            f"'{backend_contract}' not in {sorted(ALLOWED_PHASE2_BACKEND_CONTRACTS)}"
+        )
+
+    backend_effective = report["phase2_backend_effective"]
+    if backend_effective not in ALLOWED_PHASE2_BACKENDS:
+        errors.append(
+            "phase2_backend_effective "
+            f"'{backend_effective}' not in {sorted(ALLOWED_PHASE2_BACKENDS)}"
+        )
 
     selections = report["selections"]
     if not isinstance(selections, list) or not selections:

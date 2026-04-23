@@ -97,7 +97,9 @@ def test_local_workstation_runner_invokes_matrix_with_gpu_devices_and_writes_rep
 
     report = json.loads((output_root / "local_validation_report.json").read_text(encoding="utf-8"))
     assert report["status"] == "passed"
-    assert report["phase2_native_cuda_supported"] is False
+    assert report["phase2_backend_contract"] == "dual_backend"
+    assert report["phase2_backend_default_for_profile"] == "cpu-mpi"
+    assert report["phase2_backend_effective"] == "cpu-mpi"
     assert report["device_contract"]["inference_requested"] == "gpu"
     assert report["device_contract"]["inference_effective"] == "gpu"
     assert report["device_contract"]["propagation_requested"] == "gpu"

@@ -21,11 +21,12 @@ Each phase has a distinct compute backend contract:
 | Phase | Backend | Notes |
 |-------|---------|-------|
 | Phase 1 | **GPU-batched surrogate** (when `--inference-device gpu`) or CPU MPI surrogate | Single-process Sequential Korali conduit on GPU; Distributed MPI conduit on CPU |
-| Phase 2 | **CPU MPI only** | Phase 2 is a hierarchical Psi stage. It is CPU-MPI only. No native-CUDA Phase 2 runtime is validated or supported in this release. |
+| Phase 2 | **Validation-profile default: CPU MPI** | The broader workflow spine now supports `cpu-mpi` and `native-cuda`, but this local validation runner exercises the validation-profile default `phase2_backend=cpu-mpi`. |
 | Phase 3b | **GPU-batched surrogate** (when `--inference-device gpu`) or CPU MPI surrogate | Same conduit choice as Phase 1 |
 | Propagation Phase 3b | **GPU surrogate** (when `--propagation-device gpu`) or CPU | Lightweight; GPU reduces wall time |
 
-`MesoUQ` does not currently expose a validated supported native-CUDA Phase 2 runtime contract.
+This workstation page is a validation-profile smoke surface. It does not, by itself, certify the
+production native-CUDA `Phase 2` path.
 
 ## GPU batching scope
 
@@ -35,7 +36,7 @@ GPU batching (`--device gpu`) applies to:
 - **Phase 3b**: `run_phase_3b.py --device gpu` — batched TMCMC surrogate evaluation
 - **Propagation**: where applicable, `--device gpu` enables GPU-batched forward surrogate calls
 
-GPU batching does **not** apply to Phase 2 (CPU-MPI only).
+For this local validation runner, `Phase 2` remains on the validation-profile default CPU-MPI path.
 
 ## Local validation target outputs
 
@@ -62,6 +63,12 @@ Expected artifacts per lane (under `<output-root>/<lane>/`):
 - `results_propagation_phase3b/<exp>_<diam>um/` — forward uncertainty propagation
 - `results_map_phase3b/<exp>_<diam>um/` — MAP parameter estimates
 - `local_validation_report.json` — machine-readable summary report
+
+The local validation report records:
+
+- `phase2_backend_contract: dual_backend`
+- `phase2_backend_default_for_profile: cpu-mpi`
+- `phase2_backend_effective: cpu-mpi`
 
 ## Low-load guidance
 

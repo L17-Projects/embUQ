@@ -32,7 +32,8 @@ def _minimal_report(tmp_path: Path, *, create_files: bool = True) -> dict:
     return {
         "status": "passed",
         "selections": [sel],
-        "phase2_backend_contract": "cpu_mpi_only",
+        "phase2_backend_contract": "dual_backend",
+        "phase2_backend_effective": "cpu-mpi",
         "overlays": {
             sel: {
                 "propagation_vs_reference_plots": [str(prop_plot)],
@@ -56,7 +57,7 @@ def test_validate_report_passes_for_valid_minimal_report(tmp_path):
 
 def test_validate_report_missing_required_key():
     module = _load_module()
-    report = {"selections": ["x"], "overlays": {}, "phase2_backend_contract": "cpu_mpi_only"}
+    report = {"selections": ["x"], "overlays": {}, "phase2_backend_contract": "dual_backend"}
     errors = module.validate_report(report, check_files=False)
     assert any("status" in e for e in errors)
 
@@ -67,7 +68,8 @@ def test_validate_report_invalid_status():
         "status": "running",
         "selections": ["compression:full-model:validation"],
         "overlays": {},
-        "phase2_backend_contract": "cpu_mpi_only",
+        "phase2_backend_contract": "dual_backend",
+        "phase2_backend_effective": "cpu-mpi",
     }
     errors = module.validate_report(report, check_files=False)
     assert any("status" in e for e in errors)
@@ -79,7 +81,8 @@ def test_validate_report_empty_selections():
         "status": "passed",
         "selections": [],
         "overlays": {},
-        "phase2_backend_contract": "cpu_mpi_only",
+        "phase2_backend_contract": "dual_backend",
+        "phase2_backend_effective": "cpu-mpi",
     }
     errors = module.validate_report(report, check_files=False)
     assert any("selections" in e for e in errors)
@@ -91,7 +94,8 @@ def test_validate_report_selection_missing_from_overlays():
         "status": "passed",
         "selections": ["compression:full-model:validation"],
         "overlays": {},
-        "phase2_backend_contract": "cpu_mpi_only",
+        "phase2_backend_contract": "dual_backend",
+        "phase2_backend_effective": "cpu-mpi",
     }
     errors = module.validate_report(report, check_files=False)
     assert any("missing from overlays" in e for e in errors)
@@ -102,7 +106,8 @@ def test_validate_report_non_string_selection_is_reported(tmp_path):
     report = {
         "status": "passed",
         "selections": [{"bad": "value"}],
-        "phase2_backend_contract": "cpu_mpi_only",
+        "phase2_backend_contract": "dual_backend",
+        "phase2_backend_effective": "cpu-mpi",
         "overlays": {},
     }
     errors = module.validate_report(report, check_files=False)
@@ -115,7 +120,8 @@ def test_validate_report_no_propagation_plots():
     report = {
         "status": "passed",
         "selections": [sel],
-        "phase2_backend_contract": "cpu_mpi_only",
+        "phase2_backend_contract": "dual_backend",
+        "phase2_backend_effective": "cpu-mpi",
         "overlays": {
             sel: {
                 "propagation_vs_reference_plots": [],
@@ -133,7 +139,8 @@ def test_validate_report_no_map_plots():
     report = {
         "status": "passed",
         "selections": [sel],
-        "phase2_backend_contract": "cpu_mpi_only",
+        "phase2_backend_contract": "dual_backend",
+        "phase2_backend_effective": "cpu-mpi",
         "overlays": {
             sel: {
                 "propagation_vs_reference_plots": ["/some/prop.png"],
@@ -158,7 +165,8 @@ def test_validate_report_missing_propagation_file(tmp_path):
     report = {
         "status": "passed",
         "selections": [sel],
-        "phase2_backend_contract": "cpu_mpi_only",
+        "phase2_backend_contract": "dual_backend",
+        "phase2_backend_effective": "cpu-mpi",
         "overlays": {
             sel: {
                 "propagation_vs_reference_plots": [str(tmp_path / "nonexistent_prop.png")],
@@ -178,7 +186,8 @@ def test_validate_report_missing_map_file(tmp_path):
     report = {
         "status": "passed",
         "selections": [sel],
-        "phase2_backend_contract": "cpu_mpi_only",
+        "phase2_backend_contract": "dual_backend",
+        "phase2_backend_effective": "cpu-mpi",
         "overlays": {
             sel: {
                 "propagation_vs_reference_plots": [str(prop_plot)],
@@ -196,7 +205,8 @@ def test_validate_report_skip_file_check_ignores_missing(tmp_path):
     report = {
         "status": "passed",
         "selections": [sel],
-        "phase2_backend_contract": "cpu_mpi_only",
+        "phase2_backend_contract": "dual_backend",
+        "phase2_backend_effective": "cpu-mpi",
         "overlays": {
             sel: {
                 "propagation_vs_reference_plots": ["/does/not/exist/prop.png"],
@@ -243,7 +253,8 @@ def test_main_returns_zero_with_no_check_files_flag(tmp_path):
     report = {
         "status": "passed",
         "selections": [sel],
-        "phase2_backend_contract": "cpu_mpi_only",
+        "phase2_backend_contract": "dual_backend",
+        "phase2_backend_effective": "cpu-mpi",
         "overlays": {
             sel: {
                 "propagation_vs_reference_plots": ["/ghost/prop.png"],
@@ -278,10 +289,27 @@ def test_main_all_four_lanes_pass(tmp_path):
     report = {
         "status": "passed",
         "selections": selections,
-        "phase2_backend_contract": "cpu_mpi_only",
+        "phase2_backend_contract": "dual_backend",
+        "phase2_backend_effective": "cpu-mpi",
         "overlays": overlays,
     }
     report_path = tmp_path / "report.json"
     report_path.write_text(json.dumps(report), encoding="utf-8")
     rc = module.main(["--report", str(report_path)])
     assert rc == 0
+
+
+def test_validate_report_rejects_unknown_phase2_contract(tmp_path):
+    module = _load_module()
+    report = _minimal_report(tmp_path)
+    report["phase2_backend_contract"] = "cpu_mpi_only"
+    errors = module.validate_report(report, check_files=False)
+    assert any("phase2_backend_contract" in error for error in errors)
+
+
+def test_validate_report_rejects_unknown_phase2_backend_effective(tmp_path):
+    module = _load_module()
+    report = _minimal_report(tmp_path)
+    report["phase2_backend_effective"] = "bogus"
+    errors = module.validate_report(report, check_files=False)
+    assert any("phase2_backend_effective" in error for error in errors)
