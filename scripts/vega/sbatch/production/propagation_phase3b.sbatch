@@ -1,8 +1,9 @@
 #!/bin/bash
-#SBATCH --partition=cpu
+#SBATCH --partition=gpu
 #SBATCH --ntasks=1
 #SBATCH --mem=4000
 #SBATCH --time=03:00:00
+#SBATCH --gres=gpu:1
 
 set -eo pipefail
 
@@ -21,7 +22,7 @@ MODEL_FAMILY="${MODEL_FAMILY:-full-model}"
 PROFILE="${PROFILE:-production}"
 RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
-PROPAGATION_DEVICE="${PROPAGATION_DEVICE:-cpu}"
+PROPAGATION_DEVICE="${PROPAGATION_DEVICE:-gpu}"
 OUTPUT_DIR="${OUTPUT_DIR:-_runs/${EXPERIMENT}/${RUN_TAG}/production/setup}"
 
 if [[ -z "${CONFIG_PATH:-}" ]]; then

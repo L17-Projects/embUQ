@@ -240,8 +240,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--site", choices=["vega", "karolina"], default=None)
     parser.add_argument("--python-bin", type=str, default=sys.executable)
     parser.add_argument("--phase2-cpu-ranks", type=int, default=1)
-    parser.add_argument("--inference-device", choices=["cpu", "gpu"], default="cpu")
-    parser.add_argument("--propagation-device", choices=["cpu", "gpu"], default="cpu")
+    parser.add_argument("--inference-device", choices=["cpu", "gpu"], default="gpu")
+    parser.add_argument("--propagation-device", choices=["cpu", "gpu"], default="gpu")
     parser.add_argument("--config-override", action="append", default=[])
     parser.add_argument("--continue-on-error", action="store_true", default=False)
     parser.add_argument("--run-phase1-map", action="store_true", default=False,

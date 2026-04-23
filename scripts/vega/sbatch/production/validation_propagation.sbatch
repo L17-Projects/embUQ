@@ -22,7 +22,7 @@ PROFILE="${PROFILE:-validation}"
 STAGE="${STAGE:-phase3b}"
 OUTPUT_DIR="${OUTPUT_DIR:-}"
 CONFIG_PATH="${CONFIG_PATH:-}"
-DEVICE="${DEVICE:-cpu}"
+DEVICE="${DEVICE:-gpu}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 
 module purge

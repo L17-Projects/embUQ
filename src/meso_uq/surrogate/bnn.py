@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 from typing import Any, Callable, Dict, Tuple
 
@@ -17,12 +16,10 @@ def _resolve_torch_device(device: str) -> torch.device:
     if normalized == "gpu":
         normalized = "cuda"
     if normalized == "cuda" and not torch.cuda.is_available():
-        warnings.warn(
-            "Requested CUDA for BNN surrogate, but CUDA is unavailable. Falling back to CPU.",
-            RuntimeWarning,
-            stacklevel=2,
+        raise RuntimeError(
+            "Requested CUDA for BNN surrogate, but CUDA is unavailable. "
+            "Use --device cpu to run on CPU, or ensure a GPU is visible to PyTorch."
         )
-        normalized = "cpu"
     return torch.device(normalized)
 
 
@@ -95,6 +92,8 @@ def make_artifact_payload(
     prior_scale: float,
     obs_noise_prior_scale: float = 1.0,
     pyro_param_values: Dict[str, torch.Tensor],
+    base_model_state_dict: Dict[str, torch.Tensor] | None = None,
+    guide_state_dict: Dict[str, torch.Tensor] | None = None,
     training_summary: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     serialized_params: Dict[str, torch.Tensor] = {}
@@ -114,6 +113,16 @@ def make_artifact_payload(
         "yscale": list(yscale),
         "pyro_param_values": serialized_params,
     }
+    if base_model_state_dict is not None:
+        serialized_model_state: Dict[str, torch.Tensor] = {}
+        for name, tensor in base_model_state_dict.items():
+            serialized_model_state[str(name)] = torch.as_tensor(tensor).detach().cpu()
+        payload["base_model_state_dict"] = serialized_model_state
+    if guide_state_dict is not None:
+        serialized_guide_state: Dict[str, torch.Tensor] = {}
+        for name, tensor in guide_state_dict.items():
+            serialized_guide_state[str(name)] = torch.as_tensor(tensor).detach().cpu()
+        payload["guide_state_dict"] = serialized_guide_state
     if training_summary is not None:
         payload["training"] = training_summary
     return payload
@@ -180,7 +189,7 @@ class VariationalBNNPredictor:
         obs_noise_prior_scale = float(
             payload.get("obs_noise_prior_scale", payload.get("obs_noise", 1.0))
         )
-        pyro, _, model, guide = build_variational_components(
+        pyro, base_model, model, guide = build_variational_components(
             input_dim=int(payload["input_dim"]),
             width=int(payload["width"]),
             depth=int(payload["depth"]),
@@ -188,12 +197,18 @@ class VariationalBNNPredictor:
             obs_noise_prior_scale=obs_noise_prior_scale,
             device=self.device,
         )
+        base_model_state = payload.get("base_model_state_dict")
+        if isinstance(base_model_state, dict):
+            restored_state = {
+                str(name): torch.as_tensor(value, dtype=torch.float32, device=self.device)
+                for name, value in base_model_state.items()
+            }
+            base_model.load_state_dict(restored_state, strict=True)
         pyro.clear_param_store()
-        with torch.inference_mode():
-            guide(
-                torch.zeros((1, int(payload["input_dim"])), dtype=torch.float32, device=self.device),
-                torch.zeros((1, 1), dtype=torch.float32, device=self.device),
-            )
+        guide(
+            torch.zeros((1, int(payload["input_dim"])), dtype=torch.float32, device=self.device),
+            torch.zeros((1, 1), dtype=torch.float32, device=self.device),
+        )
         store = pyro.get_param_store()
         expected_names = set(store._params.keys())
         param_constraints = {
@@ -210,6 +225,12 @@ class VariationalBNNPredictor:
             raise KeyError(
                 "Unexpected Pyro parameters while loading BNN artifact: " + ", ".join(unexpected)
             )
+        guide_state = None
+        if isinstance(payload.get("guide_state_dict"), dict):
+            guide_state = {
+                name: torch.as_tensor(value, dtype=torch.float32, device=self.device)
+                for name, value in payload["guide_state_dict"].items()
+            }
         param_values = {
             name: torch.as_tensor(value, dtype=torch.float32, device=self.device).detach().clone()
             for name, value in payload["pyro_param_values"].items()
@@ -217,6 +238,9 @@ class VariationalBNNPredictor:
 
         def _restore_param_store() -> None:
             pyro.clear_param_store()
+            if guide_state is not None:
+                guide.load_state_dict(guide_state, strict=True)
+                return
             local_store = pyro.get_param_store()
             for name, value in param_values.items():
                 unconstrained = value.clone().detach()

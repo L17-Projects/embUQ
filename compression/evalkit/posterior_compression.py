@@ -133,7 +133,7 @@ def _load_run_equil():
 
 
 def compute_compression_surrogate(
-    sample: Dict[str, Any], displ: List[float], diameter_um: float
+    sample: Dict[str, Any], displ: List[float], diameter_um: float, device: str = "cpu"
 ) -> None:
     project_root = _resolve_project_root()
     config = _load_config(project_root)
@@ -144,7 +144,7 @@ def compute_compression_surrogate(
     )
     Yt, kb, b1, b2, a3, a4, d0, sigma = params.tolist()
     backend, predictive_mc_samples, predictive_mc_chunk_size = _resolve_surrogate_runtime(config)
-    surrogate = _get_surrogate(project_root, diameter_um, backend=backend)
+    surrogate = _get_surrogate(project_root, diameter_um, device=device, backend=backend)
     displ_corrected = [max(0.0, d - d0) for d in displ]
     if backend == "dnn":
         forces = surrogate.evaluate_compression(x=[Yt, kb, b1, b2, a3, a4], disp=displ_corrected)

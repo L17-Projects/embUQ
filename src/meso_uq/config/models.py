@@ -100,6 +100,7 @@ class InferenceConfig(BaseModel):
     data_prefix: Optional[str] = Field(default=None)
     data_files: Optional[dict] = Field(default=None)
     surrogate_dir: Optional[str] = Field(default=None)
+    surrogate: Optional[dict] = Field(default=None)
     experiments: Optional[List[dict]] = Field(default=None)
 
     @field_validator("emb_diameters")

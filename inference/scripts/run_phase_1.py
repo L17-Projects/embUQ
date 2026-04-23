@@ -40,6 +40,18 @@ from meso_uq.workflow_acceleration import (
 )
 
 
+def _resolve_surrogate_backend(config: dict) -> str:
+    surrogate_cfg = config.get("surrogate", {})
+    if surrogate_cfg is None:
+        surrogate_cfg = {}
+    if not isinstance(surrogate_cfg, dict):
+        raise ValueError("Expected 'surrogate' config section to be a mapping.")
+    backend = str(surrogate_cfg.get("backend", "dnn")).strip().lower()
+    if backend not in {"dnn", "bnn"}:
+        raise ValueError(f"Unsupported surrogate backend '{backend}'. Expected 'dnn' or 'bnn'.")
+    return backend
+
+
 def _align_reference_data(ref_points, ref_data, exp_name, rank):
     if len(ref_points) != len(ref_data):
         min_len = min(len(ref_points), len(ref_data))
@@ -152,6 +164,7 @@ def run_inference(
     target_cov = config["target_cov"]
     covariance_scaling = config["covariance_scaling"]
     use_surrogate = config.get("use_surrogate", True)
+    surrogate_backend = _resolve_surrogate_backend(config)
 
     experiments = [exp for exp in load_experiments(config, PROJECT_ROOT) if exp.enabled]
 
@@ -169,7 +182,7 @@ def run_inference(
                     f"No surrogate preload function registered for experiment '{exp.name}'"
                 )
             for diameter_um in exp.diameters:
-                preload_fn(diameter_um, device=device)
+                preload_fn(diameter_um, device=device, backend=surrogate_backend)
         if device == "cpu":
             comm.Barrier()
 

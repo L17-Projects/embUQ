@@ -5,6 +5,7 @@ __pycache__/
 *.egg-info/
 .coverage
 .venv-*/
+.venv/
 coverage.xml
 coverage.json
 coverage-summary.md
@@ -14,7 +15,5 @@ out_*
 logs/
 AGENTS.md
 CLAUDE.md
-compression/surrogate/diameters/*/trained/*BNN*.pt
 compression/surrogate/diameters/*/trained/*BNN*_loss_hist.json
-indentation/surrogate/diameters/*/trained/*BNN*.pt
 indentation/surrogate/diameters/*/trained/*BNN*_loss_hist.json

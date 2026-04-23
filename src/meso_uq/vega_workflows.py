@@ -296,7 +296,7 @@ def build_propagation_command(
         "--output-dir",
         str(Path(output_root).resolve()),
     ]
-    if stage == "phase3b":
+    if stage in {"phase1", "phase3b"}:
         cmd.extend(["--device", device])
     return cmd
 

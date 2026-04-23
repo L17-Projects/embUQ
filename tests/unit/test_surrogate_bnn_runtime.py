@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 
 import numpy as np
@@ -14,15 +13,12 @@ from indentation.surrogate import evaluate_bnn as indentation_evaluate_bnn
 from meso_uq.surrogate import bnn as bnn_runtime
 
 
-def test_resolve_torch_device_falls_back_to_cpu_with_warning(
+def test_resolve_torch_device_raises_when_cuda_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(bnn_runtime.torch.cuda, "is_available", lambda: False)
-    with warnings.catch_warnings(record=True) as captured:
-        warnings.simplefilter("always")
-        resolved = bnn_runtime._resolve_torch_device("cuda")
-    assert resolved.type == "cpu"
-    assert any("Falling back to CPU" in str(w.message) for w in captured)
+    with pytest.raises(RuntimeError, match="CUDA is unavailable"):
+        bnn_runtime._resolve_torch_device("cuda")
 
 
 def test_compression_bnn_surrogate_requires_artifact(tmp_path: Path) -> None:
@@ -138,3 +134,67 @@ def test_variational_predictors_restore_own_pyro_param_store(
         inputs, predictive_mc_samples=2, predictive_mc_chunk_size=1
     )
     assert not np.allclose(mean_a, mean_b)
+
+
+def test_format_v1_reload_is_independent_of_base_model_init_seed(tmp_path: Path) -> None:
+    pyro = pytest.importorskip("pyro")
+    torch.manual_seed(12345)
+    device = torch.device("cpu")
+    _, base_model, _, guide = bnn_runtime.build_variational_components(
+        input_dim=2,
+        width=4,
+        depth=1,
+        prior_scale=1.0,
+        obs_noise_prior_scale=1.0,
+        device=device,
+    )
+    pyro.clear_param_store()
+    with torch.inference_mode():
+        guide(
+            torch.zeros((1, 2), dtype=torch.float32, device=device),
+            torch.zeros((1, 1), dtype=torch.float32, device=device),
+        )
+    store = pyro.get_param_store()
+    payload = bnn_runtime.make_artifact_payload(
+        xshift=[0.0, 0.0],
+        xscale=[1.0, 1.0],
+        yshift=[0.0],
+        yscale=[1.0],
+        input_dim=2,
+        width=4,
+        depth=1,
+        prior_scale=1.0,
+        obs_noise_prior_scale=1.0,
+        pyro_param_values={
+            name: value.detach().clone().cpu() for name, value in store._params.items()
+        },
+        base_model_state_dict={
+            name: value.detach().clone().cpu()
+            for name, value in base_model.state_dict().items()
+        },
+        guide_state_dict={
+            name: value.detach().clone().cpu()
+            for name, value in guide.state_dict().items()
+        },
+    )
+    artifact = tmp_path / "seed_stable_bnn.pt"
+    torch.save(payload, artifact)
+
+    inputs = np.asarray([[0.2, -0.1], [0.5, 0.3]], dtype=np.float32)
+
+    torch.manual_seed(1)
+    predictor_a = bnn_runtime.VariationalBNNPredictor(str(artifact), device="cpu")
+    torch.manual_seed(20260422)
+    mean_a, std_a = predictor_a.predict_mean_std(
+        inputs, predictive_mc_samples=16, predictive_mc_chunk_size=16
+    )
+
+    torch.manual_seed(999)
+    predictor_b = bnn_runtime.VariationalBNNPredictor(str(artifact), device="cpu")
+    torch.manual_seed(20260422)
+    mean_b, std_b = predictor_b.predict_mean_std(
+        inputs, predictive_mc_samples=16, predictive_mc_chunk_size=16
+    )
+
+    np.testing.assert_allclose(mean_a, mean_b, rtol=0.0, atol=1e-6)
+    np.testing.assert_allclose(std_a, std_b, rtol=0.0, atol=1e-6)

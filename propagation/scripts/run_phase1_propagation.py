@@ -16,10 +16,28 @@ sys.path.insert(0, str(PROJECT_ROOT / "compression" / "evalkit"))
 sys.path.insert(0, str(PROJECT_ROOT / "indentation"))
 sys.path.insert(0, str(PROJECT_ROOT / "indentation" / "evalkit"))
 
-from compression.evalkit.posterior_compression import compute_compression_surrogate
-from indentation.evalkit.posterior_indentation import compute_indentation_surrogate
+from compression.evalkit.posterior_compression import (
+    compute_compression_surrogate,
+    preload_compression_surrogate,
+)
+from indentation.evalkit.posterior_indentation import (
+    compute_indentation_surrogate,
+    preload_indentation_surrogate,
+)
 from meso_uq.experiments import load_experiments
 from meso_uq.postprocess.propagation import propagate_run_directory
+
+
+def _resolve_surrogate_backend(config: dict) -> str:
+    surrogate_cfg = config.get("surrogate", {})
+    if surrogate_cfg is None:
+        surrogate_cfg = {}
+    if not isinstance(surrogate_cfg, dict):
+        raise ValueError("Expected 'surrogate' config section to be a mapping.")
+    backend = str(surrogate_cfg.get("backend", "dnn")).strip().lower()
+    if backend not in {"dnn", "bnn"}:
+        raise ValueError(f"Unsupported surrogate backend '{backend}'. Expected 'dnn' or 'bnn'.")
+    return backend
 
 
 def _reference_csv_for_experiment(exp, diameter_um: float, output_dir: Path) -> Path:
@@ -35,6 +53,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run lightweight propagation from Phase 1 posterior samples")
     parser.add_argument("--config", required=True)
     parser.add_argument("--output-dir", default="_setup")
+    parser.add_argument(
+        "--device",
+        choices=["cpu", "gpu"],
+        default="cpu",
+        help="Surrogate device: cpu (default) or gpu (cuda)",
+    )
     args = parser.parse_args()
 
     config_path = Path(args.config)
@@ -49,10 +73,26 @@ def main() -> int:
     with open(config_path, "rb") as handle:
         config = yaml.load(handle, Loader=yaml.CLoader)
     experiments = [exp for exp in load_experiments(config, PROJECT_ROOT) if exp.enabled]
+    surrogate_backend = _resolve_surrogate_backend(config)
+
+    preload_map = {
+        "compression": preload_compression_surrogate,
+        "indentation": preload_indentation_surrogate,
+    }
+    for exp in experiments:
+        preload_fn = preload_map.get(exp.name)
+        if preload_fn is None:
+            raise ValueError(f"No surrogate preload function registered for experiment '{exp.name}'")
+        for diameter_um in exp.diameters:
+            preload_fn(diameter_um, device=args.device, backend=surrogate_backend)
 
     eval_map = {
-        "compression": lambda sample, pts, d: compute_compression_surrogate(sample, pts, d),
-        "indentation": lambda sample, pts, d: compute_indentation_surrogate(sample, pts, d),
+        "compression": lambda sample, pts, d: compute_compression_surrogate(
+            sample, pts, d, device=args.device
+        ),
+        "indentation": lambda sample, pts, d: compute_indentation_surrogate(
+            sample, pts, d, device=args.device
+        ),
     }
 
     for exp in experiments:

@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 
 from meso_uq.surrogate.bnn_training import train_tabular_bnn_surrogate
-from meso_uq.surrogate.cli import read_wide_curve_table
+from meso_uq.surrogate.group_holdout import read_indentation_table
 
 
 def main() -> None:
@@ -20,7 +20,13 @@ def main() -> None:
     parser.add_argument("--width", type=int, default=64)
     parser.add_argument("--depth", type=int, default=3)
     parser.add_argument("--prior-scale", type=float, default=1.0)
-    parser.add_argument("--obs-noise", type=float, default=0.1)
+    parser.add_argument(
+        "--obs-noise-prior-scale",
+        "--obs-noise",
+        dest="obs_noise_prior_scale",
+        type=float,
+        default=1.0,
+    )
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--max-steps", type=int, default=2500)
@@ -37,7 +43,7 @@ def main() -> None:
     out_path = Path(args.out).resolve()
     dnn_ref = Path(args.dnn_reference).resolve()
     report_path = Path(args.report_path).resolve() if args.report_path else None
-    df = read_wide_curve_table(str(data_path), curve_axis_name="F", value_name="disp")
+    df = read_indentation_table(str(data_path), disp_source="auto", rupture_ratio_threshold=2.0)
     result = train_tabular_bnn_surrogate(
         df,
         input_cols=["Yt", "kb", "b1", "b2", "a3", "a4", "F"],
@@ -48,7 +54,7 @@ def main() -> None:
         width=args.width,
         depth=args.depth,
         prior_scale=args.prior_scale,
-        obs_noise=args.obs_noise,
+        obs_noise_prior_scale=args.obs_noise_prior_scale,
         batch_size=args.batch_size,
         lr=args.lr,
         max_steps=args.max_steps,

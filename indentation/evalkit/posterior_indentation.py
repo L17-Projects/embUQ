@@ -126,7 +126,7 @@ def _get_dump_flag() -> bool:
 
 
 def compute_indentation_surrogate(
-    sample: Dict[str, Any], forces: List[float], diameter_um: float
+    sample: Dict[str, Any], forces: List[float], diameter_um: float, device: str = "cpu"
 ) -> None:
     project_root = _resolve_project_root()
     dump = _get_dump_flag()
@@ -136,7 +136,7 @@ def compute_indentation_surrogate(
     )
     Yt, kb, b1, b2, a3, a4, d0, sigma = params.tolist()
     backend, predictive_mc_samples, predictive_mc_chunk_size = _resolve_surrogate_runtime(config)
-    surrogate = _get_surrogate(project_root, diameter_um, backend=backend)
+    surrogate = _get_surrogate(project_root, diameter_um, device=device, backend=backend)
     if backend == "dnn":
         displacements = surrogate.evaluate_indentation(x=[Yt, kb, b1, b2, a3, a4], forces=forces)
         displacements = np.maximum(0.0, np.asarray(displacements) + d0)
