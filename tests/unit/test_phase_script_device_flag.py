@@ -4,7 +4,7 @@ Coverage targets:
 - build_inference_command: phase3b gpu → no mpi, has --device gpu
 - build_inference_command: phase2 with device kwarg ignored
 - build_propagation_command: phase3b cpu/gpu device flag
-- build_propagation_command: phase1 omits device flag
+- build_propagation_command: phase1 carries device flag for GPU-batched runs
 """
 
 from pathlib import Path
@@ -107,7 +107,7 @@ def test_build_propagation_command_phase3b_default_device() -> None:
     assert "--device" in command
 
 
-def test_build_propagation_command_phase1_no_device_flag() -> None:
+def test_build_propagation_command_phase1_has_device_flag() -> None:
     repo_root = _repo_root()
     selection = VegaWorkflowSelection("compression", "full-model", "production")
     command = build_propagation_command(
@@ -118,7 +118,8 @@ def test_build_propagation_command_phase1_no_device_flag() -> None:
         resolve_workflow_output_root(repo_root, selection),
     )
 
-    assert "--device" not in command
+    assert "--device" in command
+    assert command[command.index("--device") + 1] == "cpu"
 
 
 def test_build_inference_command_phase1_cpu_multi_rank_device_flag() -> None:
