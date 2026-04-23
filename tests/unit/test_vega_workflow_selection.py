@@ -296,7 +296,7 @@ def test_build_propagation_command_phase3b_includes_device_flag() -> None:
     assert command[-2:] == ["--device", "gpu"]
 
 
-def test_build_propagation_command_phase1_omits_device_flag() -> None:
+def test_build_propagation_command_phase1_includes_device_flag() -> None:
     repo_root = _repo_root()
     selection = VegaWorkflowSelection("compression", "full-model", "validation")
     command = build_propagation_command(
@@ -307,7 +307,7 @@ def test_build_propagation_command_phase1_omits_device_flag() -> None:
         resolve_workflow_output_root(repo_root, selection),
     )
 
-    assert "--device" not in command
+    assert command[-2:] == ["--device", "cpu"]
 
 
 def test_build_inference_command_rejects_non_phase2_cpu_ranks() -> None:

@@ -165,7 +165,7 @@ def test_run_inference_stage_uses_reduced_phase1_wrapper(tmp_path, monkeypatch):
 
     assert rc == 0
     assert captured["cwd"] == str(repo_root)
-    assert captured["command"][6] == str(repo_root / "reduced" / "scripts" / "run_phase_1.py")
+    assert captured["command"][1] == str(repo_root / "reduced" / "scripts" / "run_phase_1.py")
     assert "--restart" in captured["command"]
     assert "--dry_run" in captured["command"]
     assert (
