@@ -262,6 +262,7 @@ def test_phase3b_gpu_passes_device_flag() -> None:
 def test_propagation_partition_is_gpu() -> None:
     text = _read("propagation_phase3b.sbatch")
     assert "#SBATCH --partition=gpu" in text
+    assert "#SBATCH --gres=gpu:1" in text
 
 
 def test_propagation_mem_matches_orchestrator_budget() -> None:
