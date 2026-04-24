@@ -343,9 +343,15 @@ def test_vega_bootstrap_scripts_resolve_repo_root_after_platforms_move() -> None
     repo_root = Path(__file__).resolve().parents[1]
     korali = repo_root / "scripts" / "platforms" / "vega" / "bootstrap_korali.sh"
     mirheo = repo_root / "scripts" / "platforms" / "vega" / "bootstrap_mirheo.sh"
+    legacy_korali = repo_root / "scripts" / "vega" / "bootstrap_korali.sh"
+    legacy_mirheo = repo_root / "scripts" / "vega" / "bootstrap_mirheo.sh"
 
     korali_text = korali.read_text(encoding="utf-8")
     mirheo_text = mirheo.read_text(encoding="utf-8")
+    legacy_korali_text = legacy_korali.read_text(encoding="utf-8")
+    legacy_mirheo_text = legacy_mirheo.read_text(encoding="utf-8")
 
-    assert 'repo_root="$(cd "${script_dir}/../../.." && pwd)"' in korali_text
-    assert 'repo_root="$(cd "${script_dir}/../../.." && pwd)"' in mirheo_text
+    for text in (korali_text, mirheo_text, legacy_korali_text, legacy_mirheo_text):
+        assert 'script_path="$(readlink -f "${BASH_SOURCE[0]}")"' in text
+        assert 'script_dir="$(cd "$(dirname "$script_path")" && pwd)"' in text
+        assert 'repo_root="$(cd "${script_dir}/../../.." && pwd)"' in text

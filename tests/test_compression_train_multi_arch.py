@@ -9,12 +9,16 @@ from pathlib import Path
 import matplotlib
 import numpy as np
 import pandas as pd
+import pytest
 
 matplotlib.use("Agg", force=True)
 os.environ.setdefault("MPLBACKEND", "Agg")
 
 
 def _load_module(path: Path, name: str):
+    repo_root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(repo_root / "src"))
+    sys.path.insert(0, str(repo_root))
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -126,3 +130,350 @@ def test_compression_train_multi_arch_main_writes_report(tmp_path, monkeypatch):
     payload = json.loads(report_json.read_text(encoding="utf-8"))
     assert payload["best"]["name"] == "w32_d2"
     assert payload["best_dest"].endswith("microbubble_force_BEST.pkl")
+
+
+def test_compression_resolve_data_path_uses_fallback_candidates(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        "compression_train_multi_arch_paths_test",
+    )
+
+    surrogate_root = tmp_path / "compression" / "surrogate"
+    data_dir = surrogate_root / "diameters" / "2.1um" / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(module, "SURROGATE_ROOT", surrogate_root)
+
+    assert module._resolve_data_path("2.1", None).name == "F_Delta.dat"
+    (data_dir / "samples_all.dat").write_text("sample", encoding="utf-8")
+    assert module._resolve_data_path("2.1", None).name == "samples_all.dat"
+    assert module._resolve_data_path("2.1", "custom.dat").name == "custom.dat"
+
+
+def test_compression_train_multi_arch_collect_only_and_error_paths(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        "compression_train_multi_arch_collect_only_test",
+    )
+
+    surrogate_root = tmp_path / "compression" / "surrogate"
+    data_dir = surrogate_root / "diameters" / "2.1um" / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "F_Delta.dat").write_text("sample", encoding="utf-8")
+    monkeypatch.setattr(module, "SURROGATE_ROOT", surrogate_root)
+
+    output_dir = tmp_path / "trained"
+    report_json = tmp_path / "collect_report.json"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "train_multi_arch.py",
+            "--diameter",
+            "2.1",
+            "--output-dir",
+            str(output_dir),
+            "--collect-only",
+            "--report-json",
+            str(report_json),
+        ],
+    )
+
+    with pytest.raises(FileNotFoundError, match="No per-architecture result JSONs found"):
+        module.main()
+
+    model_path = output_dir / "w32_d2.pkl"
+    model_path.write_text("model", encoding="utf-8")
+    result_payload = {
+        "name": "w32_d2",
+        "width": 32,
+        "depth": 2,
+        "train_loss": 1.0,
+        "val_loss": 0.5,
+        "model_path": str(model_path),
+    }
+    (output_dir / "result_w32_d2.json").write_text(json.dumps(result_payload), encoding="utf-8")
+
+    module.main()
+    payload = json.loads(report_json.read_text(encoding="utf-8"))
+    assert payload["best"]["name"] == "w32_d2"
+    assert payload["data_path"].endswith("F_Delta.dat")
+
+
+def test_compression_train_multi_arch_rejects_invalid_arch_selection(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        "compression_train_multi_arch_invalid_arch_test",
+    )
+
+    surrogate_root = tmp_path / "compression" / "surrogate"
+    data_dir = surrogate_root / "diameters" / "2.1um" / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "F_Delta.dat").write_text("sample", encoding="utf-8")
+    monkeypatch.setattr(module, "SURROGATE_ROOT", surrogate_root)
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "train_multi_arch.py",
+            "--diameter",
+            "2.1",
+            "--arch-index",
+            "0",
+            "--arch-name",
+            "w32_d2",
+        ],
+    )
+    with pytest.raises(ValueError, match="Use only one of --arch-index or --arch-name"):
+        module.main()
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "train_multi_arch.py",
+            "--diameter",
+            "2.1",
+            "--arch-name",
+            "bad-arch",
+        ],
+    )
+    with pytest.raises(ValueError, match="Unknown arch-name"):
+        module.main()
+
+
+def test_compression_train_multi_arch_resolve_data_path_fallbacks(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        "compression_train_multi_arch_paths_test",
+    )
+
+    surrogate_root = tmp_path / "compression" / "surrogate"
+    monkeypatch.setattr(module, "SURROGATE_ROOT", surrogate_root)
+    data_dir = surrogate_root / "diameters" / "2.1um" / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    explicit = data_dir / "custom.dat"
+    explicit.write_text("explicit", encoding="utf-8")
+    assert module._resolve_data_path("2.1", "custom.dat") == explicit
+
+    default_path = data_dir / "F_Delta.dat"
+    default_path.write_text("default", encoding="utf-8")
+    assert module._resolve_data_path("2.1", None) == default_path
+
+    default_path.unlink()
+    samples_path = data_dir / "samples_all.dat"
+    samples_path.write_text("samples", encoding="utf-8")
+    assert module._resolve_data_path("2.1", None) == samples_path
+
+    samples_path.unlink()
+    assert module._resolve_data_path("2.1", None) == data_dir / "F_Delta.dat"
+
+
+def test_compression_train_multi_arch_finalize_results_writes_artifacts(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        "compression_train_multi_arch_finalize_test",
+    )
+
+    surrogate_root = tmp_path / "compression" / "surrogate"
+    monkeypatch.setattr(module, "SURROGATE_ROOT", surrogate_root)
+
+    output_dir = tmp_path / "trained"
+    plots_dir = tmp_path / "plots"
+    report_json = tmp_path / "reports" / "summary.json"
+    model_a = output_dir / "w32_d2.pkl"
+    model_b = output_dir / "w64_d2.pkl"
+    model_a.parent.mkdir(parents=True, exist_ok=True)
+    model_a.write_text("model-a", encoding="utf-8")
+    model_b.write_text("model-b", encoding="utf-8")
+
+    payload = module.finalize_results(
+        diameter="2.1",
+        output_dir=output_dir,
+        results=[
+            {"name": "w64_d2", "width": 64, "depth": 2, "train_loss": 0.9, "val_loss": 0.4, "model_path": str(model_b)},
+            {"name": "w32_d2", "width": 32, "depth": 2, "train_loss": 1.0, "val_loss": 0.2, "model_path": str(model_a)},
+        ],
+        plots_dir=plots_dir,
+        report_json=report_json,
+        timestamp="20260424_120000",
+    )
+
+    best_dest = surrogate_root / "diameters" / "2.1um" / "trained" / "microbubble_force_BEST.pkl"
+    assert payload["best"]["name"] == "w32_d2"
+    assert Path(payload["training_results_csv"]).exists()
+    assert Path(payload["summary_plot"]).exists()
+    assert best_dest.read_text(encoding="utf-8") == "model-a"
+    assert json.loads(report_json.read_text(encoding="utf-8"))["best"]["name"] == "w32_d2"
+
+
+def test_compression_train_multi_arch_finalize_results_rejects_empty_results(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        "compression_train_multi_arch_finalize_empty_test",
+    )
+
+    with pytest.raises(ValueError, match="No architecture results"):
+        module.finalize_results(
+            diameter="2.1",
+            output_dir=tmp_path / "trained",
+            results=[],
+            plots_dir=tmp_path / "plots",
+        )
+
+
+def test_compression_train_multi_arch_main_collect_only_aggregates_results(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        "compression_train_multi_arch_collect_only_test",
+    )
+
+    surrogate_root = tmp_path / "compression" / "surrogate"
+    data_dir = surrogate_root / "diameters" / "2.1um" / "data"
+    output_dir = tmp_path / "trained"
+    report_json = tmp_path / "collect_only_report.json"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "F_Delta.dat").write_text("sample", encoding="utf-8")
+    model_a = output_dir / "w32_d2.pkl"
+    model_b = output_dir / "w64_d2.pkl"
+    model_a.write_text("model-a", encoding="utf-8")
+    model_b.write_text("model-b", encoding="utf-8")
+    (output_dir / "result_1.json").write_text(
+        json.dumps({"name": "w64_d2", "width": 64, "depth": 2, "train_loss": 0.8, "val_loss": 0.5, "model_path": str(model_b)}),
+        encoding="utf-8",
+    )
+    (output_dir / "result_0.json").write_text(
+        json.dumps({"name": "w32_d2", "width": 32, "depth": 2, "train_loss": 0.9, "val_loss": 0.3, "model_path": str(model_a)}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(module, "SURROGATE_ROOT", surrogate_root)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "train_multi_arch.py",
+            "--diameter",
+            "2.1",
+            "--output-dir",
+            str(output_dir),
+            "--report-json",
+            str(report_json),
+            "--collect-only",
+        ],
+    )
+
+    module.main()
+
+    payload = json.loads(report_json.read_text(encoding="utf-8"))
+    assert payload["best"]["name"] == "w32_d2"
+    assert payload["data_path"] == str(data_dir / "F_Delta.dat")
+    assert Path(payload["best_dest"]).read_text(encoding="utf-8") == "model-a"
+
+
+def test_compression_train_multi_arch_main_collect_only_requires_result_jsons(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        "compression_train_multi_arch_collect_only_missing_results_test",
+    )
+
+    surrogate_root = tmp_path / "compression" / "surrogate"
+    data_dir = surrogate_root / "diameters" / "2.1um" / "data"
+    output_dir = tmp_path / "trained"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "F_Delta.dat").write_text("sample", encoding="utf-8")
+    monkeypatch.setattr(module, "SURROGATE_ROOT", surrogate_root)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "train_multi_arch.py",
+            "--diameter",
+            "2.1",
+            "--output-dir",
+            str(output_dir),
+            "--collect-only",
+        ],
+    )
+
+    with pytest.raises(FileNotFoundError, match="No per-architecture result JSONs"):
+        module.main()
+
+
+def test_compression_train_multi_arch_main_rejects_invalid_single_arch_selection(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        "compression_train_multi_arch_single_arch_errors_test",
+    )
+
+    surrogate_root = tmp_path / "compression" / "surrogate"
+    data_dir = surrogate_root / "diameters" / "2.1um" / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "F_Delta.dat").write_text("sample", encoding="utf-8")
+    monkeypatch.setattr(module, "SURROGATE_ROOT", surrogate_root)
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "train_multi_arch.py",
+            "--diameter",
+            "2.1",
+            "--arch-index",
+            "0",
+            "--arch-name",
+            "w32_d2",
+        ],
+    )
+    with pytest.raises(ValueError, match="Use only one of --arch-index or --arch-name"):
+        module.main()
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "train_multi_arch.py",
+            "--diameter",
+            "2.1",
+            "--arch-name",
+            "missing-arch",
+        ],
+    )
+    with pytest.raises(ValueError, match="Unknown arch-name 'missing-arch'"):
+        module.main()
+
+
+def test_compression_train_multi_arch_main_requires_existing_training_data(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        "compression_train_multi_arch_missing_data_test",
+    )
+
+    surrogate_root = tmp_path / "compression" / "surrogate"
+    monkeypatch.setattr(module, "SURROGATE_ROOT", surrogate_root)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "train_multi_arch.py",
+            "--diameter",
+            "2.1",
+        ],
+    )
+
+    with pytest.raises(FileNotFoundError, match="Training data not found"):
+        module.main()

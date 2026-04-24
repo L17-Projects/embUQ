@@ -56,7 +56,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+script_dir="$(cd "$(dirname "$script_path")" && pwd)"
 repo_root="$(cd "${script_dir}/../../.." && pwd)"
 
 eval "$("$python_bin" - <<'PY' "$repo_root"
