@@ -337,3 +337,15 @@ def test_acceptance_template_uses_public_command() -> None:
     assert "SELECTIONS" in text
     assert "compression:reduced-model:validation" in text
     assert "_vega/korali/env.sh" in text
+
+
+def test_vega_bootstrap_scripts_resolve_repo_root_after_platforms_move() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    korali = repo_root / "scripts" / "platforms" / "vega" / "bootstrap_korali.sh"
+    mirheo = repo_root / "scripts" / "platforms" / "vega" / "bootstrap_mirheo.sh"
+
+    korali_text = korali.read_text(encoding="utf-8")
+    mirheo_text = mirheo.read_text(encoding="utf-8")
+
+    assert 'repo_root="$(cd "${script_dir}/../../.." && pwd)"' in korali_text
+    assert 'repo_root="$(cd "${script_dir}/../../.." && pwd)"' in mirheo_text
