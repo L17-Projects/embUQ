@@ -77,6 +77,21 @@ def test_evaluate_script_path_compression():
     assert path.suffix == ".py"
 
 
+def test_mpirun_export_args_forwards_runtime_env(monkeypatch):
+    from run_map_mirheo import _mpirun_export_args
+
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/tmp/lib")
+    monkeypatch.setenv("MESOUQ_MIRHEO_SRC", "/tmp/Mirheo")
+    monkeypatch.delenv("HDF5_DIR", raising=False)
+
+    args = _mpirun_export_args()
+
+    assert "-x" in args
+    assert "LD_LIBRARY_PATH" in args
+    assert "MESOUQ_MIRHEO_SRC" in args
+    assert "HDF5_DIR" not in args
+
+
 def test_map_mirheo_manifest_schema(tmp_path):
     """Verify the written summary manifest has the expected top-level keys."""
     from run_map_mirheo import run_map_mirheo
@@ -98,7 +113,13 @@ def test_map_mirheo_manifest_schema(tmp_path):
     mock_result.stdout = "done"
     mock_result.stderr = ""
 
-    with patch("subprocess.run", return_value=mock_result):
+    captured_cmds = []
+
+    def fake_run(cmd, **kwargs):
+        captured_cmds.append(cmd)
+        return mock_result
+
+    with patch("subprocess.run", side_effect=fake_run):
         summary = run_map_mirheo(
             experiment="indentation",
             output_dir=tmp_path,
@@ -118,6 +139,9 @@ def test_map_mirheo_manifest_schema(tmp_path):
     assert manifest_out.exists()
     loaded = json.loads(manifest_out.read_text())
     assert loaded["experiment"] == "indentation"
+    rendered = " ".join(str(a) for a in captured_cmds[0])
+    assert "--scratch-root" in rendered
+    assert str(tmp_path / "map_mirheo" / "_scratch" / "indentation_3.2um") in rendered
 
 
 def test_map_mirheo_missing_manifest_raises(tmp_path):
@@ -366,6 +390,7 @@ def test_main_numsteps_overrides_forwarded(tmp_path):
     rendered = " ".join(str(a) for a in captured_cmds[0])
     assert "--numsteps 5000" in rendered
     assert "--numsteps-eq 10000" in rendered
+    assert "--scratch-root" in rendered
 
 
 def test_main_passed_status_returns_zero(tmp_path):

@@ -39,6 +39,19 @@ def test_production_sanity_all_lanes_expands_both_experiments_and_model_families
     assert {selection.profile for selection in selections} == {"production"}
 
 
+def test_production_sanity_deduplicates_explicit_selections() -> None:
+    selections = resolve_production_sanity_selections(
+        ["compression:full-model:production", "compression:full-model:production"]
+    )
+
+    assert len(selections) == 1
+
+
+def test_production_sanity_rejects_non_production_profile() -> None:
+    with pytest.raises(ValueError, match="Production sanity only supports production selections"):
+        resolve_production_sanity_selections(["compression:full-model:validation"])
+
+
 def test_build_production_smoke_config_only_lowers_cost_knobs() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     selection = resolve_production_sanity_selections(["indentation:reduced-model:production"])[0]
@@ -96,6 +109,18 @@ def test_write_production_smoke_config_writes_yaml(tmp_path: Path) -> None:
         assert payload[key] == value
 
 
+def test_build_production_smoke_config_rejects_non_mapping_yaml(tmp_path: Path, monkeypatch) -> None:
+    import meso_uq.production_sanity as ps
+
+    selection = resolve_production_sanity_selections(["compression:full-model:production"])[0]
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("- not-a-mapping\n", encoding="utf-8")
+    monkeypatch.setattr(ps, "resolve_workflow_config_path", lambda repo_root, sel: config_path)
+
+    with pytest.raises(ValueError, match="Expected YAML mapping"):
+        build_production_smoke_config(tmp_path, selection)
+
+
 def test_load_korali_build_state_missing_reports_unknown(tmp_path: Path) -> None:
     state = load_korali_build_state(tmp_path / "missing_repo")
 
@@ -116,6 +141,19 @@ def test_inference_config_environment_restores_previous_var(
         assert os.environ["HUQ_INFERENCE_CONFIG"] == str(config_path)
 
     assert os.environ["HUQ_INFERENCE_CONFIG"] == previous
+
+
+def test_inference_config_environment_clears_var_when_unset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("HUQ_INFERENCE_CONFIG", raising=False)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("{}", encoding="utf-8")
+
+    with _inference_config_environment(config_path):
+        assert os.environ["HUQ_INFERENCE_CONFIG"] == str(config_path)
+
+    assert "HUQ_INFERENCE_CONFIG" not in os.environ
 
 
 def test_parameter_columns_excludes_log_fields() -> None:
@@ -257,3 +295,79 @@ def test_evaluate_map_surrogate_prediction_for_both_experiments(
 
     assert list(comp["map_surrogate"]) == [2.1, 3.1]
     assert list(ind["map_surrogate"]) == [2.1, 1.1]
+
+
+def test_evaluate_map_surrogate_prediction_rejects_invalid_shapes_and_experiment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import meso_uq.production_sanity as ps
+
+    monkeypatch.setattr(ps, "_ensure_evalkit_paths", lambda repo_root: None)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("{}", encoding="utf-8")
+
+    bad_rows = tmp_path / "bad_rows.csv"
+    bad_rows.write_text("Yt,kb,d0,sigma\n1,2,0.1,0.01\n2,3,0.2,0.02\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="Expected a single MAP row"):
+        ps._evaluate_map_surrogate_prediction(
+            tmp_path,
+            experiment="compression",
+            config_path=config_path,
+            diameter_um=2.1,
+            map_csv=bad_rows,
+            reference_points=[0.0, 1.0],
+        )
+
+    one_row = tmp_path / "one_row.csv"
+    one_row.write_text("Yt,kb,d0,sigma\n1,2,0.1,0.01\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="Unsupported experiment"):
+        ps._evaluate_map_surrogate_prediction(
+            tmp_path,
+            experiment="other",
+            config_path=config_path,
+            diameter_um=2.1,
+            map_csv=one_row,
+            reference_points=[0.0, 1.0],
+        )
+
+
+def test_ensure_evalkit_paths_and_render_bundle_cover_remaining_branches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import meso_uq.production_sanity as ps
+
+    original_sys_path = list(sys.path)
+    try:
+        repo_root = tmp_path / "repo"
+        ps._ensure_evalkit_paths(repo_root)
+        expected_prefixes = [
+            str(repo_root / "compression"),
+            str(repo_root / "compression" / "evalkit"),
+            str(repo_root / "indentation"),
+            str(repo_root / "indentation" / "evalkit"),
+        ]
+        for entry in expected_prefixes:
+            assert entry in sys.path
+
+        ps._ensure_evalkit_paths(repo_root)
+        for entry in expected_prefixes:
+            assert sys.path.count(entry) == 1
+    finally:
+        sys.path[:] = original_sys_path
+
+    samples = pd.DataFrame({"Yt": [1.0], "kb": [2.0]})
+    monkeypatch.setattr(ps, "load_posterior_samples", lambda run_dir: samples)
+    written: dict[str, str] = {}
+
+    def _fake_plot(csv_path: str, plot_path: str) -> None:
+        written["csv_path"] = csv_path
+        written["plot_path"] = plot_path
+        Path(plot_path).write_text("plot", encoding="utf-8")
+
+    monkeypatch.setattr(ps, "plot_posterior_marginals", _fake_plot)
+    bundle = ps._render_korali_plot_bundle(tmp_path / "run", tmp_path / "plots")
+
+    assert Path(bundle["samples_csv"]).exists()
+    assert Path(bundle["korali_plot"]).exists()
+    assert written["csv_path"] == bundle["samples_csv"]
+    assert written["plot_path"] == bundle["korali_plot"]

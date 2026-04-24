@@ -13,7 +13,13 @@ _init*/
 _*
 out_*
 logs/
-AGENTS.md
+/mesouq-*.out
+/mesouq-*.err
+/AGENTS.md
+dir.md
+/.last_huqemb_campaign_id
 CLAUDE.md
 compression/surrogate/diameters/*/trained/*BNN*_loss_hist.json
 indentation/surrogate/diameters/*/trained/*BNN*_loss_hist.json
+compression/surrogate/diameters/*/plots/
+indentation/surrogate/diameters/*/plots/

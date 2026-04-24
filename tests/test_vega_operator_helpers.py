@@ -75,6 +75,8 @@ def test_run_inference_stage_builds_phase2_command_with_profile_and_model_family
     assert captured["cwd"] == str(repo_root)
     assert captured["command"][:6] == ["mpirun", "--bind-to", "none", "--oversubscribe", "-np", "4"]
     assert str(repo_root / "inference" / "scripts" / "run_phase_2.py") in captured["command"]
+    assert "--phase2-backend" in captured["command"]
+    assert captured["command"][-1] == "cpu-mpi"
     assert (
         str(
             repo_root
@@ -85,6 +87,45 @@ def test_run_inference_stage_builds_phase2_command_with_profile_and_model_family
         )
         in captured["command"]
     )
+
+
+def test_run_inference_stage_phase2_production_defaults_to_native_cuda(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "vega" / "run_inference_stage.py",
+        "run_inference_stage_production_phase2_native_cuda_test",
+    )
+    captured = {}
+
+    def fake_run(command, cwd=None, check=False):
+        captured["command"] = command
+        captured["cwd"] = cwd
+        return 0
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    rc = module.main(
+        [
+            "--experiment",
+            "compression",
+            "--model-family",
+            "full-model",
+            "--profile",
+            "production",
+            "--stage",
+            "phase2",
+            "--output-dir",
+            str(tmp_path / "run"),
+            "--python-bin",
+            "python",
+        ]
+    )
+
+    assert rc == 0
+    assert captured["cwd"] == str(repo_root)
+    assert captured["command"][0] == "python"
+    assert "mpirun" not in captured["command"]
+    assert captured["command"][-2:] == ["--phase2-backend", "native-cuda"]
 
 
 def test_run_propagation_uses_explicit_stage_wrapper(tmp_path, monkeypatch):
@@ -244,9 +285,12 @@ def test_vega_sbatch_templates_expose_model_family_and_profile_axes() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     template_dir = repo_root / "scripts" / "vega" / "sbatch"
     templates = sorted(template_dir.glob("*.sbatch"))
+    fixed_scope_templates = {"train_dnn_arch_array.sbatch", "train_dnn_surrogates.sbatch"}
 
     assert templates
     for template in templates:
+        if template.name in fixed_scope_templates:
+            continue
         text = template.read_text(encoding="utf-8")
         assert (
             "MODEL_FAMILY" in text
@@ -293,3 +337,21 @@ def test_acceptance_template_uses_public_command() -> None:
     assert "SELECTIONS" in text
     assert "compression:reduced-model:validation" in text
     assert "_vega/korali/env.sh" in text
+
+
+def test_vega_bootstrap_scripts_resolve_repo_root_after_platforms_move() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    korali = repo_root / "scripts" / "platforms" / "vega" / "bootstrap_korali.sh"
+    mirheo = repo_root / "scripts" / "platforms" / "vega" / "bootstrap_mirheo.sh"
+    legacy_korali = repo_root / "scripts" / "vega" / "bootstrap_korali.sh"
+    legacy_mirheo = repo_root / "scripts" / "vega" / "bootstrap_mirheo.sh"
+
+    korali_text = korali.read_text(encoding="utf-8")
+    mirheo_text = mirheo.read_text(encoding="utf-8")
+    legacy_korali_text = legacy_korali.read_text(encoding="utf-8")
+    legacy_mirheo_text = legacy_mirheo.read_text(encoding="utf-8")
+
+    for text in (korali_text, mirheo_text, legacy_korali_text, legacy_mirheo_text):
+        assert 'script_path="$(readlink -f "${BASH_SOURCE[0]}")"' in text
+        assert 'script_dir="$(cd "$(dirname "$script_path")" && pwd)"' in text
+        assert 'repo_root="$(cd "${script_dir}/../../.." && pwd)"' in text

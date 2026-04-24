@@ -98,7 +98,7 @@ def test_hpc_roundtrip_wrapper_dispatches_to_selected_site(monkeypatch) -> None:
     assert captured
     joined = " ".join(captured[0])
     assert sys.executable in captured[0][0]
-    assert "scripts/karolina/run_bnn_roundtrip_check.py" in joined
+    assert "scripts/platforms/karolina/run_bnn_roundtrip_check.py" in joined
     assert "--selection indentation_3.2um" in joined
 
 

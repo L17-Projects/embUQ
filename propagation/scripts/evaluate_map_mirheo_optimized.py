@@ -64,7 +64,11 @@ def calculate_optimized_displacement_grid(
 
 
 def setup_map_specific_init_dir(
-    diameter_um: float, retry_attempt: int, dt_scale_factor: float, rank: int
+    diameter_um: float,
+    retry_attempt: int,
+    dt_scale_factor: float,
+    rank: int,
+    scratch_root: str | None = None,
 ) -> str:
     """Create MAP-specific init directory and apply dt/numsteps scaling for retries.
 
@@ -72,7 +76,10 @@ def setup_map_specific_init_dir(
     """
     comm = MPI.COMM_WORLD
     original_init_dir = str(PROJECT_ROOT / f"_init_compression_{diameter_um}um")
-    map_init_dir = str(PROJECT_ROOT / f"_init_compression_{diameter_um}um_map")
+    if scratch_root is None:
+        map_init_dir = str(PROJECT_ROOT / f"_init_compression_{diameter_um}um_map")
+    else:
+        map_init_dir = str(Path(scratch_root).resolve())
 
     if rank == 0:
         if os.path.exists(map_init_dir):
@@ -166,6 +173,11 @@ def main():
     parser.add_argument("--dt-scale-factor", type=float, default=0.5)
     parser.add_argument("--numsteps", type=int, default=None)
     parser.add_argument("--numsteps-eq", type=int, default=None)
+    parser.add_argument(
+        "--scratch-root",
+        default=None,
+        help="Optional unique scratch directory for MAP init files.",
+    )
     args = parser.parse_args()
 
     if args.retry_attempt < 0:
@@ -218,7 +230,7 @@ def main():
     sample = {"Parameters": map_params_for_sim, "Sample Id": map_data["sample_id"]}
 
     map_init_dir = setup_map_specific_init_dir(
-        diameter_um, args.retry_attempt, args.dt_scale_factor, rank
+        diameter_um, args.retry_attempt, args.dt_scale_factor, rank, args.scratch_root
     )
 
     if rank == 0 and (args.numsteps is not None or args.numsteps_eq is not None):

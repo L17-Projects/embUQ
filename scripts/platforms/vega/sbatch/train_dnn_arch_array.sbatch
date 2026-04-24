@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+#SBATCH --job-name=mesouq-dnn-arch
+#SBATCH --partition=cpu
+#SBATCH --time=04:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=8G
+#SBATCH --output=%x-%A_%a.out
+#SBATCH --error=%x-%A_%a.err
+
+set -euo pipefail
+
+REPO_ROOT="${REPO_ROOT:-${SLURM_SUBMIT_DIR:-$(pwd)}}"
+if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
+  echo "Set REPO_ROOT explicitly or submit from the repo root." >&2
+  exit 2
+fi
+TRAIN_SCRIPT="${TRAIN_SCRIPT:?TRAIN_SCRIPT not set}"
+EXPERIMENT="${EXPERIMENT:?EXPERIMENT not set}"
+DIAMETER="${DIAMETER:?DIAMETER not set}"
+OUTPUT_DIR="${OUTPUT_DIR:?OUTPUT_DIR not set}"
+PYTHON_BIN="${PYTHON_BIN:-python}"
+BATCH_SIZE="${BATCH_SIZE:?BATCH_SIZE not set}"
+LR="${LR:?LR not set}"
+MAX_EPOCH="${MAX_EPOCH:?MAX_EPOCH not set}"
+ARCH_INDEX="${ARCH_INDEX:-${SLURM_ARRAY_TASK_ID:?SLURM_ARRAY_TASK_ID not set}}"
+RESULT_JSON="${OUTPUT_DIR}/result_${ARCH_INDEX}.json"
+DATA_DIAMETER="${DATA_DIAMETER:-${DIAMETER}}"
+DATA_FILE="${DATA_FILE:-}"
+DISP_SOURCE="${DISP_SOURCE:-auto}"
+
+module purge
+module load Python/3.10.8-GCCcore-12.2.0
+source "${REPO_ROOT}/_vega/venv/bin/activate"
+
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+
+cd "${REPO_ROOT}"
+mkdir -p "${OUTPUT_DIR}"
+
+common_args=(
+  --diameter "${DIAMETER}"
+  --data-diameter "${DATA_DIAMETER}"
+  --arch-index "${ARCH_INDEX}"
+  --output-dir "${OUTPUT_DIR}"
+  --result-json "${RESULT_JSON}"
+  --batch-size "${BATCH_SIZE}"
+  --lr "${LR}"
+  --max-epoch "${MAX_EPOCH}"
+)
+if [[ -n "${DATA_FILE}" ]]; then
+  common_args+=(--data-file "${DATA_FILE}")
+fi
+if [[ "${EXPERIMENT}" == "indentation" ]]; then
+  common_args+=(--disp-source "${DISP_SOURCE}" --num-workers 0)
+fi
+
+"${PYTHON_BIN}" "${TRAIN_SCRIPT}" "${common_args[@]}"

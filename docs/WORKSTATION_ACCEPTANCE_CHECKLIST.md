@@ -1,6 +1,6 @@
 # Workstation acceptance checklist
 
-This checklist is the manual Linux NVIDIA workstation validation layer for the `v0.1.0` release line.
+This checklist is the manual Linux NVIDIA workstation validation layer for the current branch.
 
 It exists because some release claims require real GPU hardware, but do not need the full Vega acceptance path.
 
@@ -12,8 +12,8 @@ This checklist is intended for:
 - the public `MesoUQ` repository checkout
 - reduced-cost validation or smoke-scale runs that still execute the real public entrypoints
 
-This checklist does **not** add a native-CUDA Phase 2 claim for `v0.1.0`.
-That backend claim remains explicitly out of scope for this release line.
+This checklist does **not** replace Vega canaries for production-readiness claims.
+If `Phase 2` is exercised on a workstation, the effective backend must be recorded explicitly.
 
 ## Required checks
 
@@ -22,8 +22,9 @@ Record all of the following:
 1. install the repo in a clean environment
 2. run at least one public surrogate retraining path
 3. run the public Phase 1 GPU-batched path
-4. run the public Phase 3b GPU-batched path
-5. run MAP extraction and at least one plotting step from the produced outputs
+4. run at least one public Phase 2 path and record the effective backend
+5. run the public Phase 3b GPU-batched path
+6. run MAP extraction and at least one plotting step from the produced outputs
 
 ## What to archive
 
@@ -49,7 +50,7 @@ An example report is shipped at:
 Validate a completed record with:
 
 ```bash
-python scripts/workstation/validate_acceptance_record.py \
+python scripts/platforms/workstation/validate_acceptance_record.py \
   --report /path/to/workstation_acceptance_report.json \
   --must-exist
 ```
@@ -70,18 +71,20 @@ The required step names are:
 - `surrogate_retraining`
 - `phase1_gpu_batched`
 - `phase3b_gpu_batched`
+- `phase2_backend_smoke`
 - `map_extraction_and_plotting`
 
 ## Phase backend contract
 
 - **Phase 1**: GPU-batched surrogate (Sequential Korali conduit) when `--device gpu`.
-- **Phase 2**: **CPU-MPI only.** No native-CUDA Phase 2 is validated for this release line.
+- **Phase 2**: dual backend. The workflow spine supports `cpu-mpi` and `native-cuda`.
+  Production defaults to `native-cuda`; validation defaults to `cpu-mpi` unless overridden.
 - **Phase 3b**: GPU-batched surrogate (Sequential Korali conduit) when `--device gpu`.
 - **Propagation**: GPU surrogate where applicable.
 
 ## Low-load guidance
 
-- Use **at most 9 CPUs** for Phase 2 MPI workers.
+- Use **at most 9 CPUs** for Phase 2 only when exercising the CPU-MPI backend.
 - Keep **>2 GB RAM free** at all times during a run.
 - Do not run competing compilation or large data-transfer jobs concurrently.
 - Use validation-profile configs (reduced cost), not production configs, for acceptance runs.

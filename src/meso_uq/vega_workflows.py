@@ -17,6 +17,7 @@ VALID_PROFILES = ("production", "validation")
 VALID_INFERENCE_STAGES = ("phase1", "phase2", "phase3b")
 VALID_PROPAGATION_STAGES = ("phase1", "phase3b")
 VALID_MAP_STAGES = ("phase1", "phase3b")
+VALID_PHASE2_BACKENDS = ("cpu-mpi", "native-cuda")
 
 
 @dataclass(frozen=True)
@@ -231,6 +232,7 @@ def build_inference_command(
     restart: bool = False,
     dry_run: bool = False,
     device: str = "cpu",
+    phase2_backend: str | None = None,
 ) -> list[str]:
     driver = resolve_inference_stage_driver(repo_root, stage, selection.model_family)
     config_path = Path(config_path).resolve()
@@ -244,6 +246,10 @@ def build_inference_command(
         raise ValueError("restart is only supported for phase1")
     if stage != "phase1" and dry_run:
         raise ValueError("dry_run is only supported for phase1")
+    if stage != "phase2" and phase2_backend is not None:
+        raise ValueError(
+            f"phase2_backend is only supported for phase2, got stage={stage} phase2_backend={phase2_backend}"
+        )
 
     base_command = [
         python_bin,
@@ -260,6 +266,25 @@ def build_inference_command(
     if stage == "phase1" and dry_run:
         base_command.append("--dry_run")
     if stage == "phase2":
+        resolved_phase2_backend = (
+            phase2_backend
+            if phase2_backend is not None
+            else ("native-cuda" if selection.profile == "production" else "cpu-mpi")
+        )
+        if resolved_phase2_backend not in VALID_PHASE2_BACKENDS:
+            raise ValueError(
+                f"Unsupported phase2_backend '{resolved_phase2_backend}'. "
+                f"Expected one of {VALID_PHASE2_BACKENDS}."
+            )
+        base_command.extend(["--phase2-backend", resolved_phase2_backend])
+        if resolved_phase2_backend == "native-cuda":
+            if cpu_ranks != 1:
+                raise ValueError(
+                    "Phase 2 native-cuda backend requires cpu_ranks=1; "
+                    f"got cpu_ranks={cpu_ranks}."
+                )
+            return base_command
+        # cpu-mpi backend
         if cpu_ranks > 1:
             return [
                 "mpirun",

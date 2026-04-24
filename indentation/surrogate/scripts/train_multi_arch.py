@@ -255,6 +255,51 @@ def _resolve_data_path(data_diameter, data_file):
     return data_dir / "samples_all.dat"
 
 
+def finalize_results(
+    *,
+    diameter: str,
+    output_dir: str | os.PathLike[str],
+    results: list[dict[str, object]],
+    plots_dir: str | os.PathLike[str],
+    report_json: str | os.PathLike[str] | None = None,
+    timestamp: str | None = None,
+) -> dict[str, object]:
+    if not results:
+        raise ValueError("No architecture results were provided for finalization.")
+
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
+    results_sorted = sorted(results, key=lambda x: float(x["val_loss"]))
+    training_results_path = output_dir_path / "training_results.csv"
+    pd.DataFrame(results_sorted).to_csv(training_results_path, index=False)
+
+    plots_dir_path = Path(plots_dir)
+    plots_dir_path.mkdir(parents=True, exist_ok=True)
+    effective_timestamp = timestamp or datetime.now().strftime("%Y%m%d_%H%M%S")
+    summary_plot_path = plots_dir_path / f"training_summary_{effective_timestamp}.png"
+    plot_results_summary(results_sorted, str(summary_plot_path), diameter)
+
+    best = results_sorted[0]
+    best_dest = SURROGATE_ROOT / f"diameters/{diameter}um/trained/microbubble_displacement_BEST.pkl"
+    best_dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(best["model_path"], best_dest)
+    print(f"Best model: {best['name']} -> {best_dest}")
+
+    payload = {
+        "diameter": diameter,
+        "output_dir": str(output_dir_path),
+        "best": best,
+        "training_results_csv": str(training_results_path),
+        "summary_plot": str(summary_plot_path),
+        "best_dest": str(best_dest),
+        "results": results_sorted,
+    }
+    if report_json:
+        with open(report_json, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+    return payload
+
+
 def main():
     ap = argparse.ArgumentParser(description="Train multiple NN architectures for the indentation surrogate")
     ap.add_argument("--diameter", type=str, required=True)
@@ -270,6 +315,8 @@ def main():
     ap.add_argument("--arch-name", type=str, default=None)
     ap.add_argument("--output-dir", type=str, default=None)
     ap.add_argument("--result-json", type=str, default=None)
+    ap.add_argument("--report-json", type=str, default=None)
+    ap.add_argument("--collect-only", action="store_true", default=False)
     args = ap.parse_args()
 
     data_diameter = args.data_diameter if args.data_diameter else args.diameter
@@ -280,6 +327,25 @@ def main():
 
     if not data_path.exists():
         raise FileNotFoundError(f"Training data not found: {data_path}")
+
+    if args.collect_only:
+        result_files = sorted(Path(output_dir).glob("result_*.json"))
+        if not result_files:
+            raise FileNotFoundError(f"No per-architecture result JSONs found in {output_dir}")
+        results = [json.loads(path.read_text(encoding="utf-8")) for path in result_files]
+        payload = finalize_results(
+            diameter=args.diameter,
+            output_dir=output_dir,
+            results=results,
+            plots_dir=plots_dir,
+            report_json=args.report_json,
+            timestamp=timestamp,
+        )
+        payload["data_path"] = str(data_path)
+        if args.report_json:
+            with open(args.report_json, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, indent=2)
+        return
 
     architectures = get_architectures()
     if args.arch_index is not None or args.arch_name is not None:
@@ -304,15 +370,19 @@ def main():
     rupture_threshold = args.rupture_ratio if args.rupture_ratio > 0 else None
     for arch in architectures:
         results.append(train_single_architecture(arch, str(data_path), output_dir, args.disp_source, args.batch_size, args.lr, args.max_epoch, args.num_workers, rupture_threshold))
-    results.sort(key=lambda x: x["val_loss"])
-    pd.DataFrame(results).to_csv(os.path.join(output_dir, "training_results.csv"), index=False)
-    plots_dir.mkdir(parents=True, exist_ok=True)
-    plot_results_summary(results, str(plots_dir / f"training_summary_{timestamp}.png"), args.diameter)
-    best = results[0]
-    best_dest = SURROGATE_ROOT / f"diameters/{args.diameter}um/trained/microbubble_displacement_BEST.pkl"
-    best_dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy(best["model_path"], best_dest)
-    print(f"Best model: {best['name']} -> {best_dest}")
+    payload = finalize_results(
+        diameter=args.diameter,
+        output_dir=output_dir,
+        results=results,
+        plots_dir=plots_dir,
+        report_json=args.report_json,
+        timestamp=timestamp,
+    )
+    payload["data_path"] = str(data_path)
+    if args.report_json:
+        os.makedirs(os.path.dirname(args.report_json), exist_ok=True)
+        with open(args.report_json, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
 
 
 if __name__ == "__main__":

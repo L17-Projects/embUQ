@@ -27,7 +27,7 @@ This is intentional. `reduced-model` is a scientific/model-family choice. `valid
 Run one public inference stage with explicit workflow selection:
 
 ```bash
-python scripts/vega/run_inference_stage.py \
+python scripts/platforms/vega/run_inference_stage.py \
   --experiment compression \
   --model-family full-model \
   --profile validation \
@@ -37,7 +37,7 @@ python scripts/vega/run_inference_stage.py \
 For phase 2, MPI ranks can be requested explicitly:
 
 ```bash
-python scripts/vega/run_inference_stage.py \
+python scripts/platforms/vega/run_inference_stage.py \
   --experiment compression \
   --model-family full-model \
   --profile validation \
@@ -56,7 +56,7 @@ _vega/runs/<experiment>/<model-family>/<profile>/
 Run the public lightweight propagation layer with the same explicit selection:
 
 ```bash
-python scripts/vega/run_propagation.py \
+python scripts/platforms/vega/run_propagation.py \
   --experiment compression \
   --model-family reduced-model \
   --profile production \
@@ -68,7 +68,7 @@ python scripts/vega/run_propagation.py \
 Extract MAP samples from either Phase 1 or Phase 3b without selecting run directories manually:
 
 ```bash
-python scripts/vega/extract_map.py \
+python scripts/platforms/vega/extract_map.py \
   --experiment compression \
   --model-family full-model \
   --profile validation \
@@ -92,7 +92,7 @@ That manifest is the intended reuse handoff for later plotting, reporting, or op
 
 ## sbatch templates
 
-The following canned templates live under `scripts/vega/sbatch/`:
+The following canned templates live under `scripts/platforms/vega/sbatch/`:
 
 - `workflow_phase1_to_3b.sbatch`
 - `workflow_propagation.sbatch`
@@ -125,7 +125,7 @@ settings.
 The production complete scripts require passing `REPO_ROOT` at submission time:
 
 ```bash
-REPO_ROOT=$(pwd) sbatch scripts/vega/sbatch/production/complete_reduced_compression.sbatch
+REPO_ROOT=$(pwd) sbatch scripts/platforms/vega/sbatch/production/complete_reduced_compression.sbatch
 ```
 
 Useful production overrides:

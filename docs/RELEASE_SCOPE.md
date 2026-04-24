@@ -13,13 +13,13 @@ The public line already includes:
 - Sobol sensitivity helpers and a lightweight Latin-hypercube design generator
 - MAP extraction and plotting/postprocessing helpers
 - a focused vendored Korali patch surface under `extern/korali/`
+- a repo-local Mirheo bootstrap surface driven by `extern/mirheo.lock.json`
 
 ## Intentionally deferred
 
 The following remain intentionally outside the current public boundary:
 - heavy generated artifacts and large trained model payloads
 - every internal/private convenience script from the research line
-- the heavier Mirheo data-generation execution surface
 - full propagation execution pipelines beyond the current public plotting/postprocessing layer
 - manuscript-specific `_paper` content
 
@@ -41,3 +41,4 @@ If you are using the repo now, the intended public strengths are:
 - understanding the vendored Korali patch surface that supports those workflows
 
 If you need large-scale data generation or cluster-specific Mirheo production pipelines, treat those as later extension work rather than a guaranteed part of the current public alpha line.
+The repo now includes the bootstrap/runtime contract for Mirheo itself, but the heavy generated results remain intentionally outside the repository.

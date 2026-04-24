@@ -1,5 +1,8 @@
 # Release evidence checklist for `v0.1.0`
 
+This document is historical and release-specific. It describes the archived `v0.1.0` evidence
+contract only; it does not define the current HUQ-EMB rebuild branch contract.
+
 This checklist defines the minimum evidence bundle required before tagging `MesoUQ` as `v0.1.0`.
 
 The goal is to make the release bar explicit, reviewable, and machine-checkable.
@@ -38,7 +41,7 @@ An example manifest is shipped at:
 Validate a completed manifest with:
 
 ```bash
-python scripts/release/validate_release_evidence.py \
+python scripts/qa/release/validate_release_evidence.py \
   --report /path/to/release_evidence_manifest.json \
   --must-exist
 ```
