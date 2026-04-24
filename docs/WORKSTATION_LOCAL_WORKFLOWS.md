@@ -84,7 +84,7 @@ To keep the workstation usable during a local validation run:
 Use:
 
 ```bash
-python scripts/workstation/run_local_validation_matrix.py \
+python scripts/platforms/workstation/run_local_validation_matrix.py \
   --output-root _o369_runs \
   --python-bin /temp/brieuc/workspace/myenv_torchfix/bin/python \
   --phase2-cpu-ranks 2 \

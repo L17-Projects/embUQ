@@ -50,7 +50,7 @@ An example report is shipped at:
 Validate a completed record with:
 
 ```bash
-python scripts/workstation/validate_acceptance_record.py \
+python scripts/platforms/workstation/validate_acceptance_record.py \
   --report /path/to/workstation_acceptance_report.json \
   --must-exist
 ```

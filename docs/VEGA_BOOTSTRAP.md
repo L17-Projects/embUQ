@@ -12,6 +12,7 @@ The supported path is:
 - place all Vega-specific state under `_vega/`
 - build vendored `extern/korali/` into `_vega/korali/install`
 - build Mirheo from the locked external source path into `_vega/mirheo/`
+- install repo-local TinyTeX into `_vega/tinytex/`
 - source the generated `_vega/korali/env.sh` before running workflows
 
 ## Recommended module stack
@@ -50,7 +51,7 @@ That editable install now includes the mesh-preparation dependency `trimesh`, wh
 Run the Vega doctor before building Korali:
 
 ```bash
-python scripts/vega/doctor_vega.py
+python scripts/platforms/vega/doctor_vega.py
 ```
 
 The doctor reports:
@@ -66,13 +67,13 @@ If you already have a user-global Korali on `PYTHONPATH`, the doctor will report
 If you also need MAP Mirheo workflows, use the Mirheo-aware doctor mode:
 
 ```bash
-python scripts/vega/doctor_vega.py --with-mirheo
+python scripts/platforms/vega/doctor_vega.py --with-mirheo
 ```
 
 ## Build vendored Korali
 
 ```bash
-bash scripts/vega/bootstrap_korali.sh --jobs 8
+bash scripts/platforms/vega/bootstrap_korali.sh --jobs 8
 ```
 
 Default behavior:
@@ -101,7 +102,7 @@ The Mirheo source default is tracked in [`extern/mirheo.lock.json`](../extern/mi
 You can override it temporarily with `MESOUQ_MIRHEO_SRC=/abs/path/to/Mirheo` or `--source /abs/path/to/Mirheo`.
 
 ```bash
-bash scripts/vega/bootstrap_mirheo.sh --jobs 8
+bash scripts/platforms/vega/bootstrap_mirheo.sh --jobs 8
 ```
 
 Default behavior:
@@ -135,17 +136,36 @@ Optional flags:
 ```bash
 source _vega/korali/env.sh
 source _vega/mirheo/env.sh
-python scripts/vega/doctor_vega.py --strict --with-mirheo
+source _vega/tinytex/env.sh
+python scripts/platforms/vega/doctor_vega.py --strict --with-mirheo --with-tex
 ```
 
 The generated env script intentionally replaces inherited `PYTHONPATH` entries so the repo-local Korali install wins over any preexisting user-global Korali.
 The Mirheo env script records the resolved source path, repo-local build/install locations, and the source snapshot manifest used for reproducibility.
+
+## Build repo-local TinyTeX for paper-facing figures
+
+Paper-facing figure generation uses the original UQ_DPD TeX rendering path. On Vega this is now bootstrapped repo-locally:
+
+```bash
+bash scripts/platforms/vega/bootstrap_tex.sh
+source _vega/tinytex/env.sh
+python scripts/platforms/vega/doctor_vega.py --with-tex
+```
+
+The TinyTeX bootstrap installs the exact packages needed by the figure scripts, including:
+
+- `psnfss` / `helvet.sty`
+- `sansmath.sty`
+- `revtex4-2.cls`
+- `preview.sty`
+- `dvipng`
 
 ## Next steps
 
 With the repo-local runtime active, continue with:
 
 - `pytest`
-- `python scripts/vega/run_validation_matrix.py ...`
+- `python scripts/platforms/vega/run_validation_matrix.py ...`
 - `python scripts/run_vega_acceptance.py ...`
 - the public Phase 1 / Phase 2 / Phase 3b / propagation / MAP wrappers as they are added in later PRs

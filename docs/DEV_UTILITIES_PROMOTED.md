@@ -14,7 +14,7 @@ These utilities are not the narrow paper-facing core. They exist because they im
 
 ### 1. Workflow validation suite
 
-`scripts/vega/run_validation_suite.py`
+`scripts/platforms/vega/run_validation_suite.py`
 
 Use this when you want to run a packaged reduced/full validation sequence and collect workflow artifacts.
 

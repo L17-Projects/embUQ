@@ -22,6 +22,17 @@ omit =
     scripts/postprocess/generate_map_overlay_figure.py
     scripts/postprocess/generate_propagation_bands_figure.py
     scripts/vega/run_postprocess_figures.py
+    scripts/shared/postprocess/generate_map_overlay_figure.py
+    scripts/shared/postprocess/generate_propagation_bands_figure.py
+    scripts/platforms/vega/run_postprocess_figures.py
+    scripts/platforms/vega/run_dnn_surrogate_training.py
+    scripts/platforms/vega/run_validation_matrix.py
+    scripts/platforms/vega/run_vega_acceptance.py
+    scripts/platforms/workstation/validate_acceptance_record.py
+    scripts/qa/ci/check_docs_links.py
+    scripts/qa/release/validate_release_evidence.py
+    scripts/workflows/emb/huq_emb/run_paper_data_campaign.py
+    scripts/workflows/emb/huq_emb/run_vega_50k_campaign.py
 
 [report]
 exclude_also =

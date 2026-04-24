@@ -90,7 +90,7 @@ python sampling/run_LHS.py --output lhs_samples.csv
 Extract a MAP sample from a Korali run directory:
 
 ```bash
-python scripts/vega/extract_map.py \
+python scripts/platforms/vega/extract_map.py \
   --experiment compression \
   --model-family full-model \
   --profile validation \

@@ -53,7 +53,7 @@ All other production semantics remain unchanged, including reduced-model fixed p
 Run it inside an allocated Vega job:
 
 ```bash
-python scripts/vega/run_production_sanity.py \
+python scripts/platforms/vega/run_production_sanity.py \
   --output-root _vega/production_sanity \
   --phase2-cpu-ranks 2 \
   --python-bin python
@@ -62,7 +62,7 @@ python scripts/vega/run_production_sanity.py \
 To run a non-default lane:
 
 ```bash
-python scripts/vega/run_production_sanity.py \
+python scripts/platforms/vega/run_production_sanity.py \
   --selection indentation:reduced-model:production \
   --output-root _vega/production_sanity/indentation_reduced_model
 ```
@@ -70,7 +70,7 @@ python scripts/vega/run_production_sanity.py \
 To run multiple lanes explicitly:
 
 ```bash
-python scripts/vega/run_production_sanity.py \
+python scripts/platforms/vega/run_production_sanity.py \
   --selection compression:full-model:production \
   --selection compression:reduced-model:production \
   --output-root _vega/production_sanity/compression_pair

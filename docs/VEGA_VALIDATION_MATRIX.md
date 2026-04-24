@@ -32,7 +32,7 @@ That exercises the full-model and reduced-model codepaths while keeping the work
 Run the matrix directly inside an allocated Vega job:
 
 ```bash
-python scripts/vega/run_validation_matrix.py \
+python scripts/platforms/vega/run_validation_matrix.py \
   --experiments compression indentation \
   --model-families full-model reduced-model \
   --output-root _vega/validation_matrix \
@@ -41,7 +41,7 @@ python scripts/vega/run_validation_matrix.py \
 
 The public command always fixes the execution profile to `validation`.
 
-It delegates to the lower-level `scripts/vega/run_workflow_matrix.py` operator runner, which remains available for broader matrix/debugging use.
+It delegates to the lower-level `scripts/platforms/vega/run_workflow_matrix.py` operator runner, which remains available for broader matrix/debugging use.
 
 Each selection runs:
 
@@ -69,7 +69,7 @@ The command writes:
 
 The canned template is:
 
-- `scripts/vega/sbatch/validation_matrix.sbatch`
+- `scripts/platforms/vega/sbatch/validation_matrix.sbatch`
 
 It targets the Vega `dev` partition and therefore keeps the wall clock at 30 minutes or less. For longer non-smoke operator runs, copy the template and adjust the partition/time budget explicitly.
 
@@ -94,7 +94,7 @@ The template exposes:
 For targeted debugging, a selection-specific config can be injected with:
 
 ```bash
-python scripts/vega/run_validation_matrix.py \
+python scripts/platforms/vega/run_validation_matrix.py \
   --selection compression:full-model:validation \
   --output-root _vega/validation_matrix/custom_debug \
   --config-override compression:full-model:validation=/abs/path/config.yaml

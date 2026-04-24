@@ -89,6 +89,13 @@ def test_selection_helpers_reject_legacy_aliases() -> None:
         parse_selection("indentation_reduced")
 
 
+def test_selection_rejects_unsupported_model_family_and_profile() -> None:
+    with pytest.raises(ValueError, match="Unsupported model family"):
+        VegaWorkflowSelection("compression", "legacy-model", "production")
+    with pytest.raises(ValueError, match="Unsupported profile"):
+        VegaWorkflowSelection("compression", "full-model", "legacy")
+
+
 def test_expand_selection_matrix_builds_cartesian_product() -> None:
     selections = expand_selection_matrix(
         experiments=["compression", "indentation"],
@@ -258,6 +265,52 @@ def test_build_inference_command_phase2_production_cpu_mpi_override_uses_mpirun(
 
     assert command[:6] == ["mpirun", "--bind-to", "none", "--oversubscribe", "-np", "4"]
     assert command[-2:] == ["--phase2-backend", "cpu-mpi"]
+
+
+def test_build_inference_command_rejects_invalid_phase2_backend() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "production")
+    with pytest.raises(ValueError, match="Unsupported phase2_backend"):
+        build_inference_command(
+            repo_root,
+            selection,
+            stage="phase2",
+            python_bin="python",
+            config_path=resolve_workflow_config_path(repo_root, selection),
+            output_root=resolve_workflow_output_root(repo_root, selection),
+            phase2_backend="bad-backend",
+        )
+
+
+def test_build_inference_command_rejects_native_cuda_with_multiple_ranks() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "production")
+    with pytest.raises(ValueError, match="requires cpu_ranks=1"):
+        build_inference_command(
+            repo_root,
+            selection,
+            stage="phase2",
+            python_bin="python",
+            config_path=resolve_workflow_config_path(repo_root, selection),
+            output_root=resolve_workflow_output_root(repo_root, selection),
+            cpu_ranks=2,
+            phase2_backend="native-cuda",
+        )
+
+
+def test_build_inference_command_rejects_phase2_backend_outside_phase2() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "production")
+    with pytest.raises(ValueError, match="phase2_backend is only supported for phase2"):
+        build_inference_command(
+            repo_root,
+            selection,
+            stage="phase1",
+            python_bin="python",
+            config_path=resolve_workflow_config_path(repo_root, selection),
+            output_root=resolve_workflow_output_root(repo_root, selection),
+            phase2_backend="native-cuda",
+        )
 
 
 def test_build_inference_command_phase2_native_cuda_rejects_multi_rank() -> None:

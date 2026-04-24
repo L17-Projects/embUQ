@@ -50,11 +50,27 @@ These validation configs are execution-profile choices for smoke and acceptance 
 
 Compression:
 - evaluator: `compression/surrogate/evaluate.py`
-- training entrypoint: `compression/surrogate/scripts/emb_train.py`
+- lightweight training entrypoint: `compression/surrogate/scripts/emb_train.py`
+- paper-facing 12-architecture sweep + BEST promotion: `compression/surrogate/scripts/train_multi_arch.py`
 
 Indentation:
 - evaluator: `indentation/surrogate/evaluate.py`
-- training entrypoint: `indentation/surrogate/scripts/emb_train.py`
+- lightweight training entrypoint: `indentation/surrogate/scripts/emb_train.py`
+- paper-facing 12-architecture sweep + BEST promotion: `indentation/surrogate/scripts/train_multi_arch.py`
+
+Vega DNN rebuild matrix:
+- `scripts/platforms/vega/run_dnn_surrogate_training.py`
+- `scripts/platforms/vega/sbatch/train_dnn_surrogates.sbatch`
+
+The Vega DNN matrix now writes one per-spec provenance manifest under:
+- `<output-root>/<spec>/dnn_training_manifest.json`
+
+Each per-spec manifest records:
+- the training config used for that diameter
+- the SLURM array job id
+- submit / array / finalize logs
+- the promoted `*_BEST.pkl` artifact path and checksum
+- the final training report path and checksum when present
 
 Shared training logic is implemented once in `src/meso_uq/surrogate/`.
 
@@ -74,21 +90,21 @@ This surface also feeds the MAP Mirheo execution layer used by the paper-facing 
 ## 6. MAP extraction and plotting
 
 MAP extraction:
-- `scripts/postprocess/extract_phase1_map.py`
-- `scripts/postprocess/extract_phase3b_map.py`
-- `scripts/vega/run_map_mirheo.py`
+- `scripts/shared/postprocess/extract_phase1_map.py`
+- `scripts/shared/postprocess/extract_phase3b_map.py`
+- `scripts/platforms/vega/run_map_mirheo.py`
 
 Plotting/postprocessing:
 - `propagation/scripts/plot_validation_overlay.py`
 - `propagation/scripts/plot_d0_correlations.py`
 - `propagation/scripts/plot_posterior_marginals.py`
-- `scripts/postprocess/generate_map_overlay_figure.py`
+- `scripts/shared/postprocess/generate_map_overlay_figure.py`
 
 Shared postprocessing helpers live under `src/meso_uq/postprocess/`.
 
 ## 7. Vega helper surface
 
-For Vega-first operation, the repo now also ships split helpers under `scripts/vega/`:
+For Vega-first operation, the repo now also ships split helpers under `scripts/platforms/vega/`:
 
 - `run_validation_suite.py`
 - `run_inference_stage.py`
@@ -118,10 +134,10 @@ jobs with runtime strictly `<00:30:00` go to `dev`; jobs with runtime `>=00:30:0
 That policy also applies to MAP Mirheo jobs.
 
 Default production lanes:
-- `scripts/vega/sbatch/production/complete_inference_compression.sbatch`
-- `scripts/vega/sbatch/production/complete_inference_indentation.sbatch`
-- `scripts/vega/sbatch/production/complete_reduced_compression.sbatch`
-- `scripts/vega/sbatch/production/complete_reduced_indentation.sbatch`
+- `scripts/platforms/vega/sbatch/production/complete_inference_compression.sbatch`
+- `scripts/platforms/vega/sbatch/production/complete_inference_indentation.sbatch`
+- `scripts/platforms/vega/sbatch/production/complete_reduced_compression.sbatch`
+- `scripts/platforms/vega/sbatch/production/complete_reduced_indentation.sbatch`
 
 ## 8. Vendored Korali patch surface
 
@@ -142,7 +158,7 @@ Mirheo is not vendored under `extern/`. The current contract is:
 - source snapshot manifest at `_vega/mirheo/source_snapshot.json`
 
 Canonical bootstrap entrypoint:
-- `scripts/hpc/bootstrap_mirheo.sh`
+- `scripts/platforms/hpc/bootstrap_mirheo.sh`
 
 Current default source lock:
 - `/ceph/hpc/home/eubrieucb/software/Mirheo`
@@ -152,6 +168,21 @@ Supported MAP Mirheo micro-canary contract on Vega:
 - `numsteps=200`
 - `numsteps_eq=200`
 - strict `<00:30:00 => dev` routing still applies
+
+Important separation:
+- the dedicated sanity runner exports the `200/200` micro-canary floor explicitly
+- the generic `workflow_map_mirheo.sbatch` wrapper keeps `numsteps` unset by default so production uses the scientific Mirheo payload defaults
+
+Scratch/runtime rule:
+- MAP Mirheo must use lane-local scratch under the lane output tree
+- do not reuse repo-root `_init_*_map` scratch directories across concurrent full/reduced lanes
+- the orchestration path now passes a unique scratch root per dataset under `map_mirheo/_scratch/`
+
+Production walltime rule:
+- indentation MAP Mirheo currently fits the `00:45:00` production wrapper budget
+- compression MAP Mirheo requires a longer production budget in the real 50k runner (`02:00:00`)
+- both remain on the `gpu` partition because they are not strict `<00:30:00` jobs
+- the generic `workflow_map_mirheo.sbatch` wrapper now defaults to a safer `02:00:00`; shorter callers should override `--time` and `GPU_TIME_LIMIT` explicitly
 
 ## 9. Local workstation validation (o369 / non-SLURM)
 
@@ -174,3 +205,22 @@ A good order for an outside user is:
 3. run full-model or reduced-model inference depending on the goal
 4. extract MAP samples
 5. generate validation and posterior plots
+
+## 10. HUQ-EMB Vega production rebuild
+
+For the real 50k HUQ-EMB rebuild on Vega, use:
+- `scripts/workflows/emb/huq_emb/run_vega_50k_campaign.py`
+
+Do not use `scripts/workflows/emb/huq_emb/run_paper_data_campaign.py` for the Vega full rebuild launch path.
+That legacy runner is reserved for postprocess / asset-graph work and will reject the Vega full-rebuild selection set unless `--skip-workflow` is used.
+
+This runner performs, in order:
+1. DNN surrogate 12-architecture rebuild for all six diameters
+2. four production lanes through `sbatch/production/complete_*.sbatch`
+3. MAP extraction (`phase1`, `phase3b`)
+4. MAP Mirheo
+5. paper asset generation via the postprocess-only paper runner
+
+For exact paper-facing figure rendering on Vega, bootstrap and source repo-local TinyTeX first:
+- `bash scripts/platforms/vega/bootstrap_tex.sh`
+- `source _vega/tinytex/env.sh`

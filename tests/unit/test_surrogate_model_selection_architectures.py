@@ -105,3 +105,23 @@ def test_compression_model_select_rejects_bad_architecture_token() -> None:
     mod = _load_compression_model_select_module()
     with pytest.raises(ValueError, match="Invalid architecture token"):
         mod._parse_architecture_list("64x3,badtoken")
+
+
+def test_grid_search_tabular_surrogate_rejects_empty_architecture_override(
+    tmp_path: Path,
+) -> None:
+    df = pd.DataFrame({"x": [0.0], "y": [0.0]})
+
+    with pytest.raises(ValueError, match="architectures must be non-empty"):
+        model_selection.grid_search_tabular_surrogate(
+            df,
+            input_cols=["x"],
+            target_col="y",
+            output_dir=tmp_path,
+            widths=[8],
+            depths=[1],
+            architectures=[],
+            batch_size=1,
+            lr=1e-3,
+            max_epoch=1,
+        )

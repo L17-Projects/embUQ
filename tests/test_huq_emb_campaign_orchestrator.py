@@ -27,7 +27,7 @@ def _arg_value(command: list[str], flag: str) -> str:
 def test_huq_emb_orchestrator_runs_workflow_and_manifest_postprocess(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "papers" / "huq_emb" / "run_paper_data_campaign.py",
+        repo_root / "scripts" / "workflows" / "emb" / "huq_emb" / "run_paper_data_campaign.py",
         "huq_emb_campaign_orchestrator_test",
     )
     captured: list[list[str]] = []
@@ -91,7 +91,7 @@ def test_huq_emb_orchestrator_runs_workflow_and_manifest_postprocess(tmp_path, m
     monkeypatch.setattr(module, "_record_python_step", fake_internal_step)
 
     paper_root = tmp_path / "paper_data"
-    rc = module.main(["--paper-data-root", str(paper_root), "--campaign-id", "camp1"])
+    rc = module.main(["--paper-data-root", str(paper_root), "--campaign-id", "camp1", "--site", "karolina"])
     assert rc == 0
 
     assert any(Path(cmd[1]).name == "run_workflow_matrix.py" for cmd in captured)
@@ -116,7 +116,7 @@ def test_huq_emb_orchestrator_runs_workflow_and_manifest_postprocess(tmp_path, m
 def test_huq_emb_orchestrator_fails_when_release_manifest_reports_fail(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "papers" / "huq_emb" / "run_paper_data_campaign.py",
+        repo_root / "scripts" / "workflows" / "emb" / "huq_emb" / "run_paper_data_campaign.py",
         "huq_emb_campaign_orchestrator_fail_test",
     )
 
@@ -176,5 +176,23 @@ def test_huq_emb_orchestrator_fails_when_release_manifest_reports_fail(tmp_path,
         },
     )
 
-    rc = module.main(["--paper-data-root", str(tmp_path / "paper_data"), "--campaign-id", "camp2"])
+    rc = module.main(["--paper-data-root", str(tmp_path / "paper_data"), "--campaign-id", "camp2", "--site", "karolina"])
     assert rc == 1
+
+
+def test_huq_emb_orchestrator_rejects_vega_full_rebuild_path(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "workflows" / "emb" / "huq_emb" / "run_paper_data_campaign.py",
+        "huq_emb_campaign_orchestrator_guard_test",
+    )
+
+    try:
+        module.main(["--paper-data-root", str(tmp_path / "paper_data"), "--campaign-id", "camp3"])
+    except SystemExit as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("Expected Vega full rebuild guard to abort the legacy runner.")
+
+    assert "run_vega_50k_campaign.py" in message
+    assert "--skip-workflow" in message

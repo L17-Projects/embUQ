@@ -532,7 +532,9 @@ def test_validation_matrix_wrapper_delegates_to_workflow_matrix_with_validation_
     assert rc == 0
     assert captured["cwd"] == str(repo_root)
     assert captured["command"][0] == "python"
-    assert captured["command"][1] == str(repo_root / "scripts" / "vega" / "run_workflow_matrix.py")
+    assert captured["command"][1] == str(
+        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py"
+    )
     assert "--profiles" in captured["command"]
     assert captured["command"][captured["command"].index("--profiles") + 1] == "validation"
     assert str(tmp_path / "validation") in captured["command"]

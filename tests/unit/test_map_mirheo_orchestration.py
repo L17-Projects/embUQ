@@ -113,7 +113,13 @@ def test_map_mirheo_manifest_schema(tmp_path):
     mock_result.stdout = "done"
     mock_result.stderr = ""
 
-    with patch("subprocess.run", return_value=mock_result):
+    captured_cmds = []
+
+    def fake_run(cmd, **kwargs):
+        captured_cmds.append(cmd)
+        return mock_result
+
+    with patch("subprocess.run", side_effect=fake_run):
         summary = run_map_mirheo(
             experiment="indentation",
             output_dir=tmp_path,
@@ -133,6 +139,9 @@ def test_map_mirheo_manifest_schema(tmp_path):
     assert manifest_out.exists()
     loaded = json.loads(manifest_out.read_text())
     assert loaded["experiment"] == "indentation"
+    rendered = " ".join(str(a) for a in captured_cmds[0])
+    assert "--scratch-root" in rendered
+    assert str(tmp_path / "map_mirheo" / "_scratch" / "indentation_3.2um") in rendered
 
 
 def test_map_mirheo_missing_manifest_raises(tmp_path):
@@ -381,6 +390,7 @@ def test_main_numsteps_overrides_forwarded(tmp_path):
     rendered = " ".join(str(a) for a in captured_cmds[0])
     assert "--numsteps 5000" in rendered
     assert "--numsteps-eq 10000" in rendered
+    assert "--scratch-root" in rendered
 
 
 def test_main_passed_status_returns_zero(tmp_path):

@@ -55,7 +55,7 @@ That split is deliberate:
 Those hardware-specific checks must still be recorded in-repo so the release does not depend on undocumented tribal knowledge.
 
 The workstation proof layer is documented in `WORKSTATION_ACCEPTANCE_CHECKLIST.md`.
-Validate archived workstation reports with `scripts/workstation/validate_acceptance_record.py`.
+Validate archived workstation reports with `scripts/platforms/workstation/validate_acceptance_record.py`.
 
 The public Vega validation matrix is documented in `VEGA_VALIDATION_MATRIX.md`.
 

@@ -70,6 +70,7 @@ def setup_map_specific_init_dir(
     retry_attempt: int,
     dt_scale_factor: float,
     rank: int,
+    scratch_root: str | None = None,
 ) -> str:
     """Create MAP-specific init directory and apply dt/numsteps scaling for retries.
 
@@ -79,7 +80,10 @@ def setup_map_specific_init_dir(
     diam_str = f"{diameter_um:.1f}"
     base_template_dir = PROJECT_ROOT / "indentation" / "src"
     emb_defaults_path = base_template_dir / "parameters-default.emb.yaml"
-    map_init_dir = PROJECT_ROOT / f"_init_indentation_{diam_str}um_map"
+    if scratch_root is None:
+        map_init_dir = PROJECT_ROOT / f"_init_indentation_{diam_str}um_map"
+    else:
+        map_init_dir = Path(scratch_root).resolve()
 
     if rank == 0:
         datedPrint("[MAP] Setting up MAP-specific init directory")
@@ -196,6 +200,11 @@ def main():
     parser.add_argument("--dt-scale-factor", type=float, default=0.5)
     parser.add_argument("--numsteps", type=int, default=None)
     parser.add_argument("--numsteps-eq", type=int, default=None)
+    parser.add_argument(
+        "--scratch-root",
+        default=None,
+        help="Optional unique scratch directory for MAP init files.",
+    )
     args = parser.parse_args()
 
     if args.retry_attempt < 0:
@@ -250,7 +259,7 @@ def main():
     sample = {"Parameters": map_params, "Sample Id": map_data["sample_id"]}
 
     map_init_dir = setup_map_specific_init_dir(
-        diameter_um, args.retry_attempt, args.dt_scale_factor, rank
+        diameter_um, args.retry_attempt, args.dt_scale_factor, rank, args.scratch_root
     )
 
     if rank == 0 and (args.numsteps is not None or args.numsteps_eq is not None):

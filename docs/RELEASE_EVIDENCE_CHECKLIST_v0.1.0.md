@@ -41,7 +41,7 @@ An example manifest is shipped at:
 Validate a completed manifest with:
 
 ```bash
-python scripts/release/validate_release_evidence.py \
+python scripts/qa/release/validate_release_evidence.py \
   --report /path/to/release_evidence_manifest.json \
   --must-exist
 ```

@@ -7,19 +7,19 @@ This document describes the single Vega-first acceptance command shipped by `Mes
 The acceptance command is a thin wrapper around the richer operator runner:
 
 - wrapper: `scripts/run_vega_acceptance.py`
-- operator runner: `scripts/vega/run_validation_suite.py`
+- operator runner: `scripts/platforms/vega/run_validation_suite.py`
 
 The wrapper exists so a fresh clone on Vega has one obvious command to run and one machine-readable report to inspect.
 
 Before running acceptance from a fresh clone, bootstrap the repo-local Korali runtime and verify it:
 
-- `bash scripts/vega/bootstrap_korali.sh --jobs 8`
+- `bash scripts/platforms/vega/bootstrap_korali.sh --jobs 8`
 - `source _vega/korali/env.sh`
-- `python scripts/vega/doctor_vega.py --strict`
+- `python scripts/platforms/vega/doctor_vega.py --strict`
 
 For a canned Vega batch submission, the repo also ships:
 
-- `scripts/vega/sbatch/acceptance.sbatch`
+- `scripts/platforms/vega/sbatch/acceptance.sbatch`
 
 ## Command
 

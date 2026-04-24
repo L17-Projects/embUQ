@@ -47,9 +47,9 @@ python -m pip install -U pip
 pip install -e ".[test,mpi]"
 pip install pybind11 meson ninja
 
-bash scripts/vega/bootstrap_korali.sh --jobs 8
+bash scripts/platforms/vega/bootstrap_korali.sh --jobs 8
 source _vega/korali/env.sh
-python scripts/vega/doctor_vega.py --strict
+python scripts/platforms/vega/doctor_vega.py --strict
 ```
 
 For more detail on the bootstrap path, see [VEGA_BOOTSTRAP.md](VEGA_BOOTSTRAP.md).
@@ -61,7 +61,7 @@ Use the explicit Vega helper surface with the reduced-model indentation producti
 Phase 1:
 
 ```bash
-python scripts/vega/run_inference_stage.py \
+python scripts/platforms/vega/run_inference_stage.py \
   --experiment indentation \
   --model-family reduced-model \
   --profile production \
@@ -71,7 +71,7 @@ python scripts/vega/run_inference_stage.py \
 Phase 2:
 
 ```bash
-python scripts/vega/run_inference_stage.py \
+python scripts/platforms/vega/run_inference_stage.py \
   --experiment indentation \
   --model-family reduced-model \
   --profile production \
@@ -83,7 +83,7 @@ python scripts/vega/run_inference_stage.py \
 Phase 3b:
 
 ```bash
-python scripts/vega/run_inference_stage.py \
+python scripts/platforms/vega/run_inference_stage.py \
   --experiment indentation \
   --model-family reduced-model \
   --profile production \
@@ -93,7 +93,7 @@ python scripts/vega/run_inference_stage.py \
 Propagation `Phase 3b`:
 
 ```bash
-python scripts/vega/run_propagation.py \
+python scripts/platforms/vega/run_propagation.py \
   --experiment indentation \
   --model-family reduced-model \
   --profile production \
@@ -103,7 +103,7 @@ python scripts/vega/run_propagation.py \
 MAP extraction:
 
 ```bash
-python scripts/vega/extract_map.py \
+python scripts/platforms/vega/extract_map.py \
   --experiment indentation \
   --model-family reduced-model \
   --profile production \
@@ -112,7 +112,7 @@ python scripts/vega/extract_map.py \
 
 ## sbatch helpers
 
-The checked-in Vega templates under `scripts/vega/sbatch/` are the preferred batch entrypoints.
+The checked-in Vega templates under `scripts/platforms/vega/sbatch/` are the preferred batch entrypoints.
 
 For reduced-model indentation, set:
 

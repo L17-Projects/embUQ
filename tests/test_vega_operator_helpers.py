@@ -285,9 +285,12 @@ def test_vega_sbatch_templates_expose_model_family_and_profile_axes() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     template_dir = repo_root / "scripts" / "vega" / "sbatch"
     templates = sorted(template_dir.glob("*.sbatch"))
+    fixed_scope_templates = {"train_dnn_arch_array.sbatch", "train_dnn_surrogates.sbatch"}
 
     assert templates
     for template in templates:
+        if template.name in fixed_scope_templates:
+            continue
         text = template.read_text(encoding="utf-8")
         assert (
             "MODEL_FAMILY" in text

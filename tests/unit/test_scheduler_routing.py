@@ -26,6 +26,20 @@ def test_parse_slurm_time_limit_invalid_raises() -> None:
     with pytest.raises(ValueError):
         parse_slurm_time_limit("foo")
 
+    with pytest.raises(ValueError):
+        parse_slurm_time_limit("")
+
+    with pytest.raises(ValueError):
+        parse_slurm_time_limit("1x-00:10:00")
+
+    with pytest.raises(ValueError):
+        parse_slurm_time_limit("00:01:02:03")
+
+
+def test_parse_slurm_time_limit_short_forms() -> None:
+    assert parse_slurm_time_limit("15") == 15 * 60
+    assert parse_slurm_time_limit("10:05") == 10 * 60 + 5
+
 
 def test_route_gpu_partition_strict_threshold() -> None:
     assert route_gpu_partition("00:29:59") == "dev"
@@ -52,10 +66,10 @@ def test_map_sbatch_templates_use_partition_router_script() -> None:
     assert "strict GPU partition policy violation" in mirheo_text
 
 
-def test_map_mirheo_template_uses_supported_canary_floor() -> None:
+def test_map_mirheo_template_keeps_production_defaults_unset() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     mirheo_template = repo_root / "scripts" / "vega" / "sbatch" / "workflow_map_mirheo.sbatch"
     mirheo_text = mirheo_template.read_text(encoding="utf-8")
 
-    assert 'MAP_MIRHEO_NUMSTEPS="${MAP_MIRHEO_NUMSTEPS:-200}"' in mirheo_text
-    assert 'MAP_MIRHEO_NUMSTEPS_EQ="${MAP_MIRHEO_NUMSTEPS_EQ:-200}"' in mirheo_text
+    assert 'MAP_MIRHEO_NUMSTEPS="${MAP_MIRHEO_NUMSTEPS:-}"' in mirheo_text
+    assert 'MAP_MIRHEO_NUMSTEPS_EQ="${MAP_MIRHEO_NUMSTEPS_EQ:-}"' in mirheo_text
