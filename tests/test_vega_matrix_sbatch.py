@@ -61,10 +61,14 @@ def test_promote_template_redirects_scheduler_logs_into_certification_root() -> 
     text = _read("promote_certified_bnn.sbatch")
     assert "#SBATCH --output=/dev/null" in text
     assert "#SBATCH --error=/dev/null" in text
-    assert 'LOG_ROOT="${LOG_ROOT:-${CERTIFICATION_ROOT}/logs}"' in text
+    assert 'DEFAULT_LOG_BASE="${CERTIFICATION_ROOT:-${REPO_ROOT}/_runs/vega/bnn_promotion_preflight}"' in text
+    assert 'LOG_ROOT="${LOG_ROOT:-${DEFAULT_LOG_BASE}/logs}"' in text
     assert 'mkdir -p "${LOG_ROOT}"' in text
     assert 'exec > >(tee -a "${LOG_ROOT}/slurm-${JOB_TOKEN}.out")' in text
     assert '2> >(tee -a "${LOG_ROOT}/slurm-${JOB_TOKEN}.err" >&2)' in text
+    assert text.index('exec > >(tee -a "${LOG_ROOT}/slurm-${JOB_TOKEN}.out")') < text.index(
+        'if [[ -z "${CERTIFICATION_ROOT}" ]]; then'
+    )
 
 
 @pytest.mark.parametrize("template", ("dnn_rebaseline_matrix.sbatch", "bnn_roundtrip_check.sbatch"))
@@ -145,6 +149,9 @@ def test_bnn_certification_template_dispatches_gpu_runner_with_seeded_roots() ->
     assert "--no-resume" in text
     assert "torch.cuda.is_available()" in text
     assert "run_bnn_certification_matrix.py" in text
+    assert text.index('exec > >(tee -a "${LOG_ROOT}/slurm-${JOB_TOKEN}.out")') < text.index(
+        'if [[ -z "${DNN_ROOT}" || -z "${BNN_ROOT}" ]]; then'
+    )
 
 
 def test_bnn_roundtrip_template_dispatches_gpu_runner_with_selection_and_reload_knobs() -> None:

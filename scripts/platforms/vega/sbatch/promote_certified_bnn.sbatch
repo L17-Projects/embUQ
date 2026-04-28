@@ -22,19 +22,20 @@ DRY_RUN="${DRY_RUN:-false}"
 # Promotion consumes one certification root at a time; keep the selection axis visible for
 # operator parity with other Vega sbatch entrypoints.
 SELECTIONS="${SELECTIONS:-}"
-LOG_ROOT="${LOG_ROOT:-${CERTIFICATION_ROOT}/logs}"
+DEFAULT_LOG_BASE="${CERTIFICATION_ROOT:-${REPO_ROOT}/_runs/vega/bnn_promotion_preflight}"
+LOG_ROOT="${LOG_ROOT:-${DEFAULT_LOG_BASE}/logs}"
 VENV_DIR="${VENV_DIR:-${REPO_ROOT}/_vega/venv}"
 PYTHON_BIN="${PYTHON_BIN:-${VENV_DIR}/bin/python}"
-
-if [[ -z "${CERTIFICATION_ROOT}" ]]; then
-  echo "Set CERTIFICATION_ROOT before submitting promotion." >&2
-  exit 2
-fi
 
 cd "${REPO_ROOT}"
 mkdir -p "${LOG_ROOT}"
 JOB_TOKEN="${SLURM_JOB_ID:-manual}"
 exec > >(tee -a "${LOG_ROOT}/slurm-${JOB_TOKEN}.out") 2> >(tee -a "${LOG_ROOT}/slurm-${JOB_TOKEN}.err" >&2)
+
+if [[ -z "${CERTIFICATION_ROOT}" ]]; then
+  echo "Set CERTIFICATION_ROOT before submitting promotion." >&2
+  exit 2
+fi
 
 module purge
 module load Python/3.10.8-GCCcore-12.2.0

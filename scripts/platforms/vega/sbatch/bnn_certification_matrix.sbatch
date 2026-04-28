@@ -40,15 +40,15 @@ CONFIDENCE_LEVEL="${CONFIDENCE_LEVEL:-}"
 ACCEPTANCE_UPPER_BOUND="${ACCEPTANCE_UPPER_BOUND:-}"
 RESUME="${RESUME:-true}"
 
-if [[ -z "${DNN_ROOT}" || -z "${BNN_ROOT}" ]]; then
-  echo "Set both DNN_ROOT and BNN_ROOT before submitting certification." >&2
-  exit 2
-fi
-
 cd "${REPO_ROOT}"
 mkdir -p "${OUTPUT_ROOT}" "${LOG_ROOT}"
 JOB_TOKEN="${SLURM_JOB_ID:-manual}"
 exec > >(tee -a "${LOG_ROOT}/slurm-${JOB_TOKEN}.out") 2> >(tee -a "${LOG_ROOT}/slurm-${JOB_TOKEN}.err" >&2)
+
+if [[ -z "${DNN_ROOT}" || -z "${BNN_ROOT}" ]]; then
+  echo "Set both DNN_ROOT and BNN_ROOT before submitting certification." >&2
+  exit 2
+fi
 
 module purge
 module load \
