@@ -163,7 +163,10 @@ def run_inference(
     max_gen = config["max_gen"]
     target_cov = config["target_cov"]
     covariance_scaling = config["covariance_scaling"]
-    burn_in = int(config.get("phase1_burn_in", config.get("hbi_burn_in", 0)))
+    burn_in_value = config.get("phase1_burn_in")
+    if burn_in_value is None:
+        burn_in_value = config.get("hbi_burn_in")
+    burn_in = 0 if burn_in_value is None else int(burn_in_value)
     use_surrogate = config.get("use_surrogate", True)
     surrogate_backend = _resolve_surrogate_backend(config)
 

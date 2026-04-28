@@ -49,10 +49,11 @@ V3_ROOT = PAPER_STAGE_ROOT
 FIGURES_DIR = Path(os.environ.get("HUQ_PAPER_FIGURES_DIR", str(V3_ROOT / "generated" / "figures")))
 GENERATED_DIR = V3_ROOT / "generated"
 SCRATCH_MIRHEO_ROOT = V3_ROOT / "scratch" / "map_mirheo_quick"
+DEFAULT_TEXDEPS_DIR = REPO_ROOT / "papers" / "huq_emb" / "_texdeps"
 TEXDEPS_DIR = Path(
     os.environ.get(
         "MESOUQ_PAPER_TEXDEPS_DIR",
-        "/ceph/hpc/home/eubrieucb/workspace/UQ_DPD/Hierarchical_UQ_compression/_paper/v3/files/_texdeps",
+        str(DEFAULT_TEXDEPS_DIR),
     )
 ).resolve()
 WORKFLOW_ROOT = CAMPAIGN_ROOT / "workflow_matrix" / "runs"
