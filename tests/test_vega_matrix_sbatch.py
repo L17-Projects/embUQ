@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib.util
+import sys
 from pathlib import Path
 
 import pytest
@@ -16,6 +18,14 @@ TEMPLATES = (
 
 def _read(name: str) -> str:
     return (SBATCH_DIR / name).read_text(encoding="utf-8")
+
+
+def _load_module(path: Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    spec.loader.exec_module(module)  # type: ignore[union-attr]
+    return module
 
 
 @pytest.mark.parametrize("template", TEMPLATES)
@@ -93,3 +103,26 @@ def test_bnn_roundtrip_template_dispatches_gpu_runner_with_selection_and_reload_
     assert 'command+=(--predictive-mc-chunk-size "${PREDICTIVE_MC_CHUNK_SIZE}")' in text
     assert "torch.cuda.is_available()" in text
     assert "run_bnn_roundtrip_check.py" in text
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "expected_target"),
+    [
+        ("scripts/platforms/vega/run_dnn_rebaseline_matrix.py", "scripts/platforms/karolina/run_dnn_rebaseline_matrix.py"),
+        ("scripts/platforms/vega/run_bnn_sweep_matrix.py", "scripts/platforms/karolina/run_bnn_sweep_matrix.py"),
+        ("scripts/platforms/vega/run_bnn_roundtrip_check.py", "scripts/platforms/karolina/run_bnn_roundtrip_check.py"),
+    ],
+)
+def test_vega_python_wrappers_dispatch_to_karolina(monkeypatch, relative_path: str, expected_target: str) -> None:
+    module = _load_module(Path(relative_path), f"dispatch_{Path(relative_path).stem}_test")
+    captured: list[list[str]] = []
+    expected_abs_target = str((Path(relative_path).resolve().parent.parent / "karolina" / Path(expected_target).name).resolve())
+
+    def fake_call(command):  # noqa: ANN001
+        captured.append(list(command))
+        return 0
+
+    monkeypatch.setattr(module.subprocess, "call", fake_call)
+    rc = module.main(["--flag", "value"])
+    assert rc == 0
+    assert captured == [[sys.executable, expected_abs_target, "--flag", "value"]]
