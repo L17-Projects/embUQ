@@ -22,7 +22,6 @@ from meso_uq.workflow_acceleration import (
 
 _CONFIG_CACHE: Dict[str, Dict[str, Any]] = {}
 _SURROGATE_CACHE: Dict[Tuple[str, float, str, str], Any] = {}
-_SURROGATE_PATH_ADDED = False
 _DUMP_FLAG: bool | None = None
 
 
@@ -83,19 +82,15 @@ def _resolve_surrogate_runtime(config: Dict[str, Any]) -> Tuple[str, int, int]:
 def _build_surrogate(
     project_root: str, diameter_um: float, device: str = "cpu", backend: str = "dnn"
 ) -> Any:
-    global _SURROGATE_PATH_ADDED
-    if not _SURROGATE_PATH_ADDED:
-        sys.path.insert(0, os.path.join(project_root, "indentation", "surrogate"))
-        _SURROGATE_PATH_ADDED = True
     surrogate_path = os.path.join(
         project_root, f"indentation/surrogate/diameters/{diameter_um}um/trained"
     )
     if backend == "dnn":
-        from evaluate import Surrogate
+        from indentation.surrogate.evaluate import Surrogate
 
         return Surrogate(surrogate_path, device=device)
     if backend == "bnn":
-        from evaluate_bnn import Surrogate
+        from indentation.surrogate.evaluate_bnn import Surrogate
 
         return Surrogate(surrogate_path, device=device)
     raise ValueError(f"Unsupported surrogate backend '{backend}'.")
