@@ -21,32 +21,36 @@ def _write_certification_inputs(
     certification_root: Path,
     *,
     certified: bool = True,
+    candidates: list[dict[str, object]] | None = None,
+    per_dataset_rows: list[dict[str, object]] | None = None,
 ) -> tuple[Path, Path]:
     certification_root.mkdir(parents=True, exist_ok=True)
     source = certification_root / "candidate.pt"
     target = certification_root / "trained" / "tracked.pt"
     source.write_text("artifact", encoding="utf-8")
 
-    candidates = [
-        {
-            "dataset_name": "compression_2.1um",
-            "candidate_seed": 101,
-            "candidate_artifact_path": str(source),
-            "tracked_bnn_artifact_path": str(target),
-        }
-    ]
+    if candidates is None:
+        candidates = [
+            {
+                "dataset_name": "compression_2.1um",
+                "candidate_seed": 101,
+                "candidate_artifact_path": str(source),
+                "tracked_bnn_artifact_path": str(target),
+            }
+        ]
     (certification_root / "promotion_candidates.json").write_text(
         json.dumps(candidates, indent=2),
         encoding="utf-8",
     )
-    pd.DataFrame(
-        [
+    rows = per_dataset_rows
+    if rows is None:
+        rows = [
             {
                 "dataset_name": "compression_2.1um",
                 "certified": certified,
             }
         ]
-    ).to_csv(certification_root / "certification_per_dataset.csv", index=False)
+    pd.DataFrame(rows).to_csv(certification_root / "certification_per_dataset.csv", index=False)
     return source, target
 
 
@@ -88,6 +92,66 @@ def test_promote_certified_bnn_rejects_uncertified_datasets(tmp_path: Path) -> N
 
     with pytest.raises(SystemExit, match="uncertified datasets remain"):
         module.main(["--certification-root", str(certification_root)])
+
+
+def test_promote_certified_bnn_requires_explicit_certified_row(tmp_path: Path) -> None:
+    module = _load_module(
+        Path("scripts/platforms/karolina/promote_certified_bnn.py"),
+        "promote_certified_bnn_missing_row_test",
+    )
+    certification_root = tmp_path / "cert"
+    _write_certification_inputs(
+        certification_root,
+        per_dataset_rows=[{"dataset_name": "compression_3.2um", "certified": True}],
+    )
+
+    with pytest.raises(SystemExit, match="lacks explicit certified row"):
+        module.main(["--certification-root", str(certification_root)])
+
+
+def test_promote_certified_bnn_prevalidates_all_sources_before_copy(tmp_path: Path) -> None:
+    module = _load_module(
+        Path("scripts/platforms/karolina/promote_certified_bnn.py"),
+        "promote_certified_bnn_prevalidate_test",
+    )
+    certification_root = tmp_path / "cert"
+    first_source = certification_root / "candidate_a.pt"
+    first_target = certification_root / "trained" / "tracked_a.pt"
+    missing_source = certification_root / "candidate_b.pt"
+    second_target = certification_root / "trained" / "tracked_b.pt"
+    certification_root.mkdir(parents=True, exist_ok=True)
+    first_source.write_text("artifact-a", encoding="utf-8")
+    first_target.parent.mkdir(parents=True, exist_ok=True)
+    first_target.write_text("old-a", encoding="utf-8")
+
+    _write_certification_inputs(
+        certification_root,
+        candidates=[
+            {
+                "dataset_name": "compression_2.1um",
+                "candidate_seed": 101,
+                "candidate_artifact_path": str(first_source),
+                "tracked_bnn_artifact_path": str(first_target),
+            },
+            {
+                "dataset_name": "compression_3.2um",
+                "candidate_seed": 102,
+                "candidate_artifact_path": str(missing_source),
+                "tracked_bnn_artifact_path": str(second_target),
+            },
+        ],
+        per_dataset_rows=[
+            {"dataset_name": "compression_2.1um", "certified": True},
+            {"dataset_name": "compression_3.2um", "certified": True},
+        ],
+    )
+
+    with pytest.raises(FileNotFoundError, match="does not exist"):
+        module.main(["--certification-root", str(certification_root)])
+
+    assert first_target.read_text(encoding="utf-8") == "old-a"
+    assert not second_target.exists()
+    assert not (certification_root / "promotion_manifest.json").exists()
 
 
 def test_hpc_promote_certified_bnn_wrapper_dispatches_to_selected_site(monkeypatch) -> None:
