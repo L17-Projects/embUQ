@@ -194,6 +194,102 @@ def test_certification_helpers_resolve_and_extract(tmp_path: Path) -> None:
     assert reload_payload["reload_passed"] is True
 
 
+def test_certification_helpers_cover_edge_paths(tmp_path: Path) -> None:
+    module = _load_module(
+        Path("scripts/platforms/karolina/run_bnn_certification_matrix.py"),
+        "run_bnn_certification_matrix_edge_helpers_test",
+    )
+
+    dnn_root = tmp_path / "dnn"
+    bnn_root = tmp_path / "bnn"
+    assert module._discover_seed_values(dnn_root, "spec_a") == set()
+    (dnn_root / "spec_a" / "seed_x").mkdir(parents=True, exist_ok=True)
+    (dnn_root / "spec_a" / "seed_101").mkdir(parents=True, exist_ok=True)
+    (bnn_root / "spec_a" / "seed_202").mkdir(parents=True, exist_ok=True)
+    assert module._resolve_seeds_for_spec(
+        dnn_root=dnn_root,
+        bnn_root=bnn_root,
+        spec_name="spec_a",
+        requested_seeds=[303],
+    ) == [303]
+    with pytest.raises(FileNotFoundError, match="No common seed selections found"):
+        module._resolve_seeds_for_spec(
+            dnn_root=dnn_root,
+            bnn_root=bnn_root,
+            spec_name="spec_a",
+            requested_seeds=[],
+        )
+
+    selection_path = tmp_path / "selection.json"
+    artifact_path = tmp_path / "candidate.pkl"
+    report_path = tmp_path / "report.json"
+    report_path.write_text(json.dumps({"val_rmse_phys": 1.0}), encoding="utf-8")
+    selection_path.write_text(
+        json.dumps(
+            {
+                "best_artifact_path": str(artifact_path),
+                "best_report_path": str(report_path),
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(FileNotFoundError, match="artifact does not exist"):
+        module._selection_artifact_info(family="dnn", selection_path=selection_path)
+    artifact_path.write_text("artifact", encoding="utf-8")
+    report_path.unlink()
+    with pytest.raises(FileNotFoundError, match="report does not exist"):
+        module._selection_artifact_info(family="dnn", selection_path=selection_path)
+
+    output_dir = tmp_path / "holdout"
+    assert not module._holdout_outputs_match_selection(
+        output_dir=output_dir,
+        family="dnn",
+        artifact_path=artifact_path,
+        report_path=tmp_path / "missing_report.json",
+        selection_path=selection_path,
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / module.HOLDOUT_SELECTION_CONTEXT).write_text("not-json", encoding="utf-8")
+    assert not module._holdout_outputs_match_selection(
+        output_dir=output_dir,
+        family="dnn",
+        artifact_path=artifact_path,
+        report_path=tmp_path / "missing_report.json",
+        selection_path=selection_path,
+    )
+
+    indentation_spec = {
+        "name": "indentation_3.2um",
+        "modality": "indentation",
+        "diameter_um": "3.2",
+        "data": str(tmp_path / "samples.dat"),
+        "group_holdout_script": str(tmp_path / "run_group_holdout.py"),
+    }
+    command = module._build_holdout_command(
+        python_bin="python",
+        spec=indentation_spec,
+        family="bnn",
+        artifact_path=tmp_path / "candidate.pt",
+        output_dir=tmp_path / "out",
+        seed=7,
+        val_fraction=0.2,
+        predictive_mc_samples=16,
+        predictive_mc_chunk_size=4,
+        device="cpu",
+        disp_source="diameter",
+        rupture_ratio=3.5,
+    )
+    assert "--disp-source" in command
+    assert "--rupture-ratio" in command
+
+    missing_reload = tmp_path / "missing_reload.json"
+    missing_reload.write_text(json.dumps({"training": {"final_val_rmse": 2.0}}), encoding="utf-8")
+    reload_payload = module._extract_reload_summary(missing_reload)
+    assert reload_payload["reload_passed"] is False
+    empty_candidates = pd.DataFrame(columns=["dataset_name"])
+    assert module._final_candidate_rows(empty_candidates, expected_seed_count=5).empty
+
+
 def test_bnn_certification_matrix_runner_writes_gate_outputs(tmp_path: Path, monkeypatch) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
@@ -271,6 +367,64 @@ def test_bnn_certification_matrix_runner_writes_gate_outputs(tmp_path: Path, mon
 
     promotion_candidates = json.loads((tmp_path / "cert" / "promotion_candidates.json").read_text(encoding="utf-8"))
     assert promotion_candidates[0]["tracked_bnn_artifact_path"].endswith("tracked_force_bnn.pt")
+
+
+def test_bnn_certification_matrix_runner_rejects_unknown_only_selector(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_certification_matrix.py",
+        "run_bnn_certification_matrix_bad_only_test",
+    )
+    with pytest.raises(ValueError, match="No EMB dataset specs matched --only values"):
+        module.main(
+            [
+                "--dnn-root",
+                str(tmp_path / "dnn_root"),
+                "--bnn-root",
+                str(tmp_path / "bnn_root"),
+                "--output-root",
+                str(tmp_path / "cert"),
+                "--only",
+                "missing_dataset",
+            ]
+        )
+
+
+def test_bnn_certification_matrix_runner_requires_selection_file(tmp_path: Path, monkeypatch) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_certification_matrix.py",
+        "run_bnn_certification_matrix_missing_selection_test",
+    )
+    spec = {
+        "name": "compression_2.1um",
+        "modality": "compression",
+        "diameter_um": "2.1",
+        "data": str(tmp_path / "F_Delta.dat"),
+        "dnn_artifact": str(tmp_path / "tracked_force_bnn.pt"),
+        "bnn_artifact": str(tmp_path / "tracked_force_bnn.pt"),
+        "dnn_train_script": str(tmp_path / "unused.py"),
+        "dnn_multi_arch_script": str(tmp_path / "unused.py"),
+        "bnn_train_script": str(tmp_path / "unused.py"),
+        "group_holdout_script": str(tmp_path / "run_group_holdout.py"),
+    }
+    monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [spec])
+    (tmp_path / "dnn_root" / spec["name"] / "seed_101").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "bnn_root" / spec["name"] / "seed_101").mkdir(parents=True, exist_ok=True)
+
+    with pytest.raises(FileNotFoundError, match="Missing dnn selection file"):
+        module.main(
+            [
+                "--dnn-root",
+                str(tmp_path / "dnn_root"),
+                "--bnn-root",
+                str(tmp_path / "bnn_root"),
+                "--output-root",
+                str(tmp_path / "cert"),
+                "--seed",
+                "101",
+            ]
+        )
 
 
 def test_bnn_certification_matrix_runner_reruns_only_stale_resumed_outputs(
@@ -393,6 +547,108 @@ def test_bnn_certification_matrix_runner_reruns_only_stale_resumed_outputs(
         report_path=bnn_report,
         selection_path=bnn_seed_dir / "selection.json",
     )
+
+
+def test_bnn_certification_matrix_runner_detects_missing_outputs_and_context_mismatch(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_certification_matrix.py",
+        "run_bnn_certification_matrix_output_guard_test",
+    )
+
+    spec = {
+        "name": "compression_2.1um",
+        "modality": "compression",
+        "diameter_um": "2.1",
+        "data": str(tmp_path / "F_Delta.dat"),
+        "dnn_artifact": str(tmp_path / "tracked_force_bnn.pt"),
+        "bnn_artifact": str(tmp_path / "tracked_force_bnn.pt"),
+        "dnn_train_script": str(tmp_path / "unused.py"),
+        "dnn_multi_arch_script": str(tmp_path / "unused.py"),
+        "bnn_train_script": str(tmp_path / "unused.py"),
+        "group_holdout_script": str(tmp_path / "run_group_holdout.py"),
+    }
+    monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [spec])
+
+    dnn_root = tmp_path / "dnn_root"
+    bnn_root = tmp_path / "bnn_root"
+    dnn_seed_dir = dnn_root / spec["name"] / "seed_101"
+    bnn_seed_dir = bnn_root / spec["name"] / "seed_101"
+    dnn_artifact = tmp_path / "dnn_candidate.pkl"
+    bnn_artifact = tmp_path / "bnn_candidate.pt"
+    dnn_artifact.write_text("artifact", encoding="utf-8")
+    bnn_artifact.write_text("artifact", encoding="utf-8")
+    dnn_report = tmp_path / "reports" / "dnn.json"
+    bnn_report = tmp_path / "reports" / "bnn.json"
+    _write_dnn_report(dnn_report)
+    _write_bnn_report(bnn_report, reload_passed=True)
+    _write_selection(dnn_seed_dir, family="dnn", artifact_path=dnn_artifact, report_path=dnn_report)
+    _write_selection(bnn_seed_dir, family="bnn", artifact_path=bnn_artifact, report_path=bnn_report)
+
+    def fake_run_missing(command, cwd, check):  # noqa: ANN001
+        del command, cwd, check
+
+        class _Done:
+            returncode = 0
+
+        return _Done()
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run_missing)
+    with pytest.raises(FileNotFoundError, match="did not produce required outputs"):
+        module.main(
+            [
+                "--dnn-root",
+                str(dnn_root),
+                "--bnn-root",
+                str(bnn_root),
+                "--output-root",
+                str(tmp_path / "cert_missing"),
+                "--expected-seed-count",
+                "1",
+                "--bootstrap-resamples",
+                "50",
+            ]
+        )
+
+    called: list[list[str]] = []
+
+    def fake_run(command, cwd, check):  # noqa: ANN001
+        del cwd, check
+        called.append(list(command))
+        output_dir = Path(_parse_arg(command, "--output-dir"))
+        family = _parse_arg(command, "--surrogate-family")
+        _fake_holdout_outputs(output_dir, family=family)
+
+        class _Done:
+            returncode = 0
+
+        return _Done()
+
+    def fake_write_context(**kwargs):  # noqa: ANN001
+        output_dir = kwargs["output_dir"]
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / module.HOLDOUT_SELECTION_CONTEXT).write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    monkeypatch.setattr(module, "_write_holdout_selection_context", fake_write_context)
+    with pytest.raises(RuntimeError, match="do not match the current selection context"):
+        module.main(
+            [
+                "--dnn-root",
+                str(dnn_root),
+                "--bnn-root",
+                str(bnn_root),
+                "--output-root",
+                str(tmp_path / "cert_mismatch"),
+                "--expected-seed-count",
+                "1",
+                "--bootstrap-resamples",
+                "50",
+            ]
+        )
+    assert len(called) == 1
 
 
 def test_bnn_certification_matrix_runner_fails_gate_when_reload_fails(tmp_path: Path, monkeypatch) -> None:

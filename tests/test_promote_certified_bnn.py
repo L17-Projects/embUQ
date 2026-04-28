@@ -211,6 +211,66 @@ def test_promote_certified_bnn_rolls_back_if_late_replace_fails(tmp_path: Path, 
     assert not (certification_root / "promotion_manifest.json").exists()
 
 
+def test_promote_certified_bnn_helper_error_paths(tmp_path: Path, monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/platforms/karolina/promote_certified_bnn.py"),
+        "promote_certified_bnn_helper_error_test",
+    )
+
+    certification_root = tmp_path / "cert"
+    certification_root.mkdir(parents=True, exist_ok=True)
+
+    with pytest.raises(FileNotFoundError, match="Missing promotion candidates file"):
+        module._read_candidates(certification_root)
+
+    (certification_root / "promotion_candidates.json").write_text(json.dumps({"bad": True}), encoding="utf-8")
+    with pytest.raises(TypeError, match="JSON list"):
+        module._read_candidates(certification_root)
+
+    with pytest.raises(FileNotFoundError, match="Missing certification per-dataset file"):
+        module._read_per_dataset(tmp_path / "other")
+
+    with pytest.raises(ValueError, match="Unsupported certified value"):
+        module._coerce_certified("maybe")
+    with pytest.raises(ValueError, match="must define dataset_name"):
+        module._certification_index([{"dataset_name": "", "certified": True}])
+    with pytest.raises(ValueError, match="Duplicate certification rows"):
+        module._certification_index(
+            [
+                {"dataset_name": "compression_2.1um", "certified": True},
+                {"dataset_name": "compression_2.1um", "certified": True},
+            ]
+        )
+    with pytest.raises(SystemExit, match="dataset is not certified"):
+        module._validated_promotion_rows(
+            [
+                {
+                    "dataset_name": "compression_2.1um",
+                    "candidate_seed": 101,
+                    "candidate_artifact_path": str(certification_root / "missing.pt"),
+                    "tracked_bnn_artifact_path": str(certification_root / "tracked.pt"),
+                }
+            ],
+            [{"dataset_name": "compression_2.1um", "certified": False}],
+            dry_run=False,
+        )
+
+    source = certification_root / "source.pt"
+    target = certification_root / "trained" / "tracked.pt"
+    source.write_text("artifact", encoding="utf-8")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("old", encoding="utf-8")
+
+    def fake_copy2(_source, _target):  # noqa: ANN001
+        raise OSError("copy failed")
+
+    monkeypatch.setattr(module.shutil, "copy2", fake_copy2)
+    with pytest.raises(OSError, match="copy failed"):
+        module._stage_copy(source, target)
+    with pytest.raises(OSError, match="copy failed"):
+        module._stage_backup(target)
+
+
 def test_hpc_promote_certified_bnn_wrapper_dispatches_to_selected_site(monkeypatch) -> None:
     module = _load_module(
         Path("scripts/platforms/hpc/promote_certified_bnn.py"),
