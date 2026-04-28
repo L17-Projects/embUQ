@@ -71,7 +71,7 @@ def _resolve_seeds_for_spec(
     requested_seeds: list[int],
 ) -> list[int]:
     if requested_seeds:
-        return [int(seed) for seed in requested_seeds]
+        return list(dict.fromkeys(int(seed) for seed in requested_seeds))
     common = sorted(_discover_seed_values(dnn_root, spec_name) & _discover_seed_values(bnn_root, spec_name))
     if not common:
         raise FileNotFoundError(

@@ -210,8 +210,8 @@ def test_certification_helpers_cover_edge_paths(tmp_path: Path) -> None:
         dnn_root=dnn_root,
         bnn_root=bnn_root,
         spec_name="spec_a",
-        requested_seeds=[303],
-    ) == [303]
+        requested_seeds=[303, 303, 404],
+    ) == [303, 404]
     with pytest.raises(FileNotFoundError, match="No common seed selections found"):
         module._resolve_seeds_for_spec(
             dnn_root=dnn_root,
