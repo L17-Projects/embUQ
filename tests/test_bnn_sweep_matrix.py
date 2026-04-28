@@ -76,7 +76,9 @@ def _make_spec(tmp_path: Path, name: str) -> dict[str, str]:
     }
 
 
-def test_bnn_sweep_runner_selects_best_stage2_candidate(tmp_path: Path, monkeypatch) -> None:
+def test_bnn_sweep_runner_selects_top_architecture_from_full_stage1_grid(
+    tmp_path: Path, monkeypatch
+) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
         repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
@@ -94,16 +96,17 @@ def test_bnn_sweep_runner_selects_best_stage2_candidate(tmp_path: Path, monkeypa
         report_path = Path(_parse_arg(command, "--report-path"))
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text("artifact", encoding="utf-8")
-        prior_scale = float(_parse_arg(command, "--prior-scale"))
         metric = 0.5
-        if "stage1__w32_d2" in out_path.stem:
+        if "stage1__w32_d2__prior0.5" in out_path.stem:
             metric = 0.20
-        elif "stage1__w64_d2" in out_path.stem:
+        elif "stage1__w32_d2__prior1" in out_path.stem:
+            metric = 0.40
+        elif "stage1__w64_d2__prior0.5" in out_path.stem:
+            metric = 0.35
+        elif "stage1__w64_d2__prior1" in out_path.stem:
             metric = 0.30
-        elif prior_scale == 0.5:
+        elif "stage2__w32_d2" in out_path.stem:
             metric = 0.11
-        elif prior_scale == 1.0:
-            metric = 0.15
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(
             json.dumps({"training": {"best_val_rmse": metric, "final_val_rmse": metric + 0.01}}),
@@ -125,10 +128,16 @@ def test_bnn_sweep_runner_selects_best_stage2_candidate(tmp_path: Path, monkeypa
             "101",
             "--architectures",
             "w32_d2,w64_d2",
+            "--stage1-prior-scales",
+            "0.5,1.0",
+            "--stage1-obs-noise-prior-scales",
+            "1.0",
+            "--stage1-lrs",
+            "0.001",
             "--top-k",
             "1",
             "--prior-scales",
-            "0.5,1.0",
+            "0.5",
             "--obs-noise-prior-scales",
             "0.1",
             "--lrs",
@@ -140,11 +149,20 @@ def test_bnn_sweep_runner_selects_best_stage2_candidate(tmp_path: Path, monkeypa
     payload = json.loads(selection_path.read_text(encoding="utf-8"))
     assert payload["top_architectures"] == ["w32_d2"]
     assert payload["best_candidate_metric"] == pytest.approx(0.11)
-    assert "prior0.5" in payload["best_candidate_report_path"]
-    assert called
+    stage1_stems = {Path(_parse_arg(command, "--out")).stem for command in called if "stage1__" in " ".join(command)}
+    assert stage1_stems == {
+        "stage1__w32_d2__prior0.5__obs1__lr0.001",
+        "stage1__w32_d2__prior1__obs1__lr0.001",
+        "stage1__w64_d2__prior0.5__obs1__lr0.001",
+        "stage1__w64_d2__prior1__obs1__lr0.001",
+    }
+    stage2_stems = [Path(_parse_arg(command, "--out")).stem for command in called if "stage2__" in " ".join(command)]
+    assert stage2_stems == ["stage2__w32_d2__prior0.5__obs0.1__lr0.001"]
 
 
-def test_bnn_sweep_runner_resume_skips_completed(tmp_path: Path, monkeypatch) -> None:
+def test_bnn_sweep_runner_resume_skips_completed_stage1_grid_candidate(
+    tmp_path: Path, monkeypatch
+) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
         repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
@@ -154,12 +172,15 @@ def test_bnn_sweep_runner_resume_skips_completed(tmp_path: Path, monkeypatch) ->
     monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [spec])
 
     seed_root = tmp_path / "out" / "spec_a" / "seed_20260317"
-    artifact_path, report_path = module._candidate_paths(seed_root, "stage1__w32_d2__prior1__obs1__lr0.001")
+    artifact_path, report_path = module._candidate_paths(
+        seed_root,
+        "stage1__w32_d2__prior0.5__obs1__lr0.001",
+    )
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     artifact_path.write_text("artifact", encoding="utf-8")
     report_path.write_text(
-        json.dumps({"training": {"best_val_rmse": 0.2, "final_val_rmse": 0.21}}),
+        json.dumps({"training": {"best_val_rmse": 0.15, "final_val_rmse": 0.16}}),
         encoding="utf-8",
     )
 
@@ -172,9 +193,18 @@ def test_bnn_sweep_runner_resume_skips_completed(tmp_path: Path, monkeypatch) ->
         candidate_report = Path(_parse_arg(command, "--report-path"))
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text("artifact", encoding="utf-8")
+        metric = 0.4
+        if "stage1__w32_d2__prior1" in out_path.stem:
+            metric = 0.25
+        elif "stage1__w64_d2__prior0.5" in out_path.stem:
+            metric = 0.30
+        elif "stage1__w64_d2__prior1" in out_path.stem:
+            metric = 0.35
+        elif "stage2__w32_d2" in out_path.stem:
+            metric = 0.10
         candidate_report.parent.mkdir(parents=True, exist_ok=True)
         candidate_report.write_text(
-            json.dumps({"training": {"best_val_rmse": 0.25, "final_val_rmse": 0.26}}),
+            json.dumps({"training": {"best_val_rmse": metric, "final_val_rmse": metric + 0.01}}),
             encoding="utf-8",
         )
 
@@ -193,19 +223,34 @@ def test_bnn_sweep_runner_resume_skips_completed(tmp_path: Path, monkeypatch) ->
             "20260317",
             "--architectures",
             "w32_d2,w64_d2",
+            "--stage1-prior-scales",
+            "0.5,1.0",
+            "--stage1-obs-noise-prior-scales",
+            "1.0",
+            "--stage1-lrs",
+            "0.001",
             "--top-k",
             "1",
             "--prior-scales",
-            "1.0",
+            "0.5",
             "--obs-noise-prior-scales",
-            "1.0",
+            "0.1",
             "--lrs",
             "0.001",
         ]
     )
     assert rc == 0
-    assert called
-    assert all("w32_d2" not in " ".join(command) or "stage2" in " ".join(command) for command in called)
+    stage1_stems = {Path(_parse_arg(command, "--out")).stem for command in called if "stage1__" in " ".join(command)}
+    assert stage1_stems == {
+        "stage1__w32_d2__prior1__obs1__lr0.001",
+        "stage1__w64_d2__prior0.5__obs1__lr0.001",
+        "stage1__w64_d2__prior1__obs1__lr0.001",
+    }
+    assert "stage1__w32_d2__prior0.5__obs1__lr0.001" not in stage1_stems
+    selection_path = tmp_path / "out" / "spec_a" / "seed_20260317" / "selection.json"
+    payload = json.loads(selection_path.read_text(encoding="utf-8"))
+    assert payload["top_architectures"] == ["w32_d2"]
+    assert payload["best_candidate_metric"] == pytest.approx(0.10)
 
 
 def test_bnn_sweep_runner_import_does_not_require_torch() -> None:
@@ -213,7 +258,7 @@ def test_bnn_sweep_runner_import_does_not_require_torch() -> None:
     _assert_runner_import_without_torch(repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py")
 
 
-def test_bnn_sweep_runner_parsers_and_resume_helpers(tmp_path: Path) -> None:
+def test_bnn_sweep_runner_stage1_grid_parsing_defaults_and_resume_helpers(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
         repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
@@ -226,7 +271,46 @@ def test_bnn_sweep_runner_parsers_and_resume_helpers(tmp_path: Path) -> None:
         module._parse_architecture_names("unknown_arch")
     with pytest.raises(ValueError, match="Float grid must be non-empty"):
         module._parse_float_list(" , ")
+    assert module._resolve_stage1_grid(
+        grid_text=None,
+        scalar_value=None,
+        default_text="1.0",
+        option_name="--stage1-prior-scales",
+        legacy_option_name="--stage1-prior-scale",
+    ) == [1.0]
+    assert module._resolve_stage1_grid(
+        grid_text="0.5, 1.0",
+        scalar_value=None,
+        default_text="1.0",
+        option_name="--stage1-prior-scales",
+        legacy_option_name="--stage1-prior-scale",
+    ) == [0.5, 1.0]
+    assert module._resolve_stage1_grid(
+        grid_text=None,
+        scalar_value=0.25,
+        default_text="1.0",
+        option_name="--stage1-prior-scales",
+        legacy_option_name="--stage1-prior-scale",
+    ) == [0.25]
+    with pytest.raises(ValueError, match="Use either --stage1-prior-scales or --stage1-prior-scale"):
+        module._resolve_stage1_grid(
+            grid_text="0.5,1.0",
+            scalar_value=1.0,
+            default_text="1.0",
+            option_name="--stage1-prior-scales",
+            legacy_option_name="--stage1-prior-scale",
+        )
     assert module._resolve_seeds([]) == list(module.DEFAULT_SEEDS)
+    assert module._iter_hyperparameter_grid(
+        prior_scales=[0.5, 1.0],
+        obs_noise_prior_scales=[0.1],
+        lrs=[1e-3, 2e-3],
+    ) == [
+        (0.5, 0.1, 1e-3),
+        (0.5, 0.1, 2e-3),
+        (1.0, 0.1, 1e-3),
+        (1.0, 0.1, 2e-3),
+    ]
 
     seed_root = tmp_path / "seed"
     artifact_path, report_path = module._candidate_paths(seed_root, "stage1__w32_d2__prior1__obs1__lr0.001")
