@@ -213,6 +213,73 @@ def test_bnn_sweep_runner_import_does_not_require_torch() -> None:
     _assert_runner_import_without_torch(repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py")
 
 
+def test_bnn_sweep_runner_parsers_and_resume_helpers(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        "run_bnn_sweep_matrix_parse_test",
+    )
+
+    with pytest.raises(ValueError, match="non-empty"):
+        module._parse_architecture_names(" , ")
+    with pytest.raises(ValueError, match="Unknown BNN architecture"):
+        module._parse_architecture_names("unknown_arch")
+    with pytest.raises(ValueError, match="Float grid must be non-empty"):
+        module._parse_float_list(" , ")
+    assert module._resolve_seeds([]) == list(module.DEFAULT_SEEDS)
+
+    seed_root = tmp_path / "seed"
+    artifact_path, report_path = module._candidate_paths(seed_root, "stage1__w32_d2__prior1__obs1__lr0.001")
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    artifact_path.write_text("artifact", encoding="utf-8")
+    report_path.write_text("{broken json", encoding="utf-8")
+    assert module._candidate_completed(report_path, artifact_path) is False
+
+
+def test_bnn_sweep_runner_rejects_unknown_only_filter(tmp_path: Path, monkeypatch) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        "run_bnn_sweep_matrix_only_filter_test",
+    )
+    monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [_make_spec(tmp_path, "spec_a")])
+
+    with pytest.raises(ValueError, match="No EMB dataset specs matched"):
+        module.main(["--output-root", str(tmp_path / "out"), "--only", "missing"])
+
+
+def test_bnn_sweep_runner_build_command_honors_require_parity_flag(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        "run_bnn_sweep_matrix_build_command_test",
+    )
+    spec = _make_spec(tmp_path, "spec_a")
+    command, _artifact_path, _report_path = module._build_command(
+        python_bin="python3",
+        spec=spec,
+        seed_root=tmp_path / "seed",
+        stage="stage1",
+        arch_name="w32_d2",
+        width=32,
+        depth=2,
+        prior_scale=1.0,
+        obs_noise_prior_scale=1.0,
+        batch_size=16,
+        lr=1e-3,
+        max_steps=10,
+        eval_every=1,
+        predictive_mc_samples=4,
+        max_walltime_seconds=60,
+        seed=101,
+        parity_tol=1.2,
+        require_parity=True,
+        device="cpu",
+    )
+    assert "--no-require-parity" not in command
+
+
 def test_hpc_bnn_sweep_wrapper_dispatches_to_selected_site(monkeypatch) -> None:
     module = _load_module(
         Path("scripts/platforms/hpc/run_bnn_sweep_matrix.py"),

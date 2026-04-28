@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from meso_uq import surrogate as surrogate_pkg
 from meso_uq.surrogate import model_selection
 
 
@@ -125,3 +126,18 @@ def test_grid_search_tabular_surrogate_rejects_empty_architecture_override(
             lr=1e-3,
             max_epoch=1,
         )
+
+
+def test_surrogate_package_lazy_exports_and_dir() -> None:
+    exported = surrogate_pkg.__dir__()
+    assert exported == sorted(surrogate_pkg.__all__)
+    assert surrogate_pkg.MLP is not None
+    assert surrogate_pkg.init_weights is not None
+    assert surrogate_pkg.load_model_states is not None
+    assert surrogate_pkg.save_model_states is not None
+    assert surrogate_pkg.train_model is not None
+
+
+def test_surrogate_package_rejects_unknown_attribute() -> None:
+    with pytest.raises(AttributeError, match="does_not_exist"):
+        getattr(surrogate_pkg, "does_not_exist")

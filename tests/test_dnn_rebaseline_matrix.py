@@ -194,6 +194,40 @@ def test_dnn_rebaseline_runner_import_does_not_require_torch() -> None:
     )
 
 
+def test_dnn_rebaseline_runner_rejects_empty_or_unknown_architecture_names(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_dnn_rebaseline_matrix.py",
+        "run_dnn_rebaseline_matrix_parse_test",
+    )
+
+    with pytest.raises(ValueError, match="non-empty"):
+        module._parse_architecture_names(" , ")
+    with pytest.raises(ValueError, match="Unknown DNN architecture"):
+        module._parse_architecture_names("unknown_arch")
+    assert module._resolve_seeds([]) == list(module.DEFAULT_SEEDS)
+
+    seed_root = tmp_path / "seed"
+    artifact_path, report_path = module._candidate_paths(seed_root, "w32_d2")
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    artifact_path.write_text("artifact", encoding="utf-8")
+    report_path.write_text("{broken json", encoding="utf-8")
+    assert module._candidate_completed(report_path, artifact_path) is False
+
+
+def test_dnn_rebaseline_runner_rejects_unknown_only_filter(tmp_path: Path, monkeypatch) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_dnn_rebaseline_matrix.py",
+        "run_dnn_rebaseline_matrix_only_filter_test",
+    )
+    monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [_make_spec(tmp_path, "spec_a")])
+
+    with pytest.raises(ValueError, match="No EMB dataset specs matched"):
+        module.main(["--output-root", str(tmp_path / "out"), "--only", "missing"])
+
+
 def test_hpc_dnn_rebaseline_wrapper_dispatches_to_selected_site(monkeypatch) -> None:
     module = _load_module(
         Path("scripts/platforms/hpc/run_dnn_rebaseline_matrix.py"),
