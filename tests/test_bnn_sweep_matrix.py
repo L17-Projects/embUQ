@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -19,6 +21,39 @@ def _load_module(path: Path, name: str):
 def _parse_arg(command: list[str], flag: str) -> str:
     idx = command.index(flag)
     return command[idx + 1]
+
+
+def _assert_runner_import_without_torch(path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    env = os.environ.copy()
+    env["PYTHONPATH"] = f"{repo_root / 'src'}:{repo_root}{':' + env['PYTHONPATH'] if env.get('PYTHONPATH') else ''}"
+    script = f"""
+import builtins
+import importlib.util
+
+real_import = builtins.__import__
+
+def blocked_import(name, globals=None, locals=None, fromlist=(), level=0):
+    if name.split('.', 1)[0] == 'torch':
+        raise ModuleNotFoundError('blocked torch import')
+    return real_import(name, globals, locals, fromlist, level)
+
+builtins.__import__ = blocked_import
+spec = importlib.util.spec_from_file_location('runner_import_test', {str(path)!r})
+module = importlib.util.module_from_spec(spec)
+assert spec and spec.loader
+spec.loader.exec_module(module)
+print('ok')
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=str(repo_root),
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def _make_spec(tmp_path: Path, name: str) -> dict[str, str]:
@@ -171,6 +206,11 @@ def test_bnn_sweep_runner_resume_skips_completed(tmp_path: Path, monkeypatch) ->
     assert rc == 0
     assert called
     assert all("w32_d2" not in " ".join(command) or "stage2" in " ".join(command) for command in called)
+
+
+def test_bnn_sweep_runner_import_does_not_require_torch() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    _assert_runner_import_without_torch(repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py")
 
 
 def test_hpc_bnn_sweep_wrapper_dispatches_to_selected_site(monkeypatch) -> None:
