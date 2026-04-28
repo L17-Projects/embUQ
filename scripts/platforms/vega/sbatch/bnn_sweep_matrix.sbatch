@@ -6,8 +6,8 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
-#SBATCH --output=%x-%j.out
-#SBATCH --error=%x-%j.err
+#SBATCH --output=/dev/null
+#SBATCH --error=/dev/null
 
 set -euo pipefail
 
@@ -23,9 +23,14 @@ OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/${SITE}/bnn_sweep/${RUN_TAG}}"
 LOG_ROOT="${LOG_ROOT:-${OUTPUT_ROOT}/logs}"
 VENV_DIR="${VENV_DIR:-${REPO_ROOT}/_vega/venv}"
 PYTHON_BIN="${PYTHON_BIN:-${VENV_DIR}/bin/python}"
+DNN_ROOT="${DNN_ROOT:-}"
 SELECTIONS="${SELECTIONS:-${ONLY:-}}"
 SEEDS="${SEEDS:-${SEED:-}}"
 ARCHITECTURES="${ARCHITECTURES:-}"
+ARCHITECTURE_SOURCE="${ARCHITECTURE_SOURCE:-explicit}"
+STAGE1_PRIOR_SCALES="${STAGE1_PRIOR_SCALES:-}"
+STAGE1_OBS_NOISE_PRIOR_SCALES="${STAGE1_OBS_NOISE_PRIOR_SCALES:-}"
+STAGE1_LRS="${STAGE1_LRS:-}"
 STAGE1_PRIOR_SCALE="${STAGE1_PRIOR_SCALE:-}"
 STAGE1_OBS_NOISE_PRIOR_SCALE="${STAGE1_OBS_NOISE_PRIOR_SCALE:-}"
 STAGE1_LR="${STAGE1_LR:-}"
@@ -107,6 +112,7 @@ command=(
   --output-root "${OUTPUT_ROOT}"
   --run-tag "${RUN_TAG}"
   --python-bin "${PYTHON_BIN}"
+  --architecture-source "${ARCHITECTURE_SOURCE}"
   --device "${DEVICE}"
   "${resume_arg[@]}"
   "${require_parity_arg[@]}"
@@ -114,8 +120,20 @@ command=(
   "${seed_args[@]}"
 )
 
+if [[ -n "${DNN_ROOT}" ]]; then
+  command+=(--dnn-root "${DNN_ROOT}")
+fi
 if [[ -n "${ARCHITECTURES}" ]]; then
   command+=(--architectures "${ARCHITECTURES}")
+fi
+if [[ -n "${STAGE1_PRIOR_SCALES}" ]]; then
+  command+=(--stage1-prior-scales "${STAGE1_PRIOR_SCALES}")
+fi
+if [[ -n "${STAGE1_OBS_NOISE_PRIOR_SCALES}" ]]; then
+  command+=(--stage1-obs-noise-prior-scales "${STAGE1_OBS_NOISE_PRIOR_SCALES}")
+fi
+if [[ -n "${STAGE1_LRS}" ]]; then
+  command+=(--stage1-lrs "${STAGE1_LRS}")
 fi
 if [[ -n "${STAGE1_PRIOR_SCALE}" ]]; then
   command+=(--stage1-prior-scale "${STAGE1_PRIOR_SCALE}")

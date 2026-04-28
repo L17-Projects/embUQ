@@ -9,11 +9,14 @@ import pytest
 
 SBATCH_DIR = Path(__file__).resolve().parents[1] / "scripts" / "platforms" / "vega" / "sbatch"
 
-TEMPLATES = (
+MATRIX_TEMPLATES = (
     "dnn_rebaseline_matrix.sbatch",
     "bnn_sweep_matrix.sbatch",
     "bnn_roundtrip_check.sbatch",
+    "bnn_certification_matrix.sbatch",
 )
+
+ALL_TEMPLATES = MATRIX_TEMPLATES + ("promote_certified_bnn.sbatch",)
 
 
 def _read(name: str) -> str:
@@ -28,12 +31,12 @@ def _load_module(path: Path, name: str):
     return module
 
 
-@pytest.mark.parametrize("template", TEMPLATES)
+@pytest.mark.parametrize("template", ALL_TEMPLATES)
 def test_matrix_template_exists(template: str) -> None:
     assert (SBATCH_DIR / template).exists(), f"Missing template: {template}"
 
 
-@pytest.mark.parametrize("template", TEMPLATES)
+@pytest.mark.parametrize("template", ALL_TEMPLATES)
 def test_matrix_templates_use_login_shell_repo_venv_and_repo_pythonpath(template: str) -> None:
     text = _read(template)
     assert text.startswith("#!/bin/bash -l\n")
@@ -43,7 +46,28 @@ def test_matrix_templates_use_login_shell_repo_venv_and_repo_pythonpath(template
     assert 'source "${REPO_ROOT}/_vega/korali/env.sh"' in text
 
 
-@pytest.mark.parametrize("template", TEMPLATES)
+@pytest.mark.parametrize("template", ("bnn_sweep_matrix.sbatch", "bnn_certification_matrix.sbatch"))
+def test_gpu_templates_redirect_scheduler_logs_into_output_root(template: str) -> None:
+    text = _read(template)
+    assert "#SBATCH --output=/dev/null" in text
+    assert "#SBATCH --error=/dev/null" in text
+    assert 'LOG_ROOT="${LOG_ROOT:-${OUTPUT_ROOT}/logs}"' in text
+    assert 'mkdir -p "${OUTPUT_ROOT}" "${LOG_ROOT}"' in text
+    assert 'exec > >(tee -a "${LOG_ROOT}/slurm-${JOB_TOKEN}.out")' in text
+    assert '2> >(tee -a "${LOG_ROOT}/slurm-${JOB_TOKEN}.err" >&2)' in text
+
+
+def test_promote_template_redirects_scheduler_logs_into_certification_root() -> None:
+    text = _read("promote_certified_bnn.sbatch")
+    assert "#SBATCH --output=/dev/null" in text
+    assert "#SBATCH --error=/dev/null" in text
+    assert 'LOG_ROOT="${LOG_ROOT:-${CERTIFICATION_ROOT}/logs}"' in text
+    assert 'mkdir -p "${LOG_ROOT}"' in text
+    assert 'exec > >(tee -a "${LOG_ROOT}/slurm-${JOB_TOKEN}.out")' in text
+    assert '2> >(tee -a "${LOG_ROOT}/slurm-${JOB_TOKEN}.err" >&2)' in text
+
+
+@pytest.mark.parametrize("template", ("dnn_rebaseline_matrix.sbatch", "bnn_roundtrip_check.sbatch"))
 def test_matrix_templates_keep_scheduler_logs_visible_and_mirror_logs_into_output_root(template: str) -> None:
     text = _read(template)
     assert "#SBATCH --output=%x-%j.out" in text
@@ -77,17 +101,50 @@ def test_bnn_sweep_template_dispatches_gpu_runner_without_openmpi() -> None:
     assert "CUDA/12.2.2" in text
     assert "openmpi" not in text
     assert 'OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/${SITE}/bnn_sweep/${RUN_TAG}}"' in text
+    assert 'DNN_ROOT="${DNN_ROOT:-}"' in text
     assert 'SELECTIONS="${SELECTIONS:-${ONLY:-}}"' in text
     assert 'SEEDS="${SEEDS:-${SEED:-}}"' in text
+    assert 'ARCHITECTURE_SOURCE="${ARCHITECTURE_SOURCE:-explicit}"' in text
+    assert 'STAGE1_PRIOR_SCALES="${STAGE1_PRIOR_SCALES:-}"' in text
+    assert 'STAGE1_OBS_NOISE_PRIOR_SCALES="${STAGE1_OBS_NOISE_PRIOR_SCALES:-}"' in text
+    assert 'STAGE1_LRS="${STAGE1_LRS:-}"' in text
     assert 'DEVICE="${DEVICE:-cuda}"' in text
     assert 'REQUIRE_PARITY="${REQUIRE_PARITY:-false}"' in text
     assert 'selection_args+=(--only "${selection}")' in text
     assert 'seed_args+=(--seed "${seed}")' in text
+    assert '--architecture-source "${ARCHITECTURE_SOURCE}"' in text
+    assert '--dnn-root "${DNN_ROOT}"' in text
+    assert "--stage1-prior-scales" in text
+    assert "--stage1-obs-noise-prior-scales" in text
+    assert "--stage1-lrs" in text
     assert "--require-parity" in text
     assert "--no-require-parity" in text
     assert "--max-walltime-seconds" in text
     assert "torch.cuda.is_available()" in text
     assert "run_bnn_sweep_matrix.py" in text
+
+
+def test_bnn_certification_template_dispatches_gpu_runner_with_seeded_roots() -> None:
+    text = _read("bnn_certification_matrix.sbatch")
+    assert "#SBATCH --partition=gpu" in text
+    assert "#SBATCH --gres=gpu:1" in text
+    assert "CUDA/12.2.2" in text
+    assert "openmpi" not in text
+    assert 'DNN_ROOT="${DNN_ROOT:-}"' in text
+    assert 'BNN_ROOT="${BNN_ROOT:-}"' in text
+    assert 'OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/${SITE}/bnn_certification/${RUN_TAG}}"' in text
+    assert 'SELECTIONS="${SELECTIONS:-${ONLY:-}}"' in text
+    assert 'SEEDS="${SEEDS:-${SEED:-}}"' in text
+    assert 'DEVICE="${DEVICE:-cuda}"' in text
+    assert 'selection_args+=(--only "${selection}")' in text
+    assert 'seed_args+=(--seed "${seed}")' in text
+    assert "--predictive-mc-chunk-size" in text
+    assert "--bootstrap-resamples" in text
+    assert "--acceptance-upper-bound" in text
+    assert "--resume" in text
+    assert "--no-resume" in text
+    assert "torch.cuda.is_available()" in text
+    assert "run_bnn_certification_matrix.py" in text
 
 
 def test_bnn_roundtrip_template_dispatches_gpu_runner_with_selection_and_reload_knobs() -> None:
@@ -105,12 +162,26 @@ def test_bnn_roundtrip_template_dispatches_gpu_runner_with_selection_and_reload_
     assert "run_bnn_roundtrip_check.py" in text
 
 
+def test_promote_template_dispatches_cpu_runner_with_certification_root_and_dry_run() -> None:
+    text = _read("promote_certified_bnn.sbatch")
+    assert "#SBATCH --partition=cpu" in text
+    assert "CUDA/12.2.2" not in text
+    assert "openmpi" not in text
+    assert 'CERTIFICATION_ROOT="${CERTIFICATION_ROOT:-}"' in text
+    assert 'DRY_RUN="${DRY_RUN:-false}"' in text
+    assert 'command+=(--manifest-path "${MANIFEST_PATH}")' in text
+    assert 'command+=(--dry-run)' in text
+    assert "promote_certified_bnn.py" in text
+
+
 @pytest.mark.parametrize(
     ("relative_path", "expected_target"),
     [
         ("scripts/platforms/vega/run_dnn_rebaseline_matrix.py", "scripts/platforms/karolina/run_dnn_rebaseline_matrix.py"),
         ("scripts/platforms/vega/run_bnn_sweep_matrix.py", "scripts/platforms/karolina/run_bnn_sweep_matrix.py"),
+        ("scripts/platforms/vega/run_bnn_certification_matrix.py", "scripts/platforms/karolina/run_bnn_certification_matrix.py"),
         ("scripts/platforms/vega/run_bnn_roundtrip_check.py", "scripts/platforms/karolina/run_bnn_roundtrip_check.py"),
+        ("scripts/platforms/vega/promote_certified_bnn.py", "scripts/platforms/karolina/promote_certified_bnn.py"),
     ],
 )
 def test_vega_python_wrappers_dispatch_to_karolina(monkeypatch, relative_path: str, expected_target: str) -> None:
