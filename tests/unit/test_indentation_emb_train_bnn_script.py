@@ -131,3 +131,21 @@ def test_indentation_emb_train_bnn_accepts_loader_knobs(
     )
     assert captured["disp_source"] == "displacement"
     assert captured["rupture_ratio_threshold"] is None
+
+
+def test_indentation_emb_train_bnn_passes_max_epochs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    module = _load_module(
+        repo_root / "indentation" / "surrogate" / "scripts" / "emb_train_bnn.py",
+        "indentation_emb_train_bnn_max_epochs_test",
+    )
+    captured = _run_script_with_args(
+        module,
+        monkeypatch,
+        tmp_path,
+        "--max-epochs",
+        "25",
+    )
+    assert captured["train_kwargs"]["max_epochs"] == 25

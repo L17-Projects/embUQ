@@ -178,6 +178,7 @@ def _build_command(
     batch_size: int,
     lr: float,
     max_steps: int,
+    max_epochs: int | None = None,
     eval_every: int,
     predictive_mc_samples: int,
     max_walltime_seconds: int,
@@ -216,8 +217,6 @@ def _build_command(
         str(batch_size),
         "--lr",
         str(lr),
-        "--max-steps",
-        str(max_steps),
         "--eval-every",
         str(eval_every),
         "--predictive-mc-samples",
@@ -231,6 +230,10 @@ def _build_command(
         "--device",
         str(device),
     ]
+    if max_epochs is None:
+        command.extend(["--max-steps", str(max_steps)])
+    else:
+        command.extend(["--max-epochs", str(int(max_epochs))])
     if not require_parity:
         command.append("--no-require-parity")
     return command, artifact_path, report_path
@@ -373,6 +376,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--lrs", default="5e-4,1e-3")
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--max-steps", type=int, default=2500)
+    parser.add_argument("--max-epochs", type=int, default=None)
     parser.add_argument("--eval-every", type=int, default=25)
     parser.add_argument("--predictive-mc-samples", type=int, default=64)
     parser.add_argument("--max-walltime-seconds", type=int, default=1200)
@@ -468,6 +472,7 @@ def main(argv: list[str] | None = None) -> int:
             "lrs": lrs,
             "batch_size": int(args.batch_size),
             "max_steps": int(args.max_steps),
+            "max_epochs": None if args.max_epochs is None else int(args.max_epochs),
             "eval_every": int(args.eval_every),
             "predictive_mc_samples": int(args.predictive_mc_samples),
             "max_walltime_seconds": int(args.max_walltime_seconds),
@@ -516,6 +521,7 @@ def main(argv: list[str] | None = None) -> int:
                         batch_size=int(args.batch_size),
                         lr=lr,
                         max_steps=int(args.max_steps),
+                        max_epochs=None if args.max_epochs is None else int(args.max_epochs),
                         eval_every=int(args.eval_every),
                         predictive_mc_samples=int(args.predictive_mc_samples),
                         max_walltime_seconds=int(args.max_walltime_seconds),
@@ -576,6 +582,7 @@ def main(argv: list[str] | None = None) -> int:
                         batch_size=int(args.batch_size),
                         lr=lr,
                         max_steps=int(args.max_steps),
+                        max_epochs=None if args.max_epochs is None else int(args.max_epochs),
                         eval_every=int(args.eval_every),
                         predictive_mc_samples=int(args.predictive_mc_samples),
                         max_walltime_seconds=int(args.max_walltime_seconds),
