@@ -19,6 +19,9 @@ fi
 CERTIFICATION_ROOT="${CERTIFICATION_ROOT:-}"
 MANIFEST_PATH="${MANIFEST_PATH:-}"
 DRY_RUN="${DRY_RUN:-false}"
+# Promotion consumes one certification root at a time; keep the selection axis visible for
+# operator parity with other Vega sbatch entrypoints.
+SELECTIONS="${SELECTIONS:-}"
 LOG_ROOT="${LOG_ROOT:-${CERTIFICATION_ROOT}/logs}"
 VENV_DIR="${VENV_DIR:-${REPO_ROOT}/_vega/venv}"
 PYTHON_BIN="${PYTHON_BIN:-${VENV_DIR}/bin/python}"
