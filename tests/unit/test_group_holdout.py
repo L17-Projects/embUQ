@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 import torch
 
+from meso_uq.surrogate.cli import SOURCE_CURVE_COL, read_indentation_table as read_indentation_table_cli
 from meso_uq.surrogate.group_holdout import (
     build_curve_split_manifest,
     build_holdout_outputs,
@@ -163,6 +164,29 @@ def test_build_curve_split_manifest_roundtrip_and_guards() -> None:
         build_curve_split_manifest(df.drop(columns=["curve_id"]), seed=7, val_fraction=0.25)
 
 
+def test_split_curves_prefers_cleaned_source_curve_metadata() -> None:
+    df = pd.DataFrame(
+        {
+            "Yt": [1.0, 1.0, 1.0, 1.0],
+            "kb": [2.0, 2.0, 2.0, 2.0],
+            "b1": [0.1, 0.1, 0.1, 0.1],
+            "b2": [0.2, 0.2, 0.2, 0.2],
+            "a3": [0.3, 0.3, 0.3, 0.3],
+            "a4": [0.4, 0.4, 0.4, 0.4],
+            "F": [0.0, 1.0, 0.0, 1.0],
+            "disp": [0.0, 0.5, 0.0, 0.6],
+            SOURCE_CURVE_COL: [11, 11, 29, 29],
+        }
+    )
+
+    split_df = split_curves(df, val_fraction=0.5, seed=5)
+    manifest = build_curve_split_manifest(split_df, seed=5, val_fraction=0.5)
+
+    assert split_df["curve_id"].nunique() == 2
+    assert manifest[SOURCE_CURVE_COL].tolist() == [11, 29]
+    assert set(manifest["split"]) == {"train", "validation"}
+
+
 def test_read_indentation_table_and_compression_table(tmp_path: Path) -> None:
     indentation_path = tmp_path / "indent.dat"
     # 8 scalar columns + 3 displacement/diameter columns + 3 force columns.
@@ -175,9 +199,16 @@ def test_read_indentation_table_and_compression_table(tmp_path: Path) -> None:
     pd.DataFrame(indentation_rows).to_csv(indentation_path, sep=" ", header=False, index=False)
 
     parsed = read_indentation_table(indentation_path, disp_source="auto", rupture_ratio_threshold=2.0)
+    parsed_cli = read_indentation_table_cli(
+        indentation_path,
+        disp_source="auto",
+        rupture_ratio_threshold=2.0,
+    )
+    pd.testing.assert_frame_equal(parsed, parsed_cli)
     assert len(parsed) >= 3
     assert np.isfinite(parsed["disp"]).all()
-    assert set(parsed.columns) == {"Yt", "kb", "b1", "b2", "a3", "a4", "F", "disp"}
+    assert set(parsed.columns) == {"Yt", "kb", "b1", "b2", "a3", "a4", "F", "disp", SOURCE_CURVE_COL}
+    assert parsed[SOURCE_CURVE_COL].nunique() == 2
 
     parsed_with_rupture_filter = read_indentation_table(
         indentation_path,
