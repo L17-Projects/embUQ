@@ -408,7 +408,8 @@ def main(argv: list[str] | None = None) -> int:
     dnn_root = Path(args.dnn_root).resolve() if args.dnn_root is not None else None
 
     seeds = _resolve_seeds(list(args.seed))
-    explicit_architectures = _parse_architecture_names(args.architectures or _default_architecture_text())
+    architecture_text = _default_architecture_text() if args.architectures is None else args.architectures
+    explicit_architectures = _parse_architecture_names(architecture_text)
     stage1_prior_scales = _resolve_stage1_grid(
         grid_text=args.stage1_prior_scales,
         scalar_value=args.stage1_prior_scale,
