@@ -121,7 +121,7 @@ def phase1_runtime(monkeypatch: pytest.MonkeyPatch):
     return module, fake_korali, fake_comm
 
 
-def test_phase1_uses_hbi_burn_in_from_config(
+def test_phase1_uses_phase1_burn_in_from_config(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, phase1_runtime
 ) -> None:
     mod, fake_korali, _fake_comm = phase1_runtime
@@ -133,7 +133,8 @@ def test_phase1_uses_hbi_burn_in_from_config(
                 "max_gen": -1,
                 "target_cov": 0.8,
                 "covariance_scaling": 0.04,
-                "hbi_burn_in": 1,
+                "phase1_burn_in": 1,
+                "hbi_burn_in": 0,
                 "use_surrogate": True,
                 "surrogate": {"backend": "dnn"},
                 "prior_Yt": [1.0, 2.0],
@@ -190,3 +191,73 @@ def test_phase1_uses_hbi_burn_in_from_config(
     experiment = fake_korali.created_experiments[0]
     assert experiment["Solver"]["Burn In"] == 1
     assert fake_korali.created_engines[-1].run_argument == fake_korali.created_experiments
+
+
+def test_phase1_falls_back_to_hbi_burn_in_when_phase1_knob_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, phase1_runtime
+) -> None:
+    mod, fake_korali, _fake_comm = phase1_runtime
+    config_path = tmp_path / "reduced_indentation_phase1_legacy.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "pop_size": 50000,
+                "max_gen": -1,
+                "target_cov": 0.8,
+                "covariance_scaling": 0.04,
+                "hbi_burn_in": 2,
+                "use_surrogate": True,
+                "surrogate": {"backend": "dnn"},
+                "prior_Yt": [1.0, 2.0],
+                "prior_kb": [3.0, 4.0],
+                "prior_d0": [5.0, 6.0],
+                "prior_sigma": [7.0, 8.0],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class _FakeStudy:
+        name = "indentation"
+        enabled = True
+        diameters = [3.2]
+        prior_d0 = None
+        prior_sigma = None
+        data_dir = tmp_path
+        data_prefix = "indentation_data_"
+
+        @staticmethod
+        def dataset_name(diameter_um: float) -> str:
+            return f"indentation_{diameter_um}um"
+
+        @staticmethod
+        def get_reference_points(_diameter_um: float) -> list[float]:
+            return [0.0, 1.0]
+
+        @staticmethod
+        def get_reference_data(_diameter_um: float) -> list[float]:
+            return [0.0, 1.0]
+
+        @staticmethod
+        def data_file(_diameter_um: float) -> Path:
+            return tmp_path / "dummy.csv"
+
+    monkeypatch.setattr(mod, "load_experiments", lambda config, root: [_FakeStudy()])
+    monkeypatch.setattr(
+        mod,
+        "phase1_prior_specs",
+        lambda config, prior_d0, prior_sigma: [
+            ("Yt", config["prior_Yt"]),
+            ("kb", config["prior_kb"]),
+            ("d0", prior_d0),
+            ("sigma", prior_sigma),
+        ],
+    )
+    monkeypatch.setattr(mod, "configure_device_conduit", lambda *a, **kw: None)
+    monkeypatch.setattr(mod, "to_korali_path", lambda path, *, base_dir: path)
+
+    output_dir = tmp_path / "phase1_output_legacy"
+    mod.run_inference(config_path=str(config_path), output_dir=str(output_dir), device="gpu")
+
+    experiment = fake_korali.created_experiments[0]
+    assert experiment["Solver"]["Burn In"] == 2

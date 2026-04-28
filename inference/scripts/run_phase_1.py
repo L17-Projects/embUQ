@@ -163,7 +163,7 @@ def run_inference(
     max_gen = config["max_gen"]
     target_cov = config["target_cov"]
     covariance_scaling = config["covariance_scaling"]
-    burn_in = int(config.get("hbi_burn_in", 0))
+    burn_in = int(config.get("phase1_burn_in", config.get("hbi_burn_in", 0)))
     use_surrogate = config.get("use_surrogate", True)
     surrogate_backend = _resolve_surrogate_backend(config)
 
@@ -277,6 +277,7 @@ def run_inference(
             datedPrint(f"[Korali] Number of ranks: {comm.Get_size()}")
             datedPrint(f"[Korali] Population size: {pop_size}")
             datedPrint(f"[Korali] Max generations: {max_gen}")
+            datedPrint(f"[Korali] Burn In: {burn_in}")
             datedPrint(f"[Korali] Target COV: {target_cov}")
             datedPrint(f"[Korali] Covariance scaling: {covariance_scaling}")
             datedPrint("[Korali] Experiments:")

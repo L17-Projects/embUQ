@@ -26,6 +26,7 @@ pop_size: 10
 max_gen: 1
 target_cov: 0.8
 covariance_scaling: 0.04
+phase1_burn_in: 1
 
 prior_Yt: [10000000.0, 50000000.0]
 prior_kb: [100.0, 1000.0]

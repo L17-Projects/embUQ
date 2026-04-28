@@ -1067,7 +1067,7 @@ def plot_phase1_representative() -> None:
             if row == 1:
                 q02, q10, q50, q90, q98 = np.quantile(vals, [0.02, 0.10, 0.50, 0.90, 0.98])
                 half_width = max(q90 - q50, q50 - q10)
-                half_width = max(half_width * 0.85, (q98 - q02) * 0.18)
+                half_width = max(half_width * 1.25, (q98 - q02) * 0.30)
             else:
                 q01, q05, q50, q95, q99 = np.quantile(vals, [0.01, 0.05, 0.50, 0.95, 0.99])
                 half_width = max(q95 - q50, q50 - q05)
