@@ -76,6 +76,29 @@ def _make_spec(tmp_path: Path, name: str) -> dict[str, str]:
     }
 
 
+def _write_dnn_selection(
+    seed_dir: Path,
+    *,
+    artifact_path: Path,
+    architecture: str,
+) -> Path:
+    seed_dir.mkdir(parents=True, exist_ok=True)
+    report_path = artifact_path.with_suffix(".json")
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps({"val_loss": 0.1}), encoding="utf-8")
+    (seed_dir / "selection.json").write_text(
+        json.dumps(
+            {
+                "best_architecture": architecture,
+                "best_artifact_path": str(artifact_path),
+                "best_report_path": str(report_path),
+            }
+        ),
+        encoding="utf-8",
+    )
+    return seed_dir / "selection.json"
+
+
 def test_bnn_sweep_runner_selects_top_architecture_from_full_stage1_grid(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -253,6 +276,206 @@ def test_bnn_sweep_runner_resume_skips_completed_stage1_grid_candidate(
     assert payload["best_candidate_metric"] == pytest.approx(0.10)
 
 
+def test_bnn_sweep_runner_dnn_root_overrides_catalog_reference_for_explicit_architectures(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        "run_bnn_sweep_matrix_dnn_root_test",
+    )
+    spec = _make_spec(tmp_path, "spec_a")
+    monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [spec])
+
+    dnn_root = tmp_path / "dnn_root"
+    selected_dnn = tmp_path / "seeded_dnn.pkl"
+    selected_dnn.write_text("seeded-artifact", encoding="utf-8")
+    selection_path = _write_dnn_selection(
+        dnn_root / spec["name"] / "seed_101",
+        artifact_path=selected_dnn,
+        architecture="w64_d2",
+    )
+
+    called: list[list[str]] = []
+
+    def fake_run(command, cwd, check):  # noqa: ANN001
+        del cwd, check
+        called.append(command)
+        out_path = Path(_parse_arg(command, "--out"))
+        report_path = Path(_parse_arg(command, "--report-path"))
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text("artifact", encoding="utf-8")
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps({"training": {"best_val_rmse": 0.2, "final_val_rmse": 0.21}}),
+            encoding="utf-8",
+        )
+
+        class _Done:
+            returncode = 0
+
+        return _Done()
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    rc = module.main(
+        [
+            "--output-root",
+            str(tmp_path / "out"),
+            "--dnn-root",
+            str(dnn_root),
+            "--seed",
+            "101",
+            "--architectures",
+            "w32_d2",
+            "--top-k",
+            "1",
+            "--prior-scales",
+            "0.5",
+            "--obs-noise-prior-scales",
+            "0.1",
+            "--lrs",
+            "0.001",
+        ]
+    )
+    assert rc == 0
+    assert called
+    assert {_parse_arg(command, "--dnn-reference") for command in called} == {str(selected_dnn)}
+
+    payload = json.loads((tmp_path / "out" / "spec_a" / "seed_101" / "selection.json").read_text(encoding="utf-8"))
+    assert payload["architecture_source"] == "explicit"
+    assert payload["candidate_architectures"] == ["w32_d2"]
+    assert payload["dnn_reference_path"] == str(selected_dnn)
+    assert payload["dnn_selection_path"] == str(selection_path)
+    assert payload["dnn_selected_architecture"] == "w64_d2"
+
+
+def test_bnn_sweep_runner_dnn_selection_architecture_mode_uses_seeded_winner(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        "run_bnn_sweep_matrix_dnn_arch_source_test",
+    )
+    spec = _make_spec(tmp_path, "spec_a")
+    monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [spec])
+
+    dnn_root = tmp_path / "dnn_root"
+    selected_dnn = tmp_path / "seeded_dnn.pkl"
+    selected_dnn.write_text("seeded-artifact", encoding="utf-8")
+    _write_dnn_selection(
+        dnn_root / spec["name"] / "seed_101",
+        artifact_path=selected_dnn,
+        architecture="w64_d2",
+    )
+
+    called: list[list[str]] = []
+
+    def fake_run(command, cwd, check):  # noqa: ANN001
+        del cwd, check
+        called.append(command)
+        out_path = Path(_parse_arg(command, "--out"))
+        report_path = Path(_parse_arg(command, "--report-path"))
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text("artifact", encoding="utf-8")
+        metric = 0.18 if "stage2__w64_d2" in out_path.stem else 0.22
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps({"training": {"best_val_rmse": metric, "final_val_rmse": metric + 0.01}}),
+            encoding="utf-8",
+        )
+
+        class _Done:
+            returncode = 0
+
+        return _Done()
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    rc = module.main(
+        [
+            "--output-root",
+            str(tmp_path / "out"),
+            "--dnn-root",
+            str(dnn_root),
+            "--architecture-source",
+            "dnn-selection",
+            "--seed",
+            "101",
+            "--top-k",
+            "1",
+            "--prior-scales",
+            "0.5",
+            "--obs-noise-prior-scales",
+            "0.1",
+            "--lrs",
+            "0.001",
+        ]
+    )
+    assert rc == 0
+    assert {_parse_arg(command, "--dnn-reference") for command in called} == {str(selected_dnn)}
+    stage_stems = {Path(_parse_arg(command, "--out")).stem for command in called}
+    assert stage_stems == {
+        "stage1__w64_d2__prior1__obs1__lr0.001",
+        "stage2__w64_d2__prior0.5__obs0.1__lr0.001",
+    }
+
+    payload = json.loads((tmp_path / "out" / "spec_a" / "seed_101" / "selection.json").read_text(encoding="utf-8"))
+    assert payload["architecture_source"] == "dnn-selection"
+    assert payload["candidate_architectures"] == ["w64_d2"]
+    assert payload["top_architectures"] == ["w64_d2"]
+    assert payload["dnn_selected_architecture"] == "w64_d2"
+
+
+def test_bnn_selection_helpers_validate_missing_values_and_relative_paths(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        "run_bnn_sweep_matrix_selection_helpers_test",
+    )
+
+    selection_path = tmp_path / "spec_a" / "seed_101" / "selection.json"
+    selection_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with pytest.raises(ValueError, match="Missing 'best_artifact_path'"):
+        module._selection_string_value({}, "best_artifact_path", selection_path=selection_path)
+
+    rel_artifact = selection_path.parent / "candidate.pkl"
+    rel_artifact.write_text("artifact", encoding="utf-8")
+    resolved = module._resolve_selection_path_value(
+        "candidate.pkl",
+        selection_path=selection_path,
+        label="DNN artifact",
+    )
+    assert resolved == rel_artifact.resolve()
+
+    with pytest.raises(FileNotFoundError, match="Selected DNN artifact does not exist"):
+        module._resolve_selection_path_value(
+            "missing.pkl",
+            selection_path=selection_path,
+            label="DNN artifact",
+        )
+
+
+def test_bnn_selection_helpers_reject_missing_selection_and_unknown_architecture(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        "run_bnn_sweep_matrix_selection_error_test",
+    )
+
+    with pytest.raises(FileNotFoundError, match="Missing DNN selection file"):
+        module._load_dnn_selection(dnn_root=tmp_path, spec_name="spec_a", seed=101)
+
+    selection_path = tmp_path / "spec_a" / "seed_101" / "selection.json"
+    with pytest.raises(ValueError, match="Unknown BNN architecture"):
+        module._resolve_architecture_from_selection(
+            {"best_architecture": "w999_d9"},
+            selection_path=selection_path,
+        )
+
+
 def test_bnn_sweep_runner_import_does_not_require_torch() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     _assert_runner_import_without_torch(repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py")
@@ -333,6 +556,157 @@ def test_bnn_sweep_runner_rejects_unknown_only_filter(tmp_path: Path, monkeypatc
         module.main(["--output-root", str(tmp_path / "out"), "--only", "missing"])
 
 
+def test_bnn_sweep_runner_rejects_dnn_selection_architecture_mode_without_dnn_root(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        "run_bnn_sweep_matrix_missing_dnn_root_test",
+    )
+    monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [_make_spec(tmp_path, "spec_a")])
+
+    with pytest.raises(ValueError, match="requires --dnn-root"):
+        module.main(
+            [
+                "--output-root",
+                str(tmp_path / "out"),
+                "--seed",
+                "101",
+                "--architecture-source",
+                "dnn-selection",
+            ]
+        )
+
+
+def test_bnn_sweep_runner_rejects_dnn_selection_with_explicit_architectures(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        "run_bnn_sweep_matrix_conflicting_arch_source_test",
+    )
+    monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [_make_spec(tmp_path, "spec_a")])
+
+    with pytest.raises(ValueError, match="Do not combine --architectures with --architecture-source=dnn-selection"):
+        module.main(
+            [
+                "--output-root",
+                str(tmp_path / "out"),
+                "--seed",
+                "101",
+                "--dnn-root",
+                str(tmp_path / "dnn_root"),
+                "--architecture-source",
+                "dnn-selection",
+                "--architectures",
+                "w32_d2",
+            ]
+        )
+
+
+def test_bnn_sweep_runner_rejects_explicit_empty_architecture_text(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        "run_bnn_sweep_matrix_empty_architectures_test",
+    )
+    monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [_make_spec(tmp_path, "spec_a")])
+
+    with pytest.raises(ValueError, match="Architecture list must be non-empty"):
+        module.main(
+            [
+                "--output-root",
+                str(tmp_path / "out"),
+                "--seed",
+                "101",
+                "--architectures",
+                "",
+            ]
+        )
+
+
+def test_bnn_sweep_runner_resume_skips_completed_stage2_candidate(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        "run_bnn_sweep_matrix_stage2_resume_test",
+    )
+    spec = _make_spec(tmp_path, "spec_a")
+    monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [spec])
+
+    seed_root = tmp_path / "out" / "spec_a" / "seed_20260317"
+    stage1_key = "stage1__w32_d2__prior1__obs1__lr0.001"
+    artifact_path, report_path = module._candidate_paths(seed_root, stage1_key)
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    artifact_path.write_text("artifact", encoding="utf-8")
+    report_path.write_text(
+        json.dumps({"training": {"best_val_rmse": 0.11, "final_val_rmse": 0.12}}),
+        encoding="utf-8",
+    )
+
+    stage2_key = "stage2__w32_d2__prior0.5__obs0.1__lr0.001"
+    stage2_artifact, stage2_report = module._candidate_paths(seed_root, stage2_key)
+    stage2_artifact.parent.mkdir(parents=True, exist_ok=True)
+    stage2_report.parent.mkdir(parents=True, exist_ok=True)
+    stage2_artifact.write_text("artifact", encoding="utf-8")
+    stage2_report.write_text(
+        json.dumps({"training": {"best_val_rmse": 0.09, "final_val_rmse": 0.10}}),
+        encoding="utf-8",
+    )
+
+    called: list[list[str]] = []
+
+    def fake_run(command, cwd, check):  # noqa: ANN001
+        del command, cwd, check
+        called.append([])
+
+        class _Done:
+            returncode = 0
+
+        return _Done()
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    rc = module.main(
+        [
+            "--output-root",
+            str(tmp_path / "out"),
+            "--seed",
+            "20260317",
+            "--architectures",
+            "w32_d2",
+            "--stage1-prior-scales",
+            "1.0",
+            "--stage1-obs-noise-prior-scales",
+            "1.0",
+            "--stage1-lrs",
+            "0.001",
+            "--top-k",
+            "1",
+            "--prior-scales",
+            "0.5",
+            "--obs-noise-prior-scales",
+            "0.1",
+            "--lrs",
+            "0.001",
+        ]
+    )
+    assert rc == 0
+    assert called == []
+
+    matrix_report = json.loads((tmp_path / "out" / "bnn_sweep_matrix_report.json").read_text(encoding="utf-8"))
+    stage2_rows = [row for row in matrix_report["runs"] if row["stage"] == "stage2"]
+    assert len(stage2_rows) == 1
+    assert stage2_rows[0]["status"] == "skipped_completed"
+
+
 def test_bnn_sweep_runner_build_command_honors_require_parity_flag(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
@@ -344,6 +718,7 @@ def test_bnn_sweep_runner_build_command_honors_require_parity_flag(tmp_path: Pat
         python_bin="python3",
         spec=spec,
         seed_root=tmp_path / "seed",
+        dnn_reference_path=None,
         stage="stage1",
         arch_name="w32_d2",
         width=32,
