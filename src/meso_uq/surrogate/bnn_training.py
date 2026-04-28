@@ -159,6 +159,29 @@ def _make_train_loader(
     return loader, effective_batch_size
 
 
+def _resolve_training_budget(
+    *,
+    n_train: int,
+    batch_size: int,
+    max_steps: int,
+    max_epochs: int | None,
+) -> tuple[int, int]:
+    if max_steps < 1:
+        raise ValueError("max_steps must be >= 1.")
+    if batch_size < 1:
+        raise ValueError("batch_size must be >= 1.")
+    if n_train < 1:
+        raise ValueError("n_train must be >= 1.")
+    if max_epochs is not None and max_epochs < 1:
+        raise ValueError("max_epochs must be >= 1 when provided.")
+
+    steps_per_epoch = int(np.ceil(float(n_train) / float(batch_size)))
+    resolved_max_steps = int(max_steps)
+    if max_epochs is not None:
+        resolved_max_steps = int(steps_per_epoch * int(max_epochs))
+    return resolved_max_steps, steps_per_epoch
+
+
 def train_tabular_bnn_surrogate(
     df,
     *,
@@ -174,6 +197,7 @@ def train_tabular_bnn_surrogate(
     batch_size: int = 512,
     lr: float = 1e-3,
     max_steps: int = 2500,
+    max_epochs: int | None = None,
     eval_every: int = 25,
     predictive_mc_samples: int = 64,
     max_walltime_seconds: int = 1200,
@@ -187,6 +211,8 @@ def train_tabular_bnn_surrogate(
         raise ValueError("max_steps must be >= 1.")
     if batch_size < 1:
         raise ValueError("batch_size must be >= 1.")
+    if max_epochs is not None and int(max_epochs) < 1:
+        raise ValueError("max_epochs must be >= 1 when provided.")
     if eval_every < 1:
         raise ValueError("eval_every must be >= 1.")
     if predictive_mc_samples < 1:
@@ -218,6 +244,12 @@ def train_tabular_bnn_surrogate(
         y_train,
         batch_size=int(batch_size),
         seed=seed,
+    )
+    resolved_max_steps, steps_per_epoch = _resolve_training_budget(
+        n_train=int(split["n_train"]),
+        batch_size=int(effective_batch_size),
+        max_steps=int(max_steps),
+        max_epochs=max_epochs,
     )
     train_iter = iter(train_loader)
     X_val = X_val.to(device_t)
@@ -251,7 +283,7 @@ def train_tabular_bnn_surrogate(
     step = 0
     stop_reason = "max_steps"
 
-    while step < int(max_steps):
+    while step < int(resolved_max_steps):
         try:
             X_batch, y_batch = next(train_iter)
         except StopIteration:
@@ -312,6 +344,10 @@ def train_tabular_bnn_surrogate(
 
     training_summary = {
         "step_count": int(step),
+        "resolved_max_steps": int(resolved_max_steps),
+        "requested_max_steps": int(max_steps),
+        "requested_max_epochs": None if max_epochs is None else int(max_epochs),
+        "steps_per_epoch": int(steps_per_epoch),
         "best_step": int(best_step),
         "best_val_rmse": float(best_val_rmse),
         "final_val_rmse": float(bnn_rmse),

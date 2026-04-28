@@ -69,6 +69,7 @@ def _run_bnn_and_capture_batches(
     batch_size: int,
     seed: int,
     max_steps: int = 5,
+    max_epochs: int | None = None,
 ) -> tuple[list[tuple[int, ...]], dict[str, object]]:
     batch_records: list[tuple[int, ...]] = []
     _install_recording_bnn_runtime(monkeypatch, batch_records)
@@ -90,6 +91,7 @@ def _run_bnn_and_capture_batches(
         batch_size=batch_size,
         lr=1e-3,
         max_steps=max_steps,
+        max_epochs=max_epochs,
         eval_every=1,
         predictive_mc_samples=1,
         max_walltime_seconds=30,
@@ -146,6 +148,16 @@ def test_train_tabular_bnn_rejects_invalid_basic_parameters() -> None:
             dnn_reference_path="dnn.pkl",
             max_steps=1,
             parity_tol=0.0,
+        )
+    with pytest.raises(ValueError, match="max_epochs must be >= 1"):
+        bnn_training.train_tabular_bnn_surrogate(
+            df,
+            input_cols=["x"],
+            target_col="y",
+            out_path="out.pt",
+            dnn_reference_path="dnn.pkl",
+            max_steps=1,
+            max_epochs=0,
         )
     # Backward compatibility: legacy callers may still pass obs_noise.
     with pytest.raises(ValueError, match="max_steps must be >= 1"):
@@ -275,3 +287,32 @@ def test_train_tabular_bnn_surrogate_seeded_minibatches_are_deterministic(
     )
 
     assert first_batches == second_batches
+
+
+def test_resolve_training_budget_uses_epoch_budget_when_requested() -> None:
+    resolved_steps, steps_per_epoch = bnn_training._resolve_training_budget(
+        n_train=9,
+        batch_size=4,
+        max_steps=2500,
+        max_epochs=3,
+    )
+    assert steps_per_epoch == 3
+    assert resolved_steps == 9
+
+
+def test_train_tabular_bnn_surrogate_max_epochs_resolves_dataset_sized_step_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    batch_records, result = _run_bnn_and_capture_batches(
+        tmp_path / "epochs",
+        monkeypatch,
+        batch_size=4,
+        seed=7,
+        max_steps=99,
+        max_epochs=2,
+    )
+    # n_train is 9 after the DNN-like 90/10 split, so batch_size=4 yields 3 steps per epoch.
+    assert len(batch_records) == 6
+    assert result["training"]["requested_max_epochs"] == 2
+    assert result["training"]["resolved_max_steps"] == 6
+    assert result["training"]["steps_per_epoch"] == 3

@@ -109,3 +109,23 @@ def test_compression_emb_train_bnn_accepts_new_prior_scale_flag(
     )
     kwargs = captured["train_kwargs"]
     assert kwargs["obs_noise_prior_scale"] == pytest.approx(0.77)
+
+
+def test_compression_emb_train_bnn_passes_max_epochs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    module = _load_module(
+        repo_root / "compression" / "surrogate" / "scripts" / "emb_train_bnn.py",
+        "compression_emb_train_bnn_max_epochs_test",
+    )
+
+    captured = _run_script_with_args(
+        module,
+        monkeypatch,
+        tmp_path,
+        "--max-epochs",
+        "25",
+    )
+    kwargs = captured["train_kwargs"]
+    assert kwargs["max_epochs"] == 25

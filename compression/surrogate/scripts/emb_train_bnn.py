@@ -30,6 +30,7 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--max-steps", type=int, default=2500)
+    parser.add_argument("--max-epochs", type=int, default=None)
     parser.add_argument("--eval-every", type=int, default=25)
     parser.add_argument("--predictive-mc-samples", type=int, default=64)
     parser.add_argument("--max-walltime-seconds", type=int, default=1200)
@@ -58,6 +59,7 @@ def main() -> None:
         batch_size=args.batch_size,
         lr=args.lr,
         max_steps=args.max_steps,
+        max_epochs=args.max_epochs,
         eval_every=args.eval_every,
         predictive_mc_samples=args.predictive_mc_samples,
         max_walltime_seconds=args.max_walltime_seconds,
