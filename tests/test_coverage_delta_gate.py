@@ -125,3 +125,37 @@ def test_coverage_delta_gate_ignores_optional_bnn_files(tmp_path):
 
     rc = module.main(["--base-json", str(base_json), "--head-json", str(head_json)])
     assert rc == 0
+
+
+def test_coverage_delta_gate_falls_back_to_totals_when_file_entries_are_invalid(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "qa" / "ci" / "check_coverage_increase.py",
+        "check_coverage_increase_test_invalid_files",
+    )
+
+    def _write_files_json(path: Path, *, covered: int, statements: int) -> None:
+        path.write_text(
+            json.dumps(
+                {
+                    "files": {
+                        "src/meso_uq/core.py": "invalid-entry",
+                        "src/meso_uq/metrics.py": {"summary": "invalid-summary"},
+                        "src/meso_uq/surrogate/bnn_training.py": {
+                            "summary": {"num_statements": 99, "missing_lines": 99}
+                        },
+                    },
+                    "totals": {"covered_lines": covered, "num_statements": statements},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    base_json = tmp_path / "base.json"
+    head_json = tmp_path / "head.json"
+
+    _write_files_json(base_json, covered=80, statements=100)
+    _write_files_json(head_json, covered=81, statements=100)
+
+    rc = module.main(["--base-json", str(base_json), "--head-json", str(head_json)])
+    assert rc == 0
