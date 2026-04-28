@@ -8,6 +8,7 @@ from typing import Any, Dict, Sequence
 
 import numpy as np
 import torch
+from torch.utils.data import DataLoader, TensorDataset
 
 from .bnn import build_variational_components, make_artifact_payload, _resolve_torch_device
 from .cli import make_tensors, seed_training_runtime, split_row_indices
@@ -133,6 +134,31 @@ def _evaluate_dnn_rmse(
     return float(np.sqrt(np.mean(np.square(pred - y_val_phys.reshape(-1)))))
 
 
+def _make_train_loader(
+    X_train: torch.Tensor,
+    y_train: torch.Tensor,
+    *,
+    batch_size: int,
+    seed: int | None,
+) -> tuple[DataLoader, int]:
+    if batch_size < 1:
+        raise ValueError("batch_size must be >= 1.")
+
+    train_ds = TensorDataset(X_train, y_train)
+    effective_batch_size = min(int(batch_size), len(train_ds))
+    loader_generator = None
+    if seed is not None:
+        loader_generator = torch.Generator()
+        loader_generator.manual_seed(int(seed))
+    loader = DataLoader(
+        train_ds,
+        batch_size=effective_batch_size,
+        shuffle=True,
+        generator=loader_generator,
+    )
+    return loader, effective_batch_size
+
+
 def train_tabular_bnn_surrogate(
     df,
     *,
@@ -159,6 +185,8 @@ def train_tabular_bnn_surrogate(
 ) -> Dict[str, Any]:
     if max_steps < 1:
         raise ValueError("max_steps must be >= 1.")
+    if batch_size < 1:
+        raise ValueError("batch_size must be >= 1.")
     if eval_every < 1:
         raise ValueError("eval_every must be >= 1.")
     if predictive_mc_samples < 1:
@@ -185,8 +213,13 @@ def train_tabular_bnn_surrogate(
     y_val_phys = split["y_val_phys"]
 
     device_t = _resolve_torch_device(device)
-    X_train = X_train.to(device_t)
-    y_train = y_train.to(device_t)
+    train_loader, effective_batch_size = _make_train_loader(
+        X_train,
+        y_train,
+        batch_size=int(batch_size),
+        seed=seed,
+    )
+    train_iter = iter(train_loader)
     X_val = X_val.to(device_t)
 
     pyro, base_model, model, guide = build_variational_components(
@@ -195,6 +228,7 @@ def train_tabular_bnn_surrogate(
         depth=int(depth),
         prior_scale=float(prior_scale),
         obs_noise_prior_scale=resolved_obs_noise_prior_scale,
+        training_dataset_size=int(split["n_train"]),
         device=device_t,
     )
     if seed is not None:
@@ -218,9 +252,16 @@ def train_tabular_bnn_surrogate(
     stop_reason = "max_steps"
 
     while step < int(max_steps):
-        train_loss = float(svi.step(X_train, y_train))
+        try:
+            X_batch, y_batch = next(train_iter)
+        except StopIteration:
+            train_iter = iter(train_loader)
+            X_batch, y_batch = next(train_iter)
+        X_batch = X_batch.to(device_t)
+        y_batch = y_batch.to(device_t)
+        train_loss = float(svi.step(X_batch, y_batch))
         step += 1
-        train_losses.append(train_loss / max(1, len(X_train)))
+        train_losses.append(train_loss / max(1, len(X_batch)))
 
         if step == 1 or step % int(eval_every) == 0:
             mean_norm, _ = _predictive_mean_std(
@@ -276,6 +317,7 @@ def train_tabular_bnn_surrogate(
         "final_val_rmse": float(bnn_rmse),
         "elapsed_seconds": float(time.monotonic() - start),
         "stop_reason": stop_reason,
+        "batch_size": int(effective_batch_size),
         "train_loss_last": float(train_losses[-1]) if train_losses else None,
         "parity_dnn_rmse": float(dnn_rmse),
         "parity_bnn_rmse": float(bnn_rmse),
