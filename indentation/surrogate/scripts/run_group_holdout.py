@@ -9,12 +9,12 @@ from pathlib import Path
 
 import pandas as pd
 
+from meso_uq.surrogate.cli import read_indentation_table
 from meso_uq.surrogate.group_holdout import (
     build_curve_split_manifest,
     build_holdout_outputs,
     find_representative_curve,
     predict_family_mean_std,
-    read_indentation_table,
     resolve_modality_spec,
     resolve_surrogate_family,
     split_curves,
@@ -160,4 +160,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

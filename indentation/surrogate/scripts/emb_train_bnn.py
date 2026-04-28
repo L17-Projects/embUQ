@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 
 from meso_uq.surrogate.bnn_training import train_tabular_bnn_surrogate
-from meso_uq.surrogate.group_holdout import read_indentation_table
+from meso_uq.surrogate.cli import read_indentation_table
 
 
 def main() -> None:

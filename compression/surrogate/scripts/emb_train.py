@@ -9,11 +9,13 @@ def main():
     ap = argparse.ArgumentParser(description="Train compression surrogate: force = f(Yt, kb, b1, b2, a3, a4, disp)")
     ap.add_argument("data", help="Path to whitespace training table")
     ap.add_argument("--out", default="trained/microbubble_force_BEST.pkl")
+    ap.add_argument("--report-path", default=None)
     ap.add_argument("--width", type=int, default=64)
     ap.add_argument("--depth", type=int, default=3)
     ap.add_argument("--batch-size", type=int, default=128)
     ap.add_argument("--lr", type=float, default=5e-4)
     ap.add_argument("--max-epoch", type=int, default=100)
+    ap.add_argument("--seed", type=int, default=None)
     args = ap.parse_args()
     df = read_compression_training_table(args.data, curve_axis_name="disp", value_name="F")
     result = train_tabular_surrogate(
@@ -26,6 +28,8 @@ def main():
         batch_size=args.batch_size,
         lr=args.lr,
         max_epoch=args.max_epoch,
+        seed=args.seed,
+        report_path=args.report_path,
     )
     print(f"Saved -> {result['out']}. Final train={result['train_loss']:.3e}, valid={result['val_loss']:.3e}")
 

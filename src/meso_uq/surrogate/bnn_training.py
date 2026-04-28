@@ -10,7 +10,7 @@ import numpy as np
 import torch
 
 from .bnn import build_variational_components, make_artifact_payload, _resolve_torch_device
-from .cli import make_tensors
+from .cli import make_tensors, seed_training_runtime, split_row_indices
 from .model import load_model_states
 
 
@@ -44,16 +44,7 @@ def _split_like_dnn(
     n = int(len(Xz))
     if n < 2:
         raise ValueError("Need at least 2 samples to create train/validation split.")
-    n_val = max(1, int(0.1 * n))
-    if n_val >= n:
-        n_val = n - 1
-
-    if seed is None:
-        perm = torch.randperm(n)
-    else:
-        generator = torch.Generator()
-        generator.manual_seed(int(seed))
-        perm = torch.randperm(n, generator=generator)
+    perm, n_val = split_row_indices(n, val_fraction=0.10, seed=seed)
 
     Xz_perm = Xz[perm]
     yz_perm = yz[perm]
@@ -180,6 +171,7 @@ def train_tabular_bnn_surrogate(
         obs_noise_prior_scale=float(obs_noise_prior_scale),
         obs_noise=obs_noise,
     )
+    seed_training_runtime(seed)
 
     Xz, yz, x_mu, x_sd, y_mu, y_sd = make_tensors(df, list(input_cols), target_col)
     X_phys = df[list(input_cols)].to_numpy(float)
@@ -205,6 +197,8 @@ def train_tabular_bnn_surrogate(
         obs_noise_prior_scale=resolved_obs_noise_prior_scale,
         device=device_t,
     )
+    if seed is not None:
+        pyro.set_rng_seed(int(seed))
     pyro.clear_param_store()
     svi = pyro.infer.SVI(
         model,
@@ -313,6 +307,40 @@ def train_tabular_bnn_surrogate(
     out_file.parent.mkdir(parents=True, exist_ok=True)
     torch.save(payload, str(out_file))
 
+    reload_result: dict[str, float | bool] | None = None
+    try:
+        from .bnn import VariationalBNNPredictor
+
+        predictor = VariationalBNNPredictor(str(out_file), device=device)
+        reload_mean, reload_std = predictor.predict_mean_std(
+            np.asarray(X_val_phys, dtype=np.float32),
+            predictive_mc_samples=int(predictive_mc_samples),
+            predictive_mc_chunk_size=max(1, min(int(predictive_mc_samples), 8)),
+        )
+        reload_mean = np.maximum(0.0, np.asarray(reload_mean, dtype=np.float64))
+        reload_std = np.maximum(0.0, np.asarray(reload_std, dtype=np.float64))
+        reload_rmse = float(np.sqrt(np.mean(np.square(reload_mean - y_val_phys))))
+        reload_degradation_abs = float(reload_rmse - bnn_rmse)
+        reload_degradation_rel = (
+            float(reload_degradation_abs / bnn_rmse) if bnn_rmse > 0 else float("inf")
+        )
+        reload_result = {
+            "val_rmse": float(reload_rmse),
+            "degradation_abs": float(reload_degradation_abs),
+            "degradation_rel": float(reload_degradation_rel),
+            "pred_std_mean": float(np.mean(reload_std)),
+            "passed_rel_tol_0p05": bool(np.isfinite(reload_degradation_rel) and reload_degradation_rel <= 0.05),
+        }
+    except Exception as exc:  # pragma: no cover - exercised in integration usage
+        reload_result = {
+            "val_rmse": float("nan"),
+            "degradation_abs": float("nan"),
+            "degradation_rel": float("nan"),
+            "pred_std_mean": float("nan"),
+            "passed_rel_tol_0p05": False,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
     result = {
         "out": str(out_file),
         "training": training_summary,
@@ -322,6 +350,7 @@ def train_tabular_bnn_surrogate(
             "val_target_mean": float(np.mean(y_val_phys)),
             "val_predictive_std_mean": float(np.mean(std_phys)),
         },
+        "reload": reload_result,
     }
     if report_path is not None:
         report_file = Path(report_path).resolve()

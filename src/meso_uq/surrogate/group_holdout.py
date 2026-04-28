@@ -9,7 +9,7 @@ import pandas as pd
 import torch
 
 from .bnn import VariationalBNNPredictor
-from .cli import read_compression_training_table, read_wide_curve_table
+from .cli import SOURCE_CURVE_COL, read_compression_training_table, read_indentation_table
 from .model import load_model_states
 
 SurrogateFamily = Literal["dnn", "bnn"]
@@ -66,104 +66,6 @@ def resolve_surrogate_family(family: str) -> SurrogateFamily:
     return key  # type: ignore[return-value]
 
 
-def _infer_displacement(values: np.ndarray, radp: np.ndarray, mode: str) -> np.ndarray:
-    if mode == "displacement":
-        return values
-    if mode == "diameter":
-        return (2.0 * radp[:, None]) - values
-    median_val = float(np.nanmedian(values))
-    median_radp = float(np.nanmedian(radp))
-    if median_val > (median_radp * 1.5):
-        return (2.0 * radp[:, None]) - values
-    return values
-
-
-def _is_rupture_curve(disp_sorted: np.ndarray, ratio_threshold: float, min_disp: float = 0.1) -> bool:
-    for idx in range(1, len(disp_sorted)):
-        prev = float(disp_sorted[idx - 1])
-        curr = float(disp_sorted[idx])
-        if prev > min_disp and (curr / prev) > ratio_threshold:
-            return True
-    return False
-
-
-def read_indentation_table(
-    path: str | Path,
-    *,
-    disp_source: str = "auto",
-    rupture_ratio_threshold: float | None = 2.0,
-) -> pd.DataFrame:
-    raw = pd.read_csv(path, sep=r"\s+", engine="python", header=None).dropna(axis=1, how="all")
-    if raw.shape[1] < 10:
-        raise ValueError(
-            f"File {str(path)!r} has {raw.shape[1]} columns; expected 8 scalars + curve coordinates + forces."
-        )
-    n_after_hdr = raw.shape[1] - 8
-    if n_after_hdr % 2 != 0:
-        raise ValueError(
-            f"After the first 8 columns, remaining {n_after_hdr} columns must split into coordinates and forces."
-        )
-
-    m = n_after_hdr // 2
-    n = int(len(raw))
-    Yt = raw.iloc[:, 0].to_numpy(float)
-    kb = raw.iloc[:, 2].to_numpy(float)
-    b1 = raw.iloc[:, 3].to_numpy(float)
-    b2 = raw.iloc[:, 4].to_numpy(float)
-    a3 = raw.iloc[:, 5].to_numpy(float)
-    a4 = raw.iloc[:, 6].to_numpy(float)
-    radp = raw.iloc[:, 7].to_numpy(float)
-    disp_or_diam = raw.iloc[:, 8 : 8 + m].to_numpy(float)
-    forc = raw.iloc[:, 8 + m : 8 + (2 * m)].to_numpy(float)
-    disp = _infer_displacement(disp_or_diam, radp, disp_source)
-
-    m_ext = m + 1
-    disp_ext = np.full((n, m_ext), np.nan, dtype=float)
-    forc_ext = np.full((n, m_ext), np.nan, dtype=float)
-    for i in range(n):
-        valid = np.isfinite(disp[i, :]) & np.isfinite(forc[i, :])
-        valid &= forc[i, :] >= 0.0
-        valid &= disp[i, :] >= 0.0
-        disp_valid = disp[i, valid]
-        force_valid = forc[i, valid]
-        sort_idx = np.argsort(force_valid)
-        disp_sorted = disp_valid[sort_idx]
-        force_sorted = force_valid[sort_idx]
-        if len(force_sorted) == 0:
-            continue
-
-        keep_indices = [0]
-        for j in range(1, len(force_sorted)):
-            if disp_sorted[j] > disp_sorted[keep_indices[-1]]:
-                keep_indices.append(j)
-        disp_clean = disp_sorted[keep_indices]
-        force_clean = force_sorted[keep_indices]
-
-        if rupture_ratio_threshold is not None and _is_rupture_curve(disp_clean, rupture_ratio_threshold):
-            continue
-
-        if len(disp_clean) > 0 and force_clean[0] > 0.0:
-            disp_clean = np.insert(disp_clean, 0, 0.0)
-            force_clean = np.insert(force_clean, 0, 0.0)
-
-        disp_ext[i, : len(disp_clean)] = disp_clean
-        forc_ext[i, : len(force_clean)] = force_clean
-
-    out = pd.DataFrame(
-        {
-            "Yt": np.repeat(Yt, m_ext),
-            "kb": np.repeat(kb, m_ext),
-            "b1": np.repeat(b1, m_ext),
-            "b2": np.repeat(b2, m_ext),
-            "a3": np.repeat(a3, m_ext),
-            "a4": np.repeat(a4, m_ext),
-            "F": forc_ext.reshape(-1),
-            "disp": disp_ext.reshape(-1),
-        }
-    ).dropna()
-    return out.reset_index(drop=True)
-
-
 def read_compression_table(path: str | Path) -> pd.DataFrame:
     return read_compression_training_table(str(path), curve_axis_name="disp", value_name="F")
 
@@ -174,6 +76,7 @@ def split_curves(
     val_fraction: float,
     seed: int,
     param_cols: Sequence[str] = PARAM_COLS,
+    source_curve_col: str = SOURCE_CURVE_COL,
 ) -> pd.DataFrame:
     if len(df) == 0:
         raise ValueError("Cannot split empty dataframe.")
@@ -185,7 +88,10 @@ def split_curves(
         raise KeyError(f"Missing parameter columns for curve split: {missing}.")
 
     result = df.copy()
-    result["curve_id"] = result.groupby(list(param_cols), sort=False).ngroup()
+    if source_curve_col in result.columns:
+        result["curve_id"] = pd.factorize(result[source_curve_col], sort=False)[0].astype(int)
+    else:
+        result["curve_id"] = result.groupby(list(param_cols), sort=False).ngroup()
     n_curves = int(result["curve_id"].nunique())
     if n_curves < 2:
         raise ValueError("Need at least 2 unique curves for grouped holdout split.")
@@ -204,8 +110,11 @@ def split_curves(
 def build_curve_split_manifest(df_with_split: pd.DataFrame, *, seed: int, val_fraction: float) -> pd.DataFrame:
     if "curve_id" not in df_with_split.columns or "split" not in df_with_split.columns:
         raise KeyError("df_with_split must contain 'curve_id' and 'split' columns.")
+    manifest_cols = ["curve_id", "split"]
+    if SOURCE_CURVE_COL in df_with_split.columns:
+        manifest_cols.append(SOURCE_CURVE_COL)
     manifest = (
-        df_with_split[["curve_id", "split"]]
+        df_with_split[manifest_cols]
         .drop_duplicates("curve_id")
         .sort_values("curve_id")
         .reset_index(drop=True)
