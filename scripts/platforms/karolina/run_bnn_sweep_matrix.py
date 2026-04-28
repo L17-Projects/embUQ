@@ -39,8 +39,12 @@ def _default_architecture_text() -> str:
     return ",".join(arch.name for arch in DEFAULT_BNN_ARCHITECTURES)
 
 
+def _architecture_lookup() -> dict[str, tuple[int, int, str]]:
+    return {arch.name: (arch.width, arch.depth, arch.name) for arch in DEFAULT_BNN_ARCHITECTURES}
+
+
 def _parse_architecture_names(text: str) -> list[tuple[int, int, str]]:
-    by_name = {arch.name: (arch.width, arch.depth, arch.name) for arch in DEFAULT_BNN_ARCHITECTURES}
+    by_name = _architecture_lookup()
     names = [item.strip() for item in text.split(",") if item.strip()]
     if not names:
         raise ValueError("Architecture list must be non-empty.")
@@ -102,6 +106,52 @@ def _candidate_paths(seed_root: Path, key: str) -> tuple[Path, Path]:
     return artifact_path, report_path
 
 
+def _selection_path(root: Path, spec_name: str, seed: int) -> Path:
+    return root / spec_name / f"seed_{seed}" / "selection.json"
+
+
+def _selection_string_value(payload: dict[str, object], key: str, *, selection_path: Path) -> str:
+    value = payload.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"Missing {key!r} in DNN selection file: {selection_path}")
+    return value.strip()
+
+
+def _resolve_selection_path_value(raw_path: str, *, selection_path: Path, label: str) -> Path:
+    candidate = Path(raw_path).expanduser()
+    if not candidate.is_absolute():
+        candidate = (selection_path.parent / candidate).resolve()
+    else:
+        candidate = candidate.resolve()
+    if not candidate.exists():
+        raise FileNotFoundError(f"Selected {label} does not exist: {candidate}")
+    return candidate
+
+
+def _load_dnn_selection(*, dnn_root: Path, spec_name: str, seed: int) -> tuple[Path, dict[str, object]]:
+    selection_path = _selection_path(dnn_root, spec_name, seed)
+    if not selection_path.exists():
+        raise FileNotFoundError(f"Missing DNN selection file: {selection_path}")
+    return selection_path, _read_json(selection_path)
+
+
+def _resolve_dnn_reference_from_selection(
+    payload: dict[str, object], *, selection_path: Path
+) -> Path:
+    artifact_value = _selection_string_value(payload, "best_artifact_path", selection_path=selection_path)
+    return _resolve_selection_path_value(artifact_value, selection_path=selection_path, label="DNN artifact")
+
+
+def _resolve_architecture_from_selection(
+    payload: dict[str, object], *, selection_path: Path
+) -> tuple[int, int, str]:
+    arch_name = _selection_string_value(payload, "best_architecture", selection_path=selection_path)
+    architecture = _architecture_lookup().get(arch_name)
+    if architecture is None:
+        raise ValueError(f"Unknown BNN architecture {arch_name!r} in DNN selection file: {selection_path}")
+    return architecture
+
+
 def _candidate_completed(report_path: Path, artifact_path: Path) -> bool:
     if not report_path.exists() or not artifact_path.exists():
         return False
@@ -118,6 +168,7 @@ def _build_command(
     python_bin: str,
     spec: dict[str, str],
     seed_root: Path,
+    dnn_reference_path: str | None,
     stage: str,
     arch_name: str,
     width: int,
@@ -150,7 +201,7 @@ def _build_command(
         "--out",
         str(artifact_path),
         "--dnn-reference",
-        spec["dnn_artifact"],
+        dnn_reference_path if dnn_reference_path is not None else spec["dnn_artifact"],
         "--report-path",
         str(report_path),
         "--width",
@@ -242,6 +293,52 @@ def _stage1_top_architectures(
     return [arch for _, arch in rows[: max(1, min(top_k, len(rows)))]]
 
 
+def _resolve_seed_inputs(
+    *,
+    spec: dict[str, str],
+    seed: int,
+    explicit_architectures: list[tuple[int, int, str]],
+    architecture_source: str,
+    dnn_root: Path | None,
+) -> dict[str, object]:
+    dnn_reference_path = Path(spec["dnn_artifact"]).resolve()
+    dnn_selection_path: Path | None = None
+    dnn_selected_architecture: str | None = None
+    if dnn_root is not None:
+        dnn_selection_path, selection_payload = _load_dnn_selection(
+            dnn_root=dnn_root,
+            spec_name=spec["name"],
+            seed=seed,
+        )
+        dnn_reference_path = _resolve_dnn_reference_from_selection(
+            selection_payload,
+            selection_path=dnn_selection_path,
+        )
+        best_architecture = selection_payload.get("best_architecture")
+        if isinstance(best_architecture, str) and best_architecture.strip():
+            dnn_selected_architecture = best_architecture.strip()
+        if architecture_source == "dnn-selection":
+            architecture = _resolve_architecture_from_selection(
+                selection_payload,
+                selection_path=dnn_selection_path,
+            )
+            return {
+                "architectures": [architecture],
+                "dnn_reference_path": str(dnn_reference_path),
+                "dnn_selection_path": str(dnn_selection_path),
+                "dnn_selected_architecture": architecture[2],
+            }
+    elif architecture_source == "dnn-selection":
+        raise ValueError("--architecture-source=dnn-selection requires --dnn-root.")
+
+    return {
+        "architectures": explicit_architectures,
+        "dnn_reference_path": str(dnn_reference_path),
+        "dnn_selection_path": str(dnn_selection_path) if dnn_selection_path is not None else None,
+        "dnn_selected_architecture": dnn_selected_architecture,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run a two-stage seeded BNN candidate sweep across all EMB surrogate datasets."
@@ -250,9 +347,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-root", default=None)
     parser.add_argument("--run-tag", default=None)
     parser.add_argument("--site", choices=["vega", "karolina"], default=None)
+    parser.add_argument(
+        "--dnn-root",
+        default=None,
+        help="Optional output root from run_dnn_rebaseline_matrix.py to use seeded DNN selections as references.",
+    )
     parser.add_argument("--seed", type=int, action="append", default=[])
     parser.add_argument("--only", action="append", default=[])
-    parser.add_argument("--architectures", default=_default_architecture_text())
+    parser.add_argument("--architectures", default=None)
+    parser.add_argument(
+        "--architecture-source",
+        choices=["explicit", "dnn-selection"],
+        default="explicit",
+        help="Choose BNN candidate architectures from an explicit list or from each seeded DNN rebaseline winner.",
+    )
     parser.add_argument("--stage1-prior-scales", default=None)
     parser.add_argument("--stage1-obs-noise-prior-scales", default=None)
     parser.add_argument("--stage1-lrs", default=None)
@@ -284,6 +392,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    if args.architecture_source == "dnn-selection" and args.architectures is not None:
+        raise ValueError(
+            "Do not combine --architectures with --architecture-source=dnn-selection; "
+            "the DNN winner architecture is selected automatically."
+        )
+
     resolved_site = args.site if args.site is not None else detect_hpc_site()
     output_root = (
         Path(args.output_root).resolve()
@@ -291,9 +405,10 @@ def main(argv: list[str] | None = None) -> int:
         else default_runs_root(REPO_ROOT, "bnn_sweep", site=resolved_site, run_tag=args.run_tag)
     )
     output_root.mkdir(parents=True, exist_ok=True)
+    dnn_root = Path(args.dnn_root).resolve() if args.dnn_root is not None else None
 
     seeds = _resolve_seeds(list(args.seed))
-    architectures = _parse_architecture_names(args.architectures)
+    explicit_architectures = _parse_architecture_names(args.architectures or _default_architecture_text())
     stage1_prior_scales = _resolve_stage1_grid(
         grid_text=args.stage1_prior_scales,
         scalar_value=args.stage1_prior_scale,
@@ -333,7 +448,11 @@ def main(argv: list[str] | None = None) -> int:
         "started_at": _now_iso(),
         "config": {
             "seeds": seeds,
-            "architectures": [name for _, _, name in architectures],
+            "architectures": (
+                [name for _, _, name in explicit_architectures] if args.architecture_source == "explicit" else None
+            ),
+            "architecture_source": args.architecture_source,
+            "dnn_root": str(dnn_root) if dnn_root is not None else None,
             "stage1_prior_scale": float(stage1_prior_scales[0]) if len(stage1_prior_scales) == 1 else None,
             "stage1_obs_noise_prior_scale": (
                 float(stage1_obs_noise_prior_scales[0]) if len(stage1_obs_noise_prior_scales) == 1 else None
@@ -363,7 +482,20 @@ def main(argv: list[str] | None = None) -> int:
     for spec in specs:
         for seed in seeds:
             seed_root = output_root / spec["name"] / f"seed_{seed}"
-            for width, depth, arch_name in architectures:
+            seed_inputs = _resolve_seed_inputs(
+                spec=spec,
+                seed=int(seed),
+                explicit_architectures=explicit_architectures,
+                architecture_source=str(args.architecture_source),
+                dnn_root=dnn_root,
+            )
+            seed_architectures = seed_inputs["architectures"]
+            assert isinstance(seed_architectures, list)
+            dnn_reference_path = str(seed_inputs["dnn_reference_path"])
+            dnn_selection_path = seed_inputs["dnn_selection_path"]
+            dnn_selected_architecture = seed_inputs["dnn_selected_architecture"]
+
+            for width, depth, arch_name in seed_architectures:
                 for prior_scale, obs_noise_prior_scale, lr in _iter_hyperparameter_grid(
                     prior_scales=stage1_prior_scales,
                     obs_noise_prior_scales=stage1_obs_noise_prior_scales,
@@ -373,6 +505,7 @@ def main(argv: list[str] | None = None) -> int:
                         python_bin=args.python_bin,
                         spec=spec,
                         seed_root=seed_root,
+                        dnn_reference_path=dnn_reference_path,
                         stage="stage1",
                         arch_name=arch_name,
                         width=width,
@@ -400,6 +533,8 @@ def main(argv: list[str] | None = None) -> int:
                         "lr": float(lr),
                         "artifact_path": str(artifact_path),
                         "report_path": str(report_path),
+                        "dnn_reference_path": dnn_reference_path,
+                        "dnn_selection_path": dnn_selection_path,
                         "status": "pending",
                     }
                     if args.resume and _candidate_completed(report_path, artifact_path):
@@ -413,7 +548,7 @@ def main(argv: list[str] | None = None) -> int:
 
             top_architectures = _stage1_top_architectures(
                 seed_root=seed_root,
-                architectures=architectures,
+                architectures=seed_architectures,
                 top_k=int(args.top_k),
                 prior_scales=stage1_prior_scales,
                 obs_noise_prior_scales=stage1_obs_noise_prior_scales,
@@ -430,6 +565,7 @@ def main(argv: list[str] | None = None) -> int:
                         python_bin=args.python_bin,
                         spec=spec,
                         seed_root=seed_root,
+                        dnn_reference_path=dnn_reference_path,
                         stage="stage2",
                         arch_name=arch_name,
                         width=width,
@@ -457,6 +593,8 @@ def main(argv: list[str] | None = None) -> int:
                         "lr": float(lr),
                         "artifact_path": str(artifact_path),
                         "report_path": str(report_path),
+                        "dnn_reference_path": dnn_reference_path,
+                        "dnn_selection_path": dnn_selection_path,
                         "status": "pending",
                     }
                     if args.resume and _candidate_completed(report_path, artifact_path):
@@ -478,6 +616,11 @@ def main(argv: list[str] | None = None) -> int:
                 "modality": spec["modality"],
                 "diameter_um": spec["diameter_um"],
                 "seed": int(seed),
+                "architecture_source": args.architecture_source,
+                "candidate_architectures": [arch_name for _, _, arch_name in seed_architectures],
+                "dnn_reference_path": dnn_reference_path,
+                "dnn_selection_path": dnn_selection_path,
+                "dnn_selected_architecture": dnn_selected_architecture,
                 "best_candidate_report_path": str(best["report_path"]),
                 "best_candidate_artifact_path": str(best["artifact_path"]),
                 "best_candidate_metric": float(_candidate_metric(Path(str(best["report_path"])))),
