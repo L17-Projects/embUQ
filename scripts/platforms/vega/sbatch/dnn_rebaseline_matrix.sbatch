@@ -5,8 +5,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --output=/dev/null
-#SBATCH --error=/dev/null
+#SBATCH --output=%x-%j.out
+#SBATCH --error=%x-%j.err
 
 set -euo pipefail
 
@@ -20,7 +20,7 @@ SITE="${SITE:-vega}"
 RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/${SITE}/dnn_rebaseline/${RUN_TAG}}"
 LOG_ROOT="${LOG_ROOT:-${OUTPUT_ROOT}/logs}"
-VENV_DIR="${VENV_DIR:-${REPO_ROOT}/.venv}"
+VENV_DIR="${VENV_DIR:-${REPO_ROOT}/_vega/venv}"
 PYTHON_BIN="${PYTHON_BIN:-${VENV_DIR}/bin/python}"
 SELECTIONS="${SELECTIONS:-${ONLY:-}}"
 SEEDS="${SEEDS:-${SEED:-}}"

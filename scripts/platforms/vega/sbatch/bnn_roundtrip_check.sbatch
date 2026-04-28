@@ -6,8 +6,8 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
-#SBATCH --output=/dev/null
-#SBATCH --error=/dev/null
+#SBATCH --output=%x-%j.out
+#SBATCH --error=%x-%j.err
 
 set -euo pipefail
 
@@ -21,7 +21,7 @@ SITE="${SITE:-vega}"
 RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/${SITE}/bnn_roundtrip/${RUN_TAG}}"
 LOG_ROOT="${LOG_ROOT:-${OUTPUT_ROOT}/logs}"
-VENV_DIR="${VENV_DIR:-${REPO_ROOT}/.venv}"
+VENV_DIR="${VENV_DIR:-${REPO_ROOT}/_vega/venv}"
 PYTHON_BIN="${PYTHON_BIN:-${VENV_DIR}/bin/python}"
 SELECTION="${SELECTION:-indentation_3.2um}"
 SEED="${SEED:-}"

@@ -37,17 +37,17 @@ def test_matrix_template_exists(template: str) -> None:
 def test_matrix_templates_use_login_shell_repo_venv_and_repo_pythonpath(template: str) -> None:
     text = _read(template)
     assert text.startswith("#!/bin/bash -l\n")
-    assert 'VENV_DIR="${VENV_DIR:-${REPO_ROOT}/.venv}"' in text
+    assert 'VENV_DIR="${VENV_DIR:-${REPO_ROOT}/_vega/venv}"' in text
     assert 'source "${VENV_DIR}/bin/activate"' in text
     assert 'export PYTHONPATH="${REPO_ROOT}/src:${REPO_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"' in text
     assert 'source "${REPO_ROOT}/_vega/korali/env.sh"' in text
 
 
 @pytest.mark.parametrize("template", TEMPLATES)
-def test_matrix_templates_redirect_logs_into_output_root(template: str) -> None:
+def test_matrix_templates_keep_scheduler_logs_visible_and_mirror_logs_into_output_root(template: str) -> None:
     text = _read(template)
-    assert "#SBATCH --output=/dev/null" in text
-    assert "#SBATCH --error=/dev/null" in text
+    assert "#SBATCH --output=%x-%j.out" in text
+    assert "#SBATCH --error=%x-%j.err" in text
     assert 'LOG_ROOT="${LOG_ROOT:-${OUTPUT_ROOT}/logs}"' in text
     assert 'mkdir -p "${OUTPUT_ROOT}" "${LOG_ROOT}"' in text
     assert 'exec > >(tee -a "${LOG_ROOT}/slurm-${JOB_TOKEN}.out")' in text
