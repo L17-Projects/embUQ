@@ -10,36 +10,113 @@ from .model import MLP, init_weights, save_model_states
 from .training import train_model
 
 
-def read_wide_curve_table(path, *, curve_axis_name, value_name):
+def _read_wide_curve_arrays(path):
     df = pd.read_csv(path, sep=r"\s+", engine="python", header=None).dropna(axis=1, how="all")
     if df.shape[1] < 10:
-        raise ValueError(f"File '{path}' has {df.shape[1]} columns; expected scalar header plus curve coordinates and values.")
+        raise ValueError(
+            f"File '{path}' has {df.shape[1]} columns; expected scalar header plus curve coordinates and values."
+        )
     n_after_hdr = df.shape[1] - 8
     if n_after_hdr % 2 != 0:
-        raise ValueError(f"After the first 8 columns, the remaining ({n_after_hdr}) must split into curve axis and values.")
+        raise ValueError(
+            f"After the first 8 columns, the remaining ({n_after_hdr}) must split into curve axis and values."
+        )
     m = n_after_hdr // 2
-    Yt = df.iloc[:, 0].to_numpy(float)
-    kb = df.iloc[:, 2].to_numpy(float)
-    b1 = df.iloc[:, 3].to_numpy(float)
-    b2 = df.iloc[:, 4].to_numpy(float)
-    a3 = df.iloc[:, 5].to_numpy(float)
-    a4 = df.iloc[:, 6].to_numpy(float)
-    axis = df.iloc[:, 8 : 8 + m].to_numpy(float)
-    vals = df.iloc[:, 8 + m : 8 + 2 * m].to_numpy(float)
+    return {
+        "Yt": df.iloc[:, 0].to_numpy(float),
+        "kb": df.iloc[:, 2].to_numpy(float),
+        "b1": df.iloc[:, 3].to_numpy(float),
+        "b2": df.iloc[:, 4].to_numpy(float),
+        "a3": df.iloc[:, 5].to_numpy(float),
+        "a4": df.iloc[:, 6].to_numpy(float),
+        "axis": df.iloc[:, 8 : 8 + m].to_numpy(float),
+        "vals": df.iloc[:, 8 + m : 8 + 2 * m].to_numpy(float),
+        "m": m,
+    }
+
+
+def read_wide_curve_table(path, *, curve_axis_name, value_name):
+    payload = _read_wide_curve_arrays(path)
+    m = payload["m"]
     out = pd.DataFrame(
         {
-            "Yt": np.repeat(Yt, m),
-            "kb": np.repeat(kb, m),
-            "b1": np.repeat(b1, m),
-            "b2": np.repeat(b2, m),
-            "a3": np.repeat(a3, m),
-            "a4": np.repeat(a4, m),
-            curve_axis_name: axis.reshape(-1),
-            value_name: vals.reshape(-1),
+            "Yt": np.repeat(payload["Yt"], m),
+            "kb": np.repeat(payload["kb"], m),
+            "b1": np.repeat(payload["b1"], m),
+            "b2": np.repeat(payload["b2"], m),
+            "a3": np.repeat(payload["a3"], m),
+            "a4": np.repeat(payload["a4"], m),
+            curve_axis_name: payload["axis"].reshape(-1),
+            value_name: payload["vals"].reshape(-1),
         }
     )
     out = out.replace([np.inf, -np.inf], np.nan).dropna()
     return out
+
+
+def _clean_compression_curve(disp_row, force_row):
+    valid_mask = np.isfinite(disp_row) & np.isfinite(force_row)
+    valid_mask &= force_row < 30000.0
+    valid_mask &= disp_row > 0.0
+
+    disp_valid = disp_row[valid_mask]
+    force_valid = force_row[valid_mask]
+    if len(force_valid) == 0:
+        return np.array([], dtype=float), np.array([], dtype=float)
+
+    sort_idx = np.argsort(disp_valid)
+    disp_sorted = disp_valid[sort_idx]
+    force_sorted = force_valid[sort_idx]
+
+    keep_indices = [0]
+    for j in range(1, len(force_sorted)):
+        if force_sorted[j] > force_sorted[keep_indices[-1]]:
+            keep_indices.append(j)
+
+    disp_clean = disp_sorted[keep_indices]
+    force_clean = force_sorted[keep_indices]
+
+    anchor_force = max(50.0, 0.10 * float(force_clean[0]))
+    disp_clean = np.insert(disp_clean, 0, 0.0)
+    force_clean = np.insert(force_clean, 0, anchor_force)
+
+    nonzero_mask = force_clean > 0.0
+    disp_clean = disp_clean[nonzero_mask]
+    force_clean = force_clean[nonzero_mask]
+
+    remove_mask = (disp_clean > 0.2) & (force_clean < 50.0)
+    disp_clean = disp_clean[~remove_mask]
+    force_clean = force_clean[~remove_mask]
+    return disp_clean, force_clean
+
+
+def read_compression_training_table(path, *, curve_axis_name="disp", value_name="F"):
+    payload = _read_wide_curve_arrays(path)
+    rows = []
+    n = len(payload["Yt"])
+    for i in range(n):
+        disp_clean, force_clean = _clean_compression_curve(payload["axis"][i, :], payload["vals"][i, :])
+        if len(disp_clean) == 0:
+            continue
+        rows.append(
+            pd.DataFrame(
+                {
+                    "Yt": np.full(len(disp_clean), payload["Yt"][i], dtype=float),
+                    "kb": np.full(len(disp_clean), payload["kb"][i], dtype=float),
+                    "b1": np.full(len(disp_clean), payload["b1"][i], dtype=float),
+                    "b2": np.full(len(disp_clean), payload["b2"][i], dtype=float),
+                    "a3": np.full(len(disp_clean), payload["a3"][i], dtype=float),
+                    "a4": np.full(len(disp_clean), payload["a4"][i], dtype=float),
+                    curve_axis_name: disp_clean,
+                    value_name: force_clean,
+                }
+            )
+        )
+    if not rows:
+        return pd.DataFrame(
+            columns=["Yt", "kb", "b1", "b2", "a3", "a4", curve_axis_name, value_name]
+        )
+    return pd.concat(rows, ignore_index=True)
 
 
 def make_tensors(df, input_cols, target_col):

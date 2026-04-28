@@ -81,7 +81,7 @@ def test_compression_model_select_defaults_to_12_architectures(
             "best_path": str(out_dir / "best_model.json"),
         }
 
-    monkeypatch.setattr(mod, "read_wide_curve_table", fake_read)
+    monkeypatch.setattr(mod, "read_compression_training_table", fake_read)
     monkeypatch.setattr(mod, "grid_search_tabular_surrogate", fake_grid)
 
     data_path = tmp_path / "train.dat"

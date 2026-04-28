@@ -1,4 +1,4 @@
-"""Tests for meso_uq.surrogate.cli — make_tensors and read_wide_curve_table."""
+"""Tests for meso_uq.surrogate.cli — make_tensors and training-table readers."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 import torch
 
-from meso_uq.surrogate.cli import make_tensors, read_wide_curve_table
+from meso_uq.surrogate.cli import make_tensors, read_compression_training_table, read_wide_curve_table
 
 
 # ---------------------------------------------------------------------------
@@ -100,3 +100,65 @@ def test_read_wide_curve_table_drops_inf_and_nan(tmp_path: Path) -> None:
     df = read_wide_curve_table(str(path), curve_axis_name="x", value_name="y")
     # 2 curve points, but 1 has inf → dropped → 1 row
     assert len(df) == 1
+
+
+def test_read_compression_training_table_applies_uqdpd_cleaning(tmp_path: Path) -> None:
+    path = tmp_path / "compression.dat"
+    # 8 header columns + 5 disp + 5 force.
+    # Cleaning expectations:
+    # - disp<=0 removed
+    # - non-monotonic force point at disp=0.3 removed
+    # - anchor inserted at disp=0 with force=max(50, 10% first real force)=50
+    # - low-force tail at disp=0.4 with F=40 removed because disp>0.2 and F<50
+    row = [
+        1.0,
+        0.0,
+        2.0,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.0,
+        0.0,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        200.0,
+        20.0,
+        30.0,
+        10.0,
+        40.0,
+    ]
+    np.savetxt(path, np.array([row]), fmt="%.6f")
+
+    df = read_compression_training_table(str(path), curve_axis_name="disp", value_name="F")
+
+    assert list(df.columns) == ["Yt", "kb", "b1", "b2", "a3", "a4", "disp", "F"]
+    assert df["disp"].tolist() == pytest.approx([0.0, 0.1, 0.2])
+    assert df["F"].tolist() == pytest.approx([50.0, 20.0, 30.0])
+
+
+def test_read_compression_training_table_uses_proportional_anchor_above_floor(tmp_path: Path) -> None:
+    path = tmp_path / "compression_anchor.dat"
+    row = [
+        1.0,
+        0.0,
+        2.0,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.0,
+        0.1,
+        0.2,
+        0.3,
+        60.0,
+        80.0,
+        120.0,
+    ]
+    np.savetxt(path, np.array([row]), fmt="%.6f")
+
+    df = read_compression_training_table(str(path), curve_axis_name="disp", value_name="F")
+    assert df["disp"].tolist() == pytest.approx([0.0, 0.1, 0.2, 0.3])
+    assert df["F"].tolist() == pytest.approx([50.0, 60.0, 80.0, 120.0])
