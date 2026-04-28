@@ -224,3 +224,9 @@ This runner performs, in order:
 For exact paper-facing figure rendering on Vega, bootstrap and source repo-local TinyTeX first:
 - `bash scripts/platforms/vega/bootstrap_tex.sh`
 - `source _vega/tinytex/env.sh`
+
+For one-command replay of the exact HUQ-EMB paper figures from a stored `paper_data` campaign, use:
+- `scripts/workflows/emb/huq_emb/run_exact_uqdpd_asset_port.py`
+
+This wrapper auto-stages the DNN holdout/Sobol inputs, renders the exact paper figures, copies them into `paper_data/figures/*` and `paper_data/tables/`, and writes a replay report under `runs/<campaign_id>/paper_exact_stage/`.
+If no TeX deps are configured, it falls back to non-TeX matplotlib rendering automatically. See `docs/HUQ_EMB_EXACT_FIGURE_REPLAY.md`.

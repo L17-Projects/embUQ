@@ -45,10 +45,11 @@ PAPER_STAGE_ROOT = Path(
 V3_ROOT = PAPER_STAGE_ROOT
 SUPP_DIR = V3_ROOT / "generated" / "supplementary"
 FIGURES_DIR = V3_ROOT / "generated" / "figures"
+DEFAULT_TEXDEPS_DIR = REPO_ROOT / "papers" / "huq_emb" / "_texdeps"
 TEXDEPS_DIR = Path(
     os.environ.get(
         "MESOUQ_PAPER_TEXDEPS_DIR",
-        "/ceph/hpc/home/eubrieucb/workspace/UQ_DPD/Hierarchical_UQ_compression/_paper/v3/files/_texdeps",
+        str(DEFAULT_TEXDEPS_DIR),
     )
 ).resolve()
 WORKFLOW_ROOT = CAMPAIGN_ROOT / "workflow_matrix" / "runs"
@@ -110,24 +111,29 @@ def configure_matplotlib() -> None:
     current = os.environ.get("TEXINPUTS", "")
     if texinputs_prefix not in current:
         os.environ["TEXINPUTS"] = texinputs_prefix + current
-    mpl.rcParams.update(
-        {
-            "text.usetex": True,
-            "font.family": "serif",
-            "font.serif": ["Computer Modern Roman"],
-            "axes.unicode_minus": False,
-            "text.latex.preamble": r"\usepackage{amsmath}\usepackage{amssymb}",
-            "font.size": CAPTION_FONTSIZE,
-            "axes.labelsize": CAPTION_FONTSIZE,
-            "axes.titlesize": PANEL_TITLE_FONTSIZE,
-            "xtick.labelsize": TICK_FONTSIZE,
-            "ytick.labelsize": TICK_FONTSIZE,
-            "legend.fontsize": LEGEND_FONTSIZE,
-            "figure.titlesize": PANEL_TITLE_FONTSIZE,
-            "lines.linewidth": 1.8,
-            "axes.linewidth": 0.8,
-        }
-    )
+    use_tex = os.environ.get("HUQ_PAPER_DISABLE_TEX", "").strip().lower() not in {
+        "1",
+        "true",
+        "yes",
+    }
+    rc_params = {
+        "text.usetex": use_tex,
+        "font.family": "serif",
+        "font.serif": ["Computer Modern Roman"],
+        "axes.unicode_minus": False,
+        "font.size": CAPTION_FONTSIZE,
+        "axes.labelsize": CAPTION_FONTSIZE,
+        "axes.titlesize": PANEL_TITLE_FONTSIZE,
+        "xtick.labelsize": TICK_FONTSIZE,
+        "ytick.labelsize": TICK_FONTSIZE,
+        "legend.fontsize": LEGEND_FONTSIZE,
+        "figure.titlesize": PANEL_TITLE_FONTSIZE,
+        "lines.linewidth": 1.8,
+        "axes.linewidth": 0.8,
+    }
+    if use_tex:
+        rc_params["text.latex.preamble"] = r"\usepackage{amsmath}\usepackage{amssymb}"
+    mpl.rcParams.update(rc_params)
     _MATPLOTLIB_CONFIGURED = True
 
 
