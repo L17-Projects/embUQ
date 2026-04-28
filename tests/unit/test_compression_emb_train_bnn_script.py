@@ -49,7 +49,7 @@ def _run_script_with_args(
             },
         }
 
-    monkeypatch.setattr(module, "read_wide_curve_table", fake_read)
+    monkeypatch.setattr(module, "read_compression_training_table", fake_read)
     monkeypatch.setattr(module, "train_tabular_bnn_surrogate", fake_train)
     monkeypatch.setattr(
         sys,
@@ -109,4 +109,3 @@ def test_compression_emb_train_bnn_accepts_new_prior_scale_flag(
     )
     kwargs = captured["train_kwargs"]
     assert kwargs["obs_noise_prior_scale"] == pytest.approx(0.77)
-

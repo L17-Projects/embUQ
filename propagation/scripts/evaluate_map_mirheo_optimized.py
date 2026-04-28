@@ -24,6 +24,7 @@ import json
 import os
 import shutil
 import sys
+from importlib import import_module
 from pathlib import Path
 
 import numpy as np
@@ -75,7 +76,7 @@ def setup_map_specific_init_dir(
     Returns the path to the MAP-specific directory.
     """
     comm = MPI.COMM_WORLD
-    original_init_dir = str(PROJECT_ROOT / f"_init_compression_{diameter_um}um")
+    source_compression_path = str(PROJECT_ROOT / "compression" / "src") + "/"
     if scratch_root is None:
         map_init_dir = str(PROJECT_ROOT / f"_init_compression_{diameter_um}um_map")
     else:
@@ -86,9 +87,55 @@ def setup_map_specific_init_dir(
             shutil.rmtree(map_init_dir)
 
         datedPrint("[MAP] Creating MAP-specific init directory")
-        datedPrint(f"  Source: {original_init_dir}")
+        datedPrint(f"  Source: {source_compression_path}")
         datedPrint(f"  Target: {map_init_dir}")
-        shutil.copytree(original_init_dir, map_init_dir)
+        os.makedirs(map_init_dir, exist_ok=True)
+        os.makedirs(f"{source_compression_path}logs", exist_ok=True)
+        os.makedirs("logs", exist_ok=True)
+
+        sys.path.insert(0, source_compression_path)
+        generate_module = import_module("generate")
+        parameters_module = import_module("parameters")
+        generate_module.generate_sim(
+            source_path=source_compression_path,
+            simu_path=map_init_dir + "/",
+            par=[["buck", "10.0", "10.0", "1"]],
+            obj="emb",
+            forward=None,
+            hysteresis=None,
+            parallel=True,
+            g=1,
+            N=1,
+            first=None,
+            numJobs=1,
+        )
+
+        os.makedirs(f"{map_init_dir}/microbubble", exist_ok=True)
+        os.makedirs(f"{map_init_dir}/mesh", exist_ok=True)
+        shutil.copy2(
+            f"{source_compression_path}microbubble/sphere_icosphere.py",
+            f"{map_init_dir}/microbubble/sphere_icosphere.py",
+        )
+        parameters_module.write_parameters(
+            source_path=map_init_dir + "/",
+            simu_path=map_init_dir + "/",
+            simnum="00001",
+        )
+
+        param_file = f"{map_init_dir}/parameter/parameters-default00001.yaml"
+        with open(param_file, "r") as f:
+            params = yaml.load(f, Loader=yaml.CLoader)
+
+        ul = float(params.get("ul", 1e-7))
+        radius_physical = (diameter_um / 2.0) * 1e-6
+        radius_dpd = radius_physical / ul
+        diameter_dpd = 2.0 * radius_dpd
+        params["radp"] = radius_dpd
+        params["Lx"] = float(np.ceil(diameter_dpd + 5.0))
+        params["Ly"] = float(np.ceil(diameter_dpd + 5.0))
+        params["Lz"] = float(np.ceil(diameter_dpd + 10.0))
+        with open(param_file, "w") as f:
+            yaml.dump(params, f, Dumper=yaml.CDumper, default_flow_style=False, sort_keys=False)
 
         if retry_attempt > 0:
             dt_multiplier = dt_scale_factor**retry_attempt

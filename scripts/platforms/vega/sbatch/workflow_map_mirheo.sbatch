@@ -32,6 +32,8 @@ MAP_MIRHEO_N_DISPLACEMENTS="${MAP_MIRHEO_N_DISPLACEMENTS:-15}"
 # The dedicated sanity runner exports the supported 200/200 micro-canary floor explicitly.
 MAP_MIRHEO_NUMSTEPS="${MAP_MIRHEO_NUMSTEPS:-}"
 MAP_MIRHEO_NUMSTEPS_EQ="${MAP_MIRHEO_NUMSTEPS_EQ:-}"
+MAP_MIRHEO_TIMEOUT_SECONDS="${MAP_MIRHEO_TIMEOUT_SECONDS:-}"
+MAP_MIRHEO_DATASET_NAME="${MAP_MIRHEO_DATASET_NAME:-}"
 GPU_TIME_LIMIT="${GPU_TIME_LIMIT:-02:00:00}"
 
 module purge
@@ -63,6 +65,12 @@ if [[ -n "${MAP_MIRHEO_NUMSTEPS}" ]]; then
 fi
 if [[ -n "${MAP_MIRHEO_NUMSTEPS_EQ}" ]]; then
   common_args+=(--numsteps-eq "${MAP_MIRHEO_NUMSTEPS_EQ}")
+fi
+if [[ -n "${MAP_MIRHEO_TIMEOUT_SECONDS}" ]]; then
+  common_args+=(--timeout-seconds "${MAP_MIRHEO_TIMEOUT_SECONDS}")
+fi
+if [[ -n "${MAP_MIRHEO_DATASET_NAME}" ]]; then
+  common_args+=(--dataset-name "${MAP_MIRHEO_DATASET_NAME}")
 fi
 
 python -u scripts/platforms/vega/run_map_mirheo.py "${common_args[@]}" --n-displacements "${MAP_MIRHEO_N_DISPLACEMENTS}"

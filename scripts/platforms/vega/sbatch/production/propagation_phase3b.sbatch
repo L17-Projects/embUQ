@@ -10,8 +10,14 @@ set -eo pipefail
 [[ -z "${REPO_ROOT:-}" ]] && { echo "ERROR: REPO_ROOT not set"; exit 1; }
 
 module purge
-module load Python/3.10.8-GCCcore-12.2.0 openmpi/4.1.2.1 CUDA/12.2.2 \
+module load Python/3.10.8-GCCcore-12.2.0 CUDA/12.2.2 \
             GSL/2.7-GCC-12.2.0 Eigen/3.4.0-GCCcore-12.2.0
+OMPI_BIN_DIR="$(ls -d /opt/mpi/openmpi/4.1.*/bin 2>/dev/null | sort -V | tail -1)"
+if [[ -n "${OMPI_BIN_DIR}" ]]; then
+  OMPI_ROOT="$(dirname "${OMPI_BIN_DIR}")"
+  export PATH="${OMPI_BIN_DIR}:${PATH}"
+  export LD_LIBRARY_PATH="${OMPI_ROOT}/lib:${LD_LIBRARY_PATH:-}"
+fi
 source "${REPO_ROOT}/_vega/venv/bin/activate"
 source "${REPO_ROOT}/_vega/korali/env.sh"
 

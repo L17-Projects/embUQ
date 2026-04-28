@@ -387,6 +387,41 @@ def test_build_inference_command_phase3b_cpu_uses_mpi_and_device_flag() -> None:
     assert command[-2:] == ["--device", "cpu"]
 
 
+def test_build_inference_command_phase3b_dataset_filter_is_forwarded() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "production")
+    command = build_inference_command(
+        repo_root,
+        selection,
+        stage="phase3b",
+        python_bin="python",
+        config_path=resolve_workflow_config_path(repo_root, selection),
+        output_root=resolve_workflow_output_root(repo_root, selection),
+        device="gpu",
+        dataset_name="compression_2.1um",
+    )
+
+    assert "--dataset-name" in command
+    assert command[command.index("--dataset-name") + 1] == "compression_2.1um"
+
+
+def test_build_inference_command_rejects_phase3b_conflicting_filters() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "production")
+    with pytest.raises(ValueError, match="Use either dataset_name or diameter, not both."):
+        build_inference_command(
+            repo_root,
+            selection,
+            stage="phase3b",
+            python_bin="python",
+            config_path=resolve_workflow_config_path(repo_root, selection),
+            output_root=resolve_workflow_output_root(repo_root, selection),
+            device="gpu",
+            dataset_name="compression_2.1um",
+            diameter=2.1,
+        )
+
+
 def test_build_propagation_command_phase3b_includes_device_flag() -> None:
     repo_root = _repo_root()
     selection = VegaWorkflowSelection("indentation", "full-model", "production")

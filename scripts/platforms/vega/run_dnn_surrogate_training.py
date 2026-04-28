@@ -413,7 +413,11 @@ def _finalize_spec(*, spec: dict[str, Path | str], output_root: Path, args: argp
         str(report_path),
         "--collect-only",
     ]
-    result = subprocess.run(command, cwd=str(REPO_ROOT), text=True, capture_output=True, check=False)
+    env = {
+        **dict(os.environ),
+        "PYTHONPATH": f"{REPO_ROOT / 'src'}:{REPO_ROOT}{':' + os.environ['PYTHONPATH'] if 'PYTHONPATH' in os.environ and os.environ['PYTHONPATH'] else ''}",
+    }
+    result = subprocess.run(command, cwd=str(REPO_ROOT), text=True, capture_output=True, check=False, env=env)
     stdout_log.write_text(result.stdout or "", encoding="utf-8")
     stderr_log.write_text(result.stderr or "", encoding="utf-8")
     return {

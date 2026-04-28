@@ -135,6 +135,7 @@ def run_map_mirheo(
     extra_args: list[str] | None = None,
     model_family: str = "unknown",
     timeout_seconds: int = TIMEOUT_SECONDS,
+    dataset_names: list[str] | None = None,
 ) -> dict:
     """Run MAP Mirheo for all diameters.  Returns the summary manifest dict."""
     if extra_args is None:
@@ -165,8 +166,24 @@ def run_map_mirheo(
         raw_manifest = json.load(f)
     datasets = raw_manifest.get("datasets", {})
 
+    requested = set(dataset_names or [])
+    available = {
+        (map_json.stem[:-4] if map_json.stem.endswith("_map") else map_json.stem): map_json
+        for map_json in written
+    }
+    if requested:
+        missing = sorted(requested - set(available))
+        if missing:
+            raise ValueError(
+                "Requested dataset(s) not found in phase3b map manifest: "
+                + ", ".join(missing)
+            )
+        selected = [available[name] for name in sorted(requested)]
+    else:
+        selected = sorted(written)
+
     diameter_results: list[dict] = []
-    for map_json in sorted(written):
+    for map_json in selected:
         # Derive dataset name from filename: e.g. indentation_3.2um_map.json → indentation_3.2um
         stem = map_json.stem
         dataset_name = stem[:-4] if stem.endswith("_map") else stem
@@ -207,6 +224,7 @@ def run_map_mirheo(
         "n_displacements": n_displacements,
         "mpi_ranks": mpi_ranks,
         "timeout_seconds": timeout_seconds,
+        "selected_datasets": sorted(requested),
         "status": overall_status,
         "diameters": diameter_results,
     }
@@ -264,6 +282,10 @@ def main(argv: list[str] | None = None) -> int:
         "--numsteps-eq", type=int, default=None,
         help="Optional override passed through to evaluate_map_mirheo_optimized*.py"
     )
+    parser.add_argument(
+        "--dataset-name", action="append", default=[],
+        help="Optional dataset name filter. Repeat to run only selected diameters."
+    )
     args = parser.parse_args(argv)
 
     if args.mpi_ranks != 2:
@@ -298,8 +320,9 @@ def main(argv: list[str] | None = None) -> int:
             extra_args=extra_args,
             model_family=args.model_family,
             timeout_seconds=args.timeout_seconds,
+            dataset_names=args.dataset_name,
         )
-    except FileNotFoundError as exc:
+    except (FileNotFoundError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 

@@ -312,6 +312,31 @@ def load_map_parameters(modality: str, model_kind: str, diameter: str) -> dict:
     return load_latest(path)
 
 
+def extract_map_surrogate_curve(
+    modality: str,
+    model_kind: str,
+    diameter: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    map_data = load_map_parameters(modality, model_kind, diameter)
+    x_dpd, _ = load_reference_curve(modality, diameter)
+    params = list(map_data["parameters"])
+    sigma = float(map_data.get("sigma", 0.0))
+    sample = {"Parameters": params + [sigma]}
+
+    with inference_config_environment(workflow_config_path(modality, model_kind)):
+        if modality == "compression":
+            from compression.evalkit.posterior_compression import compute_compression_surrogate
+
+            compute_compression_surrogate(sample, x_dpd.tolist(), float(diameter))
+        else:
+            from indentation.evalkit.posterior_indentation import compute_indentation_surrogate
+
+            compute_indentation_surrogate(sample, x_dpd.tolist(), float(diameter))
+
+    y_dpd = np.asarray(sample["Reference Evaluations"], dtype=float)
+    return x_dpd, y_dpd
+
+
 def _map_mirheo_override_env(modality: str, model_kind: str, diameter: str) -> str:
     diameter_token = diameter.replace(".", "p").replace("-", "m")
     return f"HUQ_MAP_MIRHEO_OVERRIDE_{modality.upper()}_{model_kind.upper()}_{diameter_token.upper()}"
@@ -554,7 +579,7 @@ def map_mirheo_path(modality: str, model_kind: str, diameter: str) -> Path | Non
 
 
 def extract_map_curve(
-    modality: str, model_kind: str, diameter: str
+    modality: str, model_kind: str, diameter: str, *, apply_indent_d0_offset: bool = True
 ) -> tuple[np.ndarray, np.ndarray]:
     x_dpd, _ = load_reference_curve(modality, diameter)
     target_map = load_map_parameters(modality, model_kind, diameter)
@@ -602,7 +627,9 @@ def extract_map_curve(
                 short_diameter_dpd = np.asarray(map_result["forces"], dtype=float)
             d0_offset = float(map_result["grid_config"]["d0_offset"])
             initial_diameter_dpd = indentation_initial_diameter_dpd(diameter)
-            y_dpd = initial_diameter_dpd - short_diameter_dpd + d0_offset
+            y_dpd = initial_diameter_dpd - short_diameter_dpd
+            if apply_indent_d0_offset:
+                y_dpd = y_dpd + d0_offset
         return x_dpd, y_dpd
 
     raise RuntimeError(
@@ -1037,8 +1064,38 @@ def plot_phase1_representative() -> None:
         for col, label in enumerate(labels):
             ax = axes[row, col]
             vals = samples[:, col]
-            bins = 50 if modality == "compression" else 30
-            ax.hist(vals, bins=bins, density=True, color=color, alpha=0.35, edgecolor="none")
+            if row == 1:
+                q02, q10, q50, q90, q98 = np.quantile(vals, [0.02, 0.10, 0.50, 0.90, 0.98])
+                half_width = max(q90 - q50, q50 - q10)
+                half_width = max(half_width * 1.25, (q98 - q02) * 0.30)
+            else:
+                q01, q05, q50, q95, q99 = np.quantile(vals, [0.01, 0.05, 0.50, 0.95, 0.99])
+                half_width = max(q95 - q50, q50 - q05)
+                half_width = max(half_width * 1.65, (q99 - q01) * 0.48)
+            if half_width > 0.0:
+                xmin = q50 - half_width
+                xmax = q50 + half_width
+            else:
+                xmin = float(np.min(vals))
+                xmax = float(np.max(vals))
+            if not np.isfinite(xmin) or not np.isfinite(xmax) or xmax <= xmin:
+                span = max(abs(q50), 1.0) * 1.0e-6
+                xmin = float(q50 - span)
+                xmax = float(q50 + span)
+
+            visible_vals = vals[(vals >= xmin) & (vals <= xmax)]
+            if visible_vals.size == 0:
+                visible_vals = vals
+            bin_edges = np.linspace(xmin, xmax, 101)
+            ax.hist(
+                visible_vals,
+                bins=bin_edges,
+                density=True,
+                color=color,
+                alpha=0.35,
+                edgecolor="none",
+            )
+            ax.set_xlim(xmin, xmax)
             ax.set_title(label, pad=3)
             ax.ticklabel_format(axis="x", style="plain", useOffset=False)
             if (row, col) in sci_y_panels:
@@ -1599,7 +1656,7 @@ def plot_representative_confirmation() -> None:
         map_x, map_y = convert_map_mirheo_to_real(modality, diameter, map_result)
     else:
         try:
-            map_x_dpd, map_y_dpd = extract_map_curve(modality, "reduced", diameter)
+            map_x_dpd, map_y_dpd = extract_map_surrogate_curve(modality, "reduced", diameter)
             map_x, map_y = convert_to_real(modality, diameter, map_x_dpd, map_y_dpd)
         except RuntimeError:
             map_x, map_y = None, None
@@ -1646,7 +1703,7 @@ def plot_representative_confirmation() -> None:
         map_x, map_y = convert_map_mirheo_to_real(modality, diameter, map_result)
     else:
         try:
-            map_x_dpd, map_y_dpd = extract_map_curve(modality, "reduced", diameter)
+            map_x_dpd, map_y_dpd = extract_map_surrogate_curve(modality, "reduced", diameter)
             map_x, map_y = convert_to_real(modality, diameter, map_x_dpd, map_y_dpd)
         except RuntimeError:
             map_x, map_y = None, None
@@ -1727,8 +1784,8 @@ def merge_full_vs_reduced_map_overlays() -> None:
         styles = diameter_styles(modality, diameters)
 
         for diameter in diameters:
-            full_x_dpd, full_y_dpd = extract_map_curve(modality, "full", diameter)
-            reduced_x_dpd, reduced_y_dpd = extract_map_curve(modality, "reduced", diameter)
+            full_x_dpd, full_y_dpd = extract_map_surrogate_curve(modality, "full", diameter)
+            reduced_x_dpd, reduced_y_dpd = extract_map_surrogate_curve(modality, "reduced", diameter)
 
             full_x, full_y = convert_to_real(modality, diameter, full_x_dpd, full_y_dpd)
             reduced_x, reduced_y = convert_to_real(modality, diameter, reduced_x_dpd, reduced_y_dpd)

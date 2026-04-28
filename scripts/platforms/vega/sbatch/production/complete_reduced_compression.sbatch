@@ -37,10 +37,10 @@ PYTHON_BIN="${PYTHON_BIN:-python}"
 CONFIG_PATH="${CONFIG_PATH:-${REPO_ROOT}/reduced/configs/production/reduced_config_compression.yaml}"
 OUTPUT_DIR="${OUTPUT_DIR:-_runs/${EXPERIMENT}/${RUN_TAG}/production/setup}"
 
-PHASE1_TIME="${PHASE1_TIME:-12:00:00}"
-PHASE2_TIME="${PHASE2_TIME:-06:00:00}"
-PHASE3B_TIME="${PHASE3B_TIME:-12:00:00}"
-PROP3B_TIME="${PROP3B_TIME:-03:00:00}"
+PHASE1_TIME="${PHASE1_TIME:-00:20:00}"
+PHASE2_TIME="${PHASE2_TIME:-00:20:00}"
+PHASE3B_TIME="${PHASE3B_TIME:-01:00:00}"
+PROP3B_TIME="${PROP3B_TIME:-00:20:00}"
 
 PHASE1_GPU_PARTITION="$(route_gpu_partition "${PHASE1_TIME}")"
 PHASE2_GPU_PARTITION="$(route_gpu_partition "${PHASE2_TIME}")"
@@ -98,12 +98,21 @@ else
 fi
 [[ -z "${PHASE2_JOB}" ]] && { echo "ERROR: Phase 2 failed"; exit 1; }
 
+PHASE3B_DATASET_COUNT=$("${PYTHON_BIN}" "${REPO_ROOT}/scripts/shared/config/list_experiment_datasets.py" \
+  --config "${CONFIG_PATH}" --format dataset | wc -l | tr -d ' ')
+[[ -z "${PHASE3B_DATASET_COUNT}" || "${PHASE3B_DATASET_COUNT}" -lt 1 ]] && {
+  echo "ERROR: No phase3b datasets resolved for ${CONFIG_PATH}" >&2
+  exit 1
+}
+PHASE3B_ARRAY_MAX=$((PHASE3B_DATASET_COUNT - 1))
+
 PHASE3B_JOB=$(REPO_ROOT="${REPO_ROOT}" CONFIG_PATH="${CONFIG_PATH}" \
   sbatch --wait \
+    --array="0-${PHASE3B_ARRAY_MAX}" \
     --partition="${PHASE3B_GPU_PARTITION}" --gres=gpu:1 --ntasks=1 \
-    --exclusive ${PHASE3B_MEM_ARG} --time="${PHASE3B_TIME}" --exclude="" \
+    ${PHASE3B_MEM_ARG} --time="${PHASE3B_TIME}" --exclude="" \
     --job-name=p3b_${EXPERIMENT} \
-    --output="${LOGS_DIR}/phase3b_%j.out" --error="${LOGS_DIR}/phase3b_%j.err" \
+    --output="${LOGS_DIR}/phase3b_%A_%a.out" --error="${LOGS_DIR}/phase3b_%A_%a.err" \
     --export="${EXPORT_ENV}" \
     "${REPO_ROOT}/scripts/platforms/vega/sbatch/production/phase3b_gpu.sbatch" \
   | awk '{print $4}')

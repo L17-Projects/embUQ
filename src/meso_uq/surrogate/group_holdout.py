@@ -9,7 +9,7 @@ import pandas as pd
 import torch
 
 from .bnn import VariationalBNNPredictor
-from .cli import read_wide_curve_table
+from .cli import read_compression_training_table, read_wide_curve_table
 from .model import load_model_states
 
 SurrogateFamily = Literal["dnn", "bnn"]
@@ -165,7 +165,7 @@ def read_indentation_table(
 
 
 def read_compression_table(path: str | Path) -> pd.DataFrame:
-    return read_wide_curve_table(str(path), curve_axis_name="disp", value_name="F")
+    return read_compression_training_table(str(path), curve_axis_name="disp", value_name="F")
 
 
 def split_curves(
@@ -342,4 +342,3 @@ def find_representative_curve(metrics_df: pd.DataFrame) -> int:
     med = float(metrics_df["rel_l2_pct"].median())
     idx = (metrics_df["rel_l2_pct"] - med).abs().idxmin()
     return int(metrics_df.loc[idx, "curve_id"])
-

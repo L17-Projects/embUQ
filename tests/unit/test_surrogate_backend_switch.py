@@ -3,9 +3,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-pytest.importorskip("korali")
-pytest.importorskip("mpi4py")
-
 from compression.evalkit import posterior_compression as posterior_compression
 from indentation.evalkit import posterior_indentation as posterior_indentation
 

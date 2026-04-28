@@ -18,7 +18,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from meso_uq.surrogate.cli import read_wide_curve_table, train_tabular_surrogate
+from meso_uq.surrogate.cli import read_compression_training_table, train_tabular_surrogate
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 SURROGATE_ROOT = PROJECT_ROOT / "compression" / "surrogate"
@@ -42,7 +42,7 @@ def get_architectures() -> list[tuple[int, int, str]]:
 
 
 def read_new_dat_to_long(path: str | os.PathLike[str]):
-    return read_wide_curve_table(path, curve_axis_name="disp", value_name="F")
+    return read_compression_training_table(path, curve_axis_name="disp", value_name="F")
 
 
 def train_single_architecture(

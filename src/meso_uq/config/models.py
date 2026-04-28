@@ -61,6 +61,7 @@ class InferenceConfig(BaseModel):
     max_gen: int = Field(default=-1)
     target_cov: float = Field(ge=0.1, le=1.0, default=0.8)
     covariance_scaling: float = Field(ge=0.001, le=1.0, default=0.04)
+    phase1_burn_in: Optional[int] = Field(ge=0, default=None)
     prior_Yt: List[float] = Field(min_length=2, max_length=2)
     prior_kb: List[float] = Field(min_length=2, max_length=2)
     prior_b1: List[float] = Field(min_length=2, max_length=2)
@@ -119,6 +120,12 @@ class InferenceConfig(BaseModel):
             raise ValueError(f"Prior min ({v[0]}) must be less than max ({v[1]})")
         return v
 
+    @model_validator(mode="after")
+    def resolve_phase1_burn_in(self):
+        if self.phase1_burn_in is None:
+            self.phase1_burn_in = self.hbi_burn_in
+        return self
+
     def get_prior_bounds(self, param_name: str) -> PriorBounds:
         bounds_list = getattr(self, f"prior_{param_name}", None)
         if bounds_list is None:
@@ -161,6 +168,7 @@ def create_default_inference_config() -> InferenceConfig:
         max_gen=-1,
         target_cov=0.8,
         covariance_scaling=0.04,
+        phase1_burn_in=1,
         prior_Yt=[10000000.0, 50000000.0],
         prior_kb=[100.0, 1000.0],
         prior_b1=[0.0, 3.0],

@@ -33,6 +33,7 @@ DISP_SOURCE="${DISP_SOURCE:-auto}"
 module purge
 module load Python/3.10.8-GCCcore-12.2.0
 source "${REPO_ROOT}/_vega/venv/bin/activate"
+export PYTHONPATH="${REPO_ROOT}/src:${REPO_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"
 
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1

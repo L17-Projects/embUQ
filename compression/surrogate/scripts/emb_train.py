@@ -2,7 +2,7 @@
 
 import argparse
 
-from meso_uq.surrogate.cli import read_wide_curve_table, train_tabular_surrogate
+from meso_uq.surrogate.cli import read_compression_training_table, train_tabular_surrogate
 
 
 def main():
@@ -15,7 +15,7 @@ def main():
     ap.add_argument("--lr", type=float, default=5e-4)
     ap.add_argument("--max-epoch", type=int, default=100)
     args = ap.parse_args()
-    df = read_wide_curve_table(args.data, curve_axis_name="disp", value_name="F")
+    df = read_compression_training_table(args.data, curve_axis_name="disp", value_name="F")
     result = train_tabular_surrogate(
         df,
         input_cols=["Yt", "kb", "b1", "b2", "a3", "a4", "disp"],

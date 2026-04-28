@@ -55,7 +55,12 @@ def test_dnn_training_matrix_runner_writes_report_and_invokes_multi_arch(tmp_pat
             ),
             encoding="utf-8",
         )
-        assert env is None or env["EXPERIMENT"] == "compression"
+        if env is not None:
+            if "EXPERIMENT" in env:
+                assert env["EXPERIMENT"] == "compression"
+            if "PYTHONPATH" in env:
+                assert str(repo_root / "src") in env["PYTHONPATH"]
+                assert str(repo_root) in env["PYTHONPATH"]
         return _Result(returncode=0, stdout="ok\n")
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
@@ -102,10 +107,13 @@ def test_dnn_training_matrix_runner_resumes_from_existing_array_results(tmp_path
     captured: list[list[str]] = []
 
     def fake_run(command, cwd=None, text=False, capture_output=False, check=False, env=None):
-        del cwd, text, capture_output, check, env
+        del cwd, text, capture_output, check
         captured.append(command)
         if command[0] == "sbatch":
             raise AssertionError("resume path should not resubmit arrays when complete results already exist")
+        assert env is not None
+        assert str(repo_root / "src") in env["PYTHONPATH"]
+        assert str(repo_root) in env["PYTHONPATH"]
         report_path = Path(command[command.index("--report-json") + 1])
         report_path.write_text(
             json.dumps(

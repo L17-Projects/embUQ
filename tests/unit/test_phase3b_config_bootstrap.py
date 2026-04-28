@@ -95,11 +95,20 @@ def test_phase3b_main_forwards_device_and_paths(monkeypatch):
     module = _load_phase3b_module()
     captured = {}
 
-    def _fake_run_phase_3b(profiling=False, config_path=None, output_dir="_setup", device="cpu"):
+    def _fake_run_phase_3b(
+        profiling=False,
+        config_path=None,
+        output_dir="_setup",
+        device="cpu",
+        dataset_name=None,
+        diameter=None,
+    ):
         captured["profiling"] = profiling
         captured["config_path"] = config_path
         captured["output_dir"] = output_dir
         captured["device"] = device
+        captured["dataset_name"] = dataset_name
+        captured["diameter"] = diameter
 
     monkeypatch.setattr(module, "run_phase_3b", _fake_run_phase_3b)
 
@@ -115,6 +124,8 @@ def test_phase3b_main_forwards_device_and_paths(monkeypatch):
             "results",
             "--device",
             "gpu",
+            "--dataset-name",
+            "compression_2.1um",
         ],
     )
     module.main([])
@@ -124,4 +135,6 @@ def test_phase3b_main_forwards_device_and_paths(monkeypatch):
         "config_path": "phase3b.yaml",
         "output_dir": "results",
         "device": "gpu",
+        "dataset_name": "compression_2.1um",
+        "diameter": None,
     }

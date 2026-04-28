@@ -9,11 +9,35 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import korali
 import numpy as np
 import pandas as pd
 import yaml
-from mpi4py import MPI
+
+try:
+    import korali
+except ModuleNotFoundError:  # pragma: no cover - optional in lightweight test environments
+    korali = None
+
+try:
+    from mpi4py import MPI
+except ModuleNotFoundError:  # pragma: no cover - optional in lightweight test environments
+    class _FallbackComm:
+        def Get_rank(self) -> int:
+            return 0
+
+        def Barrier(self) -> None:
+            return None
+
+        def send(self, *_args, **_kwargs) -> None:
+            return None
+
+        def recv(self, *_args, **_kwargs):
+            raise RuntimeError("mpi4py is required for multi-rank communication.")
+
+    class _FallbackMPI:
+        COMM_WORLD = _FallbackComm()
+
+    MPI = _FallbackMPI()
 
 here = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(here, "../.."))
@@ -27,7 +51,15 @@ from meso_uq.workflow_acceleration import (
 
 _CONFIG_CACHE: Dict[str, Dict[str, Any]] = {}
 _SURROGATE_CACHE: Dict[Tuple[str, float, str, str], Any] = {}
-_SURROGATE_PATH_ADDED = False
+
+
+def _get_worker_comm():
+    if korali is not None:
+        try:
+            return korali.getWorkerMPIComm()
+        except Exception:
+            pass
+    return MPI.COMM_WORLD
 
 
 @lru_cache(maxsize=1)
@@ -91,19 +123,15 @@ def _resolve_surrogate_runtime(config: Dict[str, Any]) -> Tuple[str, int, int]:
 def _build_surrogate(
     project_root: str, diameter_um: float, device: str = "cpu", backend: str = "dnn"
 ) -> Any:
-    global _SURROGATE_PATH_ADDED
-    if not _SURROGATE_PATH_ADDED:
-        sys.path.insert(0, os.path.join(project_root, "compression", "surrogate"))
-        _SURROGATE_PATH_ADDED = True
     surrogate_path = os.path.join(
         project_root, f"compression/surrogate/diameters/{diameter_um}um/trained"
     )
     if backend == "dnn":
-        from evaluate import Surrogate
+        from compression.surrogate.evaluate import Surrogate
 
         return Surrogate(surrogate_path, device=device)
     if backend == "bnn":
-        from evaluate_bnn import Surrogate
+        from compression.surrogate.evaluate_bnn import Surrogate
 
         return Surrogate(surrogate_path, device=device)
     raise ValueError(f"Unsupported surrogate backend '{backend}'.")
@@ -241,10 +269,7 @@ def compute_compression(
     )
     Yt, kb, b1, b2, a3, a4, d0_offset, sig = params.tolist()
     theta = [Yt, kb, b1, b2, a3, a4]
-    try:
-        comm = korali.getWorkerMPIComm()
-    except Exception:
-        comm = MPI.COMM_WORLD
+    comm = _get_worker_comm()
     rank = comm.Get_rank()
     sample["Reference Evaluations"] = []
     sample["Standard Deviation"] = []

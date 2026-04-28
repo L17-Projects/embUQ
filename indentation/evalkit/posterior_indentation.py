@@ -8,10 +8,34 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-import korali
 import numpy as np
 import yaml
-from mpi4py import MPI
+
+try:
+    import korali
+except ModuleNotFoundError:  # pragma: no cover - optional in lightweight test environments
+    korali = None
+
+try:
+    from mpi4py import MPI
+except ModuleNotFoundError:  # pragma: no cover - optional in lightweight test environments
+    class _FallbackComm:
+        def Get_rank(self) -> int:
+            return 0
+
+        def Barrier(self) -> None:
+            return None
+
+        def send(self, *_args, **_kwargs) -> None:
+            return None
+
+        def recv(self, *_args, **_kwargs):
+            raise RuntimeError("mpi4py is required for multi-rank communication.")
+
+    class _FallbackMPI:
+        COMM_WORLD = _FallbackComm()
+
+    MPI = _FallbackMPI()
 
 from indentation.evalkit.tools import dated_print
 from meso_uq.workflow_acceleration import (
@@ -22,8 +46,16 @@ from meso_uq.workflow_acceleration import (
 
 _CONFIG_CACHE: Dict[str, Dict[str, Any]] = {}
 _SURROGATE_CACHE: Dict[Tuple[str, float, str, str], Any] = {}
-_SURROGATE_PATH_ADDED = False
 _DUMP_FLAG: bool | None = None
+
+
+def _get_worker_comm():
+    if korali is not None:
+        try:
+            return korali.getWorkerMPIComm()
+        except Exception:
+            pass
+    return MPI.COMM_WORLD
 
 
 @lru_cache(maxsize=1)
@@ -83,19 +115,15 @@ def _resolve_surrogate_runtime(config: Dict[str, Any]) -> Tuple[str, int, int]:
 def _build_surrogate(
     project_root: str, diameter_um: float, device: str = "cpu", backend: str = "dnn"
 ) -> Any:
-    global _SURROGATE_PATH_ADDED
-    if not _SURROGATE_PATH_ADDED:
-        sys.path.insert(0, os.path.join(project_root, "indentation", "surrogate"))
-        _SURROGATE_PATH_ADDED = True
     surrogate_path = os.path.join(
         project_root, f"indentation/surrogate/diameters/{diameter_um}um/trained"
     )
     if backend == "dnn":
-        from evaluate import Surrogate
+        from indentation.surrogate.evaluate import Surrogate
 
         return Surrogate(surrogate_path, device=device)
     if backend == "bnn":
-        from evaluate_bnn import Surrogate
+        from indentation.surrogate.evaluate_bnn import Surrogate
 
         return Surrogate(surrogate_path, device=device)
     raise ValueError(f"Unsupported surrogate backend '{backend}'.")
@@ -154,10 +182,7 @@ def compute_indentation_surrogate(
     disp_std_arr = np.asarray(disp_std, dtype=np.float64)
     obs_std_arr = sigma * np.abs(disp_mean_arr)
     total_std_arr = np.sqrt(np.square(disp_std_arr) + np.square(obs_std_arr))
-    try:
-        comm = korali.getWorkerMPIComm()
-    except Exception:
-        comm = MPI.COMM_WORLD
+    comm = _get_worker_comm()
     if dump and comm.Get_rank() == 0:
         print(
             f"[Korali] Indentation surrogate [D={diameter_um}um] | Yt={Yt:.0f}, kb={kb:.0f}, b1={b1:.2f}, b2={b2:.2f}, a3={a3:.2f}, a4={a4:.2f}, d0={d0:.4f}"
@@ -317,10 +342,7 @@ def compute_indentation(  # pragma: no cover
     for p in theta:
         filename_param += "%.2f" % (p) + "_"
 
-    try:
-        comm = korali.getWorkerMPIComm()
-    except TypeError:
-        comm = MPI.COMM_WORLD
+    comm = _get_worker_comm()
 
     rank = comm.Get_rank()
 

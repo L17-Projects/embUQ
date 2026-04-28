@@ -195,12 +195,14 @@ def test_read_indentation_table_and_compression_table(tmp_path: Path) -> None:
 
     compression_path = tmp_path / "compression.dat"
     compression_rows = [
-        [1.0, 0.0, 2.0, 0.1, 0.2, 0.3, 0.4, 0.0, 0.0, 0.5, 1.0, 2.0, 4.0, 6.0],
+        [1.0, 0.0, 2.0, 0.1, 0.2, 0.3, 0.4, 0.0, 0.0, 0.5, 1.0, 60.0, 80.0, 100.0],
     ]
     pd.DataFrame(compression_rows).to_csv(compression_path, sep=" ", header=False, index=False)
     compression_df = read_compression_table(compression_path)
     assert set(compression_df.columns) == {"Yt", "kb", "b1", "b2", "a3", "a4", "disp", "F"}
     assert len(compression_df) == 3
+    assert compression_df["disp"].tolist() == pytest.approx([0.0, 0.5, 1.0])
+    assert compression_df["F"].tolist() == pytest.approx([50.0, 80.0, 100.0])
 
 
 def test_read_indentation_table_rejects_invalid_shapes(tmp_path: Path) -> None:
