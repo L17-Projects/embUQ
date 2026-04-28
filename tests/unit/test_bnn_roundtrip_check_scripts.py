@@ -130,7 +130,7 @@ def test_karolina_roundtrip_helper_branches(monkeypatch) -> None:
 
     captured: dict[str, object] = {}
 
-    def _fake_read_wide(path: str, *, curve_axis_name: str, value_name: str):
+    def _fake_read_compression(path: str, *, curve_axis_name: str, value_name: str):
         captured["compression"] = (path, curve_axis_name, value_name)
         return "compression-df"
 
@@ -138,7 +138,7 @@ def test_karolina_roundtrip_helper_branches(monkeypatch) -> None:
         captured["indentation"] = (path, disp_source, rupture_ratio_threshold)
         return "indentation-df"
 
-    monkeypatch.setattr(module, "read_wide_curve_table", _fake_read_wide)
+    monkeypatch.setattr(module, "read_compression_training_table", _fake_read_compression)
     monkeypatch.setattr(module, "read_indentation_table", _fake_read_indentation)
 
     assert (

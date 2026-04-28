@@ -18,8 +18,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from meso_uq.hpc_paths import default_runs_root, detect_hpc_site  # noqa: E402
 from meso_uq.surrogate.bnn import VariationalBNNPredictor  # noqa: E402
 from meso_uq.surrogate.bnn_training import _split_like_dnn, train_tabular_bnn_surrogate  # noqa: E402
-from meso_uq.surrogate.cli import make_tensors, read_wide_curve_table  # noqa: E402
-from meso_uq.surrogate.group_holdout import read_indentation_table  # noqa: E402
+from meso_uq.surrogate.cli import make_tensors, read_compression_training_table, read_indentation_table  # noqa: E402
 
 _SELECTIONS: dict[str, dict[str, str]] = {
     "compression_2.1um": {
@@ -95,7 +94,7 @@ def _compute_degradation(inprocess_rmse: float, reload_rmse: float) -> tuple[flo
 
 def _load_training_dataframe(spec: dict[str, str], *, disp_source: str, rupture_ratio: float) -> Any:
     if spec["modality"] == "compression":
-        return read_wide_curve_table(spec["data"], curve_axis_name="disp", value_name="F")
+        return read_compression_training_table(spec["data"], curve_axis_name="disp", value_name="F")
     return read_indentation_table(
         spec["data"],
         disp_source=disp_source,

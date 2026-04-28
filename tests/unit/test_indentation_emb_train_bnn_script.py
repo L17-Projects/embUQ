@@ -110,3 +110,24 @@ def test_indentation_emb_train_bnn_accepts_obs_noise_flag(
     )
     captured = _run_script_with_args(module, monkeypatch, tmp_path, "--obs-noise", "0.42")
     assert captured["train_kwargs"]["obs_noise_prior_scale"] == pytest.approx(0.42)
+
+
+def test_indentation_emb_train_bnn_accepts_loader_knobs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    module = _load_module(
+        repo_root / "indentation" / "surrogate" / "scripts" / "emb_train_bnn.py",
+        "indentation_emb_train_bnn_loader_knobs_test",
+    )
+    captured = _run_script_with_args(
+        module,
+        monkeypatch,
+        tmp_path,
+        "--disp-source",
+        "displacement",
+        "--rupture-ratio",
+        "0",
+    )
+    assert captured["disp_source"] == "displacement"
+    assert captured["rupture_ratio_threshold"] is None
