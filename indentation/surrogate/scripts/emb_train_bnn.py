@@ -37,13 +37,20 @@ def main() -> None:
     parser.add_argument("--parity-tol", type=float, default=1.20)
     parser.add_argument("--no-require-parity", action="store_true", default=False)
     parser.add_argument("--device", default="cpu")
+    parser.add_argument("--disp-source", choices=["auto", "diameter", "displacement"], default="auto")
+    parser.add_argument("--rupture-ratio", type=float, default=2.0)
     args = parser.parse_args()
 
     data_path = Path(args.data).resolve()
     out_path = Path(args.out).resolve()
     dnn_ref = Path(args.dnn_reference).resolve()
     report_path = Path(args.report_path).resolve() if args.report_path else None
-    df = read_indentation_table(str(data_path), disp_source="auto", rupture_ratio_threshold=2.0)
+    rupture_ratio = None if args.rupture_ratio <= 0 else float(args.rupture_ratio)
+    df = read_indentation_table(
+        str(data_path),
+        disp_source=args.disp_source,
+        rupture_ratio_threshold=rupture_ratio,
+    )
     result = train_tabular_bnn_surrogate(
         df,
         input_cols=["Yt", "kb", "b1", "b2", "a3", "a4", "F"],
