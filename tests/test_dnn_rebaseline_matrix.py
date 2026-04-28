@@ -127,10 +127,14 @@ def test_dnn_rebaseline_runner_writes_selection_and_state(tmp_path: Path, monkey
     assert payload["best_architecture"] == "w32_d2"
     assert payload["best_val_loss"] == pytest.approx(0.25)
 
-    matrix_path = tmp_path / "out" / "dnn_rebaseline_matrix_report.json"
+    matrix_path = tmp_path / "out" / "dnn_rebaseline_matrix_report__seeds-101.json"
     matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
     assert matrix["status"] == "passed"
+    assert matrix["completed_at"] is not None
     assert len(matrix["runs"]) == 2
+    assert matrix["config"]["requested_specs"] == []
+    assert matrix["config"]["requested_seeds"] == [101]
+    assert matrix["config"]["resolved_specs"] == ["spec_a"]
 
 
 def test_dnn_rebaseline_runner_resume_skips_completed(tmp_path: Path, monkeypatch) -> None:
@@ -187,6 +191,63 @@ def test_dnn_rebaseline_runner_resume_skips_completed(tmp_path: Path, monkeypatc
     assert "w64_d2" in " ".join(called[0])
 
 
+def test_dnn_rebaseline_runner_writes_invocation_scoped_report_for_filtered_runs(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_dnn_rebaseline_matrix.py",
+        "run_dnn_rebaseline_matrix_filtered_report_test",
+    )
+    spec = _make_spec(tmp_path, "spec_a")
+    monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [spec])
+
+    def fake_run(command, cwd, check):  # noqa: ANN001
+        del cwd, check
+        out_path = Path(_parse_arg(command, "--out"))
+        report_path = Path(_parse_arg(command, "--report-path"))
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text("artifact", encoding="utf-8")
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps({"train_loss": 0.1, "val_loss": 0.2, "out": str(out_path)}),
+            encoding="utf-8",
+        )
+
+        class _Done:
+            returncode = 0
+
+        return _Done()
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    rc = module.main(
+        [
+            "--output-root",
+            str(tmp_path / "out"),
+            "--only",
+            "spec_a",
+            "--seed",
+            "20260317",
+            "--architectures",
+            "w32_d2",
+        ]
+    )
+    assert rc == 0
+
+    default_matrix_path = tmp_path / "out" / "dnn_rebaseline_matrix_report.json"
+    filtered_matrix_path = (
+        tmp_path / "out" / "dnn_rebaseline_matrix_report__specs-spec_a__seeds-20260317.json"
+    )
+    assert default_matrix_path.exists() is False
+    matrix = json.loads(filtered_matrix_path.read_text(encoding="utf-8"))
+    assert matrix["status"] == "passed"
+    assert matrix["completed_at"] is not None
+    assert matrix["config"]["requested_specs"] == ["spec_a"]
+    assert matrix["config"]["requested_seeds"] == [20260317]
+    assert matrix["config"]["resolved_specs"] == ["spec_a"]
+
+
 def test_dnn_rebaseline_runner_import_does_not_require_torch() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     _assert_runner_import_without_torch(
@@ -214,6 +275,14 @@ def test_dnn_rebaseline_runner_rejects_empty_or_unknown_architecture_names(tmp_p
     artifact_path.write_text("artifact", encoding="utf-8")
     report_path.write_text("{broken json", encoding="utf-8")
     assert module._candidate_completed(report_path, artifact_path) is False
+    assert (
+        module._matrix_report_path(tmp_path, requested_specs=[], requested_seeds=[])
+        == tmp_path / "dnn_rebaseline_matrix_report.json"
+    )
+    assert (
+        module._matrix_report_path(tmp_path, requested_specs=["spec_a"], requested_seeds=[20260317])
+        == tmp_path / "dnn_rebaseline_matrix_report__specs-spec_a__seeds-20260317.json"
+    )
 
 
 def test_dnn_rebaseline_runner_rejects_unknown_only_filter(tmp_path: Path, monkeypatch) -> None:

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -139,6 +138,30 @@ def _selection_path(seed_root: Path) -> Path:
     return seed_root / "selection.json"
 
 
+def _sanitize_report_token(text: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in {"-", "_", "+"} else "-" for ch in text)
+
+
+def _matrix_report_path(
+    output_root: Path,
+    *,
+    requested_specs: list[str],
+    requested_seeds: list[int],
+) -> Path:
+    if not requested_specs and not requested_seeds:
+        return output_root / "dnn_rebaseline_matrix_report.json"
+
+    parts: list[str] = []
+    if requested_specs:
+        spec_token = "+".join(_sanitize_report_token(name) for name in sorted(requested_specs))
+        parts.append(f"specs-{spec_token}")
+    if requested_seeds:
+        seed_token = "+".join(str(int(seed)) for seed in requested_seeds)
+        parts.append(f"seeds-{seed_token}")
+    suffix = "__".join(parts) if parts else "invocation"
+    return output_root / f"dnn_rebaseline_matrix_report__{suffix}.json"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run seeded DNN rebaseline sweeps for all EMB surrogate datasets without promoting tracked BEST artifacts."
@@ -178,13 +201,23 @@ def main(argv: list[str] | None = None) -> int:
         if not specs:
             raise ValueError(f"No EMB dataset specs matched --only values: {sorted(wanted)}")
 
-    matrix_report_path = output_root / "dnn_rebaseline_matrix_report.json"
+    requested_specs = list(args.only)
+    requested_seed_values = [int(seed) for seed in args.seed]
+    matrix_report_path = _matrix_report_path(
+        output_root,
+        requested_specs=requested_specs,
+        requested_seeds=requested_seed_values,
+    )
     report: dict[str, object] = {
         "schema_version": 1,
         "status": "running",
+        "completed_at": None,
         "output_root": str(output_root),
         "started_at": _now_iso(),
         "config": {
+            "requested_specs": requested_specs,
+            "requested_seeds": requested_seed_values,
+            "resolved_specs": [str(spec["name"]) for spec in specs],
             "seeds": seeds,
             "architectures": [name for _, _, name in architectures],
             "batch_size": int(args.batch_size),
@@ -249,6 +282,7 @@ def main(argv: list[str] | None = None) -> int:
         _write_json(matrix_report_path, report)
 
     report["status"] = "passed"
+    report["completed_at"] = _now_iso()
     report["runs"] = run_rows
     _write_json(matrix_report_path, report)
     print(f"DNN rebaseline matrix report: {matrix_report_path}")
