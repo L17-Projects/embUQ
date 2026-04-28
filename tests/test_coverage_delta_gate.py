@@ -24,7 +24,7 @@ def _write_coverage_json(path: Path, covered: int, statements: int):
 def test_coverage_delta_gate_passes_when_head_increases(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "ci" / "check_coverage_increase.py",
+        repo_root / "scripts" / "qa" / "ci" / "check_coverage_increase.py",
         "check_coverage_increase_test",
     )
 
@@ -53,7 +53,7 @@ def test_coverage_delta_gate_passes_when_head_increases(tmp_path):
 def test_coverage_delta_gate_fails_when_head_not_higher(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "ci" / "check_coverage_increase.py",
+        repo_root / "scripts" / "qa" / "ci" / "check_coverage_increase.py",
         "check_coverage_increase_test_equal",
     )
 
@@ -72,7 +72,7 @@ def test_coverage_delta_gate_fallback_to_percent_covered(tmp_path):
     """When num_statements == 0, _extract_percent falls back to percent_covered."""
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "ci" / "check_coverage_increase.py",
+        repo_root / "scripts" / "qa" / "ci" / "check_coverage_increase.py",
         "check_coverage_increase_test_fallback",
     )
 
@@ -96,7 +96,7 @@ def test_coverage_delta_gate_fallback_to_percent_covered(tmp_path):
 def test_coverage_delta_gate_ignores_optional_bnn_files(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "ci" / "check_coverage_increase.py",
+        repo_root / "scripts" / "qa" / "ci" / "check_coverage_increase.py",
         "check_coverage_increase_test_excludes",
     )
 

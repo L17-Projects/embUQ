@@ -44,7 +44,7 @@ def test_train_bnn_matrix_resume_skips_completed(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "karolina" / "train_bnn_surrogates.py",
+        repo_root / "scripts" / "platforms" / "karolina" / "train_bnn_surrogates.py",
         "train_bnn_surrogates_resume_test",
     )
     spec_a = _make_spec(tmp_path, "spec_a")
@@ -107,7 +107,7 @@ def test_train_bnn_matrix_start_from_filters_sequence(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "karolina" / "train_bnn_surrogates.py",
+        repo_root / "scripts" / "platforms" / "karolina" / "train_bnn_surrogates.py",
         "train_bnn_surrogates_start_from_test",
     )
     spec_a = _make_spec(tmp_path, "spec_a")

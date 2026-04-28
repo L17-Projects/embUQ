@@ -24,7 +24,7 @@ def test_run_surrogate_group_holdout_orchestrator_builds_and_records_runs(
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "karolina" / "run_surrogate_group_holdout.py",
+        repo_root / "scripts" / "platforms" / "karolina" / "run_surrogate_group_holdout.py",
         "run_surrogate_group_holdout_test",
     )
 
@@ -85,7 +85,7 @@ def test_run_surrogate_group_holdout_orchestrator_handles_missing_models_and_fai
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "karolina" / "run_surrogate_group_holdout.py",
+        repo_root / "scripts" / "platforms" / "karolina" / "run_surrogate_group_holdout.py",
         "run_surrogate_group_holdout_failure_test",
     )
 

@@ -83,6 +83,21 @@ def _write_supplementary_outputs(module, generated_root: Path) -> None:  # noqa:
         (supp_root / name).write_text("table\n", encoding="utf-8")
 
 
+def _write_exported_outputs(module, paper_data_root: Path) -> None:  # noqa: ANN001
+    figures_main = paper_data_root / "figures" / "main"
+    figures_supp = paper_data_root / "figures" / "supplementary"
+    tables_root = paper_data_root / "tables"
+    figures_main.mkdir(parents=True, exist_ok=True)
+    figures_supp.mkdir(parents=True, exist_ok=True)
+    tables_root.mkdir(parents=True, exist_ok=True)
+    for name in module.MANDATORY_MAIN_FIGURES:
+        (figures_main / name).write_text("stale-main\n", encoding="utf-8")
+    for name in module.MANDATORY_SUPPLEMENTARY_FIGURES:
+        (figures_supp / name).write_text("stale-supp\n", encoding="utf-8")
+    for name in module.MANDATORY_TABLES:
+        (tables_root / name).write_text("stale-table\n", encoding="utf-8")
+
+
 def test_run_exact_uqdpd_asset_port_infers_single_campaign_and_emits_report(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -106,6 +121,8 @@ def test_run_exact_uqdpd_asset_port_infers_single_campaign_and_emits_report(
         calls.append({"command": command, "env": dict(env) if env is not None else None})
         script_name = Path(command[1]).name
         if script_name == "stage_dnn_figure_inputs.py":
+            assert command[0] == "python3"
+            assert command[command.index("--python-bin") + 1] == "python3"
             staging_root = campaign_root / "postprocess_graph" / "dnn_figure_input_staging"
             _write_staging_report(
                 staging_root / "dnn_figure_input_staging_report.json",
@@ -114,11 +131,15 @@ def test_run_exact_uqdpd_asset_port_infers_single_campaign_and_emits_report(
             )
         elif script_name == "uqdpd_generate_reduced_story_assets.py":
             assert env is not None
+            assert command[0] == "python3"
+            assert env["PYTHON_BIN"] == "python3"
             assert env["HUQ_PAPER_DISABLE_TEX"] == "1"
             assert env["PATH"].split(os.pathsep)[0] == str(tinytex_bin)
             _write_main_outputs(module, Path(env["MESOUQ_PAPER_STAGE_ROOT"]) / "generated")
         elif script_name == "uqdpd_generate_supplementary_map_figures.py":
             assert env is not None
+            assert command[0] == "python3"
+            assert env["PYTHON_BIN"] == "python3"
             assert env["HUQ_PAPER_DISABLE_TEX"] == "1"
             _write_supplementary_outputs(module, Path(env["MESOUQ_PAPER_STAGE_ROOT"]) / "generated")
         else:
@@ -127,7 +148,7 @@ def test_run_exact_uqdpd_asset_port_infers_single_campaign_and_emits_report(
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
 
-    rc = module.main(["--paper-data-root", str(paper_data_root)])
+    rc = module.main(["--paper-data-root", str(paper_data_root), "--python-bin", "python3"])
     assert rc == 0
 
     assert [Path(call["command"][1]).name for call in calls] == [
@@ -142,6 +163,7 @@ def test_run_exact_uqdpd_asset_port_infers_single_campaign_and_emits_report(
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["status"] == "passed"
     assert report["campaign_id"] == "camp1"
+    assert report["python_bin"] == "python3"
     assert report["tex"]["disable_tex"] is True
     assert not report["hard_failures"]
 
@@ -253,6 +275,61 @@ def test_run_exact_uqdpd_asset_port_fails_when_required_assets_are_missing(
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["status"] == "failed"
     assert report["hard_failures"]
+
+
+def test_run_exact_uqdpd_asset_port_does_not_accept_stale_exported_assets(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "workflows" / "emb" / "huq_emb" / "run_exact_uqdpd_asset_port.py",
+        "run_exact_uqdpd_asset_port_stale_exports_test",
+    )
+
+    paper_data_root = tmp_path / "paper_data"
+    campaign_root = paper_data_root / "runs" / "camp3_stale"
+    campaign_root.mkdir(parents=True, exist_ok=True)
+    _write_exported_outputs(module, paper_data_root)
+
+    _stub_runtime_paths(module, monkeypatch, tmp_path)
+
+    def fake_run(command, cwd=None, text=False, capture_output=False, check=False, env=None):
+        del cwd, text, capture_output, check, env
+        script_name = Path(command[1]).name
+        if script_name == "stage_dnn_figure_inputs.py":
+            staging_root = campaign_root / "postprocess_graph" / "dnn_figure_input_staging"
+            _write_staging_report(
+                staging_root / "dnn_figure_input_staging_report.json",
+                group_holdout_root=staging_root / "group_holdout",
+                sobol_root=staging_root / "sobol",
+            )
+        elif script_name == "uqdpd_generate_reduced_story_assets.py":
+            generated_figures = campaign_root / "paper_exact_stage" / "generated" / "figures"
+            generated_figures.mkdir(parents=True, exist_ok=True)
+            (generated_figures / module.MANDATORY_MAIN_FIGURES[0]).write_text("fresh\n", encoding="utf-8")
+        elif script_name == "uqdpd_generate_supplementary_map_figures.py":
+            pass
+        else:
+            raise AssertionError(f"Unexpected command: {command}")
+        return _Result(returncode=0, stdout="ok\n")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    rc = module.main(["--paper-data-root", str(paper_data_root), "--campaign-id", "camp3_stale"])
+    assert rc == 1
+
+    report_path = campaign_root / "paper_exact_stage" / "run_exact_uqdpd_asset_port.report.json"
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["status"] == "failed"
+    missing_name = module.MANDATORY_MAIN_FIGURES[1]
+    missing_entry = next(
+        entry for entry in report["required_assets"]["figures_main"] if entry["asset_id"] == missing_name
+    )
+    assert missing_entry["exists"] is False
+    assert missing_entry["path"] == str(
+        (campaign_root / "paper_exact_stage" / "generated" / "figures" / missing_name).resolve()
+    )
+    assert (paper_data_root / "figures" / "main" / missing_name).exists()
 
 
 def test_run_exact_uqdpd_asset_port_force_cleans_stage_root_and_forwards_flag(
@@ -520,6 +597,10 @@ def test_exact_wrapper_helper_paths_and_tex_resolution(monkeypatch, tmp_path: Pa
     missing_candidates = [tmp_path / "missing_python_a", tmp_path / "missing_python_b"]
     monkeypatch.setattr(module, "DEFAULT_PYTHON_CANDIDATES", missing_candidates)
     assert module._default_python_bin() == sys.executable
+    assert module._resolve_python_bin("python3") == "python3"
+    assert module._resolve_python_bin(str(tmp_path / "venv" / "bin" / "python")) == str(
+        (tmp_path / "venv" / "bin" / "python").resolve()
+    )
 
     paper_data_root = tmp_path / "paper_data"
     with pytest.raises(ValueError, match="does not exist"):

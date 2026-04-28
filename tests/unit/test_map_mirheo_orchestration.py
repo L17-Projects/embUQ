@@ -11,10 +11,10 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "src"))
-sys.path.insert(0, str(REPO / "scripts" / "vega"))
+sys.path.insert(0, str(REPO / "scripts" / "platforms" / "vega"))
 
-_SCRIPT = REPO / "scripts" / "vega" / "run_map_mirheo.py"
-_MATRIX_SCRIPT = REPO / "scripts" / "vega" / "run_workflow_matrix.py"
+_SCRIPT = REPO / "scripts" / "platforms" / "vega" / "run_map_mirheo.py"
+_MATRIX_SCRIPT = REPO / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py"
 
 
 # ---------------------------------------------------------------------------

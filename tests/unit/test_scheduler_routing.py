@@ -55,8 +55,10 @@ def test_route_gpu_partition_custom_policy() -> None:
 
 def test_map_sbatch_templates_use_partition_router_script() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    map_template = repo_root / "scripts" / "vega" / "sbatch" / "workflow_map.sbatch"
-    mirheo_template = repo_root / "scripts" / "vega" / "sbatch" / "workflow_map_mirheo.sbatch"
+    map_template = repo_root / "scripts" / "platforms" / "vega" / "sbatch" / "workflow_map.sbatch"
+    mirheo_template = (
+        repo_root / "scripts" / "platforms" / "vega" / "sbatch" / "workflow_map_mirheo.sbatch"
+    )
 
     map_text = map_template.read_text(encoding="utf-8")
     mirheo_text = mirheo_template.read_text(encoding="utf-8")
@@ -68,7 +70,9 @@ def test_map_sbatch_templates_use_partition_router_script() -> None:
 
 def test_map_mirheo_template_keeps_production_defaults_unset() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    mirheo_template = repo_root / "scripts" / "vega" / "sbatch" / "workflow_map_mirheo.sbatch"
+    mirheo_template = (
+        repo_root / "scripts" / "platforms" / "vega" / "sbatch" / "workflow_map_mirheo.sbatch"
+    )
     mirheo_text = mirheo_template.read_text(encoding="utf-8")
 
     assert 'MAP_MIRHEO_NUMSTEPS="${MAP_MIRHEO_NUMSTEPS:-}"' in mirheo_text

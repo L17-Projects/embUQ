@@ -1,4 +1,4 @@
-"""Tests for scripts/workstation/doctor_o369.py."""
+"""Tests for scripts/platforms/workstation/doctor_o369.py."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = REPO_ROOT / "scripts" / "workstation" / "doctor_o369.py"
+MODULE_PATH = REPO_ROOT / "scripts" / "platforms" / "workstation" / "doctor_o369.py"
 
 
 def _load_module():

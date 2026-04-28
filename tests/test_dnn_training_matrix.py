@@ -23,7 +23,7 @@ class _Result:
 def test_dnn_training_matrix_runner_writes_report_and_invokes_multi_arch(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_dnn_surrogate_training.py",
+        repo_root / "scripts" / "platforms" / "vega" / "run_dnn_surrogate_training.py",
         "run_dnn_surrogate_training_test",
     )
     spec = dict(next(item for item in module.SPECS if item["name"] == "compression_2.1um"))
@@ -86,7 +86,7 @@ def test_dnn_training_matrix_runner_writes_report_and_invokes_multi_arch(tmp_pat
 def test_dnn_training_matrix_runner_resumes_from_existing_array_results(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_dnn_surrogate_training.py",
+        repo_root / "scripts" / "platforms" / "vega" / "run_dnn_surrogate_training.py",
         "run_dnn_surrogate_training_resume_test",
     )
 

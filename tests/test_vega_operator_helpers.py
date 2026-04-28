@@ -41,7 +41,7 @@ def test_run_inference_stage_builds_phase2_command_with_profile_and_model_family
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_inference_stage.py", "run_inference_stage_test"
+        repo_root / "scripts" / "platforms" / "vega" / "run_inference_stage.py", "run_inference_stage_test"
     )
     captured = {}
 
@@ -92,7 +92,7 @@ def test_run_inference_stage_builds_phase2_command_with_profile_and_model_family
 def test_run_inference_stage_phase2_production_defaults_to_native_cuda(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_inference_stage.py",
+        repo_root / "scripts" / "platforms" / "vega" / "run_inference_stage.py",
         "run_inference_stage_production_phase2_native_cuda_test",
     )
     captured = {}
@@ -131,7 +131,7 @@ def test_run_inference_stage_phase2_production_defaults_to_native_cuda(tmp_path,
 def test_run_propagation_uses_explicit_stage_wrapper(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_propagation.py", "run_propagation_test"
+        repo_root / "scripts" / "platforms" / "vega" / "run_propagation.py", "run_propagation_test"
     )
     captured = {}
 
@@ -173,7 +173,7 @@ def test_run_propagation_uses_explicit_stage_wrapper(tmp_path, monkeypatch):
 def test_run_inference_stage_uses_reduced_phase1_wrapper(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_inference_stage.py",
+        repo_root / "scripts" / "platforms" / "vega" / "run_inference_stage.py",
         "run_inference_stage_reduced_test",
     )
     captured = {}
@@ -243,7 +243,10 @@ def test_reduced_phase2_wrapper_delegates_to_main_driver(tmp_path, monkeypatch):
 
 def test_extract_map_writes_manifest_for_single_selected_dataset(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
-    module = _load_module(repo_root / "scripts" / "vega" / "extract_map.py", "extract_map_test")
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "vega" / "extract_map.py",
+        "extract_map_test",
+    )
 
     output_root = tmp_path / "workflow"
     _write_latest_state(output_root / "results_phase_3b" / "compression_2.1um" / "latest")
@@ -283,7 +286,7 @@ def test_extract_map_writes_manifest_for_single_selected_dataset(tmp_path):
 
 def test_vega_sbatch_templates_expose_model_family_and_profile_axes() -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    template_dir = repo_root / "scripts" / "vega" / "sbatch"
+    template_dir = repo_root / "scripts" / "platforms" / "vega" / "sbatch"
     templates = sorted(template_dir.glob("*.sbatch"))
     fixed_scope_templates = {"train_dnn_arch_array.sbatch", "train_dnn_surrogates.sbatch"}
 
@@ -306,7 +309,7 @@ def test_vega_sbatch_templates_expose_model_family_and_profile_axes() -> None:
 
 def test_production_sanity_template_uses_public_command() -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    template = repo_root / "scripts" / "vega" / "sbatch" / "production_sanity.sbatch"
+    template = repo_root / "scripts" / "platforms" / "vega" / "sbatch" / "production_sanity.sbatch"
 
     text = template.read_text(encoding="utf-8")
 
@@ -317,7 +320,7 @@ def test_production_sanity_template_uses_public_command() -> None:
 
 def test_validation_matrix_template_uses_public_command() -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    template = repo_root / "scripts" / "vega" / "sbatch" / "validation_matrix.sbatch"
+    template = repo_root / "scripts" / "platforms" / "vega" / "sbatch" / "validation_matrix.sbatch"
 
     text = template.read_text(encoding="utf-8")
 
@@ -329,7 +332,7 @@ def test_validation_matrix_template_uses_public_command() -> None:
 
 def test_acceptance_template_uses_public_command() -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    template = repo_root / "scripts" / "vega" / "sbatch" / "acceptance.sbatch"
+    template = repo_root / "scripts" / "platforms" / "vega" / "sbatch" / "acceptance.sbatch"
 
     text = template.read_text(encoding="utf-8")
 

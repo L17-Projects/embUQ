@@ -32,7 +32,7 @@ def _selection_dataset(command: list[str]) -> str:
 def test_workflow_matrix_runner_writes_machine_readable_report(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_workflow_matrix.py", "workflow_matrix_test"
+        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py", "workflow_matrix_test"
     )
 
     def fake_run(command, cwd=None, text=False, capture_output=False, check=False):
@@ -130,7 +130,7 @@ def test_workflow_matrix_emits_policy_metadata_in_job_and_lane_manifests(
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_workflow_matrix.py",
+        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py",
         "workflow_matrix_policy_manifest_test",
     )
 
@@ -210,7 +210,7 @@ def test_workflow_matrix_writes_paper_release_manifest_with_assets_and_mapping(
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_workflow_matrix.py",
+        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py",
         "workflow_matrix_release_manifest_test",
     )
 
@@ -317,7 +317,7 @@ def test_workflow_matrix_writes_paper_release_manifest_with_assets_and_mapping(
 def test_workflow_matrix_runner_accepts_explicit_override_selector(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_workflow_matrix.py", "workflow_matrix_override_test"
+        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py", "workflow_matrix_override_test"
     )
 
     def fake_run(command, cwd=None, text=False, capture_output=False, check=False):
@@ -350,7 +350,7 @@ def test_workflow_matrix_runner_accepts_explicit_override_selector(tmp_path, mon
 def test_workflow_matrix_forwards_requested_devices(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_workflow_matrix.py", "workflow_matrix_device_test"
+        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py", "workflow_matrix_device_test"
     )
     captured: list[list[str]] = []
 
@@ -394,7 +394,7 @@ def test_workflow_matrix_forwards_requested_devices(tmp_path, monkeypatch):
 def test_workflow_matrix_phase2_backend_defaults_by_profile(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_workflow_matrix.py", "workflow_matrix_phase2_backend_defaults_test"
+        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py", "workflow_matrix_phase2_backend_defaults_test"
     )
     captured: list[list[str]] = []
 
@@ -432,7 +432,7 @@ def test_workflow_matrix_allow_release_fail_keeps_zero_exit_for_command_success(
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_workflow_matrix.py",
+        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py",
         "workflow_matrix_allow_release_fail_test",
     )
 
@@ -469,7 +469,7 @@ def test_workflow_matrix_skip_release_manifest_marks_workflow_only_scope(
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_workflow_matrix.py",
+        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py",
         "workflow_matrix_skip_release_manifest_test",
     )
 
@@ -502,7 +502,7 @@ def test_validation_matrix_wrapper_delegates_to_workflow_matrix_with_validation_
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "vega" / "run_validation_matrix.py",
         "validation_matrix_wrapper_test",
     )
     captured = {}
@@ -545,7 +545,7 @@ def test_validation_matrix_wrapper_resolves_relative_output_root_from_repo_root(
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "vega" / "run_validation_matrix.py",
         "validation_matrix_wrapper_relative_output_test",
     )
     captured = {}

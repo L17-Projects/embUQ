@@ -20,7 +20,10 @@ class _Result:
 
 def test_production_sanity_command_writes_override_configs_and_machine_readable_report(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
-    module = _load_module(repo_root / "scripts" / "vega" / "run_production_sanity.py", "run_production_sanity_test")
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "vega" / "run_production_sanity.py",
+        "run_production_sanity_test",
+    )
     captured = {}
 
     def fake_run(command, cwd=None, text=False, capture_output=False, check=False):

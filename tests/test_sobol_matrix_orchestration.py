@@ -24,7 +24,7 @@ def test_run_sobol_matrix_orchestrator_builds_and_records_runs(
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "karolina" / "run_sobol_matrix.py",
+        repo_root / "scripts" / "platforms" / "karolina" / "run_sobol_matrix.py",
         "run_sobol_matrix_test",
     )
 
@@ -88,7 +88,7 @@ def test_run_sobol_matrix_orchestrator_handles_missing_models_and_failures(
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "karolina" / "run_sobol_matrix.py",
+        repo_root / "scripts" / "platforms" / "karolina" / "run_sobol_matrix.py",
         "run_sobol_matrix_failure_test",
     )
 

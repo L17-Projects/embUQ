@@ -35,7 +35,7 @@ def test_evaluate_compression_script_parseable():
 
 
 def test_convert_map_manifest_script_parseable():
-    script = REPO / "scripts" / "vega" / "convert_map_manifest.py"
+    script = REPO / "scripts" / "platforms" / "vega" / "convert_map_manifest.py"
     py_compile.compile(str(script), doraise=True)
 
 

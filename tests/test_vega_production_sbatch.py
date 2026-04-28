@@ -9,7 +9,14 @@ from pathlib import Path
 
 import pytest
 
-SBATCH_DIR = Path(__file__).resolve().parents[1] / "scripts" / "vega" / "sbatch" / "production"
+SBATCH_DIR = (
+    Path(__file__).resolve().parents[1]
+    / "scripts"
+    / "platforms"
+    / "vega"
+    / "sbatch"
+    / "production"
+)
 
 # ---------------------------------------------------------------------------
 # Individual template files

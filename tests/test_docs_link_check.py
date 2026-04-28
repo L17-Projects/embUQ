@@ -22,7 +22,7 @@ def test_find_broken_links_reports_missing_local_markdown_targets(tmp_path):
     page.write_text("[back](../README.md)\n[anchor](#section)\n", encoding="utf-8")
 
     module = _load_module(
-        Path(__file__).resolve().parents[1] / "scripts" / "ci" / "check_docs_links.py",
+        Path(__file__).resolve().parents[1] / "scripts" / "qa" / "ci" / "check_docs_links.py",
         "check_docs_links_test",
     )
 

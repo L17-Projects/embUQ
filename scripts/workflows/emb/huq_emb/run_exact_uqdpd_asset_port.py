@@ -18,7 +18,7 @@ from meso_uq.campaign_manifests import (  # noqa: E402
     MANDATORY_MAIN_FIGURES,
     MANDATORY_SUPPLEMENTARY_FIGURES,
     MANDATORY_TABLES,
-    build_required_asset_entries,
+    sha256_path,
     utc_now_iso,
     write_manifest,
 )
@@ -47,6 +47,14 @@ def _default_python_bin() -> str:
 
 def _resolve_path(value: str | Path) -> Path:
     return Path(value).expanduser().resolve()
+
+
+def _resolve_python_bin(value: str | Path) -> str:
+    text = str(value).strip()
+    candidate = Path(text).expanduser()
+    if candidate.name != text or text.startswith((".", "~")):
+        return str(candidate.resolve())
+    return text
 
 
 def _copy_if_exists(src: Path, dst: Path) -> bool:
@@ -208,38 +216,72 @@ def _copy_required_assets(
             if _copy_if_exists(generated_supp / name, supp_out / name):
                 copied.append(str((supp_out / name).resolve()))
     for name in _required_tables(include_supplementary=include_supplementary):
-        for base in (generated_root, generated_figures, generated_supp):
-            if _copy_if_exists(base / name, tables_out / name):
-                copied.append(str((tables_out / name).resolve()))
-                break
+        if _copy_if_exists(_resolve_generated_table_path(generated_root=generated_root, filename=name), tables_out / name):
+            copied.append(str((tables_out / name).resolve()))
     return copied
+
+
+def _build_required_asset_entry(
+    *,
+    category: str,
+    filename: str,
+    file_path: Path,
+) -> dict[str, Any]:
+    exists = file_path.exists() and file_path.is_file()
+    return {
+        "asset_id": filename,
+        "category": category,
+        "relative_path": f"{category}/{filename}",
+        "path": str(file_path.resolve()),
+        "exists": exists,
+        "sha256": (sha256_path(file_path) if exists else None),
+        "source_lane": None,
+        "source_artifacts": [],
+    }
+
+
+def _resolve_generated_table_path(*, generated_root: Path, filename: str) -> Path:
+    for base in (generated_root, generated_root / "figures", generated_root / "supplementary"):
+        candidate = base / filename
+        if candidate.exists() and candidate.is_file():
+            return candidate
+    return generated_root / filename
 
 
 def _required_asset_groups(
     *,
-    main_out: Path,
-    supp_out: Path,
-    tables_out: Path,
+    generated_root: Path,
     include_supplementary: bool,
 ) -> dict[str, list[dict[str, Any]]]:
+    generated_figures = generated_root / "figures"
+    generated_supp = generated_root / "supplementary"
     groups: dict[str, list[dict[str, Any]]] = {
-        "figures_main": build_required_asset_entries(
-            category="figures/main",
-            root=main_out,
-            required_files=MANDATORY_MAIN_FIGURES,
-        ),
-        "tables": build_required_asset_entries(
-            category="tables",
-            root=tables_out,
-            required_files=_required_tables(include_supplementary=include_supplementary),
-        ),
+        "figures_main": [
+            _build_required_asset_entry(
+                category="figures/main",
+                filename=name,
+                file_path=generated_figures / name,
+            )
+            for name in MANDATORY_MAIN_FIGURES
+        ],
+        "tables": [
+            _build_required_asset_entry(
+                category="tables",
+                filename=name,
+                file_path=_resolve_generated_table_path(generated_root=generated_root, filename=name),
+            )
+            for name in _required_tables(include_supplementary=include_supplementary)
+        ],
     }
     if include_supplementary:
-        groups["figures_supplementary"] = build_required_asset_entries(
-            category="figures/supplementary",
-            root=supp_out,
-            required_files=MANDATORY_SUPPLEMENTARY_FIGURES,
-        )
+        groups["figures_supplementary"] = [
+            _build_required_asset_entry(
+                category="figures/supplementary",
+                filename=name,
+                file_path=generated_supp / name,
+            )
+            for name in MANDATORY_SUPPLEMENTARY_FIGURES
+        ]
     return groups
 
 
@@ -258,6 +300,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--force", action="store_true", default=False)
     args = parser.parse_args(argv)
 
+    python_bin = _resolve_python_bin(args.python_bin)
     paper_data_root = _resolve_path(args.paper_data_root)
     campaign_id = _resolve_campaign_id(paper_data_root, args.campaign_id)
     campaign_root = paper_data_root / "runs" / campaign_id
@@ -284,7 +327,7 @@ def main(argv: list[str] | None = None) -> int:
         "stage_root": str(stage_root),
         "generated_root": str(generated_root),
         "site": args.site,
-        "python_bin": str(_resolve_path(args.python_bin)),
+        "python_bin": python_bin,
         "include_supplementary": include_supplementary,
         "status": "running",
         "steps": [],
@@ -303,14 +346,14 @@ def main(argv: list[str] | None = None) -> int:
     }
 
     stage_command = [
-        str(_resolve_path(args.python_bin)),
+        python_bin,
         str(STAGING_SCRIPT),
         "--paper-data-root",
         str(paper_data_root),
         "--campaign-id",
         campaign_id,
         "--python-bin",
-        str(_resolve_path(args.python_bin)),
+        python_bin,
         "--site",
         args.site,
         "--staging-dirname",
@@ -372,7 +415,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     env.update(
         {
-            "PYTHON_BIN": str(_resolve_path(args.python_bin)),
+            "PYTHON_BIN": python_bin,
             "MESOUQ_PAPER_CAMPAIGN_ROOT": str(campaign_root),
             "MESOUQ_PAPER_STAGE_ROOT": str(stage_root),
             "MESOUQ_PAPER_GROUP_HOLDOUT_ROOT": str(
@@ -431,9 +474,7 @@ def main(argv: list[str] | None = None) -> int:
         include_supplementary=include_supplementary,
     )
     required_assets = _required_asset_groups(
-        main_out=main_out,
-        supp_out=supp_out,
-        tables_out=tables_out,
+        generated_root=generated_root,
         include_supplementary=include_supplementary,
     )
     hard_failures = [

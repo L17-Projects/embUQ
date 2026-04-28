@@ -121,12 +121,12 @@ python -m pip install --upgrade pip
 pip install -e ".[test,mpi]"
 pip install pybind11 meson ninja
 
-python scripts/vega/doctor_vega.py
-bash scripts/vega/bootstrap_korali.sh --jobs 8
+python scripts/platforms/vega/doctor_vega.py
+bash scripts/platforms/vega/bootstrap_korali.sh --jobs 8
 source _vega/korali/env.sh
-python scripts/vega/doctor_vega.py --strict
+python scripts/platforms/vega/doctor_vega.py --strict
 
-REPO_ROOT=$(pwd) sbatch scripts/vega/sbatch/validation_matrix.sbatch
+REPO_ROOT=$(pwd) sbatch scripts/platforms/vega/sbatch/validation_matrix.sbatch
 ```
 
 That submission runs the public validation workflow matrix on the Vega `dev` partition and writes the machine-readable report to `_vega/validation_matrix/workflow_matrix_report.json`.
@@ -134,7 +134,7 @@ That submission runs the public validation workflow matrix on the Vega `dev` par
 If you are already inside an allocated Vega job, replace the last line with:
 
 ```bash
-python scripts/vega/run_validation_matrix.py \
+python scripts/platforms/vega/run_validation_matrix.py \
   --experiments compression indentation \
   --model-families full-model reduced-model \
   --output-root _vega/validation_matrix \
@@ -164,7 +164,7 @@ After the repo-local Vega bootstrap is complete, the first real validation step 
 Direct command inside an allocated Vega job:
 
 ```bash
-python scripts/vega/run_validation_matrix.py \
+python scripts/platforms/vega/run_validation_matrix.py \
   --output-root _vega/validation_matrix \
   --phase2-cpu-ranks 4
 ```
@@ -172,7 +172,7 @@ python scripts/vega/run_validation_matrix.py \
 Tracked `sbatch` template:
 
 ```bash
-REPO_ROOT=$(pwd) sbatch scripts/vega/sbatch/validation_matrix.sbatch
+REPO_ROOT=$(pwd) sbatch scripts/platforms/vega/sbatch/validation_matrix.sbatch
 ```
 
 The machine-readable report is written to `_vega/validation_matrix/workflow_matrix_report.json`. Detailed usage and artifact layout are documented in `docs/VEGA_VALIDATION_MATRIX.md`.

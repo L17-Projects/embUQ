@@ -200,7 +200,7 @@ Low-load guidance for local runs:
 ## Suggested usage pattern for new users
 
 A good order for an outside user is:
-1. understand the config and dataset surface with `scripts/config/list_experiment_datasets.py`
+1. understand the config and dataset surface with `scripts/shared/config/list_experiment_datasets.py`
 2. retrain or inspect the surrogate surface
 3. run full-model or reduced-model inference depending on the goal
 4. extract MAP samples

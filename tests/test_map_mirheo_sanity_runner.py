@@ -21,7 +21,7 @@ class _Result:
 def test_map_mirheo_sanity_runner_writes_report(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "vega" / "run_map_mirheo_sanity.py",
+        repo_root / "scripts" / "platforms" / "vega" / "run_map_mirheo_sanity.py",
         "run_map_mirheo_sanity_test",
     )
 

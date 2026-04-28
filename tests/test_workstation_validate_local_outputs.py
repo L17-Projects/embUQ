@@ -1,4 +1,4 @@
-"""Tests for scripts/workstation/validate_local_outputs.py."""
+"""Tests for scripts/platforms/workstation/validate_local_outputs.py."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = REPO_ROOT / "scripts" / "workstation" / "validate_local_outputs.py"
+MODULE_PATH = REPO_ROOT / "scripts" / "platforms" / "workstation" / "validate_local_outputs.py"
 
 
 def _load_module():

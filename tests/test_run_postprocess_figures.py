@@ -18,7 +18,7 @@ def test_run_postprocess_figures_stops_on_comparison_failure(
     tmp_path: Path,
 ) -> None:
     module = _load_module(
-        Path("scripts/vega/run_postprocess_figures.py"),
+        Path("scripts/platforms/vega/run_postprocess_figures.py"),
         "run_postprocess_figures_failfast_test",
     )
 
@@ -48,7 +48,7 @@ def test_run_postprocess_figures_runs_all_steps_on_success(
     tmp_path: Path,
 ) -> None:
     module = _load_module(
-        Path("scripts/vega/run_postprocess_figures.py"),
+        Path("scripts/platforms/vega/run_postprocess_figures.py"),
         "run_postprocess_figures_success_test",
     )
 
@@ -123,7 +123,7 @@ def test_run_postprocess_figures_emits_release_manifest_and_passes_when_complete
     monkeypatch, tmp_path: Path
 ) -> None:
     module = _load_module(
-        Path("scripts/vega/run_postprocess_figures.py"),
+        Path("scripts/platforms/vega/run_postprocess_figures.py"),
         "run_postprocess_figures_manifest_pass_test",
     )
 
@@ -157,7 +157,7 @@ def test_run_postprocess_figures_release_gate_fails_on_missing_assets(
     monkeypatch, tmp_path: Path
 ) -> None:
     module = _load_module(
-        Path("scripts/vega/run_postprocess_figures.py"),
+        Path("scripts/platforms/vega/run_postprocess_figures.py"),
         "run_postprocess_figures_manifest_fail_test",
     )
 
@@ -188,7 +188,7 @@ def test_run_postprocess_figures_release_gate_fails_on_missing_assets(
 
 def test_manifest_only_requires_emit_release_manifest(tmp_path: Path) -> None:
     module = _load_module(
-        Path("scripts/vega/run_postprocess_figures.py"),
+        Path("scripts/platforms/vega/run_postprocess_figures.py"),
         "run_postprocess_figures_manifest_only_validation_test",
     )
     try:

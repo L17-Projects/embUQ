@@ -25,7 +25,7 @@
       "name": "surrogate_retraining",
       "status": "passed",
       "commands": [
-        "python scripts/ci/run_retraining_canary.py --config compression/surrogate/ci/retraining_smoke.yaml --output-root /tmp/mesouq_workstation_acceptance/retraining"
+        "python scripts/qa/ci/run_retraining_canary.py --config compression/surrogate/ci/retraining_smoke.yaml --output-root /tmp/mesouq_workstation_acceptance/retraining"
       ],
       "artifacts": {
         "output_root": "/tmp/mesouq_workstation_acceptance/retraining"
@@ -55,7 +55,7 @@
       "name": "map_extraction_and_plotting",
       "status": "passed",
       "commands": [
-        "python scripts/vega/extract_map.py --input /tmp/mesouq_workstation_acceptance/phase3b/latest",
+        "python scripts/platforms/vega/extract_map.py --input /tmp/mesouq_workstation_acceptance/phase3b/latest",
         "python propagation/scripts/plot_validation_overlay.py --input /tmp/mesouq_workstation_acceptance/map"
       ],
       "artifacts": {

@@ -21,7 +21,7 @@ def _load_module(path: Path, name: str):
 
 def test_karolina_roundtrip_main_writes_pass_result(tmp_path, monkeypatch) -> None:
     module = _load_module(
-        Path("scripts/karolina/run_bnn_roundtrip_check.py"),
+        Path("scripts/platforms/karolina/run_bnn_roundtrip_check.py"),
         "run_bnn_roundtrip_check_pass_test",
     )
 
@@ -46,7 +46,7 @@ def test_karolina_roundtrip_main_writes_pass_result(tmp_path, monkeypatch) -> No
 
 def test_karolina_roundtrip_main_writes_failure_result(tmp_path, monkeypatch) -> None:
     module = _load_module(
-        Path("scripts/karolina/run_bnn_roundtrip_check.py"),
+        Path("scripts/platforms/karolina/run_bnn_roundtrip_check.py"),
         "run_bnn_roundtrip_check_fail_test",
     )
 
@@ -67,7 +67,7 @@ def test_karolina_roundtrip_main_writes_failure_result(tmp_path, monkeypatch) ->
 
 def test_karolina_roundtrip_helpers_cover_selection_and_degradation() -> None:
     module = _load_module(
-        Path("scripts/karolina/run_bnn_roundtrip_check.py"),
+        Path("scripts/platforms/karolina/run_bnn_roundtrip_check.py"),
         "run_bnn_roundtrip_check_helper_test",
     )
     spec = module._resolve_selection_spec("compression_2.1um")
@@ -82,7 +82,7 @@ def test_karolina_roundtrip_helpers_cover_selection_and_degradation() -> None:
 
 def test_hpc_roundtrip_wrapper_dispatches_to_selected_site(monkeypatch) -> None:
     module = _load_module(
-        Path("scripts/hpc/run_bnn_roundtrip_check.py"),
+        Path("scripts/platforms/hpc/run_bnn_roundtrip_check.py"),
         "hpc_roundtrip_dispatch_test",
     )
     monkeypatch.setenv("HPC_SITE", "karolina")
@@ -104,7 +104,7 @@ def test_hpc_roundtrip_wrapper_dispatches_to_selected_site(monkeypatch) -> None:
 
 def test_hpc_roundtrip_wrapper_rejects_unknown_site(monkeypatch) -> None:
     module = _load_module(
-        Path("scripts/hpc/run_bnn_roundtrip_check.py"),
+        Path("scripts/platforms/hpc/run_bnn_roundtrip_check.py"),
         "hpc_roundtrip_invalid_site_test",
     )
     monkeypatch.setenv("HPC_SITE", "unknown")
@@ -114,7 +114,7 @@ def test_hpc_roundtrip_wrapper_rejects_unknown_site(monkeypatch) -> None:
 
 def test_karolina_roundtrip_helper_branches(monkeypatch) -> None:
     module = _load_module(
-        Path("scripts/karolina/run_bnn_roundtrip_check.py"),
+        Path("scripts/platforms/karolina/run_bnn_roundtrip_check.py"),
         "run_bnn_roundtrip_check_branch_test",
     )
 
@@ -155,7 +155,7 @@ def test_karolina_roundtrip_helper_branches(monkeypatch) -> None:
 
 def test_karolina_roundtrip_split_and_env_helpers(monkeypatch) -> None:
     module = _load_module(
-        Path("scripts/karolina/run_bnn_roundtrip_check.py"),
+        Path("scripts/platforms/karolina/run_bnn_roundtrip_check.py"),
         "run_bnn_roundtrip_check_split_env_test",
     )
 
@@ -222,7 +222,7 @@ def test_karolina_roundtrip_split_and_env_helpers(monkeypatch) -> None:
 
 def test_karolina_roundtrip_run_roundtrip_check_covers_pass_and_fail(monkeypatch, tmp_path) -> None:
     module = _load_module(
-        Path("scripts/karolina/run_bnn_roundtrip_check.py"),
+        Path("scripts/platforms/karolina/run_bnn_roundtrip_check.py"),
         "run_bnn_roundtrip_check_runtime_test",
     )
 
@@ -321,7 +321,7 @@ def test_karolina_roundtrip_run_roundtrip_check_covers_pass_and_fail(monkeypatch
 
 def test_karolina_roundtrip_main_uses_default_runs_root(monkeypatch, tmp_path) -> None:
     module = _load_module(
-        Path("scripts/karolina/run_bnn_roundtrip_check.py"),
+        Path("scripts/platforms/karolina/run_bnn_roundtrip_check.py"),
         "run_bnn_roundtrip_check_default_root_test",
     )
     monkeypatch.setattr(module, "detect_hpc_site", lambda: "karolina")
