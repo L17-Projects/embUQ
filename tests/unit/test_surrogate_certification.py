@@ -168,3 +168,88 @@ def test_build_paired_metric_table_rejects_incomplete_pairs() -> None:
 def test_compute_relative_deltas_rejects_unpaired_zero_baseline() -> None:
     with pytest.raises(ValueError, match="zero"):
         compute_relative_deltas([0.0, 10.0], [1.0, 11.0])
+
+
+def test_certification_input_guards_cover_invalid_shapes_and_statistics() -> None:
+    with pytest.raises(ValueError, match="one-dimensional"):
+        compute_relative_deltas([[1.0, 2.0]], [[1.0, 2.0]])
+
+    with pytest.raises(ValueError, match="finite"):
+        compute_relative_deltas([1.0, float("nan")], [1.0, 2.0])
+
+    with pytest.raises(ValueError, match="bootstrap statistic"):
+        paired_bootstrap_ci([0.1, 0.2], statistic="mode")
+
+    with pytest.raises(ValueError, match="one-dimensional"):
+        paired_bootstrap_ci([[0.1, 0.2]])
+
+    with pytest.raises(ValueError, match="non-empty"):
+        paired_bootstrap_ci([])
+
+    with pytest.raises(ValueError, match="finite"):
+        paired_bootstrap_ci([0.1, float("nan")])
+
+    with pytest.raises(ValueError, match="positive"):
+        paired_bootstrap_ci([0.1, 0.2], n_resamples=0)
+
+    with pytest.raises(ValueError, match="confidence_level"):
+        paired_bootstrap_ci([0.1, 0.2], confidence_level=1.0)
+
+
+def test_acceptance_and_pairing_guards_cover_error_paths() -> None:
+    with pytest.raises(ValueError, match="finite confidence interval bounds"):
+        evaluate_acceptance_rule(float("nan"), 0.1)
+
+    with pytest.raises(ValueError, match="lower bound cannot exceed"):
+        evaluate_acceptance_rule(0.2, 0.1)
+
+    metrics_df = _synthetic_metric_rows()
+    with pytest.raises(ValueError, match="metric_cols must be non-empty"):
+        build_paired_metric_table(metrics_df, metric_cols=[])
+
+    duplicated = pd.concat([metrics_df, metrics_df.iloc[[0]]], ignore_index=True)
+    with pytest.raises(ValueError, match="at most one row per group/family pair"):
+        build_paired_metric_table(duplicated, metric_cols=["val_rmse"])
+
+    missing_family = metrics_df[metrics_df["surrogate_family"] == "dnn"].copy()
+    with pytest.raises(ValueError, match="missing required surrogate families"):
+        build_paired_metric_table(missing_family, metric_cols=["val_rmse"])
+
+
+def test_certification_empty_outputs_and_missing_columns_are_handled() -> None:
+    with pytest.raises(KeyError, match="missing required columns"):
+        build_paired_metric_table(pd.DataFrame({"seed": [1]}), metric_cols=["val_rmse"])
+
+    empty_paired = pd.DataFrame(columns=["diameter_um", "metric_name", "delta_rel"])
+    empty_certification = certify_paired_metrics(empty_paired)
+    assert empty_certification.empty
+    assert list(empty_certification.columns) == [
+        "diameter_um",
+        "metric_name",
+        "n_pairs",
+        "delta_rel_point_estimate",
+        "ci_lower",
+        "ci_upper",
+        "confidence_level",
+        "bootstrap_resamples",
+        "bootstrap_seed",
+        "bootstrap_statistic",
+        "ci_contains_zero",
+        "upper_bound_pass",
+        "passed",
+        "acceptance_upper_bound",
+    ]
+
+    empty_summary = summarize_certification_by_diameter(
+        pd.DataFrame(columns=["diameter_um", "metric_name", "passed"])
+    )
+    assert empty_summary.empty
+    assert list(empty_summary.columns) == [
+        "diameter_um",
+        "metric_count",
+        "passed_metric_count",
+        "failed_metric_count",
+        "all_metrics_passed",
+        "passed_metrics",
+        "failed_metrics",
+    ]
