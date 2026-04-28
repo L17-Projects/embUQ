@@ -100,8 +100,15 @@ def test_extract_map_surrogate_curve_uses_map_parameters_and_surrogate(monkeypat
 
     import types
     import sys
-    sys.modules["compression.evalkit.posterior_compression"] = types.SimpleNamespace(
-        compute_compression_surrogate=fake_compute
+
+    monkeypatch.setitem(
+        sys.modules,
+        "compression.evalkit.posterior_compression",
+        types.SimpleNamespace(
+            compute_compression_surrogate=fake_compute,
+            compute_compression_surrogate_batch=lambda *args, **kwargs: None,
+            preload_compression_surrogate=lambda *args, **kwargs: None,
+        ),
     )
 
     x_dpd, y_dpd = module.extract_map_surrogate_curve("compression", "reduced", "2.9")
