@@ -143,6 +143,24 @@ def _fake_holdout_outputs(output_dir: Path, *, family: str) -> None:
     )
 
 
+def _write_holdout_selection_context(
+    module,  # noqa: ANN001
+    output_dir: Path,
+    *,
+    family: str,
+    artifact_path: Path,
+    report_path: Path,
+    selection_path: Path,
+) -> None:
+    module._write_holdout_selection_context(
+        output_dir=output_dir,
+        family=family,
+        artifact_path=artifact_path,
+        report_path=report_path,
+        selection_path=selection_path,
+    )
+
+
 def test_certification_helpers_resolve_and_extract(tmp_path: Path) -> None:
     module = _load_module(
         Path("scripts/platforms/karolina/run_bnn_certification_matrix.py"),
@@ -253,6 +271,128 @@ def test_bnn_certification_matrix_runner_writes_gate_outputs(tmp_path: Path, mon
 
     promotion_candidates = json.loads((tmp_path / "cert" / "promotion_candidates.json").read_text(encoding="utf-8"))
     assert promotion_candidates[0]["tracked_bnn_artifact_path"].endswith("tracked_force_bnn.pt")
+
+
+def test_bnn_certification_matrix_runner_reruns_only_stale_resumed_outputs(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_certification_matrix.py",
+        "run_bnn_certification_matrix_resume_context_test",
+    )
+
+    spec = {
+        "name": "compression_2.1um",
+        "modality": "compression",
+        "diameter_um": "2.1",
+        "data": str(tmp_path / "F_Delta.dat"),
+        "dnn_artifact": str(tmp_path / "tracked_force_bnn.pt"),
+        "bnn_artifact": str(tmp_path / "tracked_force_bnn.pt"),
+        "dnn_train_script": str(tmp_path / "unused.py"),
+        "dnn_multi_arch_script": str(tmp_path / "unused.py"),
+        "bnn_train_script": str(tmp_path / "unused.py"),
+        "group_holdout_script": str(tmp_path / "run_group_holdout.py"),
+    }
+    monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [spec])
+
+    dnn_root = tmp_path / "dnn_root"
+    bnn_root = tmp_path / "bnn_root"
+    output_root = tmp_path / "cert"
+    dnn_seed_dir = dnn_root / spec["name"] / "seed_101"
+    bnn_seed_dir = bnn_root / spec["name"] / "seed_101"
+    dnn_artifact = tmp_path / "dnn_candidate.pkl"
+    bnn_artifact = tmp_path / "bnn_candidate.pt"
+    old_bnn_artifact = tmp_path / "old_bnn_candidate.pt"
+    dnn_artifact.write_text("artifact", encoding="utf-8")
+    bnn_artifact.write_text("artifact", encoding="utf-8")
+    old_bnn_artifact.write_text("old-artifact", encoding="utf-8")
+    dnn_report = tmp_path / "reports" / "dnn.json"
+    bnn_report = tmp_path / "reports" / "bnn.json"
+    old_bnn_report = tmp_path / "reports" / "bnn_old.json"
+    _write_dnn_report(dnn_report)
+    _write_bnn_report(bnn_report, reload_passed=True)
+    _write_bnn_report(old_bnn_report, reload_passed=True)
+    _write_selection(dnn_seed_dir, family="dnn", artifact_path=dnn_artifact, report_path=dnn_report)
+    _write_selection(bnn_seed_dir, family="bnn", artifact_path=bnn_artifact, report_path=bnn_report)
+
+    dnn_holdout = output_root / "holdout" / spec["name"] / "seed_101" / "dnn"
+    bnn_holdout = output_root / "holdout" / spec["name"] / "seed_101" / "bnn"
+    _fake_holdout_outputs(dnn_holdout, family="dnn")
+    _fake_holdout_outputs(bnn_holdout, family="bnn")
+    _write_holdout_selection_context(
+        module,
+        dnn_holdout,
+        family="dnn",
+        artifact_path=dnn_artifact,
+        report_path=dnn_report,
+        selection_path=dnn_seed_dir / "selection.json",
+    )
+    _write_holdout_selection_context(
+        module,
+        bnn_holdout,
+        family="bnn",
+        artifact_path=old_bnn_artifact,
+        report_path=old_bnn_report,
+        selection_path=bnn_seed_dir / "selection.json",
+    )
+
+    called: list[list[str]] = []
+
+    def fake_run(command, cwd, check):  # noqa: ANN001
+        del cwd, check
+        called.append(list(command))
+        output_dir = Path(_parse_arg(command, "--output-dir"))
+        family = _parse_arg(command, "--surrogate-family")
+        _fake_holdout_outputs(output_dir, family=family)
+        if family == "bnn":
+            _write_holdout_selection_context(
+                module,
+                output_dir,
+                family=family,
+                artifact_path=bnn_artifact,
+                report_path=bnn_report,
+                selection_path=bnn_seed_dir / "selection.json",
+            )
+        else:
+            raise AssertionError("Matching DNN resume output should not rerun.")
+
+        class _Done:
+            returncode = 0
+
+        return _Done()
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    rc = module.main(
+        [
+            "--dnn-root",
+            str(dnn_root),
+            "--bnn-root",
+            str(bnn_root),
+            "--output-root",
+            str(output_root),
+            "--expected-seed-count",
+            "1",
+            "--bootstrap-resamples",
+            "200",
+        ]
+    )
+    assert rc == 0
+    assert len(called) == 1
+    assert "--surrogate-family bnn" in " ".join(called[0])
+
+    matrix_report = json.loads((output_root / "bnn_certification_matrix_report.json").read_text(encoding="utf-8"))
+    statuses = {(row["surrogate_family"], row["status"]) for row in matrix_report["runs"]}
+    assert ("dnn", "skipped_completed") in statuses
+    assert ("bnn", "passed") in statuses
+    assert module._holdout_outputs_match_selection(
+        output_dir=bnn_holdout,
+        family="bnn",
+        artifact_path=bnn_artifact,
+        report_path=bnn_report,
+        selection_path=bnn_seed_dir / "selection.json",
+    )
 
 
 def test_bnn_certification_matrix_runner_fails_gate_when_reload_fails(tmp_path: Path, monkeypatch) -> None:

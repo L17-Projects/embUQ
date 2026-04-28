@@ -154,6 +154,63 @@ def test_promote_certified_bnn_prevalidates_all_sources_before_copy(tmp_path: Pa
     assert not (certification_root / "promotion_manifest.json").exists()
 
 
+def test_promote_certified_bnn_rolls_back_if_late_replace_fails(tmp_path: Path, monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/platforms/karolina/promote_certified_bnn.py"),
+        "promote_certified_bnn_replace_rollback_test",
+    )
+    certification_root = tmp_path / "cert"
+    first_source = certification_root / "candidate_a.pt"
+    first_target = certification_root / "trained" / "tracked_a.pt"
+    second_source = certification_root / "candidate_b.pt"
+    second_target = certification_root / "trained" / "tracked_b.pt"
+    certification_root.mkdir(parents=True, exist_ok=True)
+    first_source.write_text("artifact-a", encoding="utf-8")
+    second_source.write_text("artifact-b", encoding="utf-8")
+    first_target.parent.mkdir(parents=True, exist_ok=True)
+    first_target.write_text("old-a", encoding="utf-8")
+    second_target.write_text("old-b", encoding="utf-8")
+
+    _write_certification_inputs(
+        certification_root,
+        candidates=[
+            {
+                "dataset_name": "compression_2.1um",
+                "candidate_seed": 101,
+                "candidate_artifact_path": str(first_source),
+                "tracked_bnn_artifact_path": str(first_target),
+            },
+            {
+                "dataset_name": "compression_3.2um",
+                "candidate_seed": 102,
+                "candidate_artifact_path": str(second_source),
+                "tracked_bnn_artifact_path": str(second_target),
+            },
+        ],
+        per_dataset_rows=[
+            {"dataset_name": "compression_2.1um", "certified": True},
+            {"dataset_name": "compression_3.2um", "certified": True},
+        ],
+    )
+
+    original_replace = module.Path.replace
+
+    def fake_replace(self, target):  # noqa: ANN001
+        target_path = Path(target)
+        if self.suffix == ".tmp" and target_path == second_target:
+            raise OSError("late replace failure")
+        return original_replace(self, target)
+
+    monkeypatch.setattr(module.Path, "replace", fake_replace, raising=False)
+
+    with pytest.raises(OSError, match="late replace failure"):
+        module.main(["--certification-root", str(certification_root)])
+
+    assert first_target.read_text(encoding="utf-8") == "old-a"
+    assert second_target.read_text(encoding="utf-8") == "old-b"
+    assert not (certification_root / "promotion_manifest.json").exists()
+
+
 def test_hpc_promote_certified_bnn_wrapper_dispatches_to_selected_site(monkeypatch) -> None:
     module = _load_module(
         Path("scripts/platforms/hpc/promote_certified_bnn.py"),

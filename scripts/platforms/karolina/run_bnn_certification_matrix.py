@@ -28,6 +28,7 @@ DEFAULT_METRIC_COLS = (
     "holdout_p95_rel_l2_pct",
     "holdout_max_rel_l2_pct",
 )
+HOLDOUT_SELECTION_CONTEXT = "selection_context.json"
 
 
 def _now_iso() -> str:
@@ -92,6 +93,10 @@ def _holdout_completed(output_dir: Path) -> bool:
     return all(path.exists() for path in required)
 
 
+def _holdout_selection_context_path(output_dir: Path) -> Path:
+    return output_dir / HOLDOUT_SELECTION_CONTEXT
+
+
 def _selection_artifact_info(
     *,
     family: str,
@@ -111,6 +116,65 @@ def _selection_artifact_info(
     if not report_path.exists():
         raise FileNotFoundError(f"Selected {family} report does not exist: {report_path}")
     return artifact_path, report_path
+
+
+def _holdout_selection_context(
+    *,
+    family: str,
+    artifact_path: Path,
+    report_path: Path,
+    selection_path: Path,
+) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "surrogate_family": family,
+        "artifact_path": str(artifact_path.resolve()),
+        "selection_report_path": str(report_path.resolve()),
+        "selection_path": str(selection_path.resolve()),
+    }
+
+
+def _write_holdout_selection_context(
+    *,
+    output_dir: Path,
+    family: str,
+    artifact_path: Path,
+    report_path: Path,
+    selection_path: Path,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    context_path = _holdout_selection_context_path(output_dir)
+    payload = _holdout_selection_context(
+        family=family,
+        artifact_path=artifact_path,
+        report_path=report_path,
+        selection_path=selection_path,
+    )
+    context_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _holdout_outputs_match_selection(
+    *,
+    output_dir: Path,
+    family: str,
+    artifact_path: Path,
+    report_path: Path,
+    selection_path: Path,
+) -> bool:
+    context_path = _holdout_selection_context_path(output_dir)
+    if not context_path.exists():
+        return False
+    try:
+        payload = _read_json(context_path)
+    except (OSError, json.JSONDecodeError):
+        return False
+    expected = _holdout_selection_context(
+        family=family,
+        artifact_path=artifact_path,
+        report_path=report_path,
+        selection_path=selection_path,
+    )
+    return all(payload.get(key) == value for key, value in expected.items())
 
 
 def _build_holdout_command(
@@ -361,10 +425,23 @@ def main(argv: list[str] | None = None) -> int:
                     "holdout_output_dir": str(holdout_output_dir),
                     "status": "pending",
                 }
-                if args.resume and _holdout_completed(holdout_output_dir):
+                can_resume = args.resume and _holdout_completed(holdout_output_dir)
+                if can_resume and _holdout_outputs_match_selection(
+                    output_dir=holdout_output_dir,
+                    family=family,
+                    artifact_path=artifact_path,
+                    report_path=selection_report_path,
+                    selection_path=selection_path,
+                ):
                     row["status"] = "skipped_completed"
                     run_rows.append(row)
                 else:
+                    if can_resume:
+                        print(
+                            "[BNN certification] rerunning stale holdout outputs for "
+                            f"{spec['name']} seed={seed} family={family} because the "
+                            "selection context changed."
+                        )
                     command = _build_holdout_command(
                         python_bin=args.python_bin,
                         spec=spec,
@@ -381,9 +458,31 @@ def main(argv: list[str] | None = None) -> int:
                     )
                     print(f"[BNN certification] running: {' '.join(command)}")
                     subprocess.run(command, cwd=str(REPO_ROOT), check=True)
+                    if not _holdout_completed(holdout_output_dir):
+                        raise FileNotFoundError(
+                            f"Holdout run did not produce required outputs in {holdout_output_dir}."
+                        )
+                    _write_holdout_selection_context(
+                        output_dir=holdout_output_dir,
+                        family=family,
+                        artifact_path=artifact_path,
+                        report_path=selection_report_path,
+                        selection_path=selection_path,
+                    )
                     row["status"] = "passed"
                     run_rows.append(row)
 
+                if not _holdout_outputs_match_selection(
+                    output_dir=holdout_output_dir,
+                    family=family,
+                    artifact_path=artifact_path,
+                    report_path=selection_report_path,
+                    selection_path=selection_path,
+                ):
+                    raise RuntimeError(
+                        "Holdout outputs do not match the current selection context: "
+                        f"{holdout_output_dir}"
+                    )
                 family_rows.append(
                     _build_family_metric_row(
                         spec=spec,

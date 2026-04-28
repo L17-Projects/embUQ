@@ -103,6 +103,45 @@ def _stage_copy(source: Path, target: Path) -> Path:
     return tmp_path
 
 
+def _stage_backup(target: Path) -> Path | None:
+    if not target.exists():
+        return None
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".bak", dir=str(target.parent))
+    os.close(fd)
+    backup_path = Path(tmp_name)
+    try:
+        shutil.copy2(target, backup_path)
+    except Exception:
+        backup_path.unlink(missing_ok=True)
+        raise
+    return backup_path
+
+
+def _replace_staged_copies(staged_copies: list[tuple[Path, Path]]) -> None:
+    backups: list[tuple[Path, Path | None]] = []
+    applied: list[tuple[Path, Path | None]] = []
+    try:
+        for target, _tmp_path in staged_copies:
+            backups.append((target, _stage_backup(target)))
+        backup_by_target = {str(target): backup_path for target, backup_path in backups}
+        for target, tmp_path in staged_copies:
+            tmp_path.replace(target)
+            applied.append((target, backup_by_target[str(target)]))
+    except Exception:
+        for target, backup_path in reversed(applied):
+            if backup_path is None:
+                target.unlink(missing_ok=True)
+            else:
+                backup_path.replace(target)
+        raise
+    finally:
+        for _target, tmp_path in staged_copies:
+            tmp_path.unlink(missing_ok=True)
+        for _target, backup_path in backups:
+            if backup_path is not None:
+                backup_path.unlink(missing_ok=True)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Promote certified BNN artifacts from a certification run into tracked trained/ targets."
@@ -124,16 +163,11 @@ def main(argv: list[str] | None = None) -> int:
     copied_rows = _validated_promotion_rows(candidates, per_dataset, dry_run=bool(args.dry_run))
     if not args.dry_run:
         staged_copies: list[tuple[Path, Path]] = []
-        try:
-            for row in copied_rows:
-                source = Path(str(row["source_path"]))
-                target = Path(str(row["target_path"]))
-                staged_copies.append((target, _stage_copy(source, target)))
-            for target, tmp_path in staged_copies:
-                tmp_path.replace(target)
-        finally:
-            for _target, tmp_path in staged_copies:
-                tmp_path.unlink(missing_ok=True)
+        for row in copied_rows:
+            source = Path(str(row["source_path"]))
+            target = Path(str(row["target_path"]))
+            staged_copies.append((target, _stage_copy(source, target)))
+        _replace_staged_copies(staged_copies)
 
     manifest = {
         "schema_version": 1,
