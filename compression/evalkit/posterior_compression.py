@@ -9,11 +9,35 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import korali
 import numpy as np
 import pandas as pd
 import yaml
-from mpi4py import MPI
+
+try:
+    import korali
+except ModuleNotFoundError:  # pragma: no cover - optional in lightweight test environments
+    korali = None
+
+try:
+    from mpi4py import MPI
+except ModuleNotFoundError:  # pragma: no cover - optional in lightweight test environments
+    class _FallbackComm:
+        def Get_rank(self) -> int:
+            return 0
+
+        def Barrier(self) -> None:
+            return None
+
+        def send(self, *_args, **_kwargs) -> None:
+            return None
+
+        def recv(self, *_args, **_kwargs):
+            raise RuntimeError("mpi4py is required for multi-rank communication.")
+
+    class _FallbackMPI:
+        COMM_WORLD = _FallbackComm()
+
+    MPI = _FallbackMPI()
 
 here = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(here, "../.."))
@@ -27,6 +51,17 @@ from meso_uq.workflow_acceleration import (
 
 _CONFIG_CACHE: Dict[str, Dict[str, Any]] = {}
 _SURROGATE_CACHE: Dict[Tuple[str, float, str, str], Any] = {}
+
+
+def _get_worker_comm():
+    if korali is not None:
+        try:
+            return korali.getWorkerMPIComm()
+        except Exception:
+            pass
+    return MPI.COMM_WORLD
+
+
 @lru_cache(maxsize=1)
 def _resolve_project_root() -> str:
     cwd = os.getcwd()
@@ -234,10 +269,7 @@ def compute_compression(
     )
     Yt, kb, b1, b2, a3, a4, d0_offset, sig = params.tolist()
     theta = [Yt, kb, b1, b2, a3, a4]
-    try:
-        comm = korali.getWorkerMPIComm()
-    except Exception:
-        comm = MPI.COMM_WORLD
+    comm = _get_worker_comm()
     rank = comm.Get_rank()
     sample["Reference Evaluations"] = []
     sample["Standard Deviation"] = []
