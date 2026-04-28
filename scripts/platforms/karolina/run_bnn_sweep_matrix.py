@@ -57,6 +57,23 @@ def _parse_float_list(text: str) -> list[float]:
     return [float(item) for item in values]
 
 
+def _resolve_stage1_grid(
+    *,
+    grid_text: str | None,
+    scalar_value: float | None,
+    default_text: str,
+    option_name: str,
+    legacy_option_name: str,
+) -> list[float]:
+    if grid_text is not None and scalar_value is not None:
+        raise ValueError(f"Use either {option_name} or {legacy_option_name}, not both.")
+    if grid_text is not None:
+        return _parse_float_list(grid_text)
+    if scalar_value is not None:
+        return [float(scalar_value)]
+    return _parse_float_list(default_text)
+
+
 def _resolve_seeds(values: list[int]) -> list[int]:
     if values:
         return [int(value) for value in values]
@@ -176,26 +193,51 @@ def _candidate_metric(report_path: Path) -> float:
     return float(best_val_rmse)
 
 
+def _iter_hyperparameter_grid(
+    *,
+    prior_scales: list[float],
+    obs_noise_prior_scales: list[float],
+    lrs: list[float],
+) -> list[tuple[float, float, float]]:
+    return [
+        (float(prior_scale), float(obs_noise_prior_scale), float(lr))
+        for prior_scale in prior_scales
+        for obs_noise_prior_scale in obs_noise_prior_scales
+        for lr in lrs
+    ]
+
+
 def _stage1_top_architectures(
     *,
     seed_root: Path,
     architectures: list[tuple[int, int, str]],
     top_k: int,
-    prior_scale: float,
-    obs_noise_prior_scale: float,
-    lr: float,
+    prior_scales: list[float],
+    obs_noise_prior_scales: list[float],
+    lrs: list[float],
 ) -> list[tuple[int, int, str]]:
     rows: list[tuple[float, tuple[int, int, str]]] = []
     for width, depth, arch_name in architectures:
-        key = _candidate_key(
-            stage="stage1",
-            arch_name=arch_name,
-            prior_scale=prior_scale,
-            obs_noise_prior_scale=obs_noise_prior_scale,
-            lr=lr,
+        best_metric = min(
+            _candidate_metric(
+                _candidate_paths(
+                    seed_root,
+                    _candidate_key(
+                        stage="stage1",
+                        arch_name=arch_name,
+                        prior_scale=prior_scale,
+                        obs_noise_prior_scale=obs_noise_prior_scale,
+                        lr=lr,
+                    ),
+                )[1]
+            )
+            for prior_scale, obs_noise_prior_scale, lr in _iter_hyperparameter_grid(
+                prior_scales=prior_scales,
+                obs_noise_prior_scales=obs_noise_prior_scales,
+                lrs=lrs,
+            )
         )
-        _artifact_path, report_path = _candidate_paths(seed_root, key)
-        rows.append((_candidate_metric(report_path), (width, depth, arch_name)))
+        rows.append((best_metric, (width, depth, arch_name)))
     rows.sort(key=lambda item: (item[0], item[1][0], item[1][1], item[1][2]))
     return [arch for _, arch in rows[: max(1, min(top_k, len(rows)))]]
 
@@ -211,9 +253,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, action="append", default=[])
     parser.add_argument("--only", action="append", default=[])
     parser.add_argument("--architectures", default=_default_architecture_text())
-    parser.add_argument("--stage1-prior-scale", type=float, default=1.0)
-    parser.add_argument("--stage1-obs-noise-prior-scale", type=float, default=1.0)
-    parser.add_argument("--stage1-lr", type=float, default=1e-3)
+    parser.add_argument("--stage1-prior-scales", default=None)
+    parser.add_argument("--stage1-obs-noise-prior-scales", default=None)
+    parser.add_argument("--stage1-lrs", default=None)
+    parser.add_argument("--stage1-prior-scale", type=float, default=None)
+    parser.add_argument("--stage1-obs-noise-prior-scale", type=float, default=None)
+    parser.add_argument("--stage1-lr", type=float, default=None)
     parser.add_argument("--top-k", type=int, default=3)
     parser.add_argument("--prior-scales", default="0.5,1.0,2.0")
     parser.add_argument("--obs-noise-prior-scales", default="0.1,1.0")
@@ -249,6 +294,27 @@ def main(argv: list[str] | None = None) -> int:
 
     seeds = _resolve_seeds(list(args.seed))
     architectures = _parse_architecture_names(args.architectures)
+    stage1_prior_scales = _resolve_stage1_grid(
+        grid_text=args.stage1_prior_scales,
+        scalar_value=args.stage1_prior_scale,
+        default_text="1.0",
+        option_name="--stage1-prior-scales",
+        legacy_option_name="--stage1-prior-scale",
+    )
+    stage1_obs_noise_prior_scales = _resolve_stage1_grid(
+        grid_text=args.stage1_obs_noise_prior_scales,
+        scalar_value=args.stage1_obs_noise_prior_scale,
+        default_text="1.0",
+        option_name="--stage1-obs-noise-prior-scales",
+        legacy_option_name="--stage1-obs-noise-prior-scale",
+    )
+    stage1_lrs = _resolve_stage1_grid(
+        grid_text=args.stage1_lrs,
+        scalar_value=args.stage1_lr,
+        default_text="1e-3",
+        option_name="--stage1-lrs",
+        legacy_option_name="--stage1-lr",
+    )
     prior_scales = _parse_float_list(args.prior_scales)
     obs_noise_prior_scales = _parse_float_list(args.obs_noise_prior_scales)
     lrs = _parse_float_list(args.lrs)
@@ -268,9 +334,14 @@ def main(argv: list[str] | None = None) -> int:
         "config": {
             "seeds": seeds,
             "architectures": [name for _, _, name in architectures],
-            "stage1_prior_scale": float(args.stage1_prior_scale),
-            "stage1_obs_noise_prior_scale": float(args.stage1_obs_noise_prior_scale),
-            "stage1_lr": float(args.stage1_lr),
+            "stage1_prior_scale": float(stage1_prior_scales[0]) if len(stage1_prior_scales) == 1 else None,
+            "stage1_obs_noise_prior_scale": (
+                float(stage1_obs_noise_prior_scales[0]) if len(stage1_obs_noise_prior_scales) == 1 else None
+            ),
+            "stage1_lr": float(stage1_lrs[0]) if len(stage1_lrs) == 1 else None,
+            "stage1_prior_scales": stage1_prior_scales,
+            "stage1_obs_noise_prior_scales": stage1_obs_noise_prior_scales,
+            "stage1_lrs": stage1_lrs,
             "top_k": int(args.top_k),
             "prior_scales": prior_scales,
             "obs_noise_prior_scales": obs_noise_prior_scales,
@@ -293,96 +364,109 @@ def main(argv: list[str] | None = None) -> int:
         for seed in seeds:
             seed_root = output_root / spec["name"] / f"seed_{seed}"
             for width, depth, arch_name in architectures:
-                command, artifact_path, report_path = _build_command(
-                    python_bin=args.python_bin,
-                    spec=spec,
-                    seed_root=seed_root,
-                    stage="stage1",
-                    arch_name=arch_name,
-                    width=width,
-                    depth=depth,
-                    prior_scale=float(args.stage1_prior_scale),
-                    obs_noise_prior_scale=float(args.stage1_obs_noise_prior_scale),
-                    batch_size=int(args.batch_size),
-                    lr=float(args.stage1_lr),
-                    max_steps=int(args.max_steps),
-                    eval_every=int(args.eval_every),
-                    predictive_mc_samples=int(args.predictive_mc_samples),
-                    max_walltime_seconds=int(args.max_walltime_seconds),
-                    seed=int(seed),
-                    parity_tol=float(args.parity_tol),
-                    require_parity=bool(args.require_parity),
-                    device=str(args.device),
-                )
-                row = {
-                    "name": spec["name"],
-                    "seed": int(seed),
-                    "stage": "stage1",
-                    "architecture": arch_name,
-                    "artifact_path": str(artifact_path),
-                    "report_path": str(report_path),
-                    "status": "pending",
-                }
-                if args.resume and _candidate_completed(report_path, artifact_path):
-                    row["status"] = "skipped_completed"
+                for prior_scale, obs_noise_prior_scale, lr in _iter_hyperparameter_grid(
+                    prior_scales=stage1_prior_scales,
+                    obs_noise_prior_scales=stage1_obs_noise_prior_scales,
+                    lrs=stage1_lrs,
+                ):
+                    command, artifact_path, report_path = _build_command(
+                        python_bin=args.python_bin,
+                        spec=spec,
+                        seed_root=seed_root,
+                        stage="stage1",
+                        arch_name=arch_name,
+                        width=width,
+                        depth=depth,
+                        prior_scale=prior_scale,
+                        obs_noise_prior_scale=obs_noise_prior_scale,
+                        batch_size=int(args.batch_size),
+                        lr=lr,
+                        max_steps=int(args.max_steps),
+                        eval_every=int(args.eval_every),
+                        predictive_mc_samples=int(args.predictive_mc_samples),
+                        max_walltime_seconds=int(args.max_walltime_seconds),
+                        seed=int(seed),
+                        parity_tol=float(args.parity_tol),
+                        require_parity=bool(args.require_parity),
+                        device=str(args.device),
+                    )
+                    row = {
+                        "name": spec["name"],
+                        "seed": int(seed),
+                        "stage": "stage1",
+                        "architecture": arch_name,
+                        "prior_scale": float(prior_scale),
+                        "obs_noise_prior_scale": float(obs_noise_prior_scale),
+                        "lr": float(lr),
+                        "artifact_path": str(artifact_path),
+                        "report_path": str(report_path),
+                        "status": "pending",
+                    }
+                    if args.resume and _candidate_completed(report_path, artifact_path):
+                        row["status"] = "skipped_completed"
+                        run_rows.append(row)
+                        continue
+                    print(f"[BNN sweep stage1] running: {' '.join(command)}")
+                    subprocess.run(command, cwd=str(REPO_ROOT), check=True)
+                    row["status"] = "passed"
                     run_rows.append(row)
-                    continue
-                print(f"[BNN sweep stage1] running: {' '.join(command)}")
-                subprocess.run(command, cwd=str(REPO_ROOT), check=True)
-                row["status"] = "passed"
-                run_rows.append(row)
 
             top_architectures = _stage1_top_architectures(
                 seed_root=seed_root,
                 architectures=architectures,
                 top_k=int(args.top_k),
-                prior_scale=float(args.stage1_prior_scale),
-                obs_noise_prior_scale=float(args.stage1_obs_noise_prior_scale),
-                lr=float(args.stage1_lr),
+                prior_scales=stage1_prior_scales,
+                obs_noise_prior_scales=stage1_obs_noise_prior_scales,
+                lrs=stage1_lrs,
             )
 
             for width, depth, arch_name in top_architectures:
-                for prior_scale in prior_scales:
-                    for obs_noise_prior_scale in obs_noise_prior_scales:
-                        for lr in lrs:
-                            command, artifact_path, report_path = _build_command(
-                                python_bin=args.python_bin,
-                                spec=spec,
-                                seed_root=seed_root,
-                                stage="stage2",
-                                arch_name=arch_name,
-                                width=width,
-                                depth=depth,
-                                prior_scale=float(prior_scale),
-                                obs_noise_prior_scale=float(obs_noise_prior_scale),
-                                batch_size=int(args.batch_size),
-                                lr=float(lr),
-                                max_steps=int(args.max_steps),
-                                eval_every=int(args.eval_every),
-                                predictive_mc_samples=int(args.predictive_mc_samples),
-                                max_walltime_seconds=int(args.max_walltime_seconds),
-                                seed=int(seed),
-                                parity_tol=float(args.parity_tol),
-                                require_parity=bool(args.require_parity),
-                                device=str(args.device),
-                            )
-                            row = {
-                                "name": spec["name"],
-                                "seed": int(seed),
-                                "stage": "stage2",
-                                "architecture": arch_name,
-                                "artifact_path": str(artifact_path),
-                                "report_path": str(report_path),
-                                "status": "pending",
-                            }
-                            if args.resume and _candidate_completed(report_path, artifact_path):
-                                row["status"] = "skipped_completed"
-                                run_rows.append(row)
-                                continue
-                            print(f"[BNN sweep stage2] running: {' '.join(command)}")
-                            subprocess.run(command, cwd=str(REPO_ROOT), check=True)
-                            row["status"] = "passed"
-                            run_rows.append(row)
+                for prior_scale, obs_noise_prior_scale, lr in _iter_hyperparameter_grid(
+                    prior_scales=prior_scales,
+                    obs_noise_prior_scales=obs_noise_prior_scales,
+                    lrs=lrs,
+                ):
+                    command, artifact_path, report_path = _build_command(
+                        python_bin=args.python_bin,
+                        spec=spec,
+                        seed_root=seed_root,
+                        stage="stage2",
+                        arch_name=arch_name,
+                        width=width,
+                        depth=depth,
+                        prior_scale=prior_scale,
+                        obs_noise_prior_scale=obs_noise_prior_scale,
+                        batch_size=int(args.batch_size),
+                        lr=lr,
+                        max_steps=int(args.max_steps),
+                        eval_every=int(args.eval_every),
+                        predictive_mc_samples=int(args.predictive_mc_samples),
+                        max_walltime_seconds=int(args.max_walltime_seconds),
+                        seed=int(seed),
+                        parity_tol=float(args.parity_tol),
+                        require_parity=bool(args.require_parity),
+                        device=str(args.device),
+                    )
+                    row = {
+                        "name": spec["name"],
+                        "seed": int(seed),
+                        "stage": "stage2",
+                        "architecture": arch_name,
+                        "prior_scale": float(prior_scale),
+                        "obs_noise_prior_scale": float(obs_noise_prior_scale),
+                        "lr": float(lr),
+                        "artifact_path": str(artifact_path),
+                        "report_path": str(report_path),
+                        "status": "pending",
+                    }
+                    if args.resume and _candidate_completed(report_path, artifact_path):
+                        row["status"] = "skipped_completed"
+                        run_rows.append(row)
+                        continue
+                    print(f"[BNN sweep stage2] running: {' '.join(command)}")
+                    subprocess.run(command, cwd=str(REPO_ROOT), check=True)
+                    row["status"] = "passed"
+                    run_rows.append(row)
 
             stage2_rows = [row for row in run_rows if row["name"] == spec["name"] and row["seed"] == int(seed) and row["stage"] == "stage2"]
             best = min(
