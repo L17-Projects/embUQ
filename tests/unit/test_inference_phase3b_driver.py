@@ -244,3 +244,50 @@ def test_align_sub_reference_non_zero_rank_no_print_side_effect() -> None:
     # Should not raise even for rank != 0
     result = mod._align_sub_reference(sub, ref_points, "test_exp", rank=1)
     assert len(result) == 1
+
+
+def test_select_phase3b_targets_filters_by_dataset_name() -> None:
+    mod = _load_module()
+
+    class _Spec:
+        name = "compression"
+        diameters = [2.1, 2.9]
+
+        @staticmethod
+        def dataset_name(diameter_um: float) -> str:
+            return f"compression_{diameter_um}um"
+
+    selected = mod._select_phase3b_targets([_Spec()], dataset_name="compression_2.9um")
+    assert len(selected) == 1
+    assert selected[0][1] == 2.9
+
+
+def test_select_phase3b_targets_filters_by_diameter() -> None:
+    mod = _load_module()
+
+    class _Spec:
+        name = "compression"
+        diameters = [2.1, 2.9]
+
+        @staticmethod
+        def dataset_name(diameter_um: float) -> str:
+            return f"compression_{diameter_um}um"
+
+    selected = mod._select_phase3b_targets([_Spec()], diameter=2.1)
+    assert len(selected) == 1
+    assert selected[0][1] == 2.1
+
+
+def test_select_phase3b_targets_rejects_conflicting_filters() -> None:
+    mod = _load_module()
+
+    class _Spec:
+        name = "compression"
+        diameters = [2.1]
+
+        @staticmethod
+        def dataset_name(diameter_um: float) -> str:
+            return f"compression_{diameter_um}um"
+
+    with pytest.raises(ValueError, match="Use either dataset_name or diameter, not both."):
+        mod._select_phase3b_targets([_Spec()], dataset_name="compression_2.1um", diameter=2.1)

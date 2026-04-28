@@ -233,6 +233,8 @@ def build_inference_command(
     dry_run: bool = False,
     device: str = "cpu",
     phase2_backend: str | None = None,
+    dataset_name: str | None = None,
+    diameter: float | None = None,
 ) -> list[str]:
     driver = resolve_inference_stage_driver(repo_root, stage, selection.model_family)
     config_path = Path(config_path).resolve()
@@ -250,6 +252,10 @@ def build_inference_command(
         raise ValueError(
             f"phase2_backend is only supported for phase2, got stage={stage} phase2_backend={phase2_backend}"
         )
+    if stage != "phase3b" and (dataset_name is not None or diameter is not None):
+        raise ValueError("dataset_name/diameter filters are only supported for phase3b")
+    if dataset_name is not None and diameter is not None:
+        raise ValueError("Use either dataset_name or diameter, not both.")
 
     base_command = [
         python_bin,
@@ -298,6 +304,11 @@ def build_inference_command(
         return base_command
     # phase1 and phase3b: device-aware
     base_command.extend(["--device", device])
+    if stage == "phase3b":
+        if dataset_name is not None:
+            base_command.extend(["--dataset-name", dataset_name])
+        if diameter is not None:
+            base_command.extend(["--diameter", str(float(diameter))])
     if device == "gpu":
         return base_command
     # cpu: Distributed MPI

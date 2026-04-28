@@ -105,14 +105,14 @@ def test_complete_orchestrators_use_exclude_empty(template: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Phase 3b must run with --exclusive in orchestrators (GPU memory isolation)
+# Phase 3b must run as an array job with one GPU per diameter, without node exclusivity
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("template", COMPLETE_ORCHESTRATORS)
-def test_complete_orchestrators_phase3b_exclusive(template: str) -> None:
+def test_complete_orchestrators_phase3b_does_not_request_exclusive_nodes(template: str) -> None:
     text = _read(template)
-    assert "--exclusive" in text, f"{template}: phase3b sbatch call missing --exclusive"
+    assert "--exclusive" not in text, f"{template}: phase3b should not request exclusive nodes"
 
 
 # ---------------------------------------------------------------------------
@@ -240,7 +240,8 @@ def test_phase3b_gpu_partition_is_gpu() -> None:
 
 def test_phase3b_gpu_requests_exclusive() -> None:
     text = _read("phase3b_gpu.sbatch")
-    assert "#SBATCH --exclusive" in text
+    assert "#SBATCH --exclusive" not in text
+    assert "#SBATCH --mem=70000" in text
 
 
 def test_phase3b_gpu_calls_run_inference_stage_with_phase3b() -> None:
@@ -252,6 +253,22 @@ def test_phase3b_gpu_calls_run_inference_stage_with_phase3b() -> None:
 def test_phase3b_gpu_passes_device_flag() -> None:
     text = _read("phase3b_gpu.sbatch")
     assert '--device "${DEVICE}"' in text
+
+
+def test_phase3b_gpu_resolves_dataset_from_array_task() -> None:
+    text = _read("phase3b_gpu.sbatch")
+    assert "SLURM_ARRAY_TASK_ID" in text
+    assert "list_experiment_datasets.py" in text
+    assert "--dataset-name" in text
+
+
+@pytest.mark.parametrize("template", COMPLETE_ORCHESTRATORS)
+def test_complete_orchestrators_submit_phase3b_as_array_job(template: str) -> None:
+    text = _read(template)
+    assert "--array=" in text
+    assert "PHASE3B_ARRAY_MAX" in text
+    assert "list_experiment_datasets.py" in text
+    assert "phase3b_%A_%a.out" in text
 
 
 # ---------------------------------------------------------------------------

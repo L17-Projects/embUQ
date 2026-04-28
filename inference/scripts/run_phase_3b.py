@@ -107,6 +107,27 @@ def _align_sub_reference(sub, ref_points, exp_name, rank):
     return ref_points
 
 
+def _select_phase3b_targets(experiments, dataset_name: str | None = None, diameter: float | None = None):
+    if dataset_name is not None and diameter is not None:
+        raise ValueError("Use either dataset_name or diameter, not both.")
+
+    selected: list[tuple[object, float]] = []
+    for exp in experiments:
+        for diameter_um in exp.diameters:
+            current_dataset = exp.dataset_name(diameter_um)
+            if dataset_name is not None and current_dataset != dataset_name:
+                continue
+            if diameter is not None and abs(float(diameter_um) - float(diameter)) >= 1e-9:
+                continue
+            selected.append((exp, float(diameter_um)))
+
+    if dataset_name is not None and not selected:
+        raise ValueError(f"Dataset '{dataset_name}' not found in enabled experiments.")
+    if diameter is not None and not selected:
+        raise ValueError(f"Diameter '{diameter}' not found in enabled experiments.")
+    return selected
+
+
 def run_phase_3b_dataset(
     experiment_name: str,
     diameter_um: float,
@@ -221,6 +242,8 @@ def run_phase_3b(
     config_path: str = None,
     output_dir: str = "_setup",
     device: str = "cpu",
+    dataset_name: str | None = None,
+    diameter: float | None = None,
 ):
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -231,16 +254,18 @@ def run_phase_3b(
     output_root = _resolve_output_root(output_dir)
     experiments = [exp for exp in load_experiments(config, Path(project_root)) if exp.enabled]
     surrogate_backend = _resolve_surrogate_backend(config)
+    selected_targets = _select_phase3b_targets(
+        experiments, dataset_name=dataset_name, diameter=diameter
+    )
     preload_map = {
         "compression": preload_compression_surrogate,
         "indentation": preload_indentation_surrogate,
     }
-    for exp in experiments:
+    for exp, diameter_um in selected_targets:
         preload_fn = preload_map.get(exp.name)
         if preload_fn is None:
             raise ValueError(f"No surrogate preload function registered for experiment '{exp.name}'")
-        for diameter_um in exp.diameters:
-            preload_fn(diameter_um, device=device, backend=surrogate_backend)
+        preload_fn(diameter_um, device=device, backend=surrogate_backend)
     phase3b_pop_size = config.get("phase3b_pop_size", 10000)
     phase3b_max_gen = config.get("phase3b_max_gen", -1)
     phase3b_target_cov = config.get("phase3b_target_cov", 0.6)
@@ -251,8 +276,7 @@ def run_phase_3b(
         datedPrint(f"[Phase 3b] Max generations: {phase3b_max_gen}")
         datedPrint(f"[Phase 3b] Target CoV: {phase3b_target_cov}")
         datedPrint(f"[Phase 3b] Output root: {output_root}")
-        total_sets = sum(len(exp.diameters) for exp in experiments)
-        datedPrint(f"[Phase 3b] Datasets: {total_sets}")
+        datedPrint(f"[Phase 3b] Datasets: {len(selected_targets)}")
 
     phase2_latest = output_root / "results_phase_2" / "latest"
     if not phase2_latest.exists():
@@ -260,17 +284,14 @@ def run_phase_3b(
             datedPrint(f"[Phase 3b] ERROR: Phase 2 results not found: {phase2_latest}")
         sys.exit(1)
 
-    for exp in experiments:
-        for diameter_um in exp.diameters:
-            phase1_latest = (
-                output_root / "results_phase_1" / exp.dataset_name(diameter_um) / "latest"
-            )
-            if not phase1_latest.exists():
-                if rank == 0:
-                    datedPrint(
-                        f"[Phase 3b] ERROR: Phase 1 results not found for {exp.name} {diameter_um} μm: {phase1_latest}"
-                    )
-                sys.exit(1)
+    for exp, diameter_um in selected_targets:
+        phase1_latest = output_root / "results_phase_1" / exp.dataset_name(diameter_um) / "latest"
+        if not phase1_latest.exists():
+            if rank == 0:
+                datedPrint(
+                    f"[Phase 3b] ERROR: Phase 1 results not found for {exp.name} {diameter_um} μm: {phase1_latest}"
+                )
+            sys.exit(1)
 
     if rank == 0:
         datedPrint("[Phase 3b] Verified prerequisite Phase 1 and Phase 2 results")
@@ -279,21 +300,20 @@ def run_phase_3b(
         "compression": compute_compression_surrogate,
         "indentation": compute_indentation_surrogate,
     }
-    for exp in experiments:
+    for exp, diameter_um in selected_targets:
         model = compute_surrogate_map[exp.name]
-        for diameter_um in exp.diameters:
-            run_phase_3b_dataset(
-                experiment_name=exp.name,
-                diameter_um=diameter_um,
-                reference_points=exp.get_reference_points(diameter_um),
-                compute_model=model,
-                pop_size=phase3b_pop_size,
-                max_gen=phase3b_max_gen,
-                target_cov=phase3b_target_cov,
-                output_root=output_root,
-                profiling=profiling,
-                device=device,
-            )
+        run_phase_3b_dataset(
+            experiment_name=exp.name,
+            diameter_um=diameter_um,
+            reference_points=exp.get_reference_points(diameter_um),
+            compute_model=model,
+            pop_size=phase3b_pop_size,
+            max_gen=phase3b_max_gen,
+            target_cov=phase3b_target_cov,
+            output_root=output_root,
+            profiling=profiling,
+            device=device,
+        )
 
 
 def main(argv):
@@ -309,12 +329,16 @@ def main(argv):
         default="cpu",
         help="cpu: Distributed MPI conduit; gpu: Sequential GPU-batch conduit (single rank)",
     )
+    parser.add_argument("--dataset-name", type=str, default=None)
+    parser.add_argument("--diameter", type=float, default=None)
     args = parser.parse_args()
     run_phase_3b(
         profiling=args.profiling,
         config_path=args.config,
         output_dir=args.output_dir,
         device=args.device,
+        dataset_name=args.dataset_name,
+        diameter=args.diameter,
     )
 
 

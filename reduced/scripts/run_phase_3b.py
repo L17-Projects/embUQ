@@ -26,6 +26,8 @@ def main() -> int:
     parser.add_argument("--output-dir", type=str, default="_setup")
     parser.add_argument("--profiling", action="store_true", default=False)
     parser.add_argument("--device", choices=["cpu", "gpu"], default="cpu")
+    parser.add_argument("--dataset-name", type=str, default=None)
+    parser.add_argument("--diameter", type=float, default=None)
     args = parser.parse_args()
 
     cmd = [
@@ -39,6 +41,10 @@ def main() -> int:
     if args.profiling:
         cmd.append("--profiling")
     cmd.extend(["--device", args.device])
+    if args.dataset_name is not None:
+        cmd.extend(["--dataset-name", args.dataset_name])
+    if args.diameter is not None:
+        cmd.extend(["--diameter", str(args.diameter)])
     return subprocess.call(cmd, cwd=str(PROJECT_ROOT))
 
 

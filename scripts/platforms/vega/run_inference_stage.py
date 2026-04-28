@@ -49,6 +49,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--profiling", action="store_true", default=False)
     parser.add_argument("--restart", action="store_true", default=False)
     parser.add_argument("--dry-run", action="store_true", default=False)
+    parser.add_argument("--dataset-name", type=str, default=None)
+    parser.add_argument("--diameter", type=float, default=None)
     parser.add_argument(
         "--device",
         choices=["cpu", "gpu"],
@@ -82,6 +84,8 @@ def main(argv: list[str] | None = None) -> int:
         dry_run=args.dry_run,
         device=args.device,
         phase2_backend=args.phase2_backend,
+        dataset_name=args.dataset_name,
+        diameter=args.diameter,
     )
 
     print(f"Experiment:    {selection.experiment}")
