@@ -41,9 +41,9 @@ def build_variational_components(
     depth: int,
     prior_scale: float,
     obs_noise_prior_scale: float = 1.0,
+    training_dataset_size: int | None = None,
     device: torch.device,
 ) -> Tuple[Any, MLP, Callable[..., Any], Any]:
-    pyro = _require_pyro()
     if input_dim < 1:
         raise ValueError("input_dim must be >= 1.")
     if width < 1:
@@ -54,6 +54,9 @@ def build_variational_components(
         raise ValueError("prior_scale must be > 0.")
     if obs_noise_prior_scale <= 0:
         raise ValueError("obs_noise_prior_scale must be > 0.")
+    if training_dataset_size is not None and training_dataset_size < 1:
+        raise ValueError("training_dataset_size must be >= 1 when provided.")
+    pyro = _require_pyro()
 
     base_model = MLP(input_dims=input_dim, output_dims=1, hl_dims=[width] * depth).to(device)
     _obs_noise_scale_t = torch.tensor(obs_noise_prior_scale, dtype=torch.float32, device=device)
@@ -68,12 +71,23 @@ def build_variational_components(
             ).to_event(param.dim())
         lifted = pyro.random_module("module", base_model, priors)()
         mean = lifted(x).squeeze(-1)
+        likelihood_scale = 1.0
+        if y is not None and training_dataset_size is not None:
+            likelihood_scale = float(training_dataset_size) / float(max(1, x.shape[0]))
         with pyro.plate("data", x.shape[0]):
-            pyro.sample(
-                "obs",
-                pyro.distributions.Normal(mean, obs_noise),
-                obs=None if y is None else y.squeeze(-1),
-            )
+            if likelihood_scale != 1.0:
+                with pyro.poutine.scale(scale=likelihood_scale):
+                    pyro.sample(
+                        "obs",
+                        pyro.distributions.Normal(mean, obs_noise),
+                        obs=y.squeeze(-1),
+                    )
+            else:
+                pyro.sample(
+                    "obs",
+                    pyro.distributions.Normal(mean, obs_noise),
+                    obs=None if y is None else y.squeeze(-1),
+                )
         return mean.unsqueeze(-1)
 
     guide = pyro.infer.autoguide.AutoDiagonalNormal(model)

@@ -228,6 +228,7 @@ def train_tabular_bnn_surrogate(
         depth=int(depth),
         prior_scale=float(prior_scale),
         obs_noise_prior_scale=resolved_obs_noise_prior_scale,
+        training_dataset_size=int(split["n_train"]),
         device=device_t,
     )
     if seed is not None:
