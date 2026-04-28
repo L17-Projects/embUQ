@@ -163,6 +163,7 @@ def run_inference(
     max_gen = config["max_gen"]
     target_cov = config["target_cov"]
     covariance_scaling = config["covariance_scaling"]
+    burn_in = int(config.get("hbi_burn_in", 0))
     use_surrogate = config.get("use_surrogate", True)
     surrogate_backend = _resolve_surrogate_backend(config)
 
@@ -327,6 +328,7 @@ def run_inference(
                 e["Problem"]["Reference Data"] = reference_data
                 e["Solver"]["Type"] = "Sampler/TMCMC"
                 e["Solver"]["Population Size"] = pop_size
+                e["Solver"]["Burn In"] = burn_in
                 e["Solver"]["Target Coefficient Of Variation"] = target_cov
                 e["Solver"]["Covariance Scaling"] = covariance_scaling
                 if max_gen > 0:
