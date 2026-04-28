@@ -1,4 +1,4 @@
-"""Tests for pure helper functions in scripts/vega/run_validation_suite.py."""
+"""Tests for pure helper functions in scripts/platforms/vega/run_validation_suite.py."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ def _load_module():
     key = "mesouq_test_run_validation_suite"
     if key in sys.modules:
         return sys.modules[key]
-    module_path = repo_root / "scripts" / "vega" / "run_validation_suite.py"
+    module_path = repo_root / "scripts" / "platforms" / "vega" / "run_validation_suite.py"
     spec = importlib.util.spec_from_file_location(key, module_path)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[key] = mod

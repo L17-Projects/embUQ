@@ -18,7 +18,7 @@ EXPECTED_SCRIPT_SETS = {
         "run_phase1_propagation.py",
         "run_phase3b_propagation.py",
     },
-    PROJECT_ROOT / "scripts" / "config": {
+    PROJECT_ROOT / "scripts" / "shared" / "config": {
         "list_experiment_datasets.py",
     },
 }

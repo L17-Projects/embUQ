@@ -100,7 +100,7 @@ Try these in order:
 
 ```bash
 python -c "import meso_uq; print('meso_uq import ok')"
-python scripts/config/list_experiment_datasets.py --config inference/configs/production/inference_config_compression.yaml
+python scripts/shared/config/list_experiment_datasets.py --config inference/configs/production/inference_config_compression.yaml
 python sampling/run_LHS.py --output lhs_samples.csv
 ```
 

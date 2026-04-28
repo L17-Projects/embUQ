@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 
 
 def _load_module(path: Path, name: str):
@@ -25,7 +26,7 @@ def test_local_workstation_runner_invokes_matrix_with_gpu_devices_and_writes_rep
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "workstation" / "run_local_validation_matrix.py",
         "run_local_validation_matrix_test",
     )
     captured = {}
@@ -112,7 +113,7 @@ def test_local_workstation_runner_invokes_matrix_with_gpu_devices_and_writes_rep
 def test_prepend_pythonpath_handles_empty_duplicate_and_prepend(monkeypatch, tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "workstation" / "run_local_validation_matrix.py",
         "run_local_validation_matrix_prepend",
     )
 
@@ -130,10 +131,56 @@ def test_prepend_pythonpath_handles_empty_duplicate_and_prepend(monkeypatch, tmp
     assert env["PYTHONPATH"] == f"{second}:{first}"
 
 
+def test_resolve_path_and_discover_repo_local_korali_site(monkeypatch, tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "workstation" / "run_local_validation_matrix.py",
+        "run_local_validation_matrix_paths",
+    )
+
+    monkeypatch.setattr(module, "REPO_ROOT", tmp_path)
+    assert module._resolve_path("relative/output") == (tmp_path / "relative" / "output").resolve()
+
+    site_a = tmp_path / "_vega" / "korali" / "install" / "lib" / "python3.10" / "site-packages"
+    site_b = tmp_path / "_vega" / "korali" / "install" / "lib" / "python3.11" / "site-packages"
+    site_a.mkdir(parents=True, exist_ok=True)
+    site_b.mkdir(parents=True, exist_ok=True)
+    assert module._discover_repo_local_korali_site() == site_b
+
+    monkeypatch.setattr(module, "REPO_ROOT", tmp_path / "missing-root")
+    assert module._discover_repo_local_korali_site() is None
+
+
+def test_probe_korali_engine_reports_success_and_failure(monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "workstation" / "run_local_validation_matrix.py",
+        "run_local_validation_matrix_probe",
+    )
+
+    monkeypatch.setattr(
+        module.subprocess,
+        "run",
+        lambda *args, **kwargs: _Result(returncode=0, stdout="", stderr=""),
+    )
+    ok, error = module._probe_korali_engine("python", {})
+    assert ok is True
+    assert error == ""
+
+    monkeypatch.setattr(
+        module.subprocess,
+        "run",
+        lambda *args, **kwargs: _Result(returncode=1, stdout="", stderr="engine failed"),
+    )
+    ok, error = module._probe_korali_engine("python", {})
+    assert ok is False
+    assert error == "engine failed"
+
+
 def test_resolve_selections_supports_explicit_and_all_lanes(monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "workstation" / "run_local_validation_matrix.py",
         "run_local_validation_matrix_resolve",
     )
 
@@ -148,7 +195,7 @@ def test_resolve_selections_supports_explicit_and_all_lanes(monkeypatch):
 def test_resolve_selections_rejects_non_validation_profile():
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "workstation" / "run_local_validation_matrix.py",
         "run_local_validation_matrix_non_validation",
     )
 
@@ -159,7 +206,7 @@ def test_resolve_selections_rejects_non_validation_profile():
 def test_build_runtime_env_handles_probe_outcomes(monkeypatch, tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "workstation" / "run_local_validation_matrix.py",
         "run_local_validation_matrix_runtime_env",
     )
 
@@ -189,7 +236,7 @@ def test_build_runtime_env_handles_probe_outcomes(monkeypatch, tmp_path):
 def test_build_runtime_env_retries_user_site_on_mpi4py_error(monkeypatch, tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "workstation" / "run_local_validation_matrix.py",
         "run_local_validation_matrix_runtime_retry",
     )
 
@@ -213,10 +260,37 @@ def test_build_runtime_env_retries_user_site_on_mpi4py_error(monkeypatch, tmp_pa
     assert any("Prepended user-site packages" in note for note in notes)
 
 
+def test_build_runtime_env_records_retry_failure(monkeypatch, tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "workstation" / "run_local_validation_matrix.py",
+        "run_local_validation_matrix_runtime_retry_fail",
+    )
+
+    user_site = tmp_path / "user-site"
+    user_site.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(module, "_discover_repo_local_korali_site", lambda: None)
+    monkeypatch.setattr(module.site, "getusersitepackages", lambda: str(user_site))
+
+    calls = {"count": 0}
+
+    def _probe(python_bin, env):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return False, "Could not load mpi4py API."
+        return False, "retry failed"
+
+    monkeypatch.setattr(module, "_probe_korali_engine", _probe)
+    env, notes = module._build_runtime_env("python")
+    assert calls["count"] == 2
+    assert str(user_site) in env.get("PYTHONPATH", "")
+    assert any("Retry after user-site prepend still failed: retry failed" in note for note in notes)
+
+
 def test_derive_validation_smoke_config_rejects_non_mapping_yaml(monkeypatch, tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "workstation" / "run_local_validation_matrix.py",
         "run_local_validation_matrix_bad_yaml",
     )
 
@@ -231,10 +305,39 @@ def test_derive_validation_smoke_config_rejects_non_mapping_yaml(monkeypatch, tm
         module._derive_validation_smoke_config(selection, tmp_path / "out", {"pop_size": 8})
 
 
+def test_derive_validation_smoke_config_ignores_unknown_overrides(monkeypatch, tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "workstation" / "run_local_validation_matrix.py",
+        "run_local_validation_matrix_override_filter",
+    )
+
+    base_config = tmp_path / "base.yaml"
+    base_config.write_text(
+        yaml.safe_dump({"description": "base", "pop_size": 16}, sort_keys=False),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        module,
+        "resolve_workflow_config_path",
+        lambda _repo_root, _selection: base_config,
+    )
+
+    selection = module.parse_selection("compression:full-model:validation")
+    derived_path = module._derive_validation_smoke_config(
+        selection,
+        tmp_path / "out",
+        {"pop_size": 8, "unknown_override": 99},
+    )
+    payload = yaml.safe_load(derived_path.read_text(encoding="utf-8"))
+    assert payload["pop_size"] == 8
+    assert "unknown_override" not in payload
+
+
 def test_collect_and_validate_overlay_paths_reports_missing(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "workstation" / "run_local_validation_matrix.py",
         "run_local_validation_matrix_overlays",
     )
 
@@ -258,7 +361,7 @@ def test_collect_and_validate_overlay_paths_reports_missing(tmp_path):
 def test_main_rejects_invalid_phase2_cpu_ranks(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "workstation" / "run_local_validation_matrix.py",
         "run_local_validation_matrix_invalid_ranks",
     )
 
@@ -269,7 +372,7 @@ def test_main_rejects_invalid_phase2_cpu_ranks(tmp_path):
 def test_main_returns_matrix_returncode_on_subprocess_failure(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "workstation" / "run_local_validation_matrix.py",
         "run_local_validation_matrix_subprocess_fail",
     )
 
@@ -299,7 +402,7 @@ def test_main_returns_matrix_returncode_on_subprocess_failure(tmp_path, monkeypa
 def test_main_returns_one_when_overlays_are_missing(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "workstation" / "run_local_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "workstation" / "run_local_validation_matrix.py",
         "run_local_validation_matrix_missing_outputs",
     )
 
@@ -333,3 +436,38 @@ def test_main_returns_one_when_overlays_are_missing(tmp_path, monkeypatch):
         ]
     )
     assert rc == 1
+
+
+def test_main_forwards_continue_on_error_flag(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "workstation" / "run_local_validation_matrix.py",
+        "run_local_validation_matrix_continue_flag",
+    )
+
+    captured = {}
+
+    def fake_run(command, cwd=None, text=False, capture_output=False, check=False, env=None):
+        captured["command"] = command
+        return _Result(returncode=7, stdout="bad", stderr="fail")
+
+    monkeypatch.setattr(
+        module, "_build_runtime_env", lambda _python_bin: ({"PYTHONPATH": "x"}, ["note"])
+    )
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    monkeypatch.setattr(module, "render_production_sanity_plots", lambda *args, **kwargs: {})
+
+    rc = module.main(
+        [
+            "--output-root",
+            str(tmp_path / "o369_continue"),
+            "--python-bin",
+            "python",
+            "--selection",
+            "compression:full-model:validation",
+            "--continue-on-error",
+        ]
+    )
+
+    assert rc == 7
+    assert "--continue-on-error" in captured["command"]

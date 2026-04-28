@@ -1,4 +1,4 @@
-"""Tests for pure helper functions in scripts/vega/run_workflow_matrix.py."""
+"""Tests for pure helper functions in scripts/platforms/vega/run_workflow_matrix.py."""
 from __future__ import annotations
 
 import importlib.util
@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
-_SCRIPT = REPO / "scripts" / "vega" / "run_workflow_matrix.py"
+_SCRIPT = REPO / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py"
 
 
 def _load_module():

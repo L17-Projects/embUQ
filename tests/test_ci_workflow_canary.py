@@ -18,7 +18,10 @@ def _load_module(path: Path, name: str):
 
 def test_workflow_canary_runner_writes_report_and_checks_artifacts(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
-    module = _load_module(repo_root / "scripts" / "ci" / "run_workflow_canary.py", "run_workflow_canary_test")
+    module = _load_module(
+        repo_root / "scripts" / "qa" / "ci" / "run_workflow_canary.py",
+        "run_workflow_canary_test",
+    )
     captured = {}
 
     def fake_run(command, cwd=None, capture_output=False, text=False):

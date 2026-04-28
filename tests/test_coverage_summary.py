@@ -15,7 +15,10 @@ def _load_module(path: Path, name: str):
 
 def test_coverage_summary_script_writes_markdown(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
-    module = _load_module(repo_root / "scripts" / "ci" / "summarize_coverage.py", "summarize_coverage_test")
+    module = _load_module(
+        repo_root / "scripts" / "qa" / "ci" / "summarize_coverage.py",
+        "summarize_coverage_test",
+    )
 
     coverage_json = tmp_path / "coverage.json"
     coverage_json.write_text(

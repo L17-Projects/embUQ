@@ -60,7 +60,10 @@ class _FakeExperiment:
 
 def test_validation_runner_smoke_creates_summary_and_artifacts(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
-    module = _load_module(repo_root / "scripts" / "vega" / "run_validation_suite.py", "run_gpu_validation_suite_test")
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "vega" / "run_validation_suite.py",
+        "run_gpu_validation_suite_test",
+    )
     workflow_name = "compression:reduced-model:validation"
 
     class Result:
@@ -111,7 +114,10 @@ def test_validation_runner_smoke_creates_summary_and_artifacts(tmp_path, monkeyp
 
 def test_validation_runner_defaults_to_validation_configs_and_preserves_population(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
-    module = _load_module(repo_root / "scripts" / "vega" / "run_validation_suite.py", "run_gpu_validation_suite_defaults_test")
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "vega" / "run_validation_suite.py",
+        "run_gpu_validation_suite_defaults_test",
+    )
 
     compression_reduced = module.WORKFLOW_CONFIGS["compression:reduced-model:validation"]["config"]
     indentation_reduced = module.WORKFLOW_CONFIGS["indentation:reduced-model:validation"]["config"]
@@ -130,7 +136,10 @@ def test_validation_runner_defaults_to_validation_configs_and_preserves_populati
 
 def test_validation_runner_rejects_legacy_aliases():
     repo_root = Path(__file__).resolve().parents[1]
-    module = _load_module(repo_root / "scripts" / "vega" / "run_validation_suite.py", "run_gpu_validation_suite_alias_test")
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "vega" / "run_validation_suite.py",
+        "run_gpu_validation_suite_alias_test",
+    )
 
     with pytest.raises(ValueError):
         module._resolve_validation_selection("compression_reduced")

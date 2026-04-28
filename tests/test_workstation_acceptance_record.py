@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = REPO_ROOT / "scripts" / "workstation" / "validate_acceptance_record.py"
+MODULE_PATH = REPO_ROOT / "scripts" / "platforms" / "workstation" / "validate_acceptance_record.py"
 
 
 def _load_module():
@@ -49,7 +49,7 @@ def test_validator_requires_existing_paths_when_requested(tmp_path: Path) -> Non
             {
                 "name": "surrogate_retraining",
                 "status": "passed",
-                "commands": ["python scripts/ci/run_retraining_canary.py"],
+                "commands": ["python scripts/qa/ci/run_retraining_canary.py"],
                 "artifacts": {"output_root": str(tmp_path / "retraining")},
             },
             {
@@ -67,7 +67,7 @@ def test_validator_requires_existing_paths_when_requested(tmp_path: Path) -> Non
             {
                 "name": "map_extraction_and_plotting",
                 "status": "passed",
-                "commands": ["python scripts/vega/extract_map.py"],
+                "commands": ["python scripts/platforms/vega/extract_map.py"],
                 "artifacts": {"map_root": str(tmp_path / "map")},
             },
         ],
@@ -120,7 +120,7 @@ def test_validator_accepts_existing_paths(tmp_path: Path) -> None:
             {
                 "name": "surrogate_retraining",
                 "status": "passed",
-                "commands": ["python scripts/ci/run_retraining_canary.py"],
+                "commands": ["python scripts/qa/ci/run_retraining_canary.py"],
                 "artifacts": {"output_root": str(retraining_root)},
             },
             {
@@ -138,7 +138,7 @@ def test_validator_accepts_existing_paths(tmp_path: Path) -> None:
             {
                 "name": "map_extraction_and_plotting",
                 "status": "passed",
-                "commands": ["python scripts/vega/extract_map.py"],
+                "commands": ["python scripts/platforms/vega/extract_map.py"],
                 "artifacts": {"map_root": str(map_root)},
             },
         ],
