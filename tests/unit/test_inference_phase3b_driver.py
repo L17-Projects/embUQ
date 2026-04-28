@@ -142,6 +142,22 @@ def test_resolve_output_root_expands_home(monkeypatch: pytest.MonkeyPatch, tmp_p
 
 
 # ---------------------------------------------------------------------------
+# _resolve_surrogate_backend
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_surrogate_backend_accepts_none_and_rejects_invalid_values() -> None:
+    mod = _load_module()
+    assert mod._resolve_surrogate_backend({"surrogate": None}) == "dnn"
+
+    with pytest.raises(ValueError, match="Expected 'surrogate' config section"):
+        mod._resolve_surrogate_backend({"surrogate": []})
+
+    with pytest.raises(ValueError, match="Unsupported surrogate backend"):
+        mod._resolve_surrogate_backend({"surrogate": {"backend": "foo"}})
+
+
+# ---------------------------------------------------------------------------
 # _extract_reference_data
 # ---------------------------------------------------------------------------
 
@@ -156,6 +172,13 @@ def test_extract_reference_data_list_subscript() -> None:
 def test_extract_reference_data_missing_key_returns_none() -> None:
     mod = _load_module()
     sub = {"Problem": {}}
+    result = mod._extract_reference_data(sub)
+    assert result is None
+
+
+def test_extract_reference_data_none_value_returns_none() -> None:
+    mod = _load_module()
+    sub = {"Problem": {"Reference Data": None}}
     result = mod._extract_reference_data(sub)
     assert result is None
 
@@ -191,6 +214,21 @@ def test_extract_reference_data_object_with_len() -> None:
     sub = {"Problem": {"Reference Data": _LenObj()}}
     result = mod._extract_reference_data(sub)
     assert result == [0.0, 1.0]
+
+
+def test_extract_reference_data_len_object_with_failing_index_returns_none() -> None:
+    mod = _load_module()
+
+    class _LenButBadIndex:
+        def __len__(self):
+            return 1
+
+        def __getitem__(self, i):
+            raise TypeError("bad index")
+
+    sub = {"Problem": {"Reference Data": _LenButBadIndex()}}
+    result = mod._extract_reference_data(sub)
+    assert result is None
 
 
 # ---------------------------------------------------------------------------
