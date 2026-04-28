@@ -60,3 +60,51 @@ def test_extract_map_curve_uses_map_mirheo_fallback_with_csv_map_layout(monkeypa
     x_dpd, y_dpd = module.extract_map_curve("compression", "full", "2.9")
     assert x_dpd.tolist() == [0.45, 0.55]
     assert y_dpd.tolist() == [4.0, 5.0]
+
+
+def test_extract_map_surrogate_curve_uses_map_parameters_and_surrogate(monkeypatch) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "papers" / "huq_emb" / "uqdpd_generate_reduced_story_assets.py",
+        "uqdpd_map_overlay_surrogate_test",
+    )
+
+    monkeypatch.setattr(
+        module,
+        "load_map_parameters",
+        lambda modality, model_kind, diameter: {"parameters": [1.0, 2.0, 3.0], "sigma": 0.4},
+    )
+    monkeypatch.setattr(
+        module,
+        "load_reference_curve",
+        lambda modality, diameter: (np.asarray([0.1, 0.2]), np.asarray([9.0, 8.0])),
+    )
+    monkeypatch.setattr(module, "workflow_config_path", lambda modality, model_kind: Path("/tmp/fake.yaml"))
+
+    entered = []
+
+    class _Ctx:
+        def __enter__(self):
+            entered.append(True)
+            return None
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(module, "inference_config_environment", lambda path: _Ctx())
+
+    def fake_compute(sample, xvals, diameter_um):
+        assert sample["Parameters"] == [1.0, 2.0, 3.0, 0.4]
+        assert xvals == [0.1, 0.2]
+        assert diameter_um == 2.9
+        sample["Reference Evaluations"] = [4.2, 5.3]
+
+    import types
+    import sys
+    sys.modules["compression.evalkit.posterior_compression"] = types.SimpleNamespace(
+        compute_compression_surrogate=fake_compute
+    )
+
+    x_dpd, y_dpd = module.extract_map_surrogate_curve("compression", "reduced", "2.9")
+    assert entered
+    assert x_dpd.tolist() == [0.1, 0.2]
+    assert y_dpd.tolist() == [4.2, 5.3]

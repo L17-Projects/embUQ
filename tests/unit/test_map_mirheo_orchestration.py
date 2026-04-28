@@ -201,6 +201,73 @@ def test_map_mirheo_timeout_recorded(tmp_path):
     assert summary["diameters"][0]["status"] == "timed_out"
 
 
+def test_map_mirheo_dataset_filter_runs_only_selected_dataset(tmp_path):
+    from run_map_mirheo import run_map_mirheo
+
+    manifest_dir = tmp_path / "map_phase3b"
+    manifest_dir.mkdir()
+    datasets = {
+        "compression_2.1um": {
+            "Yt": 1e7, "kb": 1e4, "d0": 0.1, "sigma": 0.03,
+            "logLikelihood": 10.0, "logPrior": -5.0, "logPosterior": 5.0,
+            "diameter_um": 2.1, "run_dir": "/tmp/r1", "output_csv": "/tmp/o1.csv",
+        },
+        "compression_3.0um": {
+            "Yt": 1e7, "kb": 1e4, "d0": 0.2, "sigma": 0.04,
+            "logLikelihood": 11.0, "logPrior": -4.0, "logPosterior": 7.0,
+            "diameter_um": 3.0, "run_dir": "/tmp/r2", "output_csv": "/tmp/o2.csv",
+        },
+    }
+    (manifest_dir / "phase3b_map_manifest.json").write_text(json.dumps({"datasets": datasets}))
+
+    mock_result = MagicMock(returncode=0, stdout="done", stderr="")
+    captured = []
+
+    def fake_run(cmd, **kwargs):
+        captured.append(cmd)
+        return mock_result
+
+    with patch("subprocess.run", side_effect=fake_run):
+        summary = run_map_mirheo(
+            "compression",
+            tmp_path,
+            sys.executable,
+            5,
+            dataset_names=["compression_3.0um"],
+        )
+
+    assert summary["status"] == "passed"
+    assert summary["selected_datasets"] == ["compression_3.0um"]
+    assert [item["dataset_name"] for item in summary["diameters"]] == ["compression_3.0um"]
+    rendered = " ".join(str(part) for part in captured[0])
+    assert "compression_3.0um_map.json" in rendered
+    assert "compression_2.1um_map.json" not in rendered
+
+
+def test_map_mirheo_dataset_filter_rejects_missing_dataset(tmp_path):
+    from run_map_mirheo import run_map_mirheo
+
+    manifest_dir = tmp_path / "map_phase3b"
+    manifest_dir.mkdir()
+    datasets = {
+        "compression_2.1um": {
+            "Yt": 1e7, "kb": 1e4, "d0": 0.1, "sigma": 0.03,
+            "logLikelihood": 10.0, "logPrior": -5.0, "logPosterior": 5.0,
+            "diameter_um": 2.1, "run_dir": "/tmp/r1", "output_csv": "/tmp/o1.csv",
+        },
+    }
+    (manifest_dir / "phase3b_map_manifest.json").write_text(json.dumps({"datasets": datasets}))
+
+    with pytest.raises(ValueError, match="Requested dataset\\(s\\) not found"):
+        run_map_mirheo(
+            "compression",
+            tmp_path,
+            sys.executable,
+            5,
+            dataset_names=["compression_3.0um"],
+        )
+
+
 def test_main_missing_manifest_returns_one(tmp_path):
     from run_map_mirheo import main
     rc = main([
