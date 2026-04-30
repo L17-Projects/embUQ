@@ -1,6 +1,10 @@
 import importlib.util
 import json
+import sys
+import types
 from pathlib import Path
+
+import pytest
 
 
 def _load_module(path: Path, name: str):
@@ -54,6 +58,8 @@ def test_run_inference_stage_builds_phase2_command_with_profile_and_model_family
 
     rc = module.main(
         [
+            "--structure",
+            "emb",
             "--experiment",
             "compression",
             "--model-family",
@@ -241,8 +247,30 @@ def test_reduced_phase2_wrapper_delegates_to_main_driver(tmp_path, monkeypatch):
     )
 
 
-def test_extract_map_writes_manifest_for_single_selected_dataset(tmp_path):
+def test_extract_map_writes_manifest_for_single_selected_dataset(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
+    fake_postprocess = types.ModuleType("meso_uq.postprocess")
+
+    class _FakeRow:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def to_dict(self):
+            return dict(self._payload)
+
+    class _FakeFrame:
+        def __init__(self, payload):
+            self.iloc = [_FakeRow(payload)]
+
+    def _fake_extract_map_from_directory(run_dir, output_csv):
+        output_path = Path(output_csv)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text("Yt,kb\n1.0,2.0\n", encoding="utf-8")
+        return _FakeFrame({"Yt": 1.0, "kb": 2.0})
+
+    fake_postprocess.extract_map_from_directory = _fake_extract_map_from_directory
+    monkeypatch.setitem(sys.modules, "meso_uq.postprocess", fake_postprocess)
+
     module = _load_module(
         repo_root / "scripts" / "platforms" / "vega" / "extract_map.py",
         "extract_map_test",
@@ -280,8 +308,79 @@ def test_extract_map_writes_manifest_for_single_selected_dataset(tmp_path):
     manifest_path = output_root / "map_phase3b" / "phase3b_map_manifest.json"
     assert manifest_path.exists()
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["structure"] == "emb"
     assert "compression_2.1um" in manifest["datasets"]
     assert Path(manifest["datasets"]["compression_2.1um"]["output_csv"]).exists()
+
+
+def test_run_inference_stage_rejects_gv_runtime_before_dispatch(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "vega" / "run_inference_stage.py",
+        "run_inference_stage_gv_runtime_rejection_test",
+    )
+
+    def fake_run(command, cwd=None, check=False):
+        raise AssertionError("subprocess.run should not be reached for unsupported GV runtime")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    with pytest.raises(ValueError, match="GV workflow runtime/config resolution is not implemented yet"):
+        module.main(
+            [
+                "--structure",
+                "gv",
+                "--experiment",
+                "stretching",
+                "--model-family",
+                "full-model",
+                "--profile",
+                "validation",
+                "--stage",
+                "phase1",
+                "--output-dir",
+                str(tmp_path / "run"),
+                "--python-bin",
+                "python",
+            ]
+        )
+
+
+def test_run_propagation_rejects_gv_runtime_before_dispatch_with_override(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "vega" / "run_propagation.py",
+        "run_propagation_gv_runtime_rejection_test",
+    )
+    config_path = tmp_path / "gv_config.yaml"
+    config_path.write_text("structure: gv\nexperiment: stretching\n", encoding="utf-8")
+
+    def fake_run(command, cwd=None, check=False):
+        raise AssertionError("subprocess.run should not be reached for unsupported GV propagation")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    with pytest.raises(ValueError, match="GV workflow propagation is not implemented yet"):
+        module.main(
+            [
+                "--structure",
+                "gv",
+                "--experiment",
+                "stretching",
+                "--model-family",
+                "full-model",
+                "--profile",
+                "validation",
+                "--stage",
+                "phase1",
+                "--config",
+                str(config_path),
+                "--output-dir",
+                str(tmp_path / "run"),
+                "--python-bin",
+                "python",
+            ]
+        )
 
 
 def test_vega_sbatch_templates_expose_model_family_and_profile_axes() -> None:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import shlex
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
@@ -11,7 +11,14 @@ import yaml
 from meso_uq.experiments import load_experiments
 from meso_uq.hpc_paths import default_runs_root, detect_hpc_site
 
+VALID_STRUCTURES = ("emb", "gv")
 VALID_EXPERIMENTS = ("compression", "indentation")
+VALID_GV_EXPERIMENTS = ("stretching", "buckling", "torsion", "eigenmodes", "shear_flow")
+ALL_WORKFLOW_EXPERIMENTS = VALID_EXPERIMENTS + VALID_GV_EXPERIMENTS
+_STRUCTURE_EXPERIMENTS = {
+    "emb": VALID_EXPERIMENTS,
+    "gv": VALID_GV_EXPERIMENTS,
+}
 VALID_MODEL_FAMILIES = ("full-model", "reduced-model")
 VALID_PROFILES = ("production", "validation")
 VALID_INFERENCE_STAGES = ("phase1", "phase2", "phase3b")
@@ -25,14 +32,34 @@ class VegaWorkflowSelection:
     experiment: str
     model_family: str
     profile: str
+    structure: str | None = None
+    structure_explicit: bool = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        if self.experiment not in VALID_EXPERIMENTS:
+        explicit_structure = self.structure is not None
+        resolved_structure = self.structure
+        if resolved_structure is None:
+            if self.experiment in VALID_EXPERIMENTS:
+                resolved_structure = "emb"
+            elif self.experiment in VALID_GV_EXPERIMENTS:
+                raise ValueError(
+                    f"Experiment '{self.experiment}' requires an explicit structure. "
+                    "Use structure='gv' or the selection form structure:experiment:model-family:profile."
+                )
+        if resolved_structure not in VALID_STRUCTURES:
+            raise ValueError(f"Unsupported structure: {resolved_structure}")
+        if self.experiment not in ALL_WORKFLOW_EXPERIMENTS:
             raise ValueError(f"Unsupported experiment: {self.experiment}")
+        if self.experiment not in _STRUCTURE_EXPERIMENTS[resolved_structure]:
+            raise ValueError(
+                f"Experiment '{self.experiment}' does not belong to structure '{resolved_structure}'."
+            )
         if self.model_family not in VALID_MODEL_FAMILIES:
             raise ValueError(f"Unsupported model family: {self.model_family}")
         if self.profile not in VALID_PROFILES:
             raise ValueError(f"Unsupported profile: {self.profile}")
+        object.__setattr__(self, "structure", resolved_structure)
+        object.__setattr__(self, "structure_explicit", explicit_structure)
 
 
 def _resolve_repo_path(repo_root: Path | str, value: str | Path | None) -> Path | None:
@@ -45,32 +72,68 @@ def _resolve_repo_path(repo_root: Path | str, value: str | Path | None) -> Path 
 
 
 def selection_key(selection: VegaWorkflowSelection) -> str:
-    return f"{selection.experiment}:{selection.model_family}:{selection.profile}"
+    return ":".join(_selection_identity_parts(selection))
 
 
 def selection_slug(selection: VegaWorkflowSelection) -> str:
-    return "__".join((selection.experiment, selection.model_family, selection.profile))
+    return "__".join(_selection_identity_parts(selection))
+
+
+def _selection_identity_parts(selection: VegaWorkflowSelection) -> tuple[str, ...]:
+    if selection.structure_explicit or selection.structure != "emb":
+        return (
+            selection.structure,
+            selection.experiment,
+            selection.model_family,
+            selection.profile,
+        )
+    return (selection.experiment, selection.model_family, selection.profile)
 
 
 def parse_selection(value: str) -> VegaWorkflowSelection:
     parts = value.split(":")
-    if len(parts) != 3:
+    if len(parts) == 3:
+        return VegaWorkflowSelection(parts[0], parts[1], parts[2])
+    if len(parts) == 4:
+        return VegaWorkflowSelection(parts[1], parts[2], parts[3], structure=parts[0])
+    raise ValueError(
+        "Workflow selection must use experiment:model-family:profile or "
+        "structure:experiment:model-family:profile. "
+        f"Got: {value}"
+    )
+
+
+def _ensure_runtime_supported(selection: VegaWorkflowSelection, operation: str) -> None:
+    if selection.structure != "emb":
         raise ValueError(
-            "Workflow selection must use experiment:model-family:profile. " f"Got: {value}"
+            f"{selection.structure.upper()} workflow {operation} is not implemented yet for "
+            f"experiment '{selection.experiment}'."
         )
-    return VegaWorkflowSelection(parts[0], parts[1], parts[2])
 
 
 def expand_selection_matrix(
     experiments: Iterable[str],
     model_families: Iterable[str],
     profiles: Iterable[str],
+    *,
+    structures: Iterable[str] | None = None,
 ) -> list[VegaWorkflowSelection]:
     selections: list[VegaWorkflowSelection] = []
-    for experiment in experiments:
-        for model_family in model_families:
-            for profile in profiles:
-                selections.append(VegaWorkflowSelection(experiment, model_family, profile))
+    if structures is None:
+        for experiment in experiments:
+            for model_family in model_families:
+                for profile in profiles:
+                    selections.append(VegaWorkflowSelection(experiment, model_family, profile))
+        return selections
+    for structure in structures:
+        for experiment in experiments:
+            for model_family in model_families:
+                for profile in profiles:
+                    selections.append(
+                        VegaWorkflowSelection(
+                            experiment, model_family, profile, structure=structure
+                        )
+                    )
     return selections
 
 
@@ -83,6 +146,7 @@ def resolve_workflow_config_path(
     override_path = _resolve_repo_path(repo_root, override)
     if override_path is not None:
         return override_path
+    _ensure_runtime_supported(selection, "runtime/config resolution")
 
     if selection.model_family == "full-model":
         filename = (
@@ -118,11 +182,19 @@ def resolve_workflow_output_root(
         env_tag = os.environ.get("MESOUQ_RUN_TAG", "").strip()
         effective_tag = env_tag or None
     effective_site = site if site is not None else detect_hpc_site()
+    segments = (
+        (selection.experiment, selection.model_family, selection.profile)
+        if not selection.structure_explicit and selection.structure == "emb"
+        else (
+            selection.structure,
+            selection.experiment,
+            selection.model_family,
+            selection.profile,
+        )
+    )
     return (
         default_runs_root(repo_root, "runs", site=effective_site, run_tag=effective_tag)
-        / selection.experiment
-        / selection.model_family
-        / selection.profile
+        .joinpath(*segments)
     ).resolve()
 
 
@@ -179,14 +251,24 @@ def load_workflow_datasets(
     repo_root: Path | str,
     config_path: Path | str,
     experiment: str,
+    structure: str | None = None,
 ) -> list[tuple[float, str]]:
     repo_root = Path(repo_root).resolve()
     config_path = Path(config_path).resolve()
     with config_path.open("rb") as handle:
         config = yaml.load(handle, Loader=yaml.CLoader)
 
+    resolved_structure = structure if structure is not None else "emb"
+    if resolved_structure != "emb":
+        raise ValueError(
+            f"{resolved_structure.upper()} workflow dataset loading is not implemented yet for "
+            f"experiment '{experiment}'."
+        )
+
     entries: list[tuple[float, str]] = []
     for spec in load_experiments(config, repo_root):
+        if getattr(spec, "structure", "emb") != resolved_structure:
+            continue
         if not spec.enabled or spec.name != experiment:
             continue
         for diameter in spec.diameters:
@@ -236,6 +318,7 @@ def build_inference_command(
     dataset_name: str | None = None,
     diameter: float | None = None,
 ) -> list[str]:
+    _ensure_runtime_supported(selection, "inference")
     driver = resolve_inference_stage_driver(repo_root, stage, selection.model_family)
     config_path = Path(config_path).resolve()
     output_root = Path(output_root).resolve()
