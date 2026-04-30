@@ -356,8 +356,56 @@ def test_offline_smoke_selection_supports_all_gv_experiments_without_mirheo(
     assert manifest["structure"] == "gv"
     assert expected_control_key in manifest["controls"]
     assert report["structure"] == "gv"
+    assert report["selection"] == selection
     assert report["execution_mode"] in {"dry_run_manifest_only", "train_load_evaluate"}
     assert "mirheo" not in {name.lower() for name in sys.modules}
+
+
+def test_offline_smoke_runtime_manifest_preserves_selection(tmp_path: Path) -> None:
+    module = _load_smoke_module("mesouq_test_gv_smoke_runtime_manifest_selection")
+    runtime_manifest = {
+        "structure": "gv",
+        "experiment": "torsion",
+        "selection": "gv:torsion",
+        "geometry": "gv_rad2_height14_28",
+        "geometry_spec": {
+            "id": "gv_rad2_height14_28",
+            "label": "GV radius 2.0 height 14.28",
+            "parameters": {"radius": 2.0, "height": 14.28},
+            "source": "unit-test",
+        },
+        "controls": {"theta": 0.04},
+        "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0_04",
+    }
+    runtime_manifest_path = tmp_path / "runtime_manifest.json"
+    runtime_manifest_path.write_text(json.dumps(runtime_manifest), encoding="utf-8")
+
+    rc = module.main(
+        [
+            "--runtime-manifest",
+            str(runtime_manifest_path),
+            "--output-root",
+            str(tmp_path / "smoke"),
+            "--num-curves",
+            "3",
+            "--points-per-curve",
+            "3",
+        ]
+    )
+
+    reference_manifest = json.loads(
+        ((tmp_path / "smoke") / "gv_reference_manifest.json").read_text(encoding="utf-8")
+    )
+    workflow_manifest = json.loads(
+        ((tmp_path / "smoke") / "gv_dnn_surrogate_smoke_manifest.json").read_text(encoding="utf-8")
+    )
+    report = json.loads(
+        ((tmp_path / "smoke") / "gv_dnn_surrogate_smoke_report.json").read_text(encoding="utf-8")
+    )
+    assert rc == 0
+    assert reference_manifest["selection"] == "gv:torsion"
+    assert workflow_manifest["selection"] == "gv:torsion"
+    assert report["selection"] == "gv:torsion"
 
 
 def test_default_output_root_routes_under_runs_and_avoids_staging(
