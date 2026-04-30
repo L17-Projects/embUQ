@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+from collections import namedtuple
 from pathlib import Path
 
 import pytest
@@ -198,6 +199,26 @@ def test_descriptor_resolution_fallback_and_bad_payload(tmp_path: Path) -> None:
     bad_payload_cli._load_experiment_module = lambda _name: _BadPayloadModule()
     with pytest.raises(TypeError, match="manifest-capable"):
         bad_payload_cli.main(["--experiment", "stretching", "--output-root", str(tmp_path)])
+
+
+def test_jsonify_normalizes_paths_namedtuples_and_objects(tmp_path: Path) -> None:
+    module = _load_module("mesouq_test_gv_runtime_jsonify")
+    Pair = namedtuple("Pair", ["path", "values"])
+
+    class Payload:
+        def __init__(self) -> None:
+            self.root = tmp_path
+            self.pair = Pair(tmp_path / "a", [tmp_path / "b"])
+
+    assert module._jsonify(tmp_path) == str(tmp_path)
+    assert module._jsonify(Pair(tmp_path / "x", (tmp_path / "y",))) == {
+        "path": str(tmp_path / "x"),
+        "values": [str(tmp_path / "y")],
+    }
+    assert module._jsonify(Payload()) == {
+        "root": str(tmp_path),
+        "pair": {"path": str(tmp_path / "a"), "values": [str(tmp_path / "b")]},
+    }
 
 
 def test_shear_flow_requires_experimental_flag(tmp_path: Path) -> None:

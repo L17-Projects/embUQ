@@ -208,6 +208,16 @@ def test_synthetic_reference_wrappers_and_private_axis_helpers() -> None:
     assert synthetic_module._control_id({}) == "default"
     assert synthetic_module._seeded_synthetic_value(3, "dataset", "not_registered", {}, 0.5) > 0.0
 
+    with pytest.raises(ValueError, match="only the 'dnn' surrogate backend"):
+        synthetic_module._identity_from_axes(
+            structure="gv",
+            experiment="torsion",
+            geometry="gv_rad2_height14_28",
+            controls={"theta": 0.03},
+            surrogate_backend="bnn",
+            reference_kind="synthetic",
+        )
+
     with pytest.raises(ValueError, match="Unsupported GV reference kind"):
         synthetic_module._identity_from_axes(
             structure="gv",
