@@ -366,6 +366,20 @@ def test_gv_hbi_artifact_probe_reports_loaded_shape(
     }
 
 
+def test_gv_hbi_artifact_probe_skips_when_model_dependency_is_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact_path = tmp_path / "model.pkl"
+    artifact_path.write_text("artifact", encoding="utf-8")
+    monkeypatch.setitem(sys.modules, "meso_uq.surrogate.model", None)
+
+    probe = gv_hbi._build_execution_artifact_probe(artifact_path)
+
+    assert probe["status"] == "skipped_missing_dependency"
+    assert "meso_uq.surrogate.model" in probe["reason"]
+
+
 def test_gv_phase1_execution_rejects_non_surrogate_config(tmp_path: Path) -> None:
     manifest_path = _surrogate_manifest(tmp_path)
     config = _gv_config(manifest_path)

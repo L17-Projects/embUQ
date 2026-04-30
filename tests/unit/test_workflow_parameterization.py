@@ -259,6 +259,8 @@ def test_gv_phase1_prior_specs_match_requested_contract() -> None:
 def test_mixed_structure_parameterization_is_rejected() -> None:
     with pytest.raises(ValueError, match="Mixed-structure inference parameterization"):
         active_variable_names({"structures": ["emb", "gv"]})
+    with pytest.raises(ValueError, match="Unsupported inference structure"):
+        phase1_variable_names({"structure": "vesicle"})
 
 
 def test_expand_parameter_vector_handles_reduced_legacy_and_full():
