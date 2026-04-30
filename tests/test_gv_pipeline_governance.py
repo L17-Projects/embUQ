@@ -11,14 +11,19 @@ from meso_uq.structures.gv.runtime import RUNTIME_EXPERIMENTS, plan_runtime, run
 
 GV_RUNTIME_ROOT = REPO_ROOT / "src" / "meso_uq" / "structures" / "gv"
 GV_SIMULATION_ROOT = REPO_ROOT / "gv_simulation_files"
-FORBIDDEN_GV_SURFACE_TOKENS = (
+FORBIDDEN_GV_BNN_SURFACE_TOKENS = (
     "variationalbnnpredictor",
     "pyro",
     "promote_certified_bnn",
     "run_bnn_",
+)
+FORBIDDEN_GV_HBI_SURFACE_TOKENS = (
     "hierarchical inference",
     "hbi",
 )
+GV_HBI_SURFACE_ALLOWLIST = {
+    REPO_ROOT / "scripts" / "workflows" / "gv" / "run_gv_operational_canary.py",
+}
 
 
 def test_gv_runtime_surface_uses_python_modules_not_raw_staging_imports() -> None:
@@ -57,11 +62,15 @@ def test_gv_runtime_plans_route_generated_outputs_outside_canonical_source(tmp_p
             assert provenance_root not in generated_path.parents
 
 
-def test_gv_surface_does_not_claim_bnn_promotion_or_hbi_support() -> None:
+def test_gv_surface_does_not_claim_bnn_promotion_or_ungated_hbi_support() -> None:
     surface_files = list(GV_RUNTIME_ROOT.rglob("*.py")) + list((REPO_ROOT / "scripts" / "workflows" / "gv").glob("*.py"))
     assert surface_files
 
     for path in surface_files:
         text = path.read_text(encoding="utf-8").lower()
-        for token in FORBIDDEN_GV_SURFACE_TOKENS:
+        for token in FORBIDDEN_GV_BNN_SURFACE_TOKENS:
             assert token not in text, f"Unexpected GV surface token {token!r} in {path}"
+        if path in GV_HBI_SURFACE_ALLOWLIST:
+            continue
+        for token in FORBIDDEN_GV_HBI_SURFACE_TOKENS:
+            assert token not in text, f"Unexpected ungated GV HBI token {token!r} in {path}"
