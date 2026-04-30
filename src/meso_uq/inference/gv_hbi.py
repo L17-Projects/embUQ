@@ -80,8 +80,6 @@ def _require_gv_only(experiments: Sequence[ExperimentSpec]) -> None:
 
 def _surrogate_manifest_map(config: Mapping[str, Any]) -> dict[str, str]:
     raw = config.get("gv_surrogate_manifests") or config.get("surrogate_manifests") or {}
-    if raw is None:
-        return {}
     if not isinstance(raw, Mapping):
         raise ValueError("gv_surrogate_manifests must be a mapping from dataset id to manifest path.")
     return {str(key): str(value) for key, value in raw.items()}
