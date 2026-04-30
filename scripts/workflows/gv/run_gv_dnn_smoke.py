@@ -255,7 +255,10 @@ def _build_reference_manifest(args: argparse.Namespace) -> dict[str, Any]:
     structure_name, experiment_name = _resolve_selected_experiment(args)
 
     if not experiment_name:
-        raise ValueError("--experiment or --selection is required when --reference-manifest is not provided.")
+        raise ValueError(
+            "--experiment is required when --reference-manifest is not provided; "
+            "alternatively use --selection gv:<experiment>."
+        )
 
     structure = get_structure(structure_name)
     structure.get_experiment(experiment_name, include_experimental=args.include_experimental)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from importlib import import_module
 from pathlib import Path
-from typing import Mapping
+from typing import Mapping, cast
 
 from .base import GV_RUNTIME_DEFAULT_ROOT, RuntimeDescriptor, RuntimeDryRun
 
@@ -18,10 +18,10 @@ def runtime_module_name(experiment: str) -> str:
 def load_runtime_descriptor(experiment: str) -> RuntimeDescriptor:
     module = import_module(runtime_module_name(experiment))
     descriptor = getattr(module, "DESCRIPTOR", None)
-    if isinstance(descriptor, RuntimeDescriptor):
-        return descriptor
+    if isinstance(descriptor, RuntimeDescriptor) or callable(getattr(descriptor, "plan", None)):
+        return cast(RuntimeDescriptor, descriptor)
     raise TypeError(
-        f"GV runtime module '{module.__name__}' must expose DESCRIPTOR as a RuntimeDescriptor."
+        f"GV runtime module '{module.__name__}' must expose DESCRIPTOR as a RuntimeDescriptor-compatible object."
     )
 
 
