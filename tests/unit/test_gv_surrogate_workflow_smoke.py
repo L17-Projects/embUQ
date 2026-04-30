@@ -5,6 +5,7 @@ import csv
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -141,3 +142,384 @@ def test_gv_dnn_smoke_rejects_runtime_manifest_without_geometry_parameters(
     with pytest.raises(SystemExit):
         smoke_module.main(["--runtime-manifest", str(runtime_manifest_path), "--output-root", str(tmp_path / "out")])
     assert "geometry_spec.parameters.radius" in capsys.readouterr().err
+
+
+def test_gv_dnn_smoke_helper_validation_branches(tmp_path: Path) -> None:
+    smoke_module = _load_module(SMOKE_SCRIPT_PATH, "mesouq_test_gv_dnn_smoke_validation_branches")
+    structure = smoke_module.get_structure("gv")
+
+    with pytest.raises(ValueError, match="Invalid control override"):
+        smoke_module._parse_controls(["theta"], "torsion", structure)
+
+    with pytest.raises(ValueError, match="Unsupported control"):
+        smoke_module._parse_controls(["unknown=1.0"], "torsion", structure)
+
+    geometry = smoke_module._resolve_geometry(
+        SimpleNamespace(geometry_id="gv_rad2_height14_28", radius=None, height=None),
+        structure,
+    )
+    assert geometry.id == "gv_rad2_height14_28"
+
+    with pytest.raises(ValueError, match="requires both --radius and --height"):
+        smoke_module._resolve_geometry(SimpleNamespace(geometry_id=None, radius=2.1, height=None), structure)
+
+    custom_geometry = smoke_module._resolve_geometry(
+        SimpleNamespace(geometry_id=None, radius=2.2, height=15.0),
+        structure,
+    )
+    assert custom_geometry.parameters == {"radius": 2.2, "height": 15.0}
+
+    with pytest.raises(ValueError, match="missing geometry_spec"):
+        smoke_module._validate_geometry_parameters({"geometry_spec": None})
+
+    with pytest.raises(ValueError, match="missing geometry_spec.parameters"):
+        smoke_module._validate_geometry_parameters({"geometry_spec": {"parameters": None}})
+
+    with pytest.raises(ValueError, match="at least 2"):
+        smoke_module._axis_points(1)
+
+    with pytest.raises(ValueError, match="at least 2"):
+        smoke_module._curve_offsets(1)
+
+    with pytest.raises(ValueError, match="Need at least 2 rows"):
+        smoke_module._split_row_indices(1, val_fraction=0.5, seed=1)
+
+    with pytest.raises(ValueError, match="val_fraction must be"):
+        smoke_module._split_row_indices(4, val_fraction=1.0, seed=1)
+
+    perm, n_val = smoke_module._split_row_indices(2, val_fraction=0.99, seed=None)
+    assert sorted(perm.tolist()) == [0, 1]
+    assert n_val == 1
+
+    assert smoke_module._control_columns({"experiment": "not_registered", "controls": {"z": 1.0, "a": 2.0}}) == [
+        "a",
+        "z",
+    ]
+
+    args = SimpleNamespace(
+        runtime_manifest=None,
+        reference_manifest=None,
+        experiment="torsion",
+        structure="gv",
+        geometry_id=None,
+        radius=2.2,
+        height=15.0,
+        control=["theta=0.04"],
+        output_root=str(tmp_path),
+        include_experimental=False,
+        reference_kind="dpd_generated",
+        backend="dnn",
+    )
+    manifest = smoke_module._build_reference_manifest(args)
+    assert manifest["geometry_spec"]["parameters"] == {"radius": 2.2, "height": 15.0}
+    assert manifest["controls"] == {"theta": 0.04}
+    assert manifest["reference_kind"] == "dpd_generated"
+
+    with pytest.raises(ValueError, match="--experiment is required"):
+        smoke_module._build_reference_manifest(
+            SimpleNamespace(
+                runtime_manifest=None,
+                reference_manifest=None,
+                experiment=None,
+                structure="gv",
+                geometry_id=None,
+                radius=None,
+                height=None,
+                control=[],
+                output_root=str(tmp_path),
+                include_experimental=False,
+                reference_kind="synthetic",
+                backend="dnn",
+            )
+        )
+
+
+def test_gv_dnn_smoke_manifest_loaders_report_invalid_inputs(tmp_path: Path) -> None:
+    smoke_module = _load_module(SMOKE_SCRIPT_PATH, "mesouq_test_gv_dnn_smoke_manifest_loader_errors")
+    valid_geometry_spec = {
+        "id": "gv_rad2_height14_28",
+        "parameters": {"radius": 2.0, "height": 14.28},
+    }
+
+    runtime_missing = tmp_path / "runtime_missing.json"
+    runtime_missing.write_text(json.dumps({"structure": "gv"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="missing required fields"):
+        smoke_module._load_runtime_manifest(runtime_missing)
+
+    runtime_wrong_structure = tmp_path / "runtime_wrong_structure.json"
+    runtime_wrong_structure.write_text(
+        json.dumps(
+            {
+                "structure": "emb",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "geometry_spec": valid_geometry_spec,
+                "controls": {"theta": 0.03},
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="structure='gv'"):
+        smoke_module._load_runtime_manifest(runtime_wrong_structure)
+
+    runtime_bad_controls = tmp_path / "runtime_bad_controls.json"
+    runtime_bad_controls.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "geometry_spec": valid_geometry_spec,
+                "controls": ["theta"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="controls must be a mapping"):
+        smoke_module._load_runtime_manifest(runtime_bad_controls)
+
+    reference_missing = tmp_path / "reference_missing.json"
+    reference_missing.write_text(json.dumps({"structure": "gv"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="missing required fields"):
+        smoke_module._load_reference_manifest(reference_missing)
+
+    reference_wrong_structure = tmp_path / "reference_wrong_structure.json"
+    reference_wrong_structure.write_text(
+        json.dumps(
+            {
+                "structure": "emb",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "controls": {"theta": 0.03},
+                "reference_kind": "synthetic",
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="structure='gv'"):
+        smoke_module._load_reference_manifest(reference_wrong_structure)
+
+    reference_bad_controls = tmp_path / "reference_bad_controls.json"
+    reference_bad_controls.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "controls": ["theta"],
+                "reference_kind": "synthetic",
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="controls must be a mapping"):
+        smoke_module._load_reference_manifest(reference_bad_controls)
+
+    reference_bad_kind = tmp_path / "reference_bad_kind.json"
+    reference_bad_kind.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "controls": {"theta": 0.03},
+                "reference_kind": "real",
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="Unsupported GV reference kind"):
+        smoke_module._load_reference_manifest(reference_bad_kind)
+
+    with pytest.raises(ValueError, match="Use either --runtime-manifest or --reference-manifest"):
+        smoke_module._build_reference_manifest(
+            SimpleNamespace(
+                runtime_manifest=str(runtime_bad_controls),
+                reference_manifest=str(reference_bad_kind),
+                reference_kind="synthetic",
+                backend="dnn",
+            )
+        )
+
+
+def test_gv_dnn_smoke_dry_run_mode_when_torch_is_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    smoke_module = _load_module(SMOKE_SCRIPT_PATH, "mesouq_test_gv_dnn_smoke_no_torch")
+    monkeypatch.setattr(smoke_module, "torch", None)
+
+    reference_manifest_path = tmp_path / "reference_manifest.json"
+    reference_manifest_path.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "geometry_spec": {
+                    "id": "gv_rad2_height14_28",
+                    "parameters": {"radius": 2.0, "height": 14.28},
+                },
+                "controls": {"theta": 0.03},
+                "reference_kind": "synthetic",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    output_root = tmp_path / "out"
+    rc = smoke_module.main(
+        [
+            "--reference-manifest",
+            str(reference_manifest_path),
+            "--output-root",
+            str(output_root),
+            "--num-curves",
+            "2",
+            "--points-per-curve",
+            "2",
+            "--val-fraction",
+            "0.5",
+        ]
+    )
+    assert rc == 0
+
+    report = json.loads((output_root / "gv_dnn_surrogate_smoke_report.json").read_text(encoding="utf-8"))
+    manifest = json.loads((output_root / "gv_dnn_surrogate_smoke_manifest.json").read_text(encoding="utf-8"))
+    assert report["status"] == "dry-run"
+    assert report["execution_mode"] == "dry_run_manifest_only"
+    assert report["training"]["n_train"] == 2
+    assert report["training"]["n_val"] == 2
+    assert manifest["reload"]["status"] == "not_run"
+    assert manifest["artifacts"]["artifact_path"] is None
+
+    with pytest.raises(RuntimeError, match="torch is required"):
+        smoke_module._train_smoke_surrogate(
+            [],
+            input_cols=[],
+            target_col="response",
+            out_path=tmp_path / "model.pkl",
+            width=2,
+            depth=1,
+            batch_size=1,
+            max_epoch=1,
+            seed=1,
+            val_fraction=0.5,
+            report_path=tmp_path / "report.json",
+        )
+
+    with pytest.raises(RuntimeError, match="torch is required"):
+        smoke_module._predict_rows(tmp_path / "model.pkl", [], input_cols=[], target_col="response")
+
+
+def test_gv_dnn_smoke_validation_helpers_cover_error_paths(tmp_path: Path) -> None:
+    smoke_module = _load_module(SMOKE_SCRIPT_PATH, "mesouq_test_gv_dnn_smoke_validation_helpers")
+    structure = smoke_module.get_structure("gv")
+
+    with pytest.raises(ValueError, match="Invalid control override"):
+        smoke_module._parse_controls(["theta"], "torsion", structure)
+
+    with pytest.raises(ValueError, match="Unsupported control"):
+        smoke_module._parse_controls(["bpress=-91"], "torsion", structure)
+
+    args = smoke_module.build_parser().parse_args(
+        ["--output-root", str(tmp_path), "--experiment", "torsion", "--radius", "2.0"]
+    )
+    with pytest.raises(ValueError, match="Custom geometry requires both"):
+        smoke_module._resolve_geometry(args, structure)
+
+    bad_runtime = tmp_path / "bad_runtime.json"
+    bad_runtime.write_text(
+        json.dumps({"structure": "emb", "experiment": "torsion", "geometry": "gv_rad2_height14_28", "controls": {}}),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="only supports structure='gv'"):
+        smoke_module._load_runtime_manifest(bad_runtime)
+
+    bad_reference = tmp_path / "bad_reference.json"
+    bad_reference.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "controls": [],
+                "reference_kind": "synthetic",
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="controls must be a mapping"):
+        smoke_module._load_reference_manifest(bad_reference)
+
+    with pytest.raises(ValueError, match="Use either --runtime-manifest or --reference-manifest"):
+        smoke_module._build_reference_manifest(
+            smoke_module.build_parser().parse_args(
+                [
+                    "--output-root",
+                    str(tmp_path),
+                    "--runtime-manifest",
+                    str(bad_runtime),
+                    "--reference-manifest",
+                    str(bad_reference),
+                ]
+            )
+        )
+
+    with pytest.raises(ValueError, match="--experiment is required"):
+        smoke_module._build_reference_manifest(smoke_module.build_parser().parse_args(["--output-root", str(tmp_path)]))
+
+
+def test_gv_dnn_smoke_rows_and_split_helpers_cover_edges(tmp_path: Path) -> None:
+    smoke_module = _load_module(SMOKE_SCRIPT_PATH, "mesouq_test_gv_dnn_smoke_row_helpers")
+    reference_manifest = {
+        "structure": "gv",
+        "experiment": "unknown_experiment",
+        "geometry": "gv_rad2_height14_28",
+        "geometry_spec": {"parameters": {"radius": 1.5, "height": 9.0}},
+        "controls": {"zeta": 2.0},
+        "reference_kind": "synthetic",
+    }
+
+    assert smoke_module._control_columns(reference_manifest) == ["zeta"]
+    rows = smoke_module._build_smoke_rows(reference_manifest, num_curves=2, points_per_curve=2)
+    assert len(rows) == 4
+    assert rows[0]["radius"] == 1.5
+    assert rows[0]["height"] == 9.0
+    assert rows[0]["response"] > 0.0
+
+    csv_path = tmp_path / "dataset.csv"
+    smoke_module._write_dataset_csv(csv_path, rows, smoke_module._ordered_dataset_columns(reference_manifest))
+    assert csv_path.read_text(encoding="utf-8").splitlines()[0].endswith("response,source_curve_id")
+
+    split_path = tmp_path / "split.csv"
+    assert smoke_module._write_split_manifest_csv(split_path, n_rows=3, val_fraction=0.99, seed=None) == 2
+
+    with pytest.raises(ValueError, match="at least 2 rows"):
+        smoke_module._split_row_indices(1, val_fraction=0.5, seed=1)
+
+    with pytest.raises(ValueError, match="val_fraction"):
+        smoke_module._split_row_indices(3, val_fraction=1.0, seed=1)
+
+    if smoke_module.torch is None:
+        with pytest.raises(RuntimeError, match="torch is required"):
+            smoke_module._train_smoke_surrogate(
+                rows,
+                input_cols=["ka", "radius", "height", "zeta", "observable_axis"],
+                target_col="response",
+                out_path=tmp_path / "model.pkl",
+                width=2,
+                depth=1,
+                batch_size=2,
+                max_epoch=1,
+                seed=1,
+                val_fraction=0.5,
+                report_path=tmp_path / "report.json",
+            )
+        with pytest.raises(RuntimeError, match="torch is required"):
+            smoke_module._predict_rows(
+                tmp_path / "model.pkl",
+                rows,
+                input_cols=["ka", "radius", "height", "zeta", "observable_axis"],
+                target_col="response",
+            )
