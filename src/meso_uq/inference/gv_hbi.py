@@ -576,7 +576,9 @@ def write_gv_phase1_execution_manifest(
         control=str(dataset["control"]),
         expected_controls=surrogate["control_values"],
     )
-    _load_json(Path(training_report_path), label="training report")
+    training_report = _load_json(Path(training_report_path), label="training report")
+    if not isinstance(training_report, Mapping):
+        raise ValueError("GV surrogate training report must be a JSON object.")
 
     phase1 = setup_manifest["phase1"]
     execution_manifest = {
