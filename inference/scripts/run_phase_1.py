@@ -14,29 +14,33 @@ sys.path.insert(0, str(PROJECT_ROOT / "compression"))
 sys.path.insert(0, str(PROJECT_ROOT / "compression" / "evalkit"))
 sys.path.insert(0, str(PROJECT_ROOT / "indentation"))
 sys.path.insert(0, str(PROJECT_ROOT / "indentation" / "evalkit"))
-
-from compression.evalkit.posterior_compression import (
-    compute_compression,
-    compute_compression_surrogate,
-    compute_compression_surrogate_batch,
-    preload_compression_surrogate,
-)
-from compression.evalkit.tools import datedPrint, prepareCompression
-from indentation.evalkit.posterior_indentation import (
-    compute_indentation_surrogate,
-    compute_indentation_surrogate_batch,
-    preload_indentation_surrogate,
-)
-from indentation.evalkit.prepare_env import prepareIndentation
 from meso_uq.config import resolve_inference_config_path
 from meso_uq.experiments import load_experiments
-from meso_uq.inference import write_gv_phase1_setup_manifest
+from meso_uq.inference import write_gv_phase1_execution_manifest, write_gv_phase1_setup_manifest
 from meso_uq.workflow_acceleration import (
     configure_device_conduit,
     configure_korali_conduit,
     phase1_prior_specs,
     to_korali_path,
 )
+
+
+def datedPrint(*args, **kwargs):
+    from compression.evalkit.tools import datedPrint as _datedPrint
+
+    return _datedPrint(*args, **kwargs)
+
+
+def prepareCompression(*args, **kwargs):
+    from compression.evalkit.tools import prepareCompression as _prepareCompression
+
+    return _prepareCompression(*args, **kwargs)
+
+
+def prepareIndentation(*args, **kwargs):
+    from indentation.evalkit.prepare_env import prepareIndentation as _prepareIndentation
+
+    return _prepareIndentation(*args, **kwargs)
 
 
 def _resolve_surrogate_backend(config: dict) -> str:
@@ -179,22 +183,39 @@ def run_inference(
             raise ValueError("Mixed EMB/GV Phase 1 configurations are not supported in the GV setup-validation path.")
         if restart:
             raise NotImplementedError("GV Phase 1 restart is not implemented in this tranche.")
-        if not (dry_run or setup_only):
-            raise NotImplementedError(
-                "GV Phase 1 execution is experimental; use --setup-only or --dry_run "
-                "to validate the setup manifest until the runtime canary passes."
+        if dry_run or setup_only:
+            manifest_path = write_gv_phase1_setup_manifest(
+                config,
+                experiments=experiments,
+                repo_root=PROJECT_ROOT,
+                output_root=output_root,
+                config_path=config_path_resolved,
             )
-        manifest_path = write_gv_phase1_setup_manifest(
+            print(f"GV Phase 1 setup manifest: {manifest_path}")
+            return
+        execution_manifest_path = write_gv_phase1_execution_manifest(
             config,
             experiments=experiments,
             repo_root=PROJECT_ROOT,
             output_root=output_root,
             config_path=config_path_resolved,
         )
-        print(f"GV Phase 1 setup manifest: {manifest_path}")
+        print(f"GV Phase 1 execution manifest: {execution_manifest_path}")
         return
 
     os.environ["HUQ_INFERENCE_CONFIG"] = str(config_path_resolved)
+    from compression.evalkit.posterior_compression import (
+        compute_compression,
+        compute_compression_surrogate,
+        compute_compression_surrogate_batch,
+        preload_compression_surrogate,
+    )
+    from indentation.evalkit.posterior_indentation import (
+        compute_indentation_surrogate,
+        compute_indentation_surrogate_batch,
+        preload_indentation_surrogate,
+    )
+
     korali, MPI = _load_korali_runtime()
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()

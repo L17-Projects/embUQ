@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import importlib.util
 import json
 import sys
@@ -11,6 +12,9 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "inference" / "scripts" / "run_phase_1.py"
+sys.path.insert(0, str(REPO_ROOT / "src"))
+
+from meso_uq.inference import gv_hbi
 
 
 def _load_module(name: str):
@@ -154,6 +158,7 @@ def test_gv_phase1_dry_run_writes_setup_manifest_without_loading_korali(tmp_path
     assert manifest["chain"] == ["Mirheo", "DNN surrogate", "hierarchical inference"]
     assert manifest["parameter_contract"]["calibrated"] == ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c"]
     assert manifest["phase1"]["variable_names"] == ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c", "sigma"]
+    assert "theta" not in manifest["phase1"]["variable_names"]
     assert manifest["phase1"]["noise_model"] == {"kind": "multiplicative", "parameter": "sigma"}
     assert manifest["phase2"]["pooled_variable_names"] == ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c"]
     assert manifest["controls"]["names"] == ["theta"]
@@ -228,6 +233,207 @@ def test_gv_phase1_dry_run_requires_experimental_flag(tmp_path: Path) -> None:
         )
 
 
+def test_gv_phase1_execution_requires_experimental_flag(tmp_path: Path) -> None:
+    module = _load_module("gv_phase1_execution_experimental_flag_test")
+    surrogate_manifest_path = tmp_path / "gv_dnn_surrogate_smoke_manifest.json"
+    surrogate_manifest_path.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "controls": {"theta": 0.03},
+                "reference_kind": "synthetic",
+                "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+                "backend": "dnn",
+                "artifacts": {"artifact_path": str(tmp_path / "missing.pkl")},
+            }
+        ),
+        encoding="utf-8",
+    )
+    config = _gv_phase1_config(surrogate_manifest_path)
+    config.pop("experimental_gv_hbi")
+    config_path = tmp_path / "gv_phase1_no_flag_execution.yaml"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    with pytest.raises(PermissionError, match="experimental"):
+        module.run_inference(
+            dry_run=False,
+            config_path=str(config_path),
+            output_dir=str(tmp_path / "phase1_out"),
+            device="cpu",
+        )
+
+
+def test_gv_phase1_restart_remains_blocked(tmp_path: Path) -> None:
+    module = _load_module("gv_phase1_restart_blocked_test")
+    surrogate_manifest_path = tmp_path / "gv_dnn_surrogate_smoke_manifest.json"
+    surrogate_manifest_path.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "controls": {"theta": 0.03},
+                "reference_kind": "synthetic",
+                "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+                "backend": "dnn",
+                "artifacts": {"artifact_path": str(tmp_path / "missing.pkl")},
+            }
+        ),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "gv_phase1_restart.yaml"
+    config_path.write_text(yaml.safe_dump(_gv_phase1_config(surrogate_manifest_path)), encoding="utf-8")
+
+    with pytest.raises(NotImplementedError, match="restart is not implemented"):
+        module.run_inference(
+            restart=True,
+            dry_run=True,
+            config_path=str(config_path),
+            output_dir=str(tmp_path / "phase1_out"),
+            device="cpu",
+        )
+
+
+def test_gv_phase1_mixed_emb_gv_configuration_remains_blocked(tmp_path: Path) -> None:
+    module = _load_module("gv_phase1_mixed_blocked_test")
+    surrogate_manifest_path = tmp_path / "gv_dnn_surrogate_smoke_manifest.json"
+    surrogate_manifest_path.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "controls": {"theta": 0.03},
+                "reference_kind": "synthetic",
+                "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+                "backend": "dnn",
+                "artifacts": {"artifact_path": str(tmp_path / "missing.pkl")},
+            }
+        ),
+        encoding="utf-8",
+    )
+    config = _gv_phase1_config(surrogate_manifest_path)
+    config["experiments"].append(
+        {
+            "structure": "emb",
+            "name": "compression",
+            "diameters": [2.1],
+        }
+    )
+    config_path = tmp_path / "gv_phase1_mixed.yaml"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Mixed EMB/GV"):
+        module.run_inference(
+            dry_run=True,
+            config_path=str(config_path),
+            output_dir=str(tmp_path / "phase1_out"),
+            device="cpu",
+        )
+
+
+def test_gv_phase1_paths_do_not_import_emb_runtime_dependencies(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_module("gv_phase1_lazy_emb_import_test")
+    original_import = builtins.__import__
+
+    def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+        root = name.split(".", 1)[0]
+        if root in {"compression", "indentation"}:
+            raise AssertionError(f"Unexpected EMB import on GV path: {name}")
+        return original_import(name, globals, locals, fromlist, level)
+
+    reference_manifest_path = tmp_path / "gv_reference_manifest.json"
+    reference_manifest_path.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "geometry_spec": {
+                    "id": "gv_rad2_height14_28",
+                    "parameters": {"radius": 2.0, "height": 14.28},
+                    "label": "GV radius 2.0 height 14.28",
+                    "source": "test",
+                },
+                "controls": {"theta": 0.03},
+                "reference_kind": "synthetic",
+                "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+                "noise_model": {"kind": "multiplicative", "parameter": "sigma"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    dataset_csv_path = tmp_path / "gv_surrogate_smoke_dataset.csv"
+    dataset_csv_path.write_text(
+        "ka,kb,mu,b1,b2,a3,a4,mu_l,c,radius,height,theta,torsion_coord,torsion_response,source_curve_id\n"
+        "0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,2.0,14.28,0.03,0.0,0.0,curve_0\n",
+        encoding="utf-8",
+    )
+    model_path = tmp_path / "gv_surrogate_dnn_smoke.pkl"
+    model_path.write_text("artifact", encoding="utf-8")
+    training_report_path = tmp_path / "gv_surrogate_dnn_training_report.json"
+    training_report_path.write_text(json.dumps({"status": "passed", "backend": "dnn"}), encoding="utf-8")
+    surrogate_manifest_path = tmp_path / "gv_dnn_surrogate_smoke_manifest.json"
+    surrogate_manifest_path.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "controls": {"theta": 0.03},
+                "reference_kind": "synthetic",
+                "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+                "backend": "dnn",
+                "artifacts": {
+                    "reference_manifest": str(reference_manifest_path),
+                    "model_path": str(model_path),
+                    "dataset_csv": str(dataset_csv_path),
+                    "training_report": str(training_report_path),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "gv_phase1_lazy_import.yaml"
+    config_path.write_text(yaml.safe_dump(_gv_phase1_config(surrogate_manifest_path)), encoding="utf-8")
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+    monkeypatch.setattr(
+        module,
+        "_load_korali_runtime",
+        lambda: (_ for _ in ()).throw(AssertionError("Korali runtime should not be loaded for GV execution seam")),
+    )
+    monkeypatch.setattr(
+        gv_hbi,
+        "_build_execution_artifact_probe",
+        lambda artifact_path: {
+            "status": "loaded",
+            "artifact_path": str(Path(artifact_path).resolve()),
+            "model_class": "MLP",
+            "input_dim": 13,
+            "output_dim": 1,
+        },
+    )
+
+    module.run_inference(
+        dry_run=True,
+        config_path=str(config_path),
+        output_dir=str(tmp_path / "phase1_setup_out"),
+        device="cpu",
+    )
+    module.run_inference(
+        dry_run=False,
+        config_path=str(config_path),
+        output_dir=str(tmp_path / "phase1_execution_out"),
+        device="cpu",
+    )
+
+
 def test_gv_phase1_dry_run_requires_existing_dnn_artifact(tmp_path: Path) -> None:
     module = _load_module("gv_phase1_setup_missing_artifact_test")
     surrogate_manifest_path = tmp_path / "gv_dnn_surrogate_smoke_manifest.json"
@@ -288,3 +494,111 @@ def test_gv_phase1_dry_run_requires_reference_manifest(tmp_path: Path) -> None:
             output_dir=str(tmp_path / "phase1_out"),
             device="cpu",
         )
+
+
+def test_gv_phase1_execution_emits_single_lane_dnn_manifest_without_loading_korali(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_module("gv_phase1_execution_test")
+    reference_manifest_path = tmp_path / "gv_reference_manifest.json"
+    reference_manifest_path.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "geometry_spec": {
+                    "id": "gv_rad2_height14_28",
+                    "parameters": {"radius": 2.0, "height": 14.28},
+                    "label": "GV radius 2.0 height 14.28",
+                    "source": "test",
+                },
+                "controls": {"theta": 0.03},
+                "reference_kind": "synthetic",
+                "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+                "noise_model": {"kind": "multiplicative", "parameter": "sigma"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    dataset_csv_path = tmp_path / "gv_surrogate_smoke_dataset.csv"
+    dataset_csv_path.write_text(
+        "ka,kb,mu,b1,b2,a3,a4,mu_l,c,radius,height,theta,torsion_coord,torsion_response,source_curve_id\n"
+        "0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,2.0,14.28,0.03,0.0,0.0,curve_0\n",
+        encoding="utf-8",
+    )
+    model_path = tmp_path / "gv_surrogate_dnn_smoke.pkl"
+    model_path.write_text("artifact", encoding="utf-8")
+    training_report_path = tmp_path / "gv_surrogate_dnn_training_report.json"
+    training_report_path.write_text(json.dumps({"status": "passed", "backend": "dnn"}), encoding="utf-8")
+    surrogate_manifest_path = tmp_path / "gv_dnn_surrogate_smoke_manifest.json"
+    surrogate_manifest_path.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "controls": {"theta": 0.03},
+                "reference_kind": "synthetic",
+                "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+                "backend": "dnn",
+                "artifacts": {
+                    "reference_manifest": str(reference_manifest_path),
+                    "model_path": str(model_path),
+                    "dataset_csv": str(dataset_csv_path),
+                    "training_report": str(training_report_path),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "gv_phase1_execution.yaml"
+    config_path.write_text(yaml.safe_dump(_gv_phase1_config(surrogate_manifest_path)), encoding="utf-8")
+
+    monkeypatch.setattr(
+        module,
+        "_load_korali_runtime",
+        lambda: (_ for _ in ()).throw(AssertionError("Korali runtime should not be loaded for GV execution seam")),
+    )
+    monkeypatch.setattr(
+        gv_hbi,
+        "_build_execution_artifact_probe",
+        lambda artifact_path: {
+            "status": "loaded",
+            "artifact_path": str(Path(artifact_path).resolve()),
+            "model_class": "MLP",
+            "input_dim": 13,
+            "output_dim": 1,
+        },
+    )
+
+    output_dir = tmp_path / "phase1_execution_out"
+    module.run_inference(
+        dry_run=False,
+        config_path=str(config_path),
+        output_dir=str(output_dir),
+        device="cpu",
+    )
+
+    setup_manifest = json.loads(
+        (output_dir / "results_phase_1" / gv_hbi.GV_PHASE1_SETUP_MANIFEST).read_text(encoding="utf-8")
+    )
+    execution_manifest = json.loads(
+        (output_dir / "results_phase_1" / gv_hbi.GV_PHASE1_EXECUTION_MANIFEST).read_text(encoding="utf-8")
+    )
+    assert setup_manifest["status"] == "setup_validated"
+    assert execution_manifest["workflow"] == "gv_phase1_execution"
+    assert execution_manifest["status"] == "execution_seam_emitted"
+    assert execution_manifest["execution_model"] == "single_lane_dnn_seam"
+    assert execution_manifest["dataset"]["dataset_id"] == "gv:torsion:gv_rad2_height14_28:theta_0.03"
+    assert execution_manifest["dataset"]["control_values"] == {"theta": 0.03}
+    assert execution_manifest["controls"]["fixed_outside_inferred_variables"] is True
+    assert execution_manifest["phase1"]["variable_names"] == ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c", "sigma"]
+    assert execution_manifest["phase1"]["noise_model"] == {"kind": "multiplicative", "parameter": "sigma"}
+    assert execution_manifest["provenance"]["noise_model"] == {"kind": "multiplicative", "parameter": "sigma"}
+    assert execution_manifest["provenance"]["dataset_csv"] == str(dataset_csv_path.resolve())
+    assert execution_manifest["provenance"]["training_report"] == str(training_report_path.resolve())
+    assert execution_manifest["artifact_probe"]["status"] == "loaded"
+    assert execution_manifest["runtime"]["korali_invoked"] is False
+    assert execution_manifest["runtime"]["full_hbi_completed"] is False

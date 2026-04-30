@@ -222,6 +222,101 @@ def test_gv_hbi_rejects_missing_reference_manifest_file(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("payload_updates", "match"),
+    (
+        ({"controls": {"theta": 0.07}}, "controls mismatch"),
+        ({"experiment": "stretching"}, "experiment mismatch"),
+        ({"geometry": "gv_rad3_height16"}, "geometry mismatch"),
+        ({"noise_model": {"kind": "additive", "parameter": "sigma"}}, "multiplicative sigma noise"),
+        ({"calibrated_parameter_names": ["theta", "kb"]}, "must match the GV parameter contract"),
+    ),
+)
+def test_gv_hbi_rejects_invalid_reference_manifests(
+    payload_updates: dict[str, object],
+    match: str,
+) -> None:
+    payload = {
+        "structure": "gv",
+        "experiment": "torsion",
+        "geometry": "gv_rad2_height14_28",
+        "controls": {"theta": 0.03},
+        "reference_kind": "synthetic",
+        "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+        "noise_model": {"kind": "multiplicative", "parameter": "sigma"},
+        "calibrated_parameter_names": ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c"],
+    }
+    payload.update(payload_updates)
+
+    with pytest.raises(ValueError, match=match):
+        gv_hbi._validate_reference_manifest(
+            payload,
+            experiment="torsion",
+            geometry="gv_rad2_height14_28",
+            dataset_id="gv:torsion:gv_rad2_height14_28:theta_0.03",
+            control="theta_0.03",
+            expected_controls={"theta": 0.03},
+        )
+
+
+def test_gv_hbi_rejects_reference_manifest_that_calibrates_controls(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _Experiment:
+        control_names = ("theta",)
+
+    class _Contract:
+        calibrated_names = ("ka", "kb", "theta")
+
+    class _Structure:
+        parameter_contract = _Contract()
+
+        @staticmethod
+        def get_experiment(_name: str, include_experimental: bool = True):
+            return _Experiment()
+
+    monkeypatch.setattr(gv_hbi, "get_structure", lambda _name: _Structure())
+
+    with pytest.raises(ValueError, match="controls separate from calibrated parameters"):
+        gv_hbi._validate_reference_manifest(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "controls": {"theta": 0.03},
+                "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+                "noise_model": {"kind": "multiplicative", "parameter": "sigma"},
+                "calibrated_parameter_names": ["ka", "kb", "theta"],
+            },
+            experiment="torsion",
+            geometry="gv_rad2_height14_28",
+            dataset_id="gv:torsion:gv_rad2_height14_28:theta_0.03",
+            control="theta_0.03",
+            expected_controls={"theta": 0.03},
+        )
+
+
+def test_gv_hbi_validates_manifest_control_shapes() -> None:
+    with pytest.raises(ValueError, match="surrogate manifest controls must be a mapping"):
+        gv_hbi._validate_gv_control_values(
+            controls=["theta=0.03"],
+            experiment_name="torsion",
+            label="GV surrogate manifest",
+        )
+
+    with pytest.raises(ValueError, match="unknown GV controls"):
+        gv_hbi._validate_gv_control_values(
+            controls={"theta": 0.03, "extra": 1.0},
+            experiment_name="torsion",
+            label="GV surrogate manifest",
+        )
+
+    with pytest.raises(ValueError, match="missing GV controls"):
+        gv_hbi._validate_gv_control_values(
+            controls={"tot_force": 500.0},
+            experiment_name="stretching",
+            label="GV surrogate manifest",
+        )
+
+
 def test_gv_hbi_build_manifest_rejects_empty_selection_and_control_overlap(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
