@@ -509,6 +509,14 @@ def test_gv_phase1_execution_rejects_missing_artifacts_and_bad_training_report(
         ),
         encoding="utf-8",
     )
+    original_load_json = gv_hbi._load_json
+
+    def _load_json_with_non_object_training_report(path: Path, *, label: str):
+        if Path(path) == training_report_path:
+            return []
+        return original_load_json(path, label=label)
+
+    monkeypatch.setattr(gv_hbi, "_load_json", _load_json_with_non_object_training_report)
     with pytest.raises(ValueError, match="training report must be a JSON object"):
         gv_hbi.write_gv_phase1_execution_manifest(
             config,
