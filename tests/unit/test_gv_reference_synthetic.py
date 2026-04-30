@@ -10,7 +10,11 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+from meso_uq.references import build_gv_synthetic_fixture
+from meso_uq.references import build_gv_synthetic_reference_manifest
 from meso_uq.references import generate_gv_synthetic_reference
+from meso_uq.references import gv_common as gv_common_module
+from meso_uq.references import synthetic as synthetic_module
 from meso_uq.references.gv_common import resolve_gv_reference_context
 from meso_uq.structures.gv.parameters import GV_PARAMETER_CONTRACT
 from meso_uq.structures.gv.runtime.catalog import load_runtime_descriptor
@@ -98,11 +102,40 @@ def test_synthetic_reference_context_reports_missing_axes_and_controls() -> None
         )
 
 
+def test_synthetic_reference_context_rejects_non_gv_structure(monkeypatch: pytest.MonkeyPatch) -> None:
+    class NonGVStructure:
+        name = "emb"
+
+    monkeypatch.setattr(gv_common_module, "get_structure", lambda _name: NonGVStructure())
+
+    with pytest.raises(ValueError, match="only support structure 'gv'"):
+        gv_common_module.resolve_gv_reference_context(
+            runtime_manifest={
+                "structure": "emb",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "controls": {"theta": 0.03},
+            }
+        )
+
+
+def test_synthetic_reference_context_merges_manifest_and_explicit_controls() -> None:
+    context = resolve_gv_reference_context(
+        runtime_manifest={
+            "structure": "gv",
+            "experiment": "stretching",
+            "geometry": "gv_rad2_height14_28",
+            "controls": {"tot_force": 500.0},
+        },
+        controls={"bpress": -91.0},
+    )
+
+    assert context.controls == {"tot_force": 500.0, "bpress": -91.0}
+    assert context.control_id == "bpress_-91__tot_force_500"
+    assert context.dataset_id == "gv:stretching:gv_rad2_height14_28:bpress_-91__tot_force_500"
+
+
 def test_synthetic_gv_reference_rejects_bnn_backend() -> None:
-    import pytest
-
-    from meso_uq.references import build_gv_synthetic_fixture
-
     with pytest.raises(ValueError, match="only the 'dnn' surrogate backend"):
         build_gv_synthetic_fixture(
             experiment="torsion",
@@ -110,4 +143,77 @@ def test_synthetic_gv_reference_rejects_bnn_backend() -> None:
             controls={"theta": 0.03},
             sigma=0.02,
             surrogate_backend="bnn",
+        )
+
+
+def test_synthetic_fixture_rejects_invalid_series_reference_kind_and_templates() -> None:
+    with pytest.raises(ValueError, match="points must contain at least one value"):
+        build_gv_synthetic_fixture(
+            experiment="torsion",
+            geometry="gv_rad2_height14_28",
+            controls={"theta": 0.03},
+            sigma=0.02,
+            points=[],
+        )
+
+    with pytest.raises(ValueError, match="No synthetic fixture template"):
+        build_gv_synthetic_fixture(
+            experiment="not_registered",
+            geometry="gv_rad2_height14_28",
+            controls={"theta": 0.03},
+            sigma=0.02,
+        )
+
+    with pytest.raises(ValueError, match="Unsupported GV reference kind"):
+        build_gv_synthetic_fixture(
+            experiment="torsion",
+            geometry="gv_rad2_height14_28",
+            controls={"theta": 0.03},
+            sigma=0.02,
+            reference_kind="real",
+        )
+
+    with pytest.raises(ValueError, match="same length"):
+        build_gv_synthetic_fixture(
+            experiment="torsion",
+            geometry="gv_rad2_height14_28",
+            controls={"theta": 0.03},
+            sigma=0.02,
+            points=[0.0, 1.0],
+            values=[0.0],
+        )
+
+
+def test_synthetic_reference_wrappers_and_private_axis_helpers() -> None:
+    manifest = build_gv_synthetic_reference_manifest(
+        seed=9,
+        experiment="torsion",
+        geometry="gv_rad2_height14_28",
+        controls={"theta": 0.03},
+        point_count=2,
+    )
+    assert manifest["points"] == [0.0, 1.0]
+    assert manifest["values"]
+
+    identity = synthetic_module._identity_from_axes(
+        structure="gv",
+        experiment="torsion",
+        geometry="gv_rad2_height14_28",
+        controls={"theta": 0.03},
+        surrogate_backend="dnn",
+        reference_kind="synthetic",
+        dataset_id="explicit",
+    )
+    assert identity.dataset_id == "explicit"
+    assert synthetic_module._control_id({}) == "default"
+    assert synthetic_module._seeded_synthetic_value(3, "dataset", "not_registered", {}, 0.5) > 0.0
+
+    with pytest.raises(ValueError, match="Unsupported GV reference kind"):
+        synthetic_module._identity_from_axes(
+            structure="gv",
+            experiment="torsion",
+            geometry="gv_rad2_height14_28",
+            controls={"theta": 0.03},
+            surrogate_backend="dnn",
+            reference_kind="real",
         )
