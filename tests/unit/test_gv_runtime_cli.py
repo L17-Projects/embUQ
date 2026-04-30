@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import json
 import sys
@@ -308,6 +309,59 @@ def test_structure_qualified_selection_rejects_conflict_with_experiment_value(tm
         )
 
     assert excinfo.value.code == 2
+
+
+def test_runtime_selection_resolver_rejects_missing_experiment_and_structure_conflict() -> None:
+    module = _load_module("mesouq_test_gv_runtime_selection_resolver_edges")
+
+    with pytest.raises(ValueError, match="Either --experiment or --selection"):
+        module._resolve_selected_experiment(
+            argparse.Namespace(selection=None, experiment=None, structure="gv")
+        )
+    with pytest.raises(ValueError, match="Conflicting structure values"):
+        module._resolve_selected_experiment(
+            argparse.Namespace(selection="gv:torsion", experiment=None, structure="emb")
+        )
+
+
+@pytest.mark.parametrize(
+    ("args", "match"),
+    (
+        (
+            argparse.Namespace(selection="gv:stretching:extra", experiment=None, structure="gv"),
+            "form gv:<experiment>",
+        ),
+        (
+            argparse.Namespace(selection="emb:compression", experiment=None, structure="gv"),
+            "does not accept structure",
+        ),
+        (
+            argparse.Namespace(selection="gv:torsion", experiment="stretching", structure="gv"),
+            "Conflicting selection values",
+        ),
+        (
+            argparse.Namespace(selection="gv:torsion", experiment=None, structure="emb"),
+            "Conflicting structure values",
+        ),
+    ),
+)
+def test_smoke_selection_resolver_rejects_invalid_values(
+    args: argparse.Namespace,
+    match: str,
+) -> None:
+    module = _load_smoke_module("mesouq_test_gv_smoke_selection_resolver_edges")
+
+    with pytest.raises(ValueError, match=match):
+        module._resolve_selected_experiment(args)
+
+
+def test_smoke_split_keeps_at_least_one_training_row() -> None:
+    module = _load_smoke_module("mesouq_test_gv_smoke_split_high_validation_fraction")
+
+    permutation, n_val = module._split_row_indices(3, val_fraction=0.99, seed=11)
+
+    assert sorted(permutation.tolist()) == [0, 1, 2]
+    assert n_val == 2
 
 
 @pytest.mark.parametrize(
