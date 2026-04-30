@@ -182,6 +182,14 @@ def _validate_surrogate_manifest(
     artifact_path = _resolve_repo_path(manifest_path.parent, str(artifact_value))
     if not artifact_path.exists():
         raise FileNotFoundError(f"Missing GV surrogate artifact for dataset '{dataset_id}': {artifact_path}")
+    reference_manifest_value = artifacts.get("reference_manifest")
+    if not reference_manifest_value:
+        raise FileNotFoundError(f"Missing GV reference manifest path in surrogate manifest: {manifest_path}")
+    reference_manifest_path = _resolve_repo_path(manifest_path.parent, str(reference_manifest_value))
+    if not reference_manifest_path.exists():
+        raise FileNotFoundError(
+            f"Missing GV reference manifest for dataset '{dataset_id}': {reference_manifest_path}"
+        )
 
     return {
         "manifest": str(manifest_path),
@@ -191,7 +199,7 @@ def _validate_surrogate_manifest(
         "control_values": dict(payload.get("controls", {}))
         if isinstance(payload.get("controls"), Mapping)
         else {},
-        "reference_manifest": artifacts.get("reference_manifest"),
+        "reference_manifest": str(reference_manifest_path),
         "dataset_csv": artifacts.get("dataset_csv"),
         "control": control,
     }

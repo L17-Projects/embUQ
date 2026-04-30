@@ -256,3 +256,35 @@ def test_gv_phase1_dry_run_requires_existing_dnn_artifact(tmp_path: Path) -> Non
             output_dir=str(tmp_path / "phase1_out"),
             device="cpu",
         )
+
+
+def test_gv_phase1_dry_run_requires_reference_manifest(tmp_path: Path) -> None:
+    module = _load_module("gv_phase1_setup_missing_reference_test")
+    model_path = tmp_path / "gv_surrogate_dnn_smoke.pkl"
+    model_path.write_text("artifact", encoding="utf-8")
+    surrogate_manifest_path = tmp_path / "gv_dnn_surrogate_smoke_manifest.json"
+    surrogate_manifest_path.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "controls": {"theta": 0.03},
+                "reference_kind": "synthetic",
+                "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+                "backend": "dnn",
+                "artifacts": {"model_path": str(model_path)},
+            }
+        ),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "gv_phase1_missing_reference.yaml"
+    config_path.write_text(yaml.safe_dump(_gv_phase1_config(surrogate_manifest_path)), encoding="utf-8")
+
+    with pytest.raises(FileNotFoundError, match="Missing GV reference manifest path"):
+        module.run_inference(
+            dry_run=True,
+            config_path=str(config_path),
+            output_dir=str(tmp_path / "phase1_out"),
+            device="cpu",
+        )
