@@ -136,6 +136,8 @@ class RuntimeDescriptor:
     runtime_package: str = "mirheo"
     run_script: str = "run.sh"
     generate_script: str = "generate.py"
+    execute_argv: tuple[str, ...] = ("bash", "commands.txt")
+    execute_description: str = "Execute generated Mirheo commands."
     generated_subdirs: tuple[str, ...] = ("logs", "mesh", "parameter", "restart")
     analysis_commands: tuple[DryRunCommand, ...] = ()
     experimental: bool = False
@@ -224,9 +226,9 @@ class RuntimeDescriptor:
                 description="Generate GV Mirheo parameter files and command list.",
             ),
             DryRunCommand(
-                argv=("bash", "commands.txt"),
+                argv=self.execute_argv,
                 cwd=str(work_dir),
-                description="Execute generated Mirheo commands.",
+                description=self.execute_description,
             ),
         )
 

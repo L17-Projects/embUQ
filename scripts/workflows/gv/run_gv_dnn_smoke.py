@@ -45,6 +45,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--runtime-manifest", default=None, help="GV runtime dry-run manifest from the Mirheo stage.")
     parser.add_argument("--reference-manifest", default=None, help="Optional synthetic or DPD-generated GV reference manifest.")
     parser.add_argument("--structure", default="gv", choices=("gv",))
+    parser.add_argument("--selection", default=None, help="Optional structure-qualified selection, for example gv:torsion.")
     parser.add_argument("--experiment", default=None)
     parser.add_argument("--geometry-id", default=None)
     parser.add_argument("--radius", type=float, default=None)
@@ -69,6 +70,31 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-epoch", type=int, default=8)
     parser.add_argument("--val-fraction", type=float, default=0.25)
     return parser
+
+
+def _resolve_selected_experiment(args: argparse.Namespace) -> tuple[str, str | None]:
+    selection = getattr(args, "selection", None)
+    if selection is None:
+        experiment_name = None if args.experiment is None else str(args.experiment)
+        return str(args.structure), experiment_name
+
+    parts = str(selection).split(":")
+    if len(parts) != 2:
+        raise ValueError("GV workflow selection must use the form gv:<experiment>.")
+    selected_structure, selected_experiment = parts
+    if selected_structure != "gv":
+        raise ValueError(
+            f"GV workflow selection does not accept structure '{selected_structure}'. Use gv:<experiment>."
+        )
+    if args.experiment is not None and str(args.experiment) != selected_experiment:
+        raise ValueError(
+            f"Conflicting selection values: --experiment={args.experiment!r} and --selection={selection!r}."
+        )
+    if str(args.structure) != selected_structure:
+        raise ValueError(
+            f"Conflicting structure values: --structure={args.structure!r} and --selection={selection!r}."
+        )
+    return selected_structure, selected_experiment
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -190,6 +216,7 @@ def _load_reference_manifest(path: Path) -> dict[str, Any]:
     if payload["reference_kind"] not in REFERENCE_KINDS:
         raise ValueError(f"Unsupported GV reference kind {payload['reference_kind']!r}. Expected one of {REFERENCE_KINDS}.")
     normalized = dict(payload)
+    normalized.setdefault("selection", f"gv:{payload['experiment']}")
     normalized.setdefault("backend", "dnn")
     normalized.setdefault("manifest_schema_version", MANIFEST_SCHEMA_VERSION)
     normalized.setdefault("upstream_contract", _upstream_contract())
@@ -212,6 +239,7 @@ def _build_reference_manifest(args: argparse.Namespace) -> dict[str, Any]:
             "dataset_id": runtime.get("dataset_id"),
             "reference_kind": args.reference_kind,
             "backend": args.backend,
+            "selection": runtime.get("selection", f"gv:{runtime['experiment']}"),
             "runtime_manifest": runtime,
             "input_manifests": {"runtime_dry_run": str(runtime_manifest_path)},
             "notes": [
@@ -224,15 +252,20 @@ def _build_reference_manifest(args: argparse.Namespace) -> dict[str, Any]:
     if args.reference_manifest is not None:
         return _load_reference_manifest(Path(args.reference_manifest).resolve())
 
-    if not args.experiment:
-        raise ValueError("--experiment is required when --reference-manifest is not provided.")
+    structure_name, experiment_name = _resolve_selected_experiment(args)
 
-    structure = get_structure(args.structure)
-    structure.get_experiment(args.experiment, include_experimental=args.include_experimental)
+    if not experiment_name:
+        raise ValueError(
+            "--experiment is required when --reference-manifest is not provided; "
+            "alternatively use --selection gv:<experiment>."
+        )
+
+    structure = get_structure(structure_name)
+    structure.get_experiment(experiment_name, include_experimental=args.include_experimental)
     geometry = _resolve_geometry(args, structure)
-    controls = _parse_controls(args.control, args.experiment, structure)
+    controls = _parse_controls(args.control, experiment_name, structure)
     runtime = plan_runtime(
-        args.experiment,
+        experiment_name,
         output_root=Path(args.output_root).resolve() / "runtime_plan",
         geometry=geometry.id,
         controls=controls or None,
@@ -241,14 +274,15 @@ def _build_reference_manifest(args: argparse.Namespace) -> dict[str, Any]:
     runtime["geometry_spec"] = _geometry_spec_to_manifest(geometry)
     return {
         "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
-        "structure": args.structure,
-        "experiment": args.experiment,
+        "structure": structure_name,
+        "experiment": experiment_name,
         "geometry": geometry.id,
         "geometry_spec": runtime["geometry_spec"],
         "controls": runtime["controls"],
         "dataset_id": runtime["dataset_id"],
         "reference_kind": args.reference_kind,
         "backend": args.backend,
+        "selection": f"{structure_name}:{experiment_name}",
         "runtime_manifest": runtime,
         "notes": [
             "Synthetic smoke reference derived from GV runtime dry-run metadata.",
@@ -649,6 +683,7 @@ def main(argv: list[str] | None = None) -> int:
     runtime_manifest = reference_manifest.get("runtime_manifest")
     runtime_stage = {}
     input_manifests = dict(reference_manifest.get("input_manifests", {}))
+    selection = reference_manifest.get("selection", f"gv:{reference_manifest['experiment']}")
     if isinstance(runtime_manifest, dict):
         runtime_stage = {
             "dataset_id": runtime_manifest.get("dataset_id"),
@@ -670,6 +705,7 @@ def main(argv: list[str] | None = None) -> int:
         "execution_mode": execution_mode,
         "structure": reference_manifest["structure"],
         "experiment": reference_manifest["experiment"],
+        "selection": selection,
         "geometry": reference_manifest["geometry"],
         "controls": reference_manifest["controls"],
         "reference_kind": reference_manifest["reference_kind"],
@@ -706,6 +742,7 @@ def main(argv: list[str] | None = None) -> int:
         "execution_mode": execution_mode,
         "structure": reference_manifest["structure"],
         "experiment": reference_manifest["experiment"],
+        "selection": selection,
         "geometry": reference_manifest["geometry"],
         "controls": reference_manifest["controls"],
         "reference_kind": reference_manifest["reference_kind"],

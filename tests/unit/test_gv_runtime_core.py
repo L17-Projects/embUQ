@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SRC_ROOT = REPO_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
 from meso_uq.structures.gv.geometries import DEFAULT_GV_GEOMETRY
 from meso_uq.structures.gv.runtime import ControlSweep, KnownIssue, RuntimeDescriptor
@@ -72,6 +78,7 @@ def test_runtime_descriptor_builds_manifest_without_writing_outputs(tmp_path: Pa
         "--forward",
         "--first",
     ]
+    assert manifest["commands"][1]["argv"] == ["bash", "commands.txt"]
     assert not dry_run.work_dir or not Path(dry_run.work_dir).exists()
 
 
@@ -157,6 +164,44 @@ def test_runtime_catalog_loads_real_descriptor_and_plans_dry_run(tmp_path: Path)
     assert manifest["controls"]["tot_force"] == 750.0
     assert manifest["dataset_id"].startswith("gv:stretching:")
     assert not any(tmp_path.rglob("*"))
+
+
+def test_runtime_catalog_preserves_shear_flow_execution_contract(tmp_path: Path) -> None:
+    descriptor = load_runtime_descriptor("shear_flow")
+    dry_run = plan_runtime(
+        "shear_flow",
+        output_root=tmp_path,
+        include_experimental=True,
+    )
+    manifest = dry_run.to_manifest()
+
+    assert descriptor.provenance_root.endswith("gv_simulation_files/shear_flow/a0")
+    assert manifest["runtime_package"] == "mirheoOBMD"
+    assert manifest["commands"][0]["argv"] == [
+        "python3",
+        str(Path(descriptor.provenance_root) / "generate.py"),
+        "-p",
+        "ptan",
+        "0_4",
+        "0_4",
+        "1",
+        "-p",
+        "afsi",
+        "0",
+        "0",
+        "1",
+        "-p",
+        "bpress",
+        "-91",
+        "-91",
+        "1",
+        "--object",
+        "gv",
+        "--parallel",
+        "--first",
+    ]
+    assert manifest["commands"][1]["argv"] == ["sbatch", "run_HPC.sbatch"]
+    assert any(path.endswith("gv_simulation_files/shear_flow/a0/run_all_HPC.sh") for path in manifest["source_files"])
 
 
 def test_runtime_catalog_rejects_module_without_descriptor(monkeypatch: pytest.MonkeyPatch) -> None:
