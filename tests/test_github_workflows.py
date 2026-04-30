@@ -79,6 +79,13 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     assert codecov_upload["with"]["fail_ci_if_error"] is False
 
     workflow_steps = workflow["jobs"]["workflow-canary"]["steps"]
+    mpi_steps = workflow["jobs"]["mpi-smoke"]["steps"]
+    mpi_install = _step_by_name(mpi_steps, "Install MPI stack")
+    assert "--no-install-recommends openmpi-bin libopenmpi-dev" in mpi_install["run"]
+
+    workflow_install = _step_by_name(workflow_steps, "Install workflow canary system packages")
+    assert "--no-install-recommends openmpi-bin libopenmpi-dev" in workflow_install["run"]
+
     workflow_summary = _step_by_name(workflow_steps, "Summarize workflow canary outputs")
     workflow_upload = _step_by_name(workflow_steps, "Upload workflow canary artifacts")
     assert workflow_summary["if"] == "always()"

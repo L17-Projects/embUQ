@@ -172,7 +172,7 @@ jobs:
       - name: Install MPI stack
         run: |
           sudo apt-get update
-          sudo apt-get install -y openmpi-bin libopenmpi-dev
+          sudo apt-get install -y --no-install-recommends openmpi-bin libopenmpi-dev
           python -m pip install --upgrade pip
           pip install -e ".[mpi]"
 
@@ -260,7 +260,7 @@ jobs:
       - name: Install workflow canary system packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y openmpi-bin libopenmpi-dev pkg-config libgsl-dev libeigen3-dev
+          sudo apt-get install -y --no-install-recommends openmpi-bin libopenmpi-dev pkg-config libgsl-dev libeigen3-dev
 
       - name: Install Python dependencies
         run: |
