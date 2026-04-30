@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from meso_uq.structures import get_structure
+import pytest
+
+from meso_uq.structures import get_structure, list_structures
 
 
 def test_gv_calibrated_parameter_order_matches_contract() -> None:
@@ -39,3 +41,17 @@ def test_gv_declares_optional_d0_and_multiplicative_sigma_noise() -> None:
     assert gv.parameter_contract.noise_model is not None
     assert gv.parameter_contract.noise_model.kind == "multiplicative"
     assert gv.parameter_contract.noise_model.parameter == "sigma"
+
+
+def test_gv_nuisance_names_and_unknown_parameter_error() -> None:
+    gv = get_structure("gv")
+
+    assert gv.parameter_contract.nuisance_names == ("d0", "sigma")
+    with pytest.raises(KeyError, match="Unknown parameter"):
+        gv.parameter_contract.get_parameter("not_a_parameter")
+
+
+def test_structure_registry_errors_and_listing() -> None:
+    assert [structure.name for structure in list_structures()] == ["gv"]
+    with pytest.raises(KeyError, match="Unknown structure"):
+        get_structure("emb")

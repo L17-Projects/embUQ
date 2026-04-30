@@ -69,6 +69,11 @@ def test_parse_selection_rejects_gv_experiment_without_explicit_structure() -> N
         parse_selection("stretching:full-model:validation")
 
 
+def test_selection_rejects_experiment_for_wrong_structure() -> None:
+    with pytest.raises(ValueError, match="does not belong to structure"):
+        VegaWorkflowSelection("compression", "full-model", "validation", structure="gv")
+
+
 def test_resolve_workflow_output_root_preserves_legacy_emb_layout(tmp_path: Path) -> None:
     selection = VegaWorkflowSelection("compression", "full-model", "production")
 
@@ -115,6 +120,14 @@ def test_load_workflow_datasets_filters_to_emb_structure(tmp_path: Path) -> None
     selected = load_workflow_datasets(tmp_path, config_path, "compression", structure="emb")
 
     assert selected == [(2.1, "compression_2.1um")]
+
+
+def test_load_workflow_datasets_rejects_gv_structure(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("experiments: []\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="GV workflow dataset loading is not implemented yet"):
+        load_workflow_datasets(tmp_path, config_path, "stretching", structure="gv")
 
 
 def test_expand_selection_matrix_supports_structure_and_experiment_axes() -> None:

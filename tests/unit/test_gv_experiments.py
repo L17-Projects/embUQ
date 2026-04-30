@@ -28,3 +28,9 @@ def test_shear_flow_requires_experimental_opt_in() -> None:
     experiment = gv.get_experiment("shear_flow", include_experimental=True)
     assert experiment.experimental is True
     assert experiment.control_names == ("ptan", "afsi", "bpress")
+
+
+def test_gv_experiment_lookup_rejects_unknown_name() -> None:
+    gv = get_structure("gv")
+    with pytest.raises(KeyError, match="Unknown experiment"):
+        gv.get_experiment("missing")
