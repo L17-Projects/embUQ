@@ -13,11 +13,12 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from meso_uq.hpc_paths import detect_hpc_site  # noqa: E402
 from meso_uq.vega_workflows import (  # noqa: E402
-    VALID_EXPERIMENTS,
+    ALL_WORKFLOW_EXPERIMENTS,
     VALID_INFERENCE_STAGES,
     VALID_MODEL_FAMILIES,
     VALID_PHASE2_BACKENDS,
     VALID_PROFILES,
+    VALID_STRUCTURES,
     VegaWorkflowSelection,
     build_inference_command,
     format_command,
@@ -30,7 +31,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run one public inference stage on Vega with explicit workflow selection."
     )
-    parser.add_argument("--experiment", choices=VALID_EXPERIMENTS, required=True)
+    parser.add_argument("--structure", choices=VALID_STRUCTURES, default=None)
+    parser.add_argument("--experiment", choices=ALL_WORKFLOW_EXPERIMENTS, required=True)
     parser.add_argument("--model-family", choices=VALID_MODEL_FAMILIES, required=True)
     parser.add_argument("--profile", choices=VALID_PROFILES, required=True)
     parser.add_argument("--stage", choices=VALID_INFERENCE_STAGES, required=True)
@@ -59,7 +61,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    selection = VegaWorkflowSelection(args.experiment, args.model_family, args.profile)
+    selection = VegaWorkflowSelection(
+        args.experiment, args.model_family, args.profile, structure=args.structure
+    )
     config_path = resolve_workflow_config_path(REPO_ROOT, selection, args.config)
     resolved_site = args.site if args.site is not None else detect_hpc_site()
     output_root = resolve_workflow_output_root(
@@ -88,6 +92,7 @@ def main(argv: list[str] | None = None) -> int:
         diameter=args.diameter,
     )
 
+    print(f"Structure:     {selection.structure}")
     print(f"Experiment:    {selection.experiment}")
     print(f"Model family:  {selection.model_family}")
     print(f"Profile:       {selection.profile}")

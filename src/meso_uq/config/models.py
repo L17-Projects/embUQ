@@ -3,6 +3,76 @@ from typing import List, Optional, Tuple
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
+EMB_EXPERIMENTS = {"compression", "indentation"}
+SUPPORTED_STRUCTURES = {"emb", "gv"}
+
+
+def format_emb_diameter(diameter_um: float) -> str:
+    text = f"{float(diameter_um):.6f}".rstrip("0").rstrip(".")
+    if "." not in text:
+        text = f"{text}.0"
+    return text
+
+
+def emb_geometry_id(diameter_um: float) -> str:
+    return f"diameter_{format_emb_diameter(diameter_um)}um"
+
+
+def infer_structure(experiment_name: Optional[str], explicit_structure: Optional[str] = None) -> Optional[str]:
+    if explicit_structure is not None:
+        if explicit_structure not in SUPPORTED_STRUCTURES:
+            raise ValueError(
+                f"Unsupported structure '{explicit_structure}'. Expected one of {sorted(SUPPORTED_STRUCTURES)}"
+            )
+        return explicit_structure
+    if experiment_name in EMB_EXPERIMENTS:
+        return "emb"
+    return None
+
+
+class ExperimentSelection(BaseModel):
+    structure: Optional[str] = None
+    name: str
+    geometries: Optional[List[str]] = None
+    controls: Optional[List[str]] = None
+    diameters: Optional[List[float]] = None
+    enabled: bool = True
+
+    @field_validator("structure")
+    @classmethod
+    def validate_structure(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        if value not in SUPPORTED_STRUCTURES:
+            raise ValueError(f"Unsupported structure '{value}'")
+        return value
+
+    @field_validator("diameters")
+    @classmethod
+    def validate_diameters(cls, value: Optional[List[float]]) -> Optional[List[float]]:
+        if value is None:
+            return value
+        if any(diameter <= 0 for diameter in value):
+            raise ValueError("All diameters must be positive")
+        return sorted(value)
+
+    @model_validator(mode="after")
+    def normalize_legacy_geometry_fields(self) -> "ExperimentSelection":
+        self.structure = infer_structure(self.name, self.structure)
+        if self.structure is None:
+            raise ValueError(
+                f"Experiment '{self.name}' requires an explicit structure to avoid ambiguous references"
+            )
+        if self.structure == "emb" and self.diameters:
+            normalized = [emb_geometry_id(diameter) for diameter in self.diameters]
+            self.geometries = sorted(set((self.geometries or []) + normalized))
+        if self.geometries is not None:
+            self.geometries = sorted(set(self.geometries))
+        if self.controls is not None:
+            self.controls = sorted(set(self.controls))
+        return self
+
+
 class PriorBounds(BaseModel):
     min_val: float
     max_val: float
@@ -54,7 +124,7 @@ class TMCMCParams(BaseModel):
 
 
 class InferenceConfig(BaseModel):
-    emb_diameters: List[float] = Field(min_length=1)
+    emb_diameters: Optional[List[float]] = Field(default=None, min_length=1)
     frac_diam: float = Field(ge=0.1, le=0.5, default=0.2)
     use_surrogate: bool = Field(default=True)
     pop_size: int = Field(ge=100, le=500000, default=50000)
@@ -96,20 +166,41 @@ class InferenceConfig(BaseModel):
     debug: int = Field(ge=0, le=2, default=0)
     dump: bool = Field(default=False)
     description: str = Field(default="")
+    structure: Optional[str] = Field(default=None)
+    structures: Optional[List[str]] = Field(default=None)
     experiment: Optional[str] = Field(default=None)
     data_dir: Optional[str] = Field(default=None)
     data_prefix: Optional[str] = Field(default=None)
     data_files: Optional[dict] = Field(default=None)
     surrogate_dir: Optional[str] = Field(default=None)
     surrogate: Optional[dict] = Field(default=None)
-    experiments: Optional[List[dict]] = Field(default=None)
+    geometries: Optional[List[str]] = Field(default=None)
+    experiments: Optional[List[ExperimentSelection]] = Field(default=None)
 
     @field_validator("emb_diameters")
     @classmethod
     def validate_diameters(cls, v):
+        if v is None:
+            return v
         if any(d <= 0 for d in v):
             raise ValueError("All diameters must be positive")
         return sorted(v)
+
+    @field_validator("structure")
+    @classmethod
+    def validate_structure(cls, value: Optional[str]) -> Optional[str]:
+        return infer_structure(None, value)
+
+    @field_validator("structures")
+    @classmethod
+    def validate_structures(cls, value: Optional[List[str]]) -> Optional[List[str]]:
+        if value is None:
+            return value
+        normalized = sorted(set(value))
+        invalid = [structure for structure in normalized if structure not in SUPPORTED_STRUCTURES]
+        if invalid:
+            raise ValueError(f"Unsupported structures: {invalid}")
+        return normalized
 
     @field_validator("prior_Yt", "prior_kb", "prior_b1", "prior_b2", "prior_a3", "prior_a4", "prior_d0", "prior_sigma")
     @classmethod
@@ -124,6 +215,43 @@ class InferenceConfig(BaseModel):
     def resolve_phase1_burn_in(self):
         if self.phase1_burn_in is None:
             self.phase1_burn_in = self.hbi_burn_in
+        self.structure = infer_structure(self.experiment, self.structure)
+        if self.structure is None and self.experiment is not None:
+            raise ValueError(
+                f"Experiment '{self.experiment}' requires an explicit structure to avoid ambiguous references"
+            )
+        if self.structures is None and self.structure is not None:
+            self.structures = [self.structure]
+        elif self.structures is not None and self.structure is not None and self.structure not in self.structures:
+            self.structures = sorted(set(self.structures + [self.structure]))
+        if self.geometries is None and self.emb_diameters:
+            self.geometries = [emb_geometry_id(diameter) for diameter in self.emb_diameters]
+        if self.experiments is None and self.experiment is not None:
+            self.experiments = [
+                ExperimentSelection(
+                    structure=self.structure,
+                    name=self.experiment,
+                    geometries=self.geometries,
+                    diameters=self.emb_diameters,
+                )
+            ]
+        if self.experiments:
+            seen = set()
+            for selection in self.experiments:
+                if selection.structure is None:
+                    selection.structure = infer_structure(selection.name, self.structure)
+                if selection.structure is None:
+                    raise ValueError(
+                        f"Experiment '{selection.name}' requires an explicit structure to avoid ambiguous references"
+                    )
+                if selection.structure == "emb" and selection.geometries is None and self.emb_diameters:
+                    selection.geometries = [emb_geometry_id(diameter) for diameter in self.emb_diameters]
+                key = (selection.structure, selection.name)
+                if key in seen:
+                    raise ValueError(
+                        f"Duplicate experiment selection for structure '{selection.structure}' and experiment '{selection.name}'"
+                    )
+                seen.add(key)
         return self
 
     def get_prior_bounds(self, param_name: str) -> PriorBounds:
