@@ -103,7 +103,7 @@ def test_load_workflow_datasets_filters_to_emb_structure(tmp_path: Path) -> None
         "\n".join(
             [
                 "experiments:",
-                "  - name: compression",
+                "  - name: stretching",
                 "    structure: gv",
                 "    enabled: true",
                 "    geometries: [gv_rad2_height14_28]",

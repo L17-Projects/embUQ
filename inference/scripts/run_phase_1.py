@@ -7,9 +7,7 @@ import sys
 from contextlib import contextmanager
 from pathlib import Path
 
-import korali
 import yaml
-from mpi4py import MPI
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "compression"))
@@ -32,6 +30,7 @@ from indentation.evalkit.posterior_indentation import (
 from indentation.evalkit.prepare_env import prepareIndentation
 from meso_uq.config import resolve_inference_config_path
 from meso_uq.experiments import load_experiments
+from meso_uq.inference import write_gv_phase1_setup_manifest
 from meso_uq.workflow_acceleration import (
     configure_device_conduit,
     configure_korali_conduit,
@@ -79,6 +78,13 @@ def _resolve_output_dir(output_dir: str | Path) -> Path:
     if not output_path.is_absolute():
         output_path = PROJECT_ROOT / output_path
     return output_path.resolve()
+
+
+def _load_korali_runtime():
+    import korali
+    from mpi4py import MPI
+
+    return korali, MPI
 
 
 @contextmanager
@@ -147,14 +153,11 @@ def run_inference(
     config_path: str = None,
     output_dir: str = "_setup",
     device: str = "cpu",
+    setup_only: bool = False,
 ):
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-
     config_path_resolved = _resolve_config_path(config_path)
     with open(config_path_resolved, "rb") as handle:
         config = yaml.load(handle, Loader=yaml.CLoader)
-    os.environ["HUQ_INFERENCE_CONFIG"] = str(config_path_resolved)
 
     output_root = _resolve_output_dir(output_dir)
     output_root.mkdir(parents=True, exist_ok=True)
@@ -171,6 +174,30 @@ def run_inference(
     surrogate_backend = _resolve_surrogate_backend(config)
 
     experiments = [exp for exp in load_experiments(config, PROJECT_ROOT) if exp.enabled]
+    if experiments and any(getattr(exp, "structure", "emb") == "gv" for exp in experiments):
+        if not all(getattr(exp, "structure", "emb") == "gv" for exp in experiments):
+            raise ValueError("Mixed EMB/GV Phase 1 configurations are not supported in the GV setup-validation path.")
+        if restart:
+            raise NotImplementedError("GV Phase 1 restart is not implemented in this tranche.")
+        if not (dry_run or setup_only):
+            raise NotImplementedError(
+                "GV Phase 1 execution is experimental; use --setup-only or --dry_run "
+                "to validate the setup manifest until the runtime canary passes."
+            )
+        manifest_path = write_gv_phase1_setup_manifest(
+            config,
+            experiments=experiments,
+            repo_root=PROJECT_ROOT,
+            output_root=output_root,
+            config_path=config_path_resolved,
+        )
+        print(f"GV Phase 1 setup manifest: {manifest_path}")
+        return
+
+    os.environ["HUQ_INFERENCE_CONFIG"] = str(config_path_resolved)
+    korali, MPI = _load_korali_runtime()
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
 
     if use_surrogate:
         preload_map = {
@@ -380,6 +407,12 @@ def main(argv):
     parser.add_argument("--config", type=str, default=None)
     parser.add_argument("--output-dir", type=str, default="_setup")
     parser.add_argument(
+        "--setup-only",
+        action="store_true",
+        default=False,
+        help="Validate GV Phase 1 setup and write a manifest without running Korali.",
+    )
+    parser.add_argument(
         "--device",
         choices=["cpu", "gpu"],
         default="cpu",
@@ -394,6 +427,7 @@ def main(argv):
         config_path=args.config,
         output_dir=args.output_dir,
         device=args.device,
+        setup_only=args.setup_only,
     )
 
 

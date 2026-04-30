@@ -54,3 +54,4 @@ gv_simulation_files/**/cgal_scripts/scale_space_manifold
 gv_simulation_files/**/cgal_scripts/a.out
 !src/meso_uq/structures/**/__init__.py
 !src/meso_uq/references/**/__init__.py
+!src/meso_uq/inference/**/__init__.py

@@ -14,6 +14,9 @@ import numpy as np
 FIXABLE_PARAMETER_ORDER = ("b1", "b2", "a3", "a4")
 FULL_VARIABLE_ORDER = ("Yt", "kb", "b1", "b2", "a3", "a4", "d0", "sigma")
 HIERARCHICAL_VARIABLE_ORDER = tuple(name for name in FULL_VARIABLE_ORDER if name != "sigma")
+GV_CALIBRATED_PARAMETER_ORDER = ("ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c")
+GV_NUISANCE_PARAMETER_ORDER = ("sigma",)
+GV_VARIABLE_ORDER = GV_CALIBRATED_PARAMETER_ORDER + GV_NUISANCE_PARAMETER_ORDER
 
 
 def require_single_rank(comm, context: str) -> None:
@@ -104,6 +107,23 @@ def default_variable_names(num_params: int) -> list[str]:
     return [f"param_{i}" for i in range(num_params)]
 
 
+def _config_structure(config: Mapping[str, object]) -> str:
+    structure = config.get("structure")
+    structures = config.get("structures")
+    if structure is not None:
+        return str(structure)
+    if isinstance(structures, (list, tuple, set)):
+        normalized = sorted({str(item) for item in structures})
+        if len(normalized) == 1:
+            return normalized[0]
+        if len(normalized) > 1:
+            raise ValueError(
+                "Mixed-structure inference parameterization is not supported in this tranche; "
+                f"got structures={normalized}."
+            )
+    return "emb"
+
+
 def get_fixed_parameters(config: Mapping[str, object]) -> dict[str, float]:
     fixed_params = config.get("fixed_params") or {}
     if not isinstance(fixed_params, Mapping):
@@ -116,6 +136,11 @@ def get_fixed_parameters(config: Mapping[str, object]) -> dict[str, float]:
 
 
 def active_variable_names(config: Mapping[str, object]) -> list[str]:
+    structure = _config_structure(config)
+    if structure == "gv":
+        return list(GV_VARIABLE_ORDER)
+    if structure != "emb":
+        raise ValueError(f"Unsupported inference structure '{structure}'.")
     fixed_params = get_fixed_parameters(config)
     return [name for name in FULL_VARIABLE_ORDER if name not in fixed_params]
 
@@ -190,7 +215,10 @@ def phase1_prior_specs(
             return prior_d0 if prior_d0 is not None else config.get("prior_d0", [0.0, 0.5])
         if name == "sigma":
             return prior_sigma if prior_sigma is not None else config["prior_sigma"]
-        return config[f"prior_{name}"]
+        key = f"prior_{name}"
+        if config.get(key) is None:
+            raise KeyError(f"Missing required prior bound '{key}'")
+        return config[key]
 
     return [(name, _bounds_for(name)) for name in active_variable_names(config)]
 

@@ -4,7 +4,35 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 EMB_EXPERIMENTS = {"compression", "indentation"}
+GV_EXPERIMENTS = {"stretching", "buckling", "torsion", "eigenmodes", "shear_flow"}
+STRUCTURE_EXPERIMENTS = {
+    "emb": EMB_EXPERIMENTS,
+    "gv": GV_EXPERIMENTS,
+}
 SUPPORTED_STRUCTURES = {"emb", "gv"}
+EMB_PHASE1_PRIOR_FIELDS = (
+    "prior_Yt",
+    "prior_kb",
+    "prior_b1",
+    "prior_b2",
+    "prior_a3",
+    "prior_a4",
+    "prior_d0",
+    "prior_sigma",
+)
+GV_PHASE1_PRIOR_FIELDS = (
+    "prior_ka",
+    "prior_kb",
+    "prior_mu",
+    "prior_b1",
+    "prior_b2",
+    "prior_a3",
+    "prior_a4",
+    "prior_mu_l",
+    "prior_c",
+    "prior_sigma",
+)
+PHASE1_PRIOR_FIELDS = tuple(dict.fromkeys((*EMB_PHASE1_PRIOR_FIELDS, *GV_PHASE1_PRIOR_FIELDS)))
 
 
 def format_emb_diameter(diameter_um: float) -> str:
@@ -24,10 +52,25 @@ def infer_structure(experiment_name: Optional[str], explicit_structure: Optional
             raise ValueError(
                 f"Unsupported structure '{explicit_structure}'. Expected one of {sorted(SUPPORTED_STRUCTURES)}"
             )
+        _validate_experiment_structure_pair(experiment_name, explicit_structure)
         return explicit_structure
     if experiment_name in EMB_EXPERIMENTS:
         return "emb"
     return None
+
+
+def _validate_experiment_structure_pair(
+    experiment_name: Optional[str],
+    structure: str,
+) -> None:
+    if experiment_name is None:
+        return
+    for expected_structure, experiment_names in STRUCTURE_EXPERIMENTS.items():
+        if experiment_name in experiment_names and structure != expected_structure:
+            raise ValueError(
+                f"Experiment '{experiment_name}' does not belong to structure '{structure}'. "
+                f"It belongs to structure '{expected_structure}'."
+            )
 
 
 class ExperimentSelection(BaseModel):
@@ -132,14 +175,18 @@ class InferenceConfig(BaseModel):
     target_cov: float = Field(ge=0.1, le=1.0, default=0.8)
     covariance_scaling: float = Field(ge=0.001, le=1.0, default=0.04)
     phase1_burn_in: Optional[int] = Field(ge=0, default=None)
-    prior_Yt: List[float] = Field(min_length=2, max_length=2)
-    prior_kb: List[float] = Field(min_length=2, max_length=2)
-    prior_b1: List[float] = Field(min_length=2, max_length=2)
-    prior_b2: List[float] = Field(min_length=2, max_length=2)
-    prior_a3: List[float] = Field(min_length=2, max_length=2)
-    prior_a4: List[float] = Field(min_length=2, max_length=2)
-    prior_d0: List[float] = Field(min_length=2, max_length=2)
-    prior_sigma: List[float] = Field(min_length=2, max_length=2)
+    prior_Yt: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    prior_ka: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    prior_kb: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    prior_mu: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    prior_b1: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    prior_b2: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    prior_a3: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    prior_a4: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    prior_mu_l: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    prior_c: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    prior_d0: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    prior_sigma: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
     hbi_pop_size: int = Field(ge=100, le=500000, default=50000)
     hbi_burn_in: int = Field(ge=0, default=1)
     hbi_target_cov: float = Field(ge=0.1, le=1.0, default=0.6)
@@ -150,8 +197,12 @@ class InferenceConfig(BaseModel):
     phase3b_covariance_scaling: float = Field(ge=0.001, le=1.0, default=0.02)
     hyperprior_mu_Yt: Optional[List[float]] = None
     hyperprior_sigma_Yt: Optional[List[float]] = None
+    hyperprior_mu_ka: Optional[List[float]] = None
+    hyperprior_sigma_ka: Optional[List[float]] = None
     hyperprior_mu_kb: Optional[List[float]] = None
     hyperprior_sigma_kb: Optional[List[float]] = None
+    hyperprior_mu_mu: Optional[List[float]] = None
+    hyperprior_sigma_mu: Optional[List[float]] = None
     hyperprior_mu_b1: Optional[List[float]] = None
     hyperprior_sigma_b1: Optional[List[float]] = None
     hyperprior_mu_b2: Optional[List[float]] = None
@@ -160,6 +211,10 @@ class InferenceConfig(BaseModel):
     hyperprior_sigma_a3: Optional[List[float]] = None
     hyperprior_mu_a4: Optional[List[float]] = None
     hyperprior_sigma_a4: Optional[List[float]] = None
+    hyperprior_mu_mu_l: Optional[List[float]] = None
+    hyperprior_sigma_mu_l: Optional[List[float]] = None
+    hyperprior_mu_c: Optional[List[float]] = None
+    hyperprior_sigma_c: Optional[List[float]] = None
     hyperprior_mu_d0: Optional[List[float]] = None
     hyperprior_sigma_d0: Optional[List[float]] = None
     out: str = Field(default="out_hierarchical")
@@ -174,8 +229,11 @@ class InferenceConfig(BaseModel):
     data_files: Optional[dict] = Field(default=None)
     surrogate_dir: Optional[str] = Field(default=None)
     surrogate: Optional[dict] = Field(default=None)
+    experimental: Optional[dict] = Field(default=None)
+    experimental_gv_hbi: bool = Field(default=False)
     geometries: Optional[List[str]] = Field(default=None)
     experiments: Optional[List[ExperimentSelection]] = Field(default=None)
+    calibrated_parameters: Optional[List[str]] = Field(default=None)
 
     @field_validator("emb_diameters")
     @classmethod
@@ -202,9 +260,11 @@ class InferenceConfig(BaseModel):
             raise ValueError(f"Unsupported structures: {invalid}")
         return normalized
 
-    @field_validator("prior_Yt", "prior_kb", "prior_b1", "prior_b2", "prior_a3", "prior_a4", "prior_d0", "prior_sigma")
+    @field_validator(*PHASE1_PRIOR_FIELDS)
     @classmethod
     def validate_prior_bounds(cls, v):
+        if v is None:
+            return v
         if len(v) != 2:
             raise ValueError("Prior bounds must have exactly 2 elements [min, max]")
         if v[0] >= v[1]:
@@ -252,7 +312,23 @@ class InferenceConfig(BaseModel):
                         f"Duplicate experiment selection for structure '{selection.structure}' and experiment '{selection.name}'"
                     )
                 seen.add(key)
+        active_structures = set(self.structures or [])
+        if self.structure is not None:
+            active_structures.add(self.structure)
+        if self.experiments:
+            active_structures.update(selection.structure for selection in self.experiments if selection.structure)
+        if not active_structures:
+            active_structures = {"emb"}
+        if "emb" in active_structures:
+            self._require_prior_fields(EMB_PHASE1_PRIOR_FIELDS, structure="EMB")
+        if "gv" in active_structures:
+            self._require_prior_fields(GV_PHASE1_PRIOR_FIELDS, structure="GV")
         return self
+
+    def _require_prior_fields(self, fields: Tuple[str, ...], *, structure: str) -> None:
+        missing = [field for field in fields if getattr(self, field) is None]
+        if missing:
+            raise ValueError(f"Missing required {structure} Phase 1 prior bounds: {', '.join(missing)}")
 
     def get_prior_bounds(self, param_name: str) -> PriorBounds:
         bounds_list = getattr(self, f"prior_{param_name}", None)

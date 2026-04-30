@@ -266,7 +266,15 @@ def load_workflow_datasets(
         )
 
     entries: list[tuple[float, str]] = []
-    for spec in load_experiments(config, repo_root):
+    experiment_config = dict(config)
+    raw_experiments = config.get("experiments")
+    if isinstance(raw_experiments, list):
+        experiment_config["experiments"] = [
+            item
+            for item in raw_experiments
+            if isinstance(item, dict) and item.get("structure", resolved_structure) == resolved_structure
+        ]
+    for spec in load_experiments(experiment_config, repo_root):
         if getattr(spec, "structure", "emb") != resolved_structure:
             continue
         if not spec.enabled or spec.name != experiment:
