@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -226,8 +228,10 @@ def test_gv_hbi_rejects_missing_reference_manifest_file(tmp_path: Path) -> None:
     ("payload_updates", "match"),
     (
         ({"controls": {"theta": 0.07}}, "controls mismatch"),
+        ({"structure": "emb"}, "structure='gv'"),
         ({"experiment": "stretching"}, "experiment mismatch"),
         ({"geometry": "gv_rad3_height16"}, "geometry mismatch"),
+        ({"dataset_id": "gv:torsion:other:theta_0.03"}, "dataset mismatch"),
         ({"noise_model": {"kind": "additive", "parameter": "sigma"}}, "multiplicative sigma noise"),
         ({"calibrated_parameter_names": ["theta", "kb"]}, "must match the GV parameter contract"),
     ),
@@ -314,6 +318,189 @@ def test_gv_hbi_validates_manifest_control_shapes() -> None:
             controls={"tot_force": 500.0},
             experiment_name="stretching",
             label="GV surrogate manifest",
+        )
+
+
+def test_gv_hbi_resolves_optional_artifacts_and_requires_existing_paths(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "manifests" / "surrogate.json"
+    manifest_path.parent.mkdir()
+    artifact_path = tmp_path / "manifests" / "artifact.pkl"
+    artifact_path.write_text("artifact", encoding="utf-8")
+
+    assert gv_hbi._resolve_optional_manifest_artifact(manifest_path, None) is None
+    assert gv_hbi._resolve_optional_manifest_artifact(manifest_path, "") is None
+    assert gv_hbi._resolve_optional_manifest_artifact(manifest_path, "artifact.pkl") == str(artifact_path.resolve())
+    assert gv_hbi._require_existing_path(str(artifact_path), label="surrogate artifact") == str(artifact_path.resolve())
+
+    with pytest.raises(FileNotFoundError, match="Missing GV surrogate artifact path"):
+        gv_hbi._require_existing_path(None, label="surrogate artifact path")
+    with pytest.raises(FileNotFoundError, match="Missing GV surrogate artifact"):
+        gv_hbi._require_existing_path(str(tmp_path / "missing.pkl"), label="surrogate artifact")
+
+
+def test_gv_hbi_artifact_probe_reports_loaded_shape(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact_path = tmp_path / "model.pkl"
+    artifact_path.write_text("artifact", encoding="utf-8")
+
+    class _Model:
+        pass
+
+    def _fake_load_model_states(path: str):
+        assert path == str(artifact_path)
+        return _Model(), [0.0, 1.0, 2.0], [1.0, 1.0, 1.0], [0.0], [1.0]
+
+    monkeypatch.setitem(
+        sys.modules,
+        "meso_uq.surrogate.model",
+        types.SimpleNamespace(load_model_states=_fake_load_model_states),
+    )
+
+    assert gv_hbi._build_execution_artifact_probe(artifact_path) == {
+        "status": "loaded",
+        "model_class": "_Model",
+        "input_dim": 3,
+        "output_dim": 1,
+    }
+
+
+def test_gv_phase1_execution_rejects_non_surrogate_config(tmp_path: Path) -> None:
+    manifest_path = _surrogate_manifest(tmp_path)
+    config = _gv_config(manifest_path)
+    config["use_surrogate"] = False
+
+    with pytest.raises(ValueError, match="requires use_surrogate=true"):
+        gv_hbi.write_gv_phase1_execution_manifest(
+            config,
+            [_experiment(tmp_path)],
+            repo_root=tmp_path,
+            output_root=tmp_path / "out",
+        )
+
+
+def test_gv_phase1_execution_rejects_invalid_setup_manifest_shapes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    setup_path = tmp_path / "setup.json"
+
+    def _write_setup(payload: dict[str, object]) -> None:
+        setup_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    monkeypatch.setattr(
+        gv_hbi,
+        "write_gv_phase1_setup_manifest",
+        lambda *args, **kwargs: setup_path,
+    )
+    config = _gv_config(_surrogate_manifest(tmp_path))
+
+    _write_setup({"datasets": []})
+    with pytest.raises(NotImplementedError, match="exactly one GV dataset lane"):
+        gv_hbi.write_gv_phase1_execution_manifest(
+            config,
+            [_experiment(tmp_path)],
+            repo_root=tmp_path,
+            output_root=tmp_path / "out",
+        )
+
+    _write_setup({"datasets": [{"dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03"}]})
+    with pytest.raises(ValueError, match="missing surrogate metadata"):
+        gv_hbi.write_gv_phase1_execution_manifest(
+            config,
+            [_experiment(tmp_path)],
+            repo_root=tmp_path,
+            output_root=tmp_path / "out",
+        )
+
+
+def test_gv_phase1_execution_rejects_missing_artifacts_and_bad_training_report(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    setup_path = tmp_path / "setup.json"
+    reference_path = tmp_path / "reference.json"
+    reference_path.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "controls": {"theta": 0.03},
+                "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+                "noise_model": {"kind": "multiplicative", "parameter": "sigma"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    artifact_path = tmp_path / "model.pkl"
+    artifact_path.write_text("artifact", encoding="utf-8")
+    dataset_path = tmp_path / "dataset.csv"
+    dataset_path.write_text("theta,response\n0.03,0.1\n", encoding="utf-8")
+    training_report_path = tmp_path / "training.json"
+    training_report_path.write_text("[]", encoding="utf-8")
+    surrogate_path = tmp_path / "surrogate.json"
+
+    setup_payload = {
+        "enabled_by": "config:experimental_gv_hbi",
+        "output_root": str(tmp_path / "out"),
+        "phase1": {"variable_names": ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c", "sigma"]},
+        "controls": {"names": ["theta"], "configured": ["theta_0.03"], "policy": "fixed"},
+        "datasets": [
+            {
+                "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+                "experiment": "torsion",
+                "experiment_id": "gv:torsion",
+                "geometry": "gv_rad2_height14_28",
+                "control": "theta_0.03",
+                "surrogate": {
+                    "manifest": str(surrogate_path),
+                    "reference_manifest": str(reference_path),
+                    "artifact": str(artifact_path),
+                    "backend": "dnn",
+                    "control_values": {"theta": 0.03},
+                },
+            }
+        ],
+    }
+    setup_path.write_text(json.dumps(setup_payload), encoding="utf-8")
+    monkeypatch.setattr(
+        gv_hbi,
+        "write_gv_phase1_setup_manifest",
+        lambda *args, **kwargs: setup_path,
+    )
+    config = _gv_config(tmp_path / "config_manifest_unused.json")
+
+    surrogate_path.write_text(json.dumps({"structure": "gv"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="missing artifacts"):
+        gv_hbi.write_gv_phase1_execution_manifest(
+            config,
+            [_experiment(tmp_path)],
+            repo_root=tmp_path,
+            output_root=tmp_path / "out",
+        )
+
+    surrogate_path.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "artifacts": {
+                    "reference_manifest": str(reference_path),
+                    "model_path": str(artifact_path),
+                    "dataset_csv": str(dataset_path),
+                    "training_report": str(training_report_path),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="training report must be a JSON object"):
+        gv_hbi.write_gv_phase1_execution_manifest(
+            config,
+            [_experiment(tmp_path)],
+            repo_root=tmp_path,
+            output_root=tmp_path / "out",
         )
 
 
