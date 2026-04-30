@@ -5,6 +5,7 @@ import sys
 import types
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from meso_uq.experiments import ExperimentSpec
@@ -378,6 +379,200 @@ def test_gv_hbi_artifact_probe_skips_when_model_dependency_is_missing(
 
     assert probe["status"] == "skipped_missing_dependency"
     assert "meso_uq.surrogate.model" in probe["reason"]
+
+
+def test_gv_hbi_builds_reference_series_and_surrogate_inputs(tmp_path: Path) -> None:
+    dataset_csv = tmp_path / "dataset.csv"
+    dataset_csv.write_text(
+        "ka,kb,mu,b1,b2,a3,a4,mu_l,c,radius,height,theta,torsion_coord,torsion_response,source_curve_id\n"
+        "0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,2.0,14.28,0.03,0.0,1.0,curve_0\n"
+        "0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,2.0,14.28,0.03,0.5,1.5,curve_0\n"
+        "0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,2.0,14.28,0.03,0.0,2.0,curve_1\n",
+        encoding="utf-8",
+    )
+
+    series = gv_hbi._reference_series_from_dataset({}, dataset_csv, controls={"theta": 0.03})
+
+    assert series["axis_column"] == "torsion_coord"
+    assert series["target_column"] == "torsion_response"
+    assert series["reference_points"] == [0.0, 0.5]
+    assert series["reference_data"] == [1.0, 1.5]
+
+    matrix = gv_hbi._build_gv_dnn_input_matrix(
+        sample_parameters={
+            "ka": 1.1,
+            "kb": 1.2,
+            "mu": 1.3,
+            "b1": 1.4,
+            "b2": 1.5,
+            "a3": 1.6,
+            "a4": 1.7,
+            "mu_l": 1.8,
+            "c": 1.9,
+            "sigma": 0.05,
+        },
+        reference_rows=series["rows"],
+        input_columns=series["input_columns"],
+        controls={"theta": 0.03},
+        geometry_parameters={"radius": 2.0, "height": 14.28},
+    )
+
+    assert matrix.shape == (2, 13)
+    assert matrix[0].tolist() == pytest.approx(
+        [1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 14.28, 0.03, 0.0]
+    )
+
+
+def test_gv_hbi_rejects_invalid_reference_dataset_shapes(tmp_path: Path) -> None:
+    empty_csv = tmp_path / "empty.csv"
+    empty_csv.write_text("ka,response\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="has no rows"):
+        gv_hbi._reference_series_from_dataset({}, empty_csv, controls={})
+
+    no_axis_csv = tmp_path / "no_axis.csv"
+    no_axis_csv.write_text(
+        "ka,kb,mu,b1,b2,a3,a4,mu_l,c,radius,height,theta,torsion_response\n"
+        "0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,2.0,14.28,0.03,1.0\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="exactly one observable-axis"):
+        gv_hbi._reference_series_from_dataset({}, no_axis_csv, controls={"theta": 0.03})
+
+    with pytest.raises(ValueError, match="geometry_spec.parameters"):
+        gv_hbi._geometry_parameters({"geometry_spec": {}})
+
+    with pytest.raises(ValueError, match="geometry parameters are missing"):
+        gv_hbi._geometry_parameters({"geometry_spec": {"parameters": {"radius": 2.0}}})
+
+    no_response_csv = tmp_path / "no_response.csv"
+    no_response_csv.write_text("ka,axis\n1.0,0.0\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="must declare target_column"):
+        gv_hbi._reference_series_from_dataset({}, no_response_csv, controls={})
+
+    missing_input_csv = tmp_path / "missing_input.csv"
+    missing_input_csv.write_text("ka,response,axis\n1.0,2.0,0.0\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="missing input columns"):
+        gv_hbi._reference_series_from_dataset(
+            {"target_column": "response", "input_columns": ["ka", "missing_axis"]},
+            missing_input_csv,
+            controls={},
+        )
+
+    with pytest.raises(ValueError, match="not a calibrated material/control input"):
+        gv_hbi._build_gv_dnn_input_matrix(
+            sample_parameters={"ka": 1.0, "d0": 0.1},
+            reference_rows=[{"axis": "0.0"}],
+            input_columns=["ka", "d0", "axis"],
+            controls={},
+            geometry_parameters={},
+        )
+
+    with pytest.raises(ValueError, match="Cannot resolve GV surrogate input column"):
+        gv_hbi._build_gv_dnn_input_matrix(
+            sample_parameters={"ka": 1.0},
+            reference_rows=[{"axis": "0.0"}],
+            input_columns=["ka", "unknown_axis"],
+            controls={},
+            geometry_parameters={},
+        )
+
+
+def test_gv_hbi_uses_response_suffix_target_fallback(tmp_path: Path) -> None:
+    dataset_csv = tmp_path / "dataset.csv"
+    dataset_csv.write_text(
+        "ka,arc_length,custom_response\n"
+        "1.0,0.0,2.0\n"
+        "1.0,1.0,3.0\n",
+        encoding="utf-8",
+    )
+
+    series = gv_hbi._reference_series_from_dataset({}, dataset_csv, controls={})
+
+    assert series["axis_column"] == "arc_length"
+    assert series["target_column"] == "custom_response"
+    assert series["reference_data"] == [2.0, 3.0]
+
+
+def test_gv_hbi_evaluate_reference_applies_optional_d0(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(gv_hbi, "_predict_gv_dnn", lambda _state, _x_raw: np.asarray([1.0, 2.0]))
+    sample_data = {"Parameters": [0.5, 3.0]}
+
+    gv_hbi._evaluate_gv_dnn_reference(
+        sample_data,
+        {
+            "variable_names": ["ka", "d0"],
+            "reference_rows": [{"axis": "0.0"}, {"axis": "1.0"}],
+            "input_columns": ["ka", "axis"],
+            "controls": {},
+            "geometry_parameters": {},
+            "model_state": object(),
+        },
+    )
+
+    assert sample_data["Reference Evaluations"] == [4.0, 5.0]
+
+
+def test_gv_phase1_dnn_execution_rejects_controls_as_korali_variables(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    surrogate_manifest = tmp_path / "surrogate_manifest.json"
+    surrogate_manifest.write_text("{}", encoding="utf-8")
+    reference_manifest = tmp_path / "reference_manifest.json"
+    reference_manifest.write_text("{}", encoding="utf-8")
+    execution_manifest = tmp_path / "gv_phase1_execution_manifest.json"
+    execution_manifest.write_text(
+        json.dumps(
+            {
+                "dataset": {
+                    "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+                    "control_values": {"theta": 0.03},
+                },
+                "phase1": {"variable_names": ["ka", "theta", "sigma"]},
+                "provenance": {
+                    "surrogate_manifest": str(surrogate_manifest),
+                    "reference_manifest": str(reference_manifest),
+                    "dataset_csv": str(tmp_path / "dataset.csv"),
+                    "surrogate_artifact": str(tmp_path / "surrogate.pkl"),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        gv_hbi,
+        "write_gv_phase1_execution_manifest",
+        lambda *args, **kwargs: execution_manifest,
+    )
+
+    with pytest.raises(ValueError, match="GV controls must not appear"):
+        gv_hbi.run_gv_phase1_dnn_execution(
+            {},
+            [],
+            repo_root=tmp_path,
+            output_root=tmp_path,
+            korali_module=object(),
+            engine=object(),
+        )
+
+
+def test_gv_hbi_predicts_with_loaded_dnn_state() -> None:
+    torch = pytest.importorskip("torch")
+    model = torch.nn.Linear(2, 1)
+    with torch.no_grad():
+        model.weight[:] = torch.tensor([[2.0, 3.0]])
+        model.bias[:] = torch.tensor([0.5])
+    predictions = gv_hbi._predict_gv_dnn(
+        (
+            model,
+            np.asarray([0.0, 0.0]),
+            np.asarray([1.0, 1.0]),
+            np.asarray([1.0]),
+            np.asarray([2.0]),
+        ),
+        np.asarray([[1.0, 2.0], [0.0, 0.0]], dtype=np.float64),
+    )
+    assert predictions.tolist() == pytest.approx([18.0, 2.0])
 
 
 def test_gv_phase1_execution_rejects_non_surrogate_config(tmp_path: Path) -> None:

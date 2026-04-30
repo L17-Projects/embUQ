@@ -4,21 +4,24 @@ import builtins
 import importlib.util
 import json
 import sys
+import types
 from pathlib import Path
 
+import numpy as np
 import pytest
 import yaml
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "inference" / "scripts" / "run_phase_1.py"
+SMOKE_SCRIPT_PATH = REPO_ROOT / "scripts" / "workflows" / "gv" / "run_gv_dnn_smoke.py"
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from meso_uq.inference import gv_hbi
 
 
-def _load_module(name: str):
-    spec = importlib.util.spec_from_file_location(name, SCRIPT_PATH)
+def _load_script(path: Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
     assert spec.loader is not None
@@ -26,7 +29,89 @@ def _load_module(name: str):
     return module
 
 
-def _gv_phase1_config(manifest_path: Path, *, backend: str = "dnn") -> dict[str, object]:
+def _load_module(name: str):
+    return _load_script(SCRIPT_PATH, name)
+
+
+class _AutoDict(dict):
+    def __getitem__(self, key):
+        if key not in self:
+            self[key] = type(self)()
+        return dict.__getitem__(self, key)
+
+
+class _FakeExperiment(_AutoDict):
+    pass
+
+
+class _FakeEngine(_AutoDict):
+    def __init__(self) -> None:
+        super().__init__()
+        self.mpi_comm = None
+        self.run_argument = None
+        self.sample_data = None
+
+    def setMPIComm(self, comm) -> None:
+        self.mpi_comm = comm
+
+    def run(self, experiments) -> None:
+        self.run_argument = experiments
+        experiment = experiments[0]
+        sample = {"Parameters": [0.5] * len(experiment["Variables"])}
+        experiment["Problem"]["Computational Model"](sample)
+        self.sample_data = sample
+        state_path = Path(experiment["File Output"]["Path"])
+        state_path.mkdir(parents=True, exist_ok=True)
+        (state_path / "latest").write_text("{}", encoding="utf-8")
+
+
+class _FakeKorali(types.SimpleNamespace):
+    def __init__(self) -> None:
+        super().__init__()
+        self.created_experiments: list[_FakeExperiment] = []
+        self.created_engines: list[_FakeEngine] = []
+
+    def Experiment(self) -> _FakeExperiment:
+        experiment = _FakeExperiment()
+        self.created_experiments.append(experiment)
+        return experiment
+
+    def Engine(self) -> _FakeEngine:
+        engine = _FakeEngine()
+        self.created_engines.append(engine)
+        return engine
+
+
+class _FakeComm:
+    def Get_rank(self) -> int:
+        return 0
+
+    def Get_size(self) -> int:
+        return 1
+
+
+def _install_fake_gv_korali(
+    module,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    patch_model: bool = True,
+) -> _FakeKorali:
+    fake_korali = _FakeKorali()
+    fake_mpi = types.SimpleNamespace(COMM_WORLD=_FakeComm())
+    monkeypatch.setattr(module, "_load_korali_runtime", lambda: (fake_korali, fake_mpi))
+    monkeypatch.setattr(module, "configure_device_conduit", lambda *args, **kwargs: None)
+    if patch_model:
+        monkeypatch.setattr(gv_hbi, "_load_gv_dnn_model_state", lambda _path: object())
+        monkeypatch.setattr(gv_hbi, "_predict_gv_dnn", lambda _state, x_raw: np.ones(x_raw.shape[0]))
+    return fake_korali
+
+
+def _gv_phase1_config(
+    manifest_path: Path,
+    *,
+    backend: str = "dnn",
+    control: str = "theta_0.03",
+) -> dict[str, object]:
     return {
         "pop_size": 32,
         "max_gen": 1,
@@ -70,7 +155,7 @@ def _gv_phase1_config(manifest_path: Path, *, backend: str = "dnn") -> dict[str,
                 "structure": "gv",
                 "name": "torsion",
                 "geometries": ["gv_rad2_height14_28"],
-                "controls": ["theta_0.03"],
+                "controls": [control],
                 "surrogate_manifest": str(manifest_path),
             }
         ],
@@ -403,11 +488,7 @@ def test_gv_phase1_paths_do_not_import_emb_runtime_dependencies(
     config_path.write_text(yaml.safe_dump(_gv_phase1_config(surrogate_manifest_path)), encoding="utf-8")
 
     monkeypatch.setattr(builtins, "__import__", guarded_import)
-    monkeypatch.setattr(
-        module,
-        "_load_korali_runtime",
-        lambda: (_ for _ in ()).throw(AssertionError("Korali runtime should not be loaded for GV execution seam")),
-    )
+    _install_fake_gv_korali(module, monkeypatch)
     monkeypatch.setattr(
         gv_hbi,
         "_build_execution_artifact_probe",
@@ -496,7 +577,7 @@ def test_gv_phase1_dry_run_requires_reference_manifest(tmp_path: Path) -> None:
         )
 
 
-def test_gv_phase1_execution_emits_single_lane_dnn_manifest_without_loading_korali(
+def test_gv_phase1_execution_runs_single_lane_dnn_korali_manifest(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -556,11 +637,7 @@ def test_gv_phase1_execution_emits_single_lane_dnn_manifest_without_loading_kora
     config_path = tmp_path / "gv_phase1_execution.yaml"
     config_path.write_text(yaml.safe_dump(_gv_phase1_config(surrogate_manifest_path)), encoding="utf-8")
 
-    monkeypatch.setattr(
-        module,
-        "_load_korali_runtime",
-        lambda: (_ for _ in ()).throw(AssertionError("Korali runtime should not be loaded for GV execution seam")),
-    )
+    fake_korali = _install_fake_gv_korali(module, monkeypatch)
     monkeypatch.setattr(
         gv_hbi,
         "_build_execution_artifact_probe",
@@ -589,8 +666,8 @@ def test_gv_phase1_execution_emits_single_lane_dnn_manifest_without_loading_kora
     )
     assert setup_manifest["status"] == "setup_validated"
     assert execution_manifest["workflow"] == "gv_phase1_execution"
-    assert execution_manifest["status"] == "execution_seam_emitted"
-    assert execution_manifest["execution_model"] == "single_lane_dnn_seam"
+    assert execution_manifest["status"] == "phase1_korali_completed"
+    assert execution_manifest["execution_model"] == "single_lane_dnn_korali"
     assert execution_manifest["dataset"]["dataset_id"] == "gv:torsion:gv_rad2_height14_28:theta_0.03"
     assert execution_manifest["dataset"]["control_values"] == {"theta": 0.03}
     assert execution_manifest["controls"]["fixed_outside_inferred_variables"] is True
@@ -600,5 +677,76 @@ def test_gv_phase1_execution_emits_single_lane_dnn_manifest_without_loading_kora
     assert execution_manifest["provenance"]["dataset_csv"] == str(dataset_csv_path.resolve())
     assert execution_manifest["provenance"]["training_report"] == str(training_report_path.resolve())
     assert execution_manifest["artifact_probe"]["status"] == "loaded"
-    assert execution_manifest["runtime"]["korali_invoked"] is False
+    assert execution_manifest["runtime"]["korali_invoked"] is True
+    assert execution_manifest["runtime"]["phase1_completed"] is True
     assert execution_manifest["runtime"]["full_hbi_completed"] is False
+    assert execution_manifest["runtime"]["latest_state_exists"] is True
+    assert execution_manifest["reference"] == {
+        "axis_column": "torsion_coord",
+        "target_column": "torsion_response",
+        "num_points": 1,
+    }
+    experiment = fake_korali.created_experiments[0]
+    assert experiment["Problem"]["Type"] == "Bayesian/Reference"
+    assert experiment["Problem"]["Reference Data"] == [0.0]
+    assert fake_korali.created_engines[-1].sample_data["Reference Evaluations"] == [1.0]
+
+
+def test_gv_phase1_execution_consumes_smoke_dnn_artifact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("torch")
+    smoke_module = _load_script(SMOKE_SCRIPT_PATH, "gv_phase1_real_smoke_dnn_source")
+    phase1_module = _load_module("gv_phase1_real_smoke_dnn_execution")
+    smoke_root = tmp_path / "smoke"
+    assert (
+        smoke_module.main(
+            [
+                "--output-root",
+                str(smoke_root),
+                "--experiment",
+                "torsion",
+                "--control",
+                "theta=0.03",
+                "--seed",
+                "5",
+                "--num-curves",
+                "3",
+                "--points-per-curve",
+                "3",
+                "--max-epoch",
+                "2",
+                "--width",
+                "5",
+                "--depth",
+                "2",
+                "--batch-size",
+                "4",
+            ]
+        )
+        == 0
+    )
+    surrogate_manifest = smoke_root / "gv_dnn_surrogate_smoke_manifest.json"
+    config_path = tmp_path / "gv_phase1_real_smoke.yaml"
+    config_path.write_text(yaml.safe_dump(_gv_phase1_config(surrogate_manifest, control="theta_0_03")), encoding="utf-8")
+    fake_korali = _install_fake_gv_korali(phase1_module, monkeypatch, patch_model=False)
+
+    output_dir = tmp_path / "phase1_real_smoke_out"
+    phase1_module.run_inference(
+        dry_run=False,
+        config_path=str(config_path),
+        output_dir=str(output_dir),
+        device="cpu",
+    )
+
+    manifest = json.loads(
+        (output_dir / "results_phase_1" / gv_hbi.GV_PHASE1_EXECUTION_MANIFEST).read_text(encoding="utf-8")
+    )
+    experiment = fake_korali.created_experiments[0]
+    reference_data = experiment["Problem"]["Reference Data"]
+    reference_evaluations = fake_korali.created_engines[-1].sample_data["Reference Evaluations"]
+    assert manifest["status"] == "phase1_korali_completed"
+    assert manifest["runtime"]["korali_invoked"] is True
+    assert manifest["provenance"]["surrogate_artifact"].endswith("gv_surrogate_dnn_smoke.pkl")
+    assert len(reference_evaluations) == len(reference_data) == 3

@@ -16,11 +16,12 @@ sys.path.insert(0, str(PROJECT_ROOT / "indentation"))
 sys.path.insert(0, str(PROJECT_ROOT / "indentation" / "evalkit"))
 from meso_uq.config import resolve_inference_config_path
 from meso_uq.experiments import load_experiments
-from meso_uq.inference import write_gv_phase1_execution_manifest, write_gv_phase1_setup_manifest
+from meso_uq.inference import run_gv_phase1_dnn_execution, write_gv_phase1_setup_manifest
 from meso_uq.workflow_acceleration import (
     configure_device_conduit,
     configure_korali_conduit,
     phase1_prior_specs,
+    require_single_rank,
     to_korali_path,
 )
 
@@ -193,11 +194,27 @@ def run_inference(
             )
             print(f"GV Phase 1 setup manifest: {manifest_path}")
             return
-        execution_manifest_path = write_gv_phase1_execution_manifest(
+        write_gv_phase1_setup_manifest(
             config,
             experiments=experiments,
             repo_root=PROJECT_ROOT,
             output_root=output_root,
+            config_path=config_path_resolved,
+        )
+        korali, MPI = _load_korali_runtime()
+        comm = MPI.COMM_WORLD
+        require_single_rank(comm, "GV Phase 1 DNN execution")
+        k = korali.Engine()
+        if device == "cpu":
+            k.setMPIComm(MPI.COMM_WORLD)
+        configure_device_conduit(k, device=device, mpi_ranks=comm.Get_size())
+        execution_manifest_path = run_gv_phase1_dnn_execution(
+            config,
+            experiments=experiments,
+            repo_root=PROJECT_ROOT,
+            output_root=output_root,
+            korali_module=korali,
+            engine=k,
             config_path=config_path_resolved,
         )
         print(f"GV Phase 1 execution manifest: {execution_manifest_path}")
