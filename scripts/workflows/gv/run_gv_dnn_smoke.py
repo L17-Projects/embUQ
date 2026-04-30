@@ -216,11 +216,25 @@ def _load_reference_manifest(path: Path) -> dict[str, Any]:
     if payload["reference_kind"] not in REFERENCE_KINDS:
         raise ValueError(f"Unsupported GV reference kind {payload['reference_kind']!r}. Expected one of {REFERENCE_KINDS}.")
     normalized = dict(payload)
+    normalized["manifest_path"] = str(path.resolve())
     normalized.setdefault("selection", f"gv:{payload['experiment']}")
     normalized.setdefault("backend", "dnn")
     normalized.setdefault("manifest_schema_version", MANIFEST_SCHEMA_VERSION)
     normalized.setdefault("upstream_contract", _upstream_contract())
     return normalized
+
+
+def _resolve_repo_relative_artifact(value: object, *, manifest_path: object | None) -> Path:
+    path = Path(str(value)).expanduser()
+    if path.is_absolute():
+        return path.resolve()
+    if manifest_path is not None:
+        resolved_manifest_path = Path(str(manifest_path)).expanduser().resolve()
+        for parent in resolved_manifest_path.parents:
+            candidate = parent / path
+            if candidate.exists():
+                return candidate.resolve()
+    return (REPO_ROOT / path).resolve()
 
 
 def _build_reference_manifest(args: argparse.Namespace) -> dict[str, Any]:
@@ -681,9 +695,13 @@ def main(argv: list[str] | None = None) -> int:
         execution_mode = "dry_run_manifest_only"
 
     runtime_manifest = reference_manifest.get("runtime_manifest")
+    materialized_reference = {}
     runtime_stage = {}
     input_manifests = dict(reference_manifest.get("input_manifests", {}))
     selection = reference_manifest.get("selection", f"gv:{reference_manifest['experiment']}")
+    reference_manifest_path_value = reference_manifest.get("manifest_path")
+    if reference_manifest_path_value is not None:
+        input_manifests.setdefault("reference_manifest", str(Path(str(reference_manifest_path_value)).resolve()))
     if isinstance(runtime_manifest, dict):
         runtime_stage = {
             "dataset_id": runtime_manifest.get("dataset_id"),
@@ -697,6 +715,37 @@ def main(argv: list[str] | None = None) -> int:
         manifest_path = runtime_manifest.get("manifest_path")
         if manifest_path is not None:
             input_manifests.setdefault("runtime_dry_run", str(Path(str(manifest_path)).resolve()))
+    artifacts = reference_manifest.get("artifacts")
+    if isinstance(artifacts, dict):
+        reference_dataset = artifacts.get("reference_dataset")
+        if reference_dataset is not None:
+            resolved_reference_dataset = str(
+                _resolve_repo_relative_artifact(
+                    reference_dataset,
+                    manifest_path=reference_manifest_path_value,
+                )
+            )
+            reference_root = artifacts.get("reference_root")
+            resolved_reference_root = (
+                str(
+                    _resolve_repo_relative_artifact(
+                        reference_root,
+                        manifest_path=reference_manifest_path_value,
+                    )
+                )
+                if reference_root is not None
+                else None
+            )
+            materialized_reference = {
+                "status": "available",
+                "reference_dataset": resolved_reference_dataset,
+                "reference_root": resolved_reference_root,
+            }
+            if reference_manifest_path_value is not None:
+                input_manifests.setdefault(
+                    "reference_materialization",
+                    str(Path(str(reference_manifest_path_value)).resolve()),
+                )
 
     workflow_manifest = {
         "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
@@ -715,6 +764,7 @@ def main(argv: list[str] | None = None) -> int:
         "target_column": target_col,
         "input_manifests": input_manifests,
         "runtime_stage": runtime_stage,
+        "reference_stage": materialized_reference,
         "synthetic_fixture": {
             "num_curves": int(args.num_curves),
             "points_per_curve": int(args.points_per_curve),
@@ -726,6 +776,7 @@ def main(argv: list[str] | None = None) -> int:
         "reload": reload_validation,
         "artifacts": {
             "reference_manifest": str(reference_manifest_path),
+            "reference_dataset": materialized_reference.get("reference_dataset"),
             "dataset_csv": str(dataset_path),
             "split_manifest": str(split_manifest_path),
             "artifact_path": str(model_path) if model_path.exists() else None,

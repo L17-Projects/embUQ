@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from typing import Any
+from pathlib import Path
+from typing import Any, Mapping
 
 from meso_uq.structures import get_structure
 from meso_uq.structures.gv import DEFAULT_GV_GEOMETRY
+from meso_uq.structures.gv.runtime.base import control_identifier
 
 from .catalogs import (
     SUPPORTED_REFERENCE_KINDS,
@@ -13,6 +15,7 @@ from .catalogs import (
 
 _REFERENCE_DATA_FILENAME = "reference_dataset.npz"
 _REFERENCE_MANIFEST_FILENAME = "reference_manifest.json"
+_SOURCE_REFERENCE_MANIFEST_FILENAME = "source_reference_manifest.json"
 _SURROGATE_MANIFEST_FILENAME = "training_manifest.json"
 _SURROGATE_ARTIFACT_FILENAME = "model.pt"
 _RUNTIME_MANIFEST_FILENAME = "gv_runtime_dry_run_manifest.json"
@@ -84,6 +87,54 @@ def _gv_catalog_path(
     leaf: str,
 ) -> str:
     return f"_runs/gv/{experiment}/{geometry}/{controls}/{reference_kind}/{leaf}"
+
+
+def gv_control_id(controls: Mapping[str, float]) -> str:
+    return control_identifier({str(name): float(value) for name, value in controls.items()})
+
+
+def gv_reference_root_relpath(
+    *,
+    experiment: str,
+    geometry: str,
+    controls: str,
+    reference_kind: str,
+) -> str:
+    return _gv_catalog_path(
+        experiment=experiment,
+        geometry=geometry,
+        controls=controls,
+        reference_kind=reference_kind,
+        leaf="",
+    ).rstrip("/")
+
+
+def gv_reference_artifact_paths(
+    repo_root: str | Path,
+    *,
+    experiment: str,
+    geometry: str,
+    controls: str,
+    reference_kind: str,
+) -> dict[str, str]:
+    root = Path(repo_root).resolve()
+    reference_root = root / gv_reference_root_relpath(
+        experiment=experiment,
+        geometry=geometry,
+        controls=controls,
+        reference_kind=reference_kind,
+    )
+    dnn_root = reference_root / "dnn"
+    return {
+        "reference_root": str(reference_root),
+        "reference_dataset": str(reference_root / _REFERENCE_DATA_FILENAME),
+        "reference_manifest": str(reference_root / _REFERENCE_MANIFEST_FILENAME),
+        "source_reference_manifest": str(reference_root / _SOURCE_REFERENCE_MANIFEST_FILENAME),
+        "runtime_manifest": str(reference_root / _RUNTIME_MANIFEST_FILENAME),
+        "surrogate_root": str(dnn_root),
+        "surrogate_training_manifest": str(dnn_root / _SURROGATE_MANIFEST_FILENAME),
+        "surrogate_artifact": str(dnn_root / _SURROGATE_ARTIFACT_FILENAME),
+    }
 
 
 def _build_gv_entry(

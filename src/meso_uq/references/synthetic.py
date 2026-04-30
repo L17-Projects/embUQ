@@ -1,17 +1,27 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Mapping, Sequence
+
+import numpy as np
 
 from meso_uq.experiments import canonical_dataset_id
 from meso_uq.structures import get_structure
 
-from .gv_common import build_manifest_prefix, resolve_gv_reference_context
-
-DEFAULT_SURROGATE_BACKEND = "dnn"
-GV_REFERENCE_KINDS = ("synthetic", "dpd_generated")
-GV_REFERENCE_KINDS = ("synthetic", "dpd_generated")
+from .gv_common import (
+    DEFAULT_SURROGATE_BACKEND,
+    GV_REFERENCE_KINDS,
+    GVReferenceMaterialization,
+    GVReferenceRecord,
+    build_reference_record,
+    control_identifier,
+    materialize_reference_records,
+    resolve_gv_reference_context,
+    validate_reference_axes,
+)
 
 _DEFAULT_CURVES: dict[str, tuple[tuple[float, ...], tuple[float, ...], str]] = {
     "stretching": ((0.0, 0.25, 0.5, 0.75, 1.0), (0.0, 0.08, 0.19, 0.31, 0.44), "extension_curve"),
@@ -54,9 +64,10 @@ class SyntheticReferenceFixture:
     nuisance_parameters: Mapping[str, float]
     noise_model: Mapping[str, object]
     metadata: Mapping[str, object]
+    runtime_manifest: Mapping[str, object] | None = None
 
     def to_manifest(self) -> dict[str, object]:
-        return {
+        manifest = {
             **self.identity.to_manifest(),
             "observable": self.observable,
             "points": list(self.points),
@@ -66,6 +77,28 @@ class SyntheticReferenceFixture:
             "noise_model": dict(self.noise_model),
             "metadata": dict(self.metadata),
         }
+        if self.runtime_manifest:
+            manifest["runtime_manifest"] = dict(self.runtime_manifest)
+        return manifest
+
+    def to_record(self) -> GVReferenceRecord:
+        context = resolve_gv_reference_context(
+            runtime_manifest=self.runtime_manifest,
+            experiment=self.identity.experiment,
+            geometry=self.identity.geometry,
+            controls=self.identity.controls,
+        )
+        return build_reference_record(
+            context=context,
+            reference_kind=self.identity.reference_kind,
+            reference_source=str(self.metadata.get("source", "synthetic_fixture")),
+            observable=self.observable,
+            points=self.points,
+            values=self.values,
+            nuisance_parameters=self.nuisance_parameters,
+            metadata=self.metadata,
+            surrogate_backend=self.identity.surrogate_backend,
+        )
 
 
 @dataclass(frozen=True)
@@ -83,7 +116,11 @@ def _normalize_controls(controls: Mapping[str, Any]) -> dict[str, float]:
     return {str(name): float(value) for name, value in controls.items()}
 
 
-def _normalize_series(name: str, values: Sequence[float] | None, fallback: Sequence[float]) -> tuple[float, ...]:
+def _normalize_series(
+    name: str,
+    values: Sequence[float] | None,
+    fallback: Sequence[float],
+) -> tuple[float, ...]:
     series = tuple(float(value) for value in (fallback if values is None else values))
     if not series:
         raise ValueError(f"{name} must contain at least one value.")
@@ -108,11 +145,10 @@ def _validate_fixture_request(
     surrogate_backend: str,
     reference_kind: str,
 ) -> None:
-    if surrogate_backend != DEFAULT_SURROGATE_BACKEND:
-        raise ValueError("GV reference fixtures support only the 'dnn' surrogate backend in this tranche.")
-    if reference_kind not in GV_REFERENCE_KINDS:
-        raise ValueError(f"Unsupported GV reference kind '{reference_kind}'. Expected one of {GV_REFERENCE_KINDS}.")
-
+    validate_reference_axes(
+        surrogate_backend=surrogate_backend,
+        reference_kind=reference_kind,
+    )
     experiment_spec = get_structure("gv").get_experiment(experiment, include_experimental=True)
     control_names = set(controls)
     expected_controls = set(experiment_spec.control_names)
@@ -131,10 +167,10 @@ def _validate_fixture_request(
 
 
 def _validate_gv_reference_axes(*, surrogate_backend: str, reference_kind: str) -> None:
-    if surrogate_backend != DEFAULT_SURROGATE_BACKEND:
-        raise ValueError("GV reference fixtures support only the 'dnn' surrogate backend in this tranche.")
-    if reference_kind not in GV_REFERENCE_KINDS:
-        raise ValueError(f"Unsupported GV reference kind '{reference_kind}'. Expected one of {GV_REFERENCE_KINDS}.")
+    validate_reference_axes(
+        surrogate_backend=surrogate_backend,
+        reference_kind=reference_kind,
+    )
 
 
 def _identity_from_axes(
@@ -165,9 +201,7 @@ def _identity_from_axes(
 
 
 def _control_id(controls: Mapping[str, float]) -> str:
-    if not controls:
-        return "default"
-    return "__".join(f"{name}_{value:g}".replace(".", "_") for name, value in sorted(controls.items()))
+    return control_identifier(controls)
 
 
 def build_gv_synthetic_fixture(
@@ -184,6 +218,7 @@ def build_gv_synthetic_fixture(
     observable: str | None = None,
     metadata: Mapping[str, object] | None = None,
     dataset_id: str | None = None,
+    runtime_manifest: Mapping[str, object] | None = None,
 ) -> SyntheticReferenceFixture:
     default_points, default_values, default_observable = _default_fixture(experiment)
     resolved_points = _normalize_series("points", points, default_points)
@@ -230,6 +265,7 @@ def build_gv_synthetic_fixture(
         nuisance_parameters=nuisance_parameters,
         noise_model={"kind": "multiplicative", "parameter": "sigma"},
         metadata=resolved_metadata,
+        runtime_manifest=dict(runtime_manifest or {}),
     )
 
 
@@ -265,6 +301,7 @@ def synthetic_fixture_from_runtime_manifest(
         observable=observable,
         metadata=combined_metadata,
         dataset_id=str(runtime_manifest["dataset_id"]),
+        runtime_manifest=runtime_manifest,
     )
 
 
@@ -286,12 +323,27 @@ def generate_gv_synthetic_reference(
         controls=controls,
     )
     points = tuple(index / (point_count - 1) for index in range(point_count))
-    values = tuple(_seeded_synthetic_value(seed, context.dataset_id, context.experiment.name, context.controls, point) for point in points)
-    manifest = build_manifest_prefix(
-        context,
+    values = tuple(
+        _seeded_synthetic_value(
+            seed,
+            context.dataset_id,
+            context.experiment.name,
+            context.controls,
+            point,
+        )
+        for point in points
+    )
+    record = build_reference_record(
+        context=context,
         reference_kind="synthetic",
         reference_source="deterministic_seeded_generator",
+        observable=context.experiment.observables[0].name,
+        points=points,
+        values=values,
+        nuisance_parameters={"sigma": 0.0},
+        metadata={"synthetic_seed": int(seed), "point_count": point_count},
     )
+    manifest = record.to_manifest()
     manifest.update(
         {
             "synthetic_seed": int(seed),
@@ -305,6 +357,77 @@ def generate_gv_synthetic_reference(
 
 def build_gv_synthetic_reference_manifest(**kwargs: Any) -> dict[str, Any]:
     return generate_gv_synthetic_reference(**kwargs).to_manifest()
+
+
+def materialize_gv_synthetic_reference_dataset(
+    fixtures: Sequence[SyntheticReferenceFixture],
+    *,
+    data_path: str | Path,
+    metadata_path: str | Path | None = None,
+    collection_id: str | None = None,
+    experiments: Sequence[str] | None = None,
+    geometries: Sequence[str] | None = None,
+    dataset_ids: Sequence[str] | None = None,
+) -> GVReferenceMaterialization:
+    return materialize_reference_records(
+        [fixture.to_record() for fixture in fixtures],
+        data_path=data_path,
+        metadata_path=metadata_path,
+        collection_id=collection_id,
+        experiments=experiments,
+        geometries=geometries,
+        dataset_ids=dataset_ids,
+    )
+
+
+def materialize_gv_synthetic_reference(
+    *,
+    seed: int,
+    output_root: str | Path,
+    runtime_manifest: Mapping[str, object] | None = None,
+    experiment: str | None = None,
+    geometry: str | None = None,
+    controls: Mapping[str, float] | None = None,
+    point_count: int = 64,
+    dataset_filename: str = "reference_dataset.npz",
+    manifest_filename: str = "reference_manifest.json",
+) -> GVReferenceMaterialization:
+    reference = generate_gv_synthetic_reference(
+        seed=seed,
+        runtime_manifest=runtime_manifest,
+        experiment=experiment,
+        geometry=geometry,
+        controls=controls,
+        point_count=point_count,
+    )
+    resolved_root = Path(output_root).resolve()
+    dataset_path = resolved_root / dataset_filename
+    manifest_path = resolved_root / manifest_filename
+    dataset_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+
+    manifest = reference.to_manifest()
+    manifest["artifacts"] = {
+        "reference_dataset": str(dataset_path),
+        "reference_manifest": str(manifest_path),
+    }
+    np.savez_compressed(
+        dataset_path,
+        points=np.asarray(reference.points, dtype=np.float64),
+        values=np.asarray(reference.values, dtype=np.float64),
+        dataset_id=np.asarray(manifest["dataset_id"], dtype="<U256"),
+        structure=np.asarray(manifest["structure"], dtype="<U32"),
+        experiment=np.asarray(manifest["experiment"], dtype="<U64"),
+        geometry=np.asarray(manifest["geometry"], dtype="<U128"),
+        controls_json=np.asarray(json.dumps(manifest["controls"], sort_keys=True), dtype="<U4096"),
+        manifest_json=np.asarray(json.dumps(manifest, sort_keys=True), dtype="<U65535"),
+    )
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+    return GVReferenceMaterialization(
+        data_path=dataset_path,
+        metadata_path=manifest_path,
+        manifest=manifest,
+    )
 
 
 def _seeded_synthetic_value(
@@ -334,11 +457,14 @@ def _uniform_01(seed: int, dataset_id: str, token: str) -> float:
 
 __all__ = [
     "DEFAULT_SURROGATE_BACKEND",
+    "GV_REFERENCE_KINDS",
     "ReferenceIdentity",
     "SyntheticGVReference",
     "SyntheticReferenceFixture",
     "build_gv_synthetic_reference_manifest",
     "build_gv_synthetic_fixture",
     "generate_gv_synthetic_reference",
+    "materialize_gv_synthetic_reference",
+    "materialize_gv_synthetic_reference_dataset",
     "synthetic_fixture_from_runtime_manifest",
 ]
