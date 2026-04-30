@@ -11,10 +11,20 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "workflows" / "gv" / "run_gv_dry_run.py"
+SMOKE_SCRIPT_PATH = REPO_ROOT / "scripts" / "workflows" / "gv" / "run_gv_dnn_smoke.py"
 
 
 def _load_module(name: str):
     spec = importlib.util.spec_from_file_location(name, SCRIPT_PATH)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_smoke_module(name: str):
+    spec = importlib.util.spec_from_file_location(name, SMOKE_SCRIPT_PATH)
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
     assert spec.loader is not None
@@ -127,7 +137,39 @@ def test_real_stretching_cli_writes_manifest_without_mirheo(tmp_path: Path) -> N
     assert manifest["experiment"] == "stretching"
     assert manifest["controls"]["tot_force"] == 750.0
     assert manifest["dataset_id"].startswith("gv:stretching:")
+    assert manifest["selection"] == "gv:stretching"
     assert "mirheo" not in {name.lower() for name in sys.modules}
+
+
+@pytest.mark.parametrize(
+    ("experiment_name", "include_experimental"),
+    (
+        ("stretching", False),
+        ("buckling", False),
+        ("torsion", False),
+        ("eigenmodes", False),
+        ("shear_flow", True),
+    ),
+)
+def test_structure_qualified_selection_supports_all_gv_runtime_experiments(
+    tmp_path: Path,
+    experiment_name: str,
+    include_experimental: bool,
+) -> None:
+    module = _load_module(f"mesouq_test_gv_runtime_selection_{experiment_name}")
+    argv = ["--selection", f"gv:{experiment_name}", "--output-root", str(tmp_path / experiment_name)]
+    if include_experimental:
+        argv.insert(2, "--include-experimental")
+
+    rc = module.main(argv)
+
+    manifest = json.loads(
+        ((tmp_path / experiment_name) / "gv_runtime_dry_run_manifest.json").read_text(encoding="utf-8")
+    )
+    assert rc == 0
+    assert manifest["structure"] == "gv"
+    assert manifest["experiment"] == experiment_name
+    assert manifest["selection"] == f"gv:{experiment_name}"
 
 
 def test_control_parser_rejects_malformed_unknown_and_non_float_controls() -> None:
@@ -235,6 +277,87 @@ def test_shear_flow_requires_experimental_flag(tmp_path: Path) -> None:
         )
 
     assert excinfo.value.code == 2
+
+
+@pytest.mark.parametrize("selection", ["emb:compression", "gv:stretching:extra"])
+def test_structure_qualified_selection_rejects_non_gv_or_malformed_values(
+    tmp_path: Path,
+    selection: str,
+) -> None:
+    module = _load_module("mesouq_test_gv_runtime_bad_selection")
+
+    with pytest.raises(SystemExit) as excinfo:
+        module.main(["--selection", selection, "--output-root", str(tmp_path / "out")])
+
+    assert excinfo.value.code == 2
+
+
+def test_structure_qualified_selection_rejects_conflict_with_experiment_value(tmp_path: Path) -> None:
+    module = _load_module("mesouq_test_gv_runtime_selection_conflict")
+
+    with pytest.raises(SystemExit) as excinfo:
+        module.main(
+            [
+                "--experiment",
+                "stretching",
+                "--selection",
+                "gv:torsion",
+                "--output-root",
+                str(tmp_path / "out"),
+            ]
+        )
+
+    assert excinfo.value.code == 2
+
+
+@pytest.mark.parametrize(
+    ("selection", "control_arg", "expected_control_key", "include_experimental"),
+    (
+        ("gv:stretching", "tot_force=700", "tot_force", False),
+        ("gv:buckling", "buck=0.2", "buck", False),
+        ("gv:torsion", "theta=0.04", "theta", False),
+        ("gv:eigenmodes", "bpress=-91.0", "bpress", False),
+        ("gv:shear_flow", "ptan=0.4", "ptan", True),
+    ),
+)
+def test_offline_smoke_selection_supports_all_gv_experiments_without_mirheo(
+    tmp_path: Path,
+    selection: str,
+    control_arg: str,
+    expected_control_key: str,
+    include_experimental: bool,
+) -> None:
+    module = _load_smoke_module(f"mesouq_test_gv_smoke_selection_{selection.replace(':', '_')}")
+    argv = [
+        "--selection",
+        selection,
+        "--output-root",
+        str(tmp_path / "smoke"),
+        "--control",
+        control_arg,
+        "--num-curves",
+        "3",
+        "--points-per-curve",
+        "3",
+    ]
+    if include_experimental:
+        argv.insert(2, "--include-experimental")
+
+    rc = module.main(argv)
+
+    manifest = json.loads(
+        ((tmp_path / "smoke") / "gv_reference_manifest.json").read_text(encoding="utf-8")
+    )
+    report = json.loads(
+        ((tmp_path / "smoke") / "gv_dnn_surrogate_smoke_report.json").read_text(encoding="utf-8")
+    )
+    assert rc == 0
+    assert manifest["selection"] == selection
+    assert manifest["structure"] == "gv"
+    assert expected_control_key in manifest["controls"]
+    assert report["structure"] == "gv"
+    assert report["execution_mode"] in {"dry_run_manifest_only", "train_load_evaluate"}
+    assert "mirheo" not in {name.lower() for name in sys.modules}
 
 
 def test_default_output_root_routes_under_runs_and_avoids_staging(

@@ -10,8 +10,8 @@ from . import ControlSweep, KnownIssue, RuntimeDescriptor
 
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
-SOURCE_ROOT = Path(__file__).resolve().parent
-PROVENANCE_ROOT = REPO_ROOT / "gv_simulation_files" / "shear_flow"
+SOURCE_ROOT = REPO_ROOT / "gv_simulation_files" / "shear_flow"
+PROVENANCE_ROOT = SOURCE_ROOT / "a0"
 DEFAULT_OUTPUT_ROOT = REPO_ROOT / "_runs" / "gv" / "shear_flow"
 
 STRUCTURE_NAME = "gv"
@@ -29,15 +29,18 @@ SHEAR_FLOW_RUNTIME = RuntimeDescriptor(
     experiment=EXPERIMENT_NAME,
     provenance_root=str(PROVENANCE_ROOT),
     source_files=(
-        "README.md",
-        "a0/commands.txt",
-        "a0/run_all_HPC.sh",
-        "a0/run_HPC.sbatch",
-        "a0/generate.py",
-        "a0/parameters.py",
-        "a0/equil.py",
-        "a0/parameters-default.gv.yaml",
-        "a0/output.out",
+        str(SOURCE_ROOT / "README.md"),
+        str(SOURCE_ROOT / "run_all.py"),
+        str(SOURCE_ROOT / "copy_and_modify.py"),
+        str(PROVENANCE_ROOT / "commands.txt"),
+        str(PROVENANCE_ROOT / "run_all_HPC.sh"),
+        str(PROVENANCE_ROOT / "run_HPC.sbatch"),
+        str(PROVENANCE_ROOT / "generate.py"),
+        str(PROVENANCE_ROOT / "parameters.py"),
+        str(PROVENANCE_ROOT / "run.sh"),
+        str(PROVENANCE_ROOT / "equil.py"),
+        str(PROVENANCE_ROOT / "parameters-default.gv.yaml"),
+        str(PROVENANCE_ROOT / "output.out"),
     ),
     control_sweeps=(
         ControlSweep("ptan", start=0.4, stop=0.4, steps=1),
@@ -47,6 +50,9 @@ SHEAR_FLOW_RUNTIME = RuntimeDescriptor(
     sweep_mode="parallel",
     first_restart=True,
     runtime_package=RUNTIME_MODULE_NAME,
+    generate_script=str(PROVENANCE_ROOT / "generate.py"),
+    execute_argv=("sbatch", "run_HPC.sbatch"),
+    execute_description="Submit the generated GV shear-flow job script to Slurm.",
     experimental=True,
     known_issues=(
         KnownIssue(

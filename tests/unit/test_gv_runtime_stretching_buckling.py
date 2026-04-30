@@ -60,9 +60,11 @@ def test_stretching_uses_control_sweeps_from_run_all(tmp_path: Path) -> None:
     assert manifest["work_dir"].startswith(str((tmp_path / "planner").resolve()))
     assert str(module.PROVENANCE_ROOT).endswith("gv_simulation_files/stretching/gv")
     assert set(module.RUNTIME_DESCRIPTOR.source_files) == {
+        str(module.PROVENANCE_ROOT / "clean_all.sh"),
         str(module.PROVENANCE_ROOT / "run_all.sh"),
         str(module.PROVENANCE_ROOT / "generate.py"),
         str(module.PROVENANCE_ROOT / "parameters.py"),
+        str(module.PROVENANCE_ROOT / "run.sh"),
         str(module.PROVENANCE_ROOT / "equil.py"),
         str(module.PROVENANCE_ROOT / "parameters-default.gv.yaml"),
     }
@@ -94,9 +96,11 @@ def test_buckling_uses_control_sweeps_from_run_all(tmp_path: Path) -> None:
     assert manifest["work_dir"].startswith(str((tmp_path / "planner").resolve()))
     assert str(module.PROVENANCE_ROOT).endswith("gv_simulation_files/buckling/gv")
     assert set(module.RUNTIME_DESCRIPTOR.source_files) == {
+        str(module.PROVENANCE_ROOT / "clean_all.sh"),
         str(module.PROVENANCE_ROOT / "run_all.sh"),
         str(module.PROVENANCE_ROOT / "generate.py"),
         str(module.PROVENANCE_ROOT / "parameters.py"),
+        str(module.PROVENANCE_ROOT / "run.sh"),
         str(module.PROVENANCE_ROOT / "equil.py"),
         str(module.PROVENANCE_ROOT / "parameters-default.gv.yaml"),
     }

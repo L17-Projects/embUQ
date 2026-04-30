@@ -3,6 +3,14 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from meso_uq.experiments import canonical_experiment_id
+from meso_uq.structures.gv import EXPERIMENT_CONTROLS, GV_PARAMETER_CONTRACT
+from meso_uq.structures.gv.runtime import (
+    RUNTIME_EXPERIMENTS,
+    load_runtime_descriptor,
+    plan_runtime,
+)
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GV_GENERATED_SAMPLES = (
@@ -49,3 +57,62 @@ def test_wrapper_tree_exists_without_staging_outputs() -> None:
         path.is_file() and "gv_simulation_files" in path.as_posix()
         for path in wrapper_root.rglob("*")
     )
+
+
+def test_runtime_catalog_keeps_structure_qualified_control_scoped_identity(
+    tmp_path: Path,
+) -> None:
+    calibrated_names = set(GV_PARAMETER_CONTRACT.calibrated_names)
+    nuisance_names = set(GV_PARAMETER_CONTRACT.nuisance_names)
+
+    for experiment_name in RUNTIME_EXPERIMENTS:
+        descriptor = load_runtime_descriptor(experiment_name)
+        dry_run = plan_runtime(
+            experiment_name,
+            output_root=tmp_path / experiment_name,
+            include_experimental=experiment_name == "shear_flow",
+        )
+        manifest = dry_run.to_manifest()
+        expected_control_names = {
+            control.name for control in EXPERIMENT_CONTROLS[experiment_name]
+        }
+
+        assert dry_run.structure == "gv"
+        assert descriptor.experiment == experiment_name
+        assert set(descriptor.control_names) == expected_control_names
+        assert expected_control_names.isdisjoint(calibrated_names)
+        assert expected_control_names.isdisjoint(nuisance_names)
+        assert manifest["control_id"] == dry_run.control_id
+        assert manifest["dataset_id"] == dry_run.dataset_id
+        assert manifest["dataset_id"].startswith(f"gv:{experiment_name}:{dry_run.geometry}:")
+        assert manifest["dataset_id"] != canonical_experiment_id("gv", experiment_name)
+
+
+def test_runtime_dry_run_canaries_stay_offline_and_provenance_backed(
+    tmp_path: Path,
+) -> None:
+    before = list(tmp_path.rglob("*"))
+
+    for experiment_name in RUNTIME_EXPERIMENTS:
+        dry_run = plan_runtime(
+            experiment_name,
+            output_root=tmp_path / "_runs" / experiment_name,
+            include_experimental=experiment_name == "shear_flow",
+        )
+        manifest = dry_run.to_manifest()
+        provenance_root = Path(dry_run.provenance_root)
+        experiment_root = provenance_root.parent
+
+        assert provenance_root.is_dir()
+        for source_file in manifest["source_files"]:
+            source_path = Path(source_file)
+            assert source_path.is_file()
+            assert provenance_root in source_path.parents or experiment_root in source_path.parents
+
+        for command in manifest["commands"]:
+            argv = command["argv"]
+            assert argv
+            assert command["cwd"] == dry_run.work_dir
+
+    after = list(tmp_path.rglob("*"))
+    assert before == after == []

@@ -25,9 +25,11 @@ PROVENANCE_ROOT = _find_repo_root() / "gv_simulation_files" / EXPERIMENT_NAME / 
 SOURCE_FILES = tuple(
     str(PROVENANCE_ROOT / filename)
     for filename in (
+        "clean_all.sh",
         "run_all.sh",
         "generate.py",
         "parameters.py",
+        "run.sh",
         "equil.py",
         "parameters-default.gv.yaml",
     )

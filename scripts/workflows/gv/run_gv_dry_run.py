@@ -25,7 +25,8 @@ GV_SIMULATION_ROOT = (REPO_ROOT / "gv_simulation_files").resolve()
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--structure", default="gv", choices=("gv",))
-    parser.add_argument("--experiment", required=True)
+    parser.add_argument("--selection", default=None, help="Optional structure-qualified selection, for example gv:stretching.")
+    parser.add_argument("--experiment", default=None)
     parser.add_argument("--geometry-id", default=None)
     parser.add_argument("--radius", type=float, default=None)
     parser.add_argument("--height", type=float, default=None)
@@ -65,6 +66,34 @@ def _parse_controls(control_items: list[str], experiment_name: str, structure: S
                 f"Invalid value for control '{name}': {raw_value!r}. Expected a float."
             ) from exc
     return parsed
+
+
+def _resolve_selected_experiment(args: argparse.Namespace) -> tuple[str, str]:
+    selection = getattr(args, "selection", None)
+    if selection is None:
+        if not args.experiment:
+            raise ValueError("Either --experiment or --selection gv:<experiment> is required.")
+        return str(args.structure), str(args.experiment)
+
+    parts = str(selection).split(":")
+    if len(parts) != 2:
+        raise ValueError(
+            "GV workflow selection must use the form gv:<experiment>."
+        )
+    selected_structure, selected_experiment = parts
+    if selected_structure != "gv":
+        raise ValueError(
+            f"GV workflow selection does not accept structure '{selected_structure}'. Use gv:<experiment>."
+        )
+    if args.experiment is not None and str(args.experiment) != selected_experiment:
+        raise ValueError(
+            f"Conflicting selection values: --experiment={args.experiment!r} and --selection={selection!r}."
+        )
+    if str(args.structure) != selected_structure:
+        raise ValueError(
+            f"Conflicting structure values: --structure={args.structure!r} and --selection={selection!r}."
+        )
+    return selected_structure, selected_experiment
 
 
 def _resolve_geometry(args: argparse.Namespace, structure: StructureSpec) -> GeometrySpec:
@@ -151,24 +180,25 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        structure = get_structure(args.structure)
+        structure_name, experiment_name = _resolve_selected_experiment(args)
+        structure = get_structure(structure_name)
         structure.get_experiment(
-            args.experiment,
+            experiment_name,
             include_experimental=args.include_experimental,
         )
         geometry = _resolve_geometry(args, structure)
-        controls = _parse_controls(args.control, args.experiment, structure)
+        controls = _parse_controls(args.control, experiment_name, structure)
         output_root = _resolve_output_root(args)
     except (KeyError, ValueError) as exc:
         parser.error(str(exc))
 
-    experiment_module_name = f"{args.runtime_module_root}.{args.experiment}"
+    experiment_module_name = f"{args.runtime_module_root}.{experiment_name}"
     experiment_module = _load_experiment_module(experiment_module_name)
     descriptor = _resolve_runtime_descriptor(experiment_module)
 
     request = {
         "structure": structure.name,
-        "experiment": args.experiment,
+        "experiment": experiment_name,
         "geometry": geometry.id,
         "controls": controls,
         "output_root": output_root,
@@ -182,7 +212,7 @@ def main(argv: list[str] | None = None) -> int:
     if not isinstance(manifest, dict):
         raise TypeError("RuntimeDescriptor.plan(...) must return a manifest-capable dry-run payload.")
     manifest.setdefault("structure", structure.name)
-    manifest.setdefault("experiment", args.experiment)
+    manifest.setdefault("experiment", experiment_name)
     manifest.setdefault("geometry", geometry.id)
     manifest.setdefault("controls", controls)
     manifest["geometry_spec"] = {
@@ -192,6 +222,7 @@ def main(argv: list[str] | None = None) -> int:
         "source": geometry.source,
     }
     manifest["runtime_module"] = experiment_module_name
+    manifest["selection"] = f"{structure.name}:{experiment_name}"
     manifest_path = output_root / "gv_runtime_dry_run_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
     print(f"Dry-run manifest: {manifest_path}")
