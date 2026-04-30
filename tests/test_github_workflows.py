@@ -40,7 +40,7 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     expected_timeouts = {
         "package-and-tests": 15,
         "docs": 5,
-        "mpi-smoke": 10,
+        "mpi-smoke": 20,
         "retraining-canary": 15,
         "workflow-canary": 20,
     }
