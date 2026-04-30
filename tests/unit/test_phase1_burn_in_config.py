@@ -594,6 +594,7 @@ def test_phase1_main_forwards_cli_arguments(monkeypatch: pytest.MonkeyPatch, pha
         config_path=None,
         output_dir="_setup",
         device="cpu",
+        setup_only=False,
     ) -> None:
         captured.update(
             {
@@ -603,6 +604,7 @@ def test_phase1_main_forwards_cli_arguments(monkeypatch: pytest.MonkeyPatch, pha
                 "config_path": config_path,
                 "output_dir": output_dir,
                 "device": device,
+                "setup_only": setup_only,
             }
         )
 
@@ -633,4 +635,5 @@ def test_phase1_main_forwards_cli_arguments(monkeypatch: pytest.MonkeyPatch, pha
         "config_path": "phase1.yaml",
         "output_dir": "results",
         "device": "gpu",
+        "setup_only": False,
     }

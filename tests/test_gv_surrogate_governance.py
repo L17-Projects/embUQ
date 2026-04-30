@@ -22,13 +22,15 @@ from meso_uq.structures.gv.runtime import RUNTIME_EXPERIMENTS, plan_runtime
 
 def _prior_kwargs() -> dict[str, list[float]]:
     return {
-        "prior_Yt": [1.0, 2.0],
-        "prior_kb": [1.0, 2.0],
+        "prior_ka": [0.1, 1.1],
+        "prior_kb": [0.2, 1.2],
+        "prior_mu": [0.3, 1.3],
         "prior_b1": [0.0, 1.0],
         "prior_b2": [0.0, 1.0],
         "prior_a3": [-1.0, 1.0],
         "prior_a4": [0.0, 1.0],
-        "prior_d0": [0.0, 0.5],
+        "prior_mu_l": [0.8, 1.8],
+        "prior_c": [0.9, 1.9],
         "prior_sigma": [0.0, 1.0],
     }
 

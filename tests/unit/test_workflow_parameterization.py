@@ -76,6 +76,71 @@ def test_phase2_hyperprior_specs_drop_fixed_parameters(full_config):
     assert hyperprior_specs[-1][2] == [1.3, 1.4]
 
 
+def test_gv_parameterization_uses_calibrated_material_order() -> None:
+    config = {
+        "structure": "gv",
+        "prior_ka": [0.1, 1.1],
+        "prior_kb": [0.2, 1.2],
+        "prior_mu": [0.3, 1.3],
+        "prior_b1": [0.4, 1.4],
+        "prior_b2": [0.5, 1.5],
+        "prior_a3": [0.6, 1.6],
+        "prior_a4": [0.7, 1.7],
+        "prior_mu_l": [0.8, 1.8],
+        "prior_c": [0.9, 1.9],
+        "prior_sigma": [0.01, 0.10],
+        "hyperprior_mu_ka": [0.1, 1.1],
+        "hyperprior_sigma_ka": [0.01, 0.2],
+        "hyperprior_mu_kb": [0.2, 1.2],
+        "hyperprior_sigma_kb": [0.01, 0.2],
+        "hyperprior_mu_mu": [0.3, 1.3],
+        "hyperprior_sigma_mu": [0.01, 0.2],
+        "hyperprior_mu_b1": [0.4, 1.4],
+        "hyperprior_sigma_b1": [0.01, 0.2],
+        "hyperprior_mu_b2": [0.5, 1.5],
+        "hyperprior_sigma_b2": [0.01, 0.2],
+        "hyperprior_mu_a3": [0.6, 1.6],
+        "hyperprior_sigma_a3": [0.01, 0.2],
+        "hyperprior_mu_a4": [0.7, 1.7],
+        "hyperprior_sigma_a4": [0.01, 0.2],
+        "hyperprior_mu_mu_l": [0.8, 1.8],
+        "hyperprior_sigma_mu_l": [0.01, 0.2],
+        "hyperprior_mu_c": [0.9, 1.9],
+        "hyperprior_sigma_c": [0.01, 0.2],
+    }
+
+    assert active_variable_names(config) == ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c", "sigma"]
+    assert active_hierarchical_variable_names(config) == ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c"]
+    assert [name for name, _bounds in phase1_prior_specs(config)] == [
+        "ka",
+        "kb",
+        "mu",
+        "b1",
+        "b2",
+        "a3",
+        "a4",
+        "mu_l",
+        "c",
+        "sigma",
+    ]
+    assert [name for name, _mu, _sigma in phase2_hyperprior_specs(config)] == [
+        "ka",
+        "kb",
+        "mu",
+        "b1",
+        "b2",
+        "a3",
+        "a4",
+        "mu_l",
+        "c",
+    ]
+
+
+def test_mixed_structure_parameterization_is_rejected() -> None:
+    with pytest.raises(ValueError, match="Mixed-structure inference parameterization"):
+        active_variable_names({"structures": ["emb", "gv"]})
+
+
 def test_expand_parameter_vector_handles_reduced_legacy_and_full():
     reduced = expand_parameter_vector(
         [10.0, 20.0, 0.5, 0.1], fixed_params={"b1": 1.0, "b2": 2.0, "a3": 3.0, "a4": 4.0}
