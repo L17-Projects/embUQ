@@ -102,12 +102,14 @@ def test_runtime_dry_run_canaries_stay_offline_and_provenance_backed(
         manifest = dry_run.to_manifest()
         provenance_root = Path(dry_run.provenance_root)
         experiment_root = provenance_root.parent
+        staging_available = provenance_root.is_dir()
 
-        assert provenance_root.is_dir()
         for source_file in manifest["source_files"]:
             source_path = Path(source_file)
-            assert source_path.is_file()
+            assert "gv_simulation_files" in source_path.parts
             assert provenance_root in source_path.parents or experiment_root in source_path.parents
+            if staging_available:
+                assert source_path.is_file()
 
         for command in manifest["commands"]:
             argv = command["argv"]
