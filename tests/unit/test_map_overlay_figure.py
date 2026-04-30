@@ -1,4 +1,4 @@
-"""Tests for generate_map_overlay_figure.py — codex-connector P2 fixes."""
+"""Tests for generate_map_overlay_figure.py regression fixes."""
 from __future__ import annotations
 
 import json

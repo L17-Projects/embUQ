@@ -149,6 +149,38 @@ def active_hierarchical_variable_names(config: Mapping[str, object]) -> list[str
     return [name for name in active_variable_names(config) if name != "sigma"]
 
 
+def phase1_variable_names(
+    config: Mapping[str, object],
+    *,
+    include_sigma: bool = True,
+    include_d0: Optional[bool] = None,
+) -> list[str]:
+    """Return the structure-aware Phase 1 variable contract.
+
+    Defaults preserve existing behavior:
+    - EMB keeps its current active-variable contract, including d0 when not fixed.
+    - GV exposes calibrated parameters plus sigma, with d0 excluded unless requested.
+    """
+
+    structure = _config_structure(config)
+    if structure == "gv":
+        names = list(GV_CALIBRATED_PARAMETER_ORDER)
+        if include_d0:
+            names.append("d0")
+        if include_sigma:
+            names.append("sigma")
+        return names
+    if structure != "emb":
+        raise ValueError(f"Unsupported inference structure '{structure}'.")
+
+    names = active_variable_names(config)
+    if include_d0 is False:
+        names = [name for name in names if name != "d0"]
+    if not include_sigma:
+        names = [name for name in names if name != "sigma"]
+    return names
+
+
 def expand_reduced_parameters(
     param_samples: np.ndarray,
     fixed_params: Optional[Dict[str, float]] = None,
@@ -209,6 +241,8 @@ def phase1_prior_specs(
     *,
     prior_d0: Optional[Sequence[float]] = None,
     prior_sigma: Optional[Sequence[float]] = None,
+    include_sigma: bool = True,
+    include_d0: Optional[bool] = None,
 ) -> list[tuple[str, Sequence[float]]]:
     def _bounds_for(name: str) -> Sequence[float]:
         if name == "d0":
@@ -220,7 +254,14 @@ def phase1_prior_specs(
             raise KeyError(f"Missing required prior bound '{key}'")
         return config[key]
 
-    return [(name, _bounds_for(name)) for name in active_variable_names(config)]
+    return [
+        (name, _bounds_for(name))
+        for name in phase1_variable_names(
+            config,
+            include_sigma=include_sigma,
+            include_d0=include_d0,
+        )
+    ]
 
 
 def phase2_hyperprior_specs(

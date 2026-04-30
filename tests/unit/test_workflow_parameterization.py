@@ -10,6 +10,7 @@ from meso_uq.workflow_acceleration import (
     expand_parameter_vector,
     expand_reduced_parameters,
     get_fixed_parameters,
+    phase1_variable_names,
     phase1_prior_specs,
     phase2_hyperprior_specs,
     require_single_rank,
@@ -63,6 +64,15 @@ def test_phase1_prior_specs_drop_fixed_parameters(full_config):
     assert [name for name, _ in prior_specs] == ["Yt", "kb", "d0", "sigma"]
     assert prior_specs[0][1] == [1.0, 2.0]
     assert prior_specs[-1][1] == [15.0, 16.0]
+
+
+def test_phase1_variable_names_preserve_emb_defaults_and_allow_opt_outs(full_config) -> None:
+    reduced = dict(full_config)
+    reduced["fixed_params"] = {"b1": 0.0, "b2": 0.0, "a3": 0.0, "a4": 0.0}
+
+    assert phase1_variable_names(reduced) == ["Yt", "kb", "d0", "sigma"]
+    assert phase1_variable_names(reduced, include_sigma=False) == ["Yt", "kb", "d0"]
+    assert phase1_variable_names(reduced, include_d0=False) == ["Yt", "kb", "sigma"]
 
 
 def test_phase2_hyperprior_specs_drop_fixed_parameters(full_config):
@@ -136,9 +146,121 @@ def test_gv_parameterization_uses_calibrated_material_order() -> None:
     ]
 
 
+def test_gv_phase1_variable_names_allow_optional_d0_without_controls() -> None:
+    config = {
+        "structure": "gv",
+        "prior_ka": [0.1, 1.1],
+        "prior_kb": [0.2, 1.2],
+        "prior_mu": [0.3, 1.3],
+        "prior_b1": [0.4, 1.4],
+        "prior_b2": [0.5, 1.5],
+        "prior_a3": [0.6, 1.6],
+        "prior_a4": [0.7, 1.7],
+        "prior_mu_l": [0.8, 1.8],
+        "prior_c": [0.9, 1.9],
+        "prior_d0": [1.0, 2.0],
+        "prior_sigma": [0.01, 0.10],
+        "prior_temperature": [300.0, 600.0],
+        "prior_pressure": [1.0, 5.0],
+    }
+
+    assert phase1_variable_names(config) == [
+        "ka",
+        "kb",
+        "mu",
+        "b1",
+        "b2",
+        "a3",
+        "a4",
+        "mu_l",
+        "c",
+        "sigma",
+    ]
+    assert phase1_variable_names(config, include_sigma=False) == [
+        "ka",
+        "kb",
+        "mu",
+        "b1",
+        "b2",
+        "a3",
+        "a4",
+        "mu_l",
+        "c",
+    ]
+    assert phase1_variable_names(config, include_d0=True) == [
+        "ka",
+        "kb",
+        "mu",
+        "b1",
+        "b2",
+        "a3",
+        "a4",
+        "mu_l",
+        "c",
+        "d0",
+        "sigma",
+    ]
+
+    names = phase1_variable_names(config, include_d0=True)
+    assert "temperature" not in names
+    assert "pressure" not in names
+
+
+def test_gv_phase1_prior_specs_match_requested_contract() -> None:
+    config = {
+        "structure": "gv",
+        "prior_ka": [0.1, 1.1],
+        "prior_kb": [0.2, 1.2],
+        "prior_mu": [0.3, 1.3],
+        "prior_b1": [0.4, 1.4],
+        "prior_b2": [0.5, 1.5],
+        "prior_a3": [0.6, 1.6],
+        "prior_a4": [0.7, 1.7],
+        "prior_mu_l": [0.8, 1.8],
+        "prior_c": [0.9, 1.9],
+        "prior_d0": [1.0, 2.0],
+        "prior_sigma": [0.01, 0.10],
+        "prior_temperature": [300.0, 600.0],
+    }
+
+    default_specs = phase1_prior_specs(config)
+    assert [name for name, _bounds in default_specs] == [
+        "ka",
+        "kb",
+        "mu",
+        "b1",
+        "b2",
+        "a3",
+        "a4",
+        "mu_l",
+        "c",
+        "sigma",
+    ]
+    assert default_specs[-1] == ("sigma", [0.01, 0.10])
+
+    with_d0_specs = phase1_prior_specs(config, include_d0=True)
+    assert [name for name, _bounds in with_d0_specs] == [
+        "ka",
+        "kb",
+        "mu",
+        "b1",
+        "b2",
+        "a3",
+        "a4",
+        "mu_l",
+        "c",
+        "d0",
+        "sigma",
+    ]
+    assert ("d0", [1.0, 2.0]) in with_d0_specs
+    assert all(name != "temperature" for name, _bounds in with_d0_specs)
+
+
 def test_mixed_structure_parameterization_is_rejected() -> None:
     with pytest.raises(ValueError, match="Mixed-structure inference parameterization"):
         active_variable_names({"structures": ["emb", "gv"]})
+    with pytest.raises(ValueError, match="Unsupported inference structure"):
+        phase1_variable_names({"structure": "vesicle"})
 
 
 def test_expand_parameter_vector_handles_reduced_legacy_and_full():
