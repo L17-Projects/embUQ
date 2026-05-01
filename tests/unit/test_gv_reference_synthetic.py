@@ -80,6 +80,12 @@ def test_synthetic_gv_reference_manifest_includes_contract_and_runtime_metadata(
     assert manifest["provenance"]["runtime_legacy_import_root"].endswith("gv_simulation_files/torsion/gv")
     assert manifest["outputs"]["output_root"] == str(tmp_path.resolve())
     assert manifest["outputs"]["work_dir"].endswith("/torsion/gv_rad2_height14_28/theta_0_01_0_1/work")
+    assert manifest["generation_seed"] == 5
+    assert tuple(item["name"] for item in manifest["observable_schema"]) == tuple(
+        manifest["observable_names"]
+    )
+    assert manifest["geometry_parameters"]["radius"] == 2.0
+    assert manifest["geometry_parameters"]["height"] == 14.28
     assert len(manifest["points"]) == 64
     assert len(manifest["values"]) == 64
 
@@ -165,6 +171,31 @@ def test_synthetic_reference_context_accepts_custom_geometry_specs() -> None:
 
     assert context.geometry.id == "gv_custom"
     assert context.geometry.parameters == {"radius": 2.5, "height": 12.0}
+
+    runtime_fallback = resolve_gv_reference_context(
+        runtime_manifest={
+            "structure": "gv",
+            "experiment": "torsion",
+            "geometry": "gv_runtime_geometry",
+            "geometry_spec": {
+                "id": "gv_runtime_geometry",
+                "label": "runtime geometry",
+                "shape": "cylinder",
+                "parameters": {"radius": 2.0, "height": 10.0},
+                "source": "runtime_manifest",
+            },
+            "controls": {"theta": 0.03},
+        }
+    )
+    assert runtime_fallback.geometry.id == "gv_runtime_geometry"
+    assert runtime_fallback.geometry.parameters == {"radius": 2.0, "height": 10.0}
+
+    with pytest.raises(KeyError):
+        resolve_gv_reference_context(
+            experiment="torsion",
+            geometry="not_registered",
+            controls={"theta": 0.03},
+        )
 
     with pytest.raises(ValueError, match="must include an id"):
         gv_common_module._geometry_spec_from_mapping({"parameters": {}})
@@ -282,6 +313,8 @@ def test_synthetic_reference_dataset_materialization_filters_and_records_entries
         data_path=tmp_path / "materialized" / "synthetic_refs.npz",
         collection_id="gv:synthetic:test-collection",
         experiments=["stretching"],
+        geometries=["gv_rad2_height14_28"],
+        dataset_ids=[stretching_fixture.identity.dataset_id],
     )
 
     assert result.dataset_path.exists()
@@ -291,8 +324,8 @@ def test_synthetic_reference_dataset_materialization_filters_and_records_entries
     assert manifest["entry_count"] == 1
     assert manifest["selection"] == {
         "experiments": ["stretching"],
-        "geometries": [],
-        "dataset_ids": [],
+        "geometries": ["gv_rad2_height14_28"],
+        "dataset_ids": [stretching_fixture.identity.dataset_id],
     }
     assert manifest["entries"][0]["dataset_id"] == stretching_fixture.identity.dataset_id
     assert manifest["entries"][0]["controls"] == {"tot_force": 500.0, "bpress": -91.0}
@@ -371,6 +404,12 @@ def test_synthetic_fixture_rejects_invalid_series_reference_kind_and_templates()
             sigma=0.02,
             points=[],
         )
+
+    with pytest.raises(ValueError, match="sigma nuisance parameter"):
+        gv_common_module.normalize_nuisance_parameters({})
+
+    with pytest.raises(ValueError, match="nuisance parameters must remain separate"):
+        gv_common_module.normalize_nuisance_parameters({"sigma": 0.02, "ka": 1.0})
 
     with pytest.raises(ValueError, match="No synthetic fixture template"):
         build_gv_synthetic_fixture(

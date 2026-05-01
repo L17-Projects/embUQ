@@ -8,11 +8,13 @@ from meso_uq.surrogate.catalogs import (
     resolve_surrogate_catalog_entries,
 )
 from meso_uq.surrogate.gv_catalog import (
+    _GV_EXPERIMENT_LANES,
     iter_gv_surrogate_catalog_entries,
     resolve_gv_surrogate_catalog_entries,
     resolve_gv_surrogate_catalog_entry,
 )
 from meso_uq.structures.gv import DEFAULT_GV_GEOMETRY
+from meso_uq.structures.registry import GeometrySpec
 
 
 def test_gv_catalog_entries_are_structure_aware_and_dnn_only() -> None:
@@ -42,6 +44,26 @@ def test_catalog_identity_rejects_unsupported_axes() -> None:
         )
 
 
+def test_gv_catalog_iter_subset_filters_by_experiment_and_geometry() -> None:
+    entries = iter_gv_surrogate_catalog_entries(
+        include_experimental=True,
+        experiments=("shear_flow", "torsion"),
+        geometries=(DEFAULT_GV_GEOMETRY.id,),
+    )
+    assert entries
+    assert {entry.identity.experiment for entry in entries} == {"shear_flow", "torsion"}
+    assert {entry.identity.geometry for entry in entries} == {DEFAULT_GV_GEOMETRY.id}
+
+    resolved = resolve_gv_surrogate_catalog_entries(
+        "/repo",
+        include_experimental=True,
+        experiments=("shear_flow",),
+        geometries=(DEFAULT_GV_GEOMETRY.id,),
+    )
+    assert resolved
+    assert {entry["experiment"] for entry in resolved} == {"shear_flow"}
+
+
 def test_gv_catalog_lookup_requires_full_identity() -> None:
     with pytest.raises(
         ValueError,
@@ -62,6 +84,61 @@ def test_gv_catalog_rejects_bnn_backend() -> None:
             controls="tot_force_500_50000__bpress_-91",
             surrogate_backend="bnn",
         )
+
+
+def test_gv_catalog_multi_geometry_subset_lookup_is_geometry_specific(monkeypatch: pytest.MonkeyPatch) -> None:
+    alt_geometry = GeometrySpec(
+        id="gv_custom_radius2_height18",
+        label="Custom geometry",
+        shape="disc",
+        parameters={"radius": 2.0, "height": 18.0},
+        source="tests",
+    )
+    from meso_uq.surrogate import gv_catalog
+
+    monkeypatch.setattr(gv_catalog, "_catalog_geometries", lambda: (DEFAULT_GV_GEOMETRY, alt_geometry))
+
+    entries = iter_gv_surrogate_catalog_entries(
+        experiments=("eigenmodes",),
+        geometries=(DEFAULT_GV_GEOMETRY.id, alt_geometry.id),
+    )
+    assert {entry.identity.geometry for entry in entries} == {DEFAULT_GV_GEOMETRY.id, alt_geometry.id}
+    assert len(entries) == 4
+    entry = resolve_gv_surrogate_catalog_entry(
+        "/repo",
+        experiment="eigenmodes",
+        geometry=alt_geometry.id,
+        controls="bpress_-91",
+    )
+    assert entry["geometry"] == alt_geometry.id
+    assert entry["metadata"]["geometry"] == alt_geometry.id
+
+
+def test_gv_catalog_rejects_calibrated_or_nuisance_controls(monkeypatch: pytest.MonkeyPatch) -> None:
+    mutated_lanes = (
+        {
+            **_GV_EXPERIMENT_LANES[0],
+            "controls": "ka_1.0",
+            "control_values": {"ka": 1.0},
+        },
+    )
+    monkeypatch.setattr("meso_uq.surrogate.gv_catalog._GV_EXPERIMENT_LANES", mutated_lanes)
+    with pytest.raises(ValueError, match="cannot collide with calibrated or nuisance parameters"):
+        iter_gv_surrogate_catalog_entries()
+
+
+def test_gv_catalog_metadata_exposes_feature_parameter_and_schema_contract() -> None:
+    entry = iter_gv_surrogate_catalog_entries(experiments=("torsion",), geometries=(DEFAULT_GV_GEOMETRY.id,))[0]
+    metadata = entry.metadata
+    assert metadata["geometry"] == DEFAULT_GV_GEOMETRY.id
+    assert metadata["controls"] == {"theta": {"start": 0.01, "stop": 0.1, "steps": 10}}
+    assert metadata["backend"] == "dnn"
+    assert metadata["reference_provenance"]["runtime_source_root"] == "gv/torsion/src"
+    assert metadata["feature_order"]["axis"] == "observable_axis"
+    assert metadata["feature_order"]["target"] == "response"
+    assert metadata["parameter_order"]["calibrated"][:3] == ["ka", "kb", "mu"]
+    assert metadata["observable_schema"]["identity"] == "meso_uq.structures.gv"
+    assert metadata["observable_schema"]["repository_path"] == "src/meso_uq/structures/gv"
 
 
 def test_gv_catalog_resolution_carries_structure_identity_and_paths() -> None:

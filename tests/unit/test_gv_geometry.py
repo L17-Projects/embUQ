@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
 
 import pytest
@@ -8,10 +9,14 @@ from meso_uq.structures import get_structure
 from meso_uq.structures.gv import build_geometry, geometry_id
 from meso_uq.structures.gv.geometries import DEFAULT_GV_GEOMETRY
 from meso_uq.structures.gv.geometry_sources import (
+    DEFAULT_GV_HEIGHT,
+    DEFAULT_GV_RADIUS,
     gv_canonical_geometry_default_source,
     gv_default_geometry_defaults,
     gv_generated_artifacts,
 )
+import meso_uq.structures.gv.geometry_sources as geometry_sources
+import meso_uq.structures.gv.geometries as geometries_module
 
 
 def test_gv_geometry_ids_are_stable_and_filesystem_safe() -> None:
@@ -33,6 +38,26 @@ def test_default_geometry_derives_from_canonical_staged_source() -> None:
     assert DEFAULT_GV_GEOMETRY.source == gv_canonical_geometry_default_source()
     assert not Path(DEFAULT_GV_GEOMETRY.source).is_absolute()
     assert DEFAULT_GV_GEOMETRY.source == "gv/stretching/src/parameters-default.gv.yaml"
+
+
+def test_default_geometry_import_does_not_read_canonical_yaml(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _fail_if_called() -> tuple[float, float]:
+        raise AssertionError("default geometry import must not read canonical YAML")
+
+    monkeypatch.setattr(geometry_sources, "gv_default_geometry_defaults", _fail_if_called)
+
+    reloaded = importlib.reload(geometries_module)
+
+    assert reloaded.DEFAULT_GV_GEOMETRY.parameters == {
+        "radius": DEFAULT_GV_RADIUS,
+        "height": DEFAULT_GV_HEIGHT,
+    }
+
+
+def test_default_geometry_defaults_fall_back_without_repo_source(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(geometry_sources, "gv_canonical_geometry_default_path", lambda: tmp_path / "missing.yaml")
+
+    assert geometry_sources.gv_default_geometry_defaults() == (DEFAULT_GV_RADIUS, DEFAULT_GV_HEIGHT)
 
 
 @pytest.mark.parametrize("pattern", ["/temp/tilen/", "/net/o364/"])

@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import yaml
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -132,6 +133,15 @@ def test_gv_operational_canary_helper_edges(tmp_path: Path, monkeypatch: pytest.
         "--control",
         "flow=1.0",
     ]
+    parsed_experiment_only = module.build_parser().parse_args(
+        ["--output-root", str(tmp_path / "experiment_only"), "--experiment", "stretching"]
+    )
+    assert parsed_experiment_only.selection is None
+    assert module._resolve_runtime_selection(
+        structure=parsed_experiment_only.structure,
+        experiment=parsed_experiment_only.experiment,
+        selection=parsed_experiment_only.selection,
+    ) == ("gv", "stretching")
     assert module._resolve_selection("gv:torsion") == ("gv", "torsion")
     with pytest.raises(ValueError, match="form gv:<experiment>"):
         module._resolve_selection("torsion")
@@ -185,9 +195,231 @@ def test_gv_operational_canary_helper_edges(tmp_path: Path, monkeypatch: pytest.
         surrogate_report={"status": "passed"},
         phase1_execution_manifest={"status": "setup_validated"},
     ) == "fail"
+    assert module._summarize_runtime_known_issues({"known_issues": "not-a-list"}) == []
+    assert module._summarize_runtime_known_issues(
+        {
+            "known_issues": [
+                {
+                    "id": "a",
+                    "summary": "Blocking runtime issue",
+                    "evidence": "runtime",
+                    "severity": "critical",
+                },
+                {
+                    "id": "b",
+                    "summary": "Notice",
+                    "evidence": "runtime",
+                    "severity": "notice",
+                },
+                "not-a-dict",
+            ]
+        }
+    ) == [
+        {
+            "id": "a",
+            "summary": "Blocking runtime issue",
+            "evidence": "runtime",
+            "severity": "critical",
+            "classification": "experimental_blocked",
+        },
+        {
+            "id": "b",
+            "summary": "Notice",
+            "evidence": "runtime",
+            "severity": "notice",
+            "classification": "observed",
+        },
+    ]
+    assert module._validate_output_root(tmp_path / "safe-canary-output") == (tmp_path / "safe-canary-output").resolve()
+    with pytest.raises(ValueError, match="must not be inside repository source trees"):
+        module._validate_output_root(module.GV_SIMULATION_ROOT / "runtime")
+    with pytest.raises(ValueError, match="must not be inside repository source trees"):
+        module._validate_output_root(module.REPO_ROOT / "gv" / "scratch")
+    with pytest.raises(ValueError, match="must not be inside repository source trees"):
+        module._validate_output_root(module.REPO_ROOT / "src" / "meso_uq")
+    with pytest.raises(ValueError, match="must not be inside repository source trees"):
+        module._validate_output_root(module.REPO_ROOT / "scripts" / "workflows")
+    with pytest.raises(ValueError, match="must not be inside repository source trees"):
+        module._validate_output_root(module.REPO_ROOT / "tests" / "unit")
 
     monkeypatch.setenv(module.GV_HBI_EXPERIMENTAL_FLAG, "yes")
     assert module._require_runtime_flag() == f"env:{module.GV_HBI_EXPERIMENTAL_FLAG}"
+
+
+def test_gv_operational_canary_cli_defaults_do_not_shadow_experiment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_module(SCRIPT_PATH, "gv_operational_canary_cli_default_test")
+    runtime_calls: list[list[str]] = []
+
+    def _fake_runtime_main(argv: list[str]) -> int:
+        runtime_calls.append(list(argv))
+        runtime_dir = Path(argv[argv.index("--output-root") + 1]).resolve()
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        if "--selection" in argv:
+            experiment = str(argv[argv.index("--selection") + 1]).split(":", maxsplit=1)[1]
+        else:
+            experiment = str(argv[argv.index("--experiment") + 1])
+        control_id = "theta_0_03" if experiment == "torsion" else "elongation_0_1"
+        controls = {"theta": 0.03} if experiment == "torsion" else {"elongation": 0.1}
+        runtime_manifest = {
+            "structure": "gv",
+            "experiment": experiment,
+            "geometry": "gv_rad2_height14_28",
+            "geometry_spec": {
+                "id": "gv_rad2_height14_28",
+                "parameters": {"radius": 2.0, "height": 14.28},
+            },
+            "controls": controls,
+            "control_id": control_id,
+            "dataset_id": f"gv:{experiment}:gv_rad2_height14_28:{control_id}",
+            "runtime_package": "mirheoOBMD",
+            "source_root": str(tmp_path / "sources" / experiment),
+            "experimental": True,
+            "known_issues": [],
+        }
+        runtime_dir.joinpath("gv_runtime_dry_run_manifest.json").write_text(json.dumps(runtime_manifest), encoding="utf-8")
+        return 0
+
+    def _fake_surrogate_main(argv: list[str]) -> int:
+        surrogate_dir = Path(argv[argv.index("--output-root") + 1]).resolve()
+        runtime_manifest = json.loads(Path(argv[argv.index("--runtime-manifest") + 1]).read_text(encoding="utf-8"))
+        surrogate_dir.mkdir(parents=True, exist_ok=True)
+        surrogate_dir.joinpath("gv_dnn_surrogate_smoke_manifest.json").write_text(
+            json.dumps(
+                {
+                    "workflow": "gv_dnn_surrogate_smoke",
+                    "reference_kind": "synthetic",
+                    "backend": "dnn",
+                    "dataset_id": runtime_manifest["dataset_id"],
+                    "artifacts": {
+                        "artifact_path": str(surrogate_dir / "model.pt"),
+                        "model_path": str(surrogate_dir / "model.pt"),
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        surrogate_dir.joinpath("gv_dnn_surrogate_smoke_report.json").write_text(
+            json.dumps({"status": "passed"}),
+            encoding="utf-8",
+        )
+        return 0
+
+    def _fake_run_inference(*, dry_run: bool, config_path: str, output_dir: str, device: str) -> None:
+        config = yaml.safe_load(Path(config_path).read_text(encoding="utf-8"))
+        dataset_id = (
+            Path(config["experiments"][0]["surrogate_manifest"]).read_text(encoding="utf-8")
+        )
+        dataset_id = json.loads(dataset_id)["dataset_id"]
+        phase1_manifest_root = Path(output_dir) / "results_phase_1"
+        phase1_manifest_root.mkdir(parents=True, exist_ok=True)
+        phase1_manifest_root.joinpath(gv_hbi.GV_PHASE1_SETUP_MANIFEST).write_text(
+            json.dumps(
+                {
+                    "enabled_by": f"env:{gv_hbi.GV_HBI_EXPERIMENTAL_FLAG}",
+                    "datasets": [{"dataset_id": dataset_id}],
+                    "parameter_contract": {"calibrated": ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c"]},
+                }
+            ),
+            encoding="utf-8",
+        )
+        phase1_manifest_root.joinpath(gv_hbi.GV_PHASE1_EXECUTION_MANIFEST).write_text(
+            json.dumps(
+                {
+                    "status": "phase1_korali_completed",
+                    "execution_model": "single_lane_dnn_korali",
+                    "dataset": {"dataset_id": dataset_id},
+                    "phase1": {
+                        "noise_model": {"kind": "multiplicative", "parameter": "sigma"},
+                        "variable_names": ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c", "sigma"],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    def patched_loader(module_name: str, path: Path):
+        if path == module.RUNTIME_SCRIPT:
+            return types.SimpleNamespace(main=_fake_runtime_main)
+        if path == module.SURROGATE_SCRIPT:
+            return types.SimpleNamespace(main=_fake_surrogate_main)
+        if path == module.PHASE1_SCRIPT:
+            return types.SimpleNamespace(run_inference=_fake_run_inference)
+        raise AssertionError(f"Unexpected module load: {module_name} from {path}")
+
+    monkeypatch.setattr(module, "_load_module", patched_loader)
+    monkeypatch.setenv(gv_hbi.GV_HBI_EXPERIMENTAL_FLAG, "1")
+
+    default_output = tmp_path / "default_selection"
+    assert module.main(["--output-root", str(default_output), "--include-experimental"]) == 0
+    default_manifest = json.loads((default_output / module.FINAL_MANIFEST).read_text(encoding="utf-8"))
+    assert default_manifest["selection"] == module.DEFAULT_SELECTION
+    assert "--selection" in runtime_calls[-1]
+    assert runtime_calls[-1][runtime_calls[-1].index("--selection") + 1] == module.DEFAULT_SELECTION
+
+    experiment_output = tmp_path / "experiment_only"
+    assert module.main(["--output-root", str(experiment_output), "--experiment", "stretching", "--include-experimental"]) == 0
+    experiment_manifest = json.loads((experiment_output / module.FINAL_MANIFEST).read_text(encoding="utf-8"))
+    assert experiment_manifest["selection"] == "gv:stretching"
+    assert "--selection" not in runtime_calls[-1]
+    assert runtime_calls[-1][runtime_calls[-1].index("--experiment") + 1] == "stretching"
+
+
+def test_gv_operational_canary_surfaces_stage_failures(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = _load_module(SCRIPT_PATH, "gv_operational_canary_failure_branch_test")
+
+    def _write_runtime_manifest(runtime_dir: Path) -> None:
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        runtime_manifest = {
+            "structure": "gv",
+            "experiment": "torsion",
+            "geometry": "gv_rad2_height14_28",
+            "geometry_spec": {
+                "id": "gv_rad2_height14_28",
+                "parameters": {"radius": 2.0, "height": 14.28},
+            },
+            "controls": {"theta": 0.03},
+            "control_id": "theta_0_03",
+            "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0_03",
+            "runtime_package": "mirheoOBMD",
+            "source_root": str(tmp_path / "sources" / "torsion"),
+            "experimental": True,
+            "known_issues": [],
+        }
+        runtime_dir.joinpath("gv_runtime_dry_run_manifest.json").write_text(json.dumps(runtime_manifest), encoding="utf-8")
+
+    def _runtime_failure(argv: list[str]) -> int:
+        return 9
+
+    def _runtime_success(argv: list[str]) -> int:
+        _write_runtime_manifest(Path(argv[argv.index("--output-root") + 1]).resolve())
+        return 0
+
+    def _surrogate_failure(argv: list[str]) -> int:
+        return 7
+
+    def patched_loader_factory(runtime_main, surrogate_main):
+        def patched_loader(module_name: str, path: Path):
+            if path == module.RUNTIME_SCRIPT:
+                return types.SimpleNamespace(main=runtime_main)
+            if path == module.SURROGATE_SCRIPT:
+                return types.SimpleNamespace(main=surrogate_main)
+            if path == module.PHASE1_SCRIPT:
+                return types.SimpleNamespace(run_inference=lambda **kwargs: None)
+            raise AssertionError(f"Unexpected module load: {module_name} from {path}")
+
+        return patched_loader
+
+    monkeypatch.setenv(gv_hbi.GV_HBI_EXPERIMENTAL_FLAG, "1")
+    monkeypatch.setattr(module, "_load_module", patched_loader_factory(_runtime_failure, _surrogate_failure))
+    with pytest.raises(RuntimeError, match="GV runtime dry-run failed with code 9"):
+        module.main(["--output-root", str(tmp_path / "runtime_failure"), "--selection", "gv:torsion", "--include-experimental"])
+
+    monkeypatch.setattr(module, "_load_module", patched_loader_factory(_runtime_success, _surrogate_failure))
+    with pytest.raises(RuntimeError, match="GV DNN smoke workflow failed with code 7"):
+        module.main(["--output-root", str(tmp_path / "surrogate_failure"), "--selection", "gv:torsion", "--include-experimental"])
 
 
 def test_gv_operational_canary_stitches_runtime_surrogate_and_phase1(
@@ -277,3 +509,138 @@ def test_gv_operational_canary_stitches_runtime_surrogate_and_phase1(
     assert all(command["status"] == "skipped-dry-run" for command in runtime_render_manifest["commands"])
     assert Path(manifest["artifacts"]["phase1_config"]).is_file()
     assert Path(manifest["artifacts"]["reference_manifest"]).is_file()
+
+
+def test_gv_operational_canary_records_runtime_blocked_issue_status(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = _load_module(SCRIPT_PATH, "gv_operational_canary_runtime_issue_test")
+
+    def _fake_runtime_main(argv: list[str]) -> int:
+        runtime_root_index = argv.index("--output-root")
+        runtime_dir = Path(argv[runtime_root_index + 1]).resolve()
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        work_dir = runtime_dir / "shear_flow" / "gv_rad2_height14_28" / "ptan_0_4__afsi_0__bpress_-91" / "work"
+        runtime_manifest = {
+            "structure": "gv",
+            "experiment": "shear_flow",
+            "geometry": "gv_rad2_height14_28",
+            "geometry_spec": {
+                "id": "gv_rad2_height14_28",
+                "parameters": {"radius": 2.0, "height": 14.28},
+            },
+            "controls": {"ptan": 0.4, "afsi": 0.0, "bpress": -91.0},
+            "control_id": "ptan_0_4__afsi_0__bpress_-91",
+            "dataset_id": "gv:shear_flow:gv_rad2_height14_28:ptan_0_4__afsi_0__bpress_-91",
+            "output_root": str(runtime_dir),
+            "work_dir": str(work_dir),
+            "source_root": str(tmp_path / "sources" / "shear_flow"),
+            "runtime_package": "mirheoOBMD",
+            "experimental": True,
+            "known_issues": [
+                {
+                    "id": "shear-flow-bouncer-candidates",
+                    "summary": "Bouncer overflow indicates blocked experimental behavior.",
+                    "evidence": "source/fixtures/bouncer.txt",
+                    "severity": "blocked",
+                },
+            ],
+            "commands": [],
+            "analysis_commands": [],
+            "generated_subdirs": [],
+        }
+        (runtime_dir / "gv_runtime_dry_run_manifest.json").write_text(json.dumps(runtime_manifest), encoding="utf-8")
+        return 0
+
+    def _fake_surrogate_main(argv: list[str]) -> int:
+        surrogate_dir = Path(argv[argv.index("--output-root") + 1]).resolve()
+        runtime_manifest = json.loads(Path(argv[argv.index("--runtime-manifest") + 1]).read_text(encoding="utf-8"))
+        surrogate_dir.mkdir(parents=True, exist_ok=True)
+        surrogate_manifest = {
+            "workflow": "gv_dnn_surrogate_smoke",
+            "reference_kind": "synthetic",
+            "backend": "dnn",
+            "dataset_id": runtime_manifest["dataset_id"],
+            "artifacts": {"artifact_path": str(surrogate_dir / "model.pt"), "model_path": str(surrogate_dir / "model.pt")},
+        }
+        surrogate_dir.joinpath("gv_dnn_surrogate_smoke_manifest.json").write_text(
+            json.dumps(surrogate_manifest),
+            encoding="utf-8",
+        )
+        surrogate_dir.joinpath("gv_dnn_surrogate_smoke_report.json").write_text(
+            json.dumps({"status": "passed"}),
+            encoding="utf-8",
+        )
+        return 0
+
+    def _fake_run_inference(*, dry_run: bool, config_path: str, output_dir: str, device: str) -> None:
+        phase1_manifest_root = Path(output_dir) / "results_phase_1"
+        phase1_manifest_root.mkdir(parents=True, exist_ok=True)
+        phase1_manifest_root.joinpath(gv_hbi.GV_PHASE1_SETUP_MANIFEST).write_text(
+            json.dumps(
+                {
+                    "enabled_by": f"env:{gv_hbi.GV_HBI_EXPERIMENTAL_FLAG}",
+                    "datasets": [{"dataset_id": "gv:shear_flow:gv_rad2_height14_28:ptan_0_4__afsi_0__bpress_-91"}],
+                    "parameter_contract": {"calibrated": ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c"]},
+                }
+            ),
+            encoding="utf-8",
+        )
+        phase1_manifest_root.joinpath(gv_hbi.GV_PHASE1_EXECUTION_MANIFEST).write_text(
+            json.dumps(
+                {
+                    "status": "phase1_korali_completed",
+                    "execution_model": "single_lane_dnn_korali",
+                    "dataset": {"dataset_id": "gv:shear_flow:gv_rad2_height14_28:ptan_0_4__afsi_0__bpress_-91"},
+                    "phase1": {
+                        "noise_model": {"parameter": "sigma"},
+                        "variable_names": ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c", "sigma"],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    phase1_module = types.SimpleNamespace(run_inference=_fake_run_inference)
+
+    original_loader = module._load_module
+
+    def patched_loader(module_name: str, path: Path):
+        if path == module.RUNTIME_SCRIPT:
+            return types.SimpleNamespace(main=_fake_runtime_main)
+        if path == module.SURROGATE_SCRIPT:
+            return types.SimpleNamespace(main=_fake_surrogate_main)
+        if path == module.PHASE1_SCRIPT:
+            return phase1_module
+        return original_loader(module_name, path)
+
+    monkeypatch.setattr(module, "_load_module", patched_loader)
+    monkeypatch.setenv(gv_hbi.GV_HBI_EXPERIMENTAL_FLAG, "1")
+
+    rc = module.main(
+        [
+            "--output-root",
+            str(tmp_path / "gv_operational_canary"),
+            "--selection",
+            "gv:shear_flow",
+            "--include-experimental",
+            "--geometry-id",
+            "gv_rad2_height14_28",
+        ]
+    )
+
+    assert rc == 0
+    manifest_path = tmp_path / "gv_operational_canary" / module.FINAL_MANIFEST
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["checks"]["runtime_experimental"] is True
+    assert manifest["checks"]["runtime_blocked_issue_count"] == 1
+    assert manifest["runtime_stage"]["experimental"] is True
+    assert manifest["runtime_stage"]["runtime_package"] == "mirheoOBMD"
+    assert manifest["runtime_stage"]["source_root"] == str(tmp_path / "sources" / "shear_flow")
+    assert manifest["runtime_stage"]["known_issues"] == [
+        {
+            "id": "shear-flow-bouncer-candidates",
+            "summary": "Bouncer overflow indicates blocked experimental behavior.",
+            "evidence": "source/fixtures/bouncer.txt",
+            "severity": "blocked",
+            "classification": "experimental_blocked",
+        }
+    ]

@@ -27,12 +27,18 @@ RUNTIME_SCRIPT = REPO_ROOT / "scripts" / "workflows" / "gv" / "run_gv_runtime.py
 SURROGATE_SCRIPT = REPO_ROOT / "scripts" / "workflows" / "gv" / "run_gv_dnn_smoke.py"
 PHASE1_SCRIPT = REPO_ROOT / "inference" / "scripts" / "run_phase_1.py"
 FINAL_MANIFEST = "gv_operational_canary_manifest.json"
+GV_SIMULATION_ROOT = REPO_ROOT / "gv_simulation_files"
+DEFAULT_SELECTION = "gv:torsion"
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--structure", default="gv")
-    parser.add_argument("--selection", default="gv:torsion", help="Structure-qualified GV selection, for example gv:torsion.")
+    parser.add_argument(
+        "--selection",
+        default=None,
+        help=f"Structure-qualified GV selection, for example gv:torsion. Defaults to {DEFAULT_SELECTION!r} when neither --selection nor --experiment is provided.",
+    )
     parser.add_argument("--output-root", required=True)
     parser.add_argument("--experiment", default=None)
     parser.add_argument("--geometry-id", default=None)
@@ -137,6 +143,38 @@ def _control_cli_items(control_items: list[str]) -> list[str]:
     return argv
 
 
+def _validate_output_root(output_root: Path) -> Path:
+    resolved = output_root.expanduser().resolve()
+    unsafe_roots = (GV_SIMULATION_ROOT, REPO_ROOT / "gv", REPO_ROOT / "src", REPO_ROOT / "scripts", REPO_ROOT / "tests")
+    for unsafe_root in unsafe_roots:
+        if resolved == unsafe_root or unsafe_root in resolved.parents:
+            raise ValueError(
+                f"GV operational canary outputs must not be inside repository source trees: {unsafe_root}"
+            )
+    return resolved
+
+
+def _summarize_runtime_known_issues(runtime_manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_known_issues = runtime_manifest.get("known_issues", [])
+    if not isinstance(raw_known_issues, list):
+        return []
+    summaries: list[dict[str, Any]] = []
+    for issue in raw_known_issues:
+        if not isinstance(issue, dict):
+            continue
+        severity = str(issue.get("severity", "")).lower()
+        summaries.append(
+            {
+                "id": str(issue.get("id", "")),
+                "summary": str(issue.get("summary", "")),
+                "evidence": str(issue.get("evidence", "")),
+                "severity": severity,
+                "classification": "experimental_blocked" if severity in {"error", "blocking", "blocked", "critical"} else "observed",
+            }
+        )
+    return summaries
+
+
 def _phase1_config(*, runtime_manifest: dict[str, Any], surrogate_manifest_path: Path) -> dict[str, Any]:
     return {
         "pop_size": 32,
@@ -223,6 +261,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         enabled_by = _require_runtime_flag()
         selection = str(args.selection) if args.selection is not None else None
+        if selection is None and args.experiment is None:
+            selection = DEFAULT_SELECTION
         structure_name, experiment_name = _resolve_runtime_selection(
             structure=args.structure,
             experiment=str(args.experiment) if args.experiment is not None else None,
@@ -234,7 +274,7 @@ def main(argv: list[str] | None = None) -> int:
     except (KeyError, PermissionError, ValueError) as exc:
         parser.error(str(exc))
 
-    output_root = Path(args.output_root).expanduser().resolve()
+    output_root = _validate_output_root(Path(args.output_root))
     output_root.mkdir(parents=True, exist_ok=True)
     runtime_root = output_root / "runtime"
     surrogate_root = output_root / "surrogate"
@@ -264,6 +304,7 @@ def main(argv: list[str] | None = None) -> int:
     runtime_manifest_path = runtime_root / "gv_runtime_dry_run_manifest.json"
     runtime_manifest = _read_json(runtime_manifest_path)
     runtime_render_manifest_path = runtime_root / "gv_runtime_render_manifest.json"
+    runtime_known_issues = _summarize_runtime_known_issues(runtime_manifest)
 
     surrogate_argv = [
         "--runtime-manifest",
@@ -366,11 +407,21 @@ def main(argv: list[str] | None = None) -> int:
         "checks": {
             "runtime_dry_run": not args.run_mirheo,
             "runtime_flag_enabled": True,
+            "runtime_experimental": bool(runtime_manifest.get("experimental", False)),
+            "runtime_blocked_issue_count": sum(
+                1 for issue in runtime_known_issues if issue.get("classification") == "experimental_blocked"
+            ),
             "controls_excluded_from_calibrated_and_nuisance": True,
             "runtime_status": runtime_rc,
             "surrogate_status": surrogate_report["status"],
             "phase1_status": phase1_execution_manifest["status"],
             "phase1_execution_model": phase1_execution_manifest["execution_model"],
+        },
+        "runtime_stage": {
+            "runtime_package": runtime_manifest.get("runtime_package"),
+            "source_root": runtime_manifest.get("source_root"),
+            "experimental": bool(runtime_manifest.get("experimental", False)),
+            "known_issues": runtime_known_issues,
         },
         "verdict": _build_verdict(
             surrogate_report=surrogate_report,
