@@ -16,7 +16,10 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from meso_uq.references.dpd_generated import load_gv_dpd_generated_reference  # noqa: E402
-from meso_uq.references.gv_common import resolve_gv_reference_context  # noqa: E402
+from meso_uq.references.gv_common import (
+    resolve_gv_reference_context,
+    validate_gv_reference_manifest,
+)  # noqa: E402
 from meso_uq.references.synthetic import generate_gv_synthetic_reference  # noqa: E402
 from meso_uq.structures.gv import DEFAULT_GV_GEOMETRY, build_geometry  # noqa: E402
 from meso_uq.structures.registry import GeometrySpec, StructureSpec, get_structure  # noqa: E402
@@ -103,7 +106,14 @@ def _normalize_runtime_manifest(payload: Mapping[str, Any], *, path: Path) -> di
 
 
 def _normalize_reference_manifest(payload: Mapping[str, Any], *, path: Path) -> dict[str, Any]:
-    required = ("structure", "experiment", "geometry", "controls", "reference_kind")
+    required = (
+        "manifest_schema_version",
+        "structure",
+        "experiment",
+        "geometry",
+        "controls",
+        "reference_kind",
+    )
     missing = [field for field in required if field not in payload]
     if missing:
         raise ValueError(f"Reference manifest {path} is missing required fields: {', '.join(missing)}")
@@ -118,6 +128,7 @@ def _normalize_reference_manifest(payload: Mapping[str, Any], *, path: Path) -> 
     normalized = dict(payload)
     normalized["controls"] = {str(name): float(value) for name, value in controls.items()}
     normalized["manifest_path"] = str(path.resolve())
+    validate_gv_reference_manifest(normalized)
     return normalized
 
 
@@ -462,6 +473,7 @@ def _canonical_reference_manifest(
         if data_reference is not None and isinstance(data_reference, Mapping) and data_reference.get("path") is not None:
             sanitized_reference["path"] = _portable_path(repo_root, data_reference["path"])
         manifest["data_reference"] = sanitized_reference
+    manifest.setdefault("generation_seed", source_manifest.get("generation_seed"))
     manifest.update(
         {
             "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
