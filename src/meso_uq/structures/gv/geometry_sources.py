@@ -10,6 +10,8 @@ REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[4]
 GV_SOURCE_ROOT: Final[Path] = REPO_ROOT / "gv"
 
 _CANONICAL_DEFAULT_GEOMETRY_EXPERIMENT: Final[str] = "stretching"
+DEFAULT_GV_RADIUS: Final[float] = 2.0
+DEFAULT_GV_HEIGHT: Final[float] = 14.28
 
 
 def gv_canonical_geometry_default_path() -> Path:
@@ -22,6 +24,8 @@ def gv_canonical_geometry_default_source() -> str:
 
 def gv_default_geometry_defaults() -> tuple[float, float]:
     parameters_path = gv_canonical_geometry_default_path()
+    if not parameters_path.is_file():
+        return DEFAULT_GV_RADIUS, DEFAULT_GV_HEIGHT
     with parameters_path.open("r", encoding="utf-8") as file:
         parameters = yaml.safe_load(file)
     return float(parameters["radGV"]), float(parameters["height"])
