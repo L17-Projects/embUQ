@@ -5,6 +5,7 @@ from typing import Any, Mapping
 
 from meso_uq.structures import get_structure
 from meso_uq.structures.gv import DEFAULT_GV_GEOMETRY
+from meso_uq.structures.registry import GeometrySpec
 from meso_uq.structures.gv.runtime.base import control_identifier
 
 from .catalogs import (
@@ -19,6 +20,13 @@ _SOURCE_REFERENCE_MANIFEST_FILENAME = "source_reference_manifest.json"
 _SURROGATE_MANIFEST_FILENAME = "training_manifest.json"
 _SURROGATE_ARTIFACT_FILENAME = "model.pt"
 _RUNTIME_MANIFEST_FILENAME = "gv_runtime_dry_run_manifest.json"
+_GV_AXIS_COLUMN_BY_EXPERIMENT: Mapping[str, str] = {
+    "shear_flow": "shear_coord",
+}
+_GV_RESPONSE_COLUMN_BY_EXPERIMENT: Mapping[str, str] = {
+    "shear_flow": "shear_response",
+}
+_GV_CONTROL_POLICY = "GV controls are design inputs and excluded from calibrated parameters."
 
 _GV_EXPERIMENT_LANES: tuple[dict[str, Any], ...] = (
     {
@@ -83,6 +91,75 @@ _GV_EXPERIMENT_LANES: tuple[dict[str, Any], ...] = (
 )
 
 
+def _catalog_geometries() -> tuple[GeometrySpec, ...]:
+    return get_structure("gv").geometries
+
+
+def _axis_column(experiment: str) -> str:
+    return _GV_AXIS_COLUMN_BY_EXPERIMENT.get(experiment, "observable_axis")
+
+
+def _target_column(experiment: str) -> str:
+    return _GV_RESPONSE_COLUMN_BY_EXPERIMENT.get(experiment, "response")
+
+
+def _parameter_order() -> dict[str, list[str]]:
+    contract = get_structure("gv").parameter_contract
+    return {
+        "calibrated": list(contract.calibrated_names),
+        "nuisance": list(contract.nuisance_names),
+    }
+
+
+def _observable_schema() -> dict[str, Any]:
+    structure = get_structure("gv")
+    return {
+        "identity": "meso_uq.structures.gv",
+        "repository_path": "src/meso_uq/structures/gv",
+        "controls": {
+            experiment.name: list(experiment.control_names) for experiment in structure.experiments
+        },
+        "observables": {
+            experiment.name: [observable.name for observable in experiment.observables]
+            for experiment in structure.experiments
+        },
+    }
+
+
+def _validate_controls(controls: Mapping[str, Any], experiment: str) -> None:
+    structure = get_structure("gv")
+    experiment_spec = structure.get_experiment(experiment, include_experimental=True)
+    overlap = {name for name in controls if name in structure.parameter_contract.calibrated_names}
+    nuisance = {name for name in controls if name in structure.parameter_contract.nuisance_names}
+    if overlap or nuisance:
+        raise ValueError(
+            "GV reference controls must remain fixed design inputs and cannot collide with calibrated or nuisance parameters."
+        )
+    unknown = sorted(set(controls) - set(experiment_spec.control_names))
+    if unknown:
+        raise ValueError(f"Unknown GV controls for {experiment}: {', '.join(unknown)}")
+
+
+def _feature_order(control_values: Mapping[str, Any], experiment: str) -> tuple[str, ...]:
+    return tuple(
+        (
+            *_parameter_order()["calibrated"],
+            "radius",
+            "height",
+            *tuple(str(name) for name in control_values),
+            _axis_column(experiment),
+        )
+    )
+
+
+def _reference_provenance(source_root: str, legacy_import_root: str) -> dict[str, str]:
+    return {
+        "runtime_source_root": source_root,
+        "runtime_provenance_root": source_root,
+        "runtime_legacy_import_root": legacy_import_root,
+    }
+
+
 def _gv_catalog_path(
     *,
     experiment: str,
@@ -145,6 +222,7 @@ def gv_reference_artifact_paths(
 def _build_gv_entry(
     *,
     experiment: str,
+    geometry: GeometrySpec,
     controls: str,
     control_values: dict[str, Any],
     source_root: str,
@@ -155,13 +233,16 @@ def _build_gv_entry(
     requires_opt_in: bool = False,
     known_issues: tuple[dict[str, str], ...] = (),
 ) -> SurrogateCatalogEntry:
-    geometry = DEFAULT_GV_GEOMETRY.id
-    root = f"_runs/gv/{experiment}/{geometry}/{controls}/{reference_kind}"
+    root = f"_runs/gv/{experiment}/{geometry.id}/{controls}/{reference_kind}"
+    structure = get_structure("gv")
+    _validate_controls(control_values, experiment)
+    axis = _axis_column(experiment)
+    target = _target_column(experiment)
     return SurrogateCatalogEntry(
         identity=SurrogateDatasetIdentity(
             structure="gv",
             experiment=experiment,
-            geometry=geometry,
+            geometry=geometry.id,
             controls=controls,
             reference_kind=reference_kind,
             surrogate_backend="dnn",
@@ -172,20 +253,30 @@ def _build_gv_entry(
         training_manifest_relpath=f"{root}/dnn/{_SURROGATE_MANIFEST_FILENAME}",
         metadata={
             "structure": "gv",
+            "geometry": geometry.id,
             "geometry_spec": {
-                "id": DEFAULT_GV_GEOMETRY.id,
-                "label": DEFAULT_GV_GEOMETRY.label,
-                "shape": DEFAULT_GV_GEOMETRY.shape,
-                "parameters": dict(DEFAULT_GV_GEOMETRY.parameters),
-                "source": DEFAULT_GV_GEOMETRY.source,
+                "id": geometry.id,
+                "label": geometry.label,
+                "shape": geometry.shape,
+                "parameters": dict(geometry.parameters),
+                "source": geometry.source,
             },
             "controls": control_values,
             "control_names": tuple(control_values),
-            "control_policy": "GV controls are design inputs and excluded from calibrated parameters.",
+            "control_policy": _GV_CONTROL_POLICY,
+            "feature_order": {
+                "input": list(_feature_order(control_values, experiment)),
+                "axis": axis,
+                "target": target,
+            },
+            "parameter_order": _parameter_order(),
+            "observable_schema": _observable_schema(),
+            "reference_provenance": _reference_provenance(source_root, legacy_import_root),
             "reference_kind": reference_kind,
             "supports_bnn": False,
             "experimental": experimental,
             "requires_opt_in": requires_opt_in,
+            "backend": "dnn",
             "parameter_contract": {
                 "calibrated": list(get_structure("gv").parameter_contract.calibrated_names),
                 "nuisance": list(get_structure("gv").parameter_contract.nuisance_names),
@@ -193,7 +284,7 @@ def _build_gv_entry(
             "paths": {
                 "runtime_manifest": _gv_catalog_path(
                     experiment=experiment,
-                    geometry=geometry,
+                    geometry=geometry.id,
                     controls=controls,
                     reference_kind=reference_kind,
                     leaf=_RUNTIME_MANIFEST_FILENAME,
@@ -212,17 +303,40 @@ def _build_gv_entry(
     )
 
 
-GV_SURROGATE_SPECS: tuple[SurrogateCatalogEntry, ...] = tuple(
-    _build_gv_entry(reference_kind=reference_kind, **lane)
-    for lane in _GV_EXPERIMENT_LANES
-    for reference_kind in ("synthetic", "dpd_generated")
-)
+def _build_gv_specs(*, include_experimental: bool = False) -> tuple[SurrogateCatalogEntry, ...]:
+    specs: list[SurrogateCatalogEntry] = []
+    reference_kinds = ("synthetic", "dpd_generated")
+    for geometry in _catalog_geometries() or (DEFAULT_GV_GEOMETRY,):
+        for lane in _GV_EXPERIMENT_LANES:
+            if not include_experimental and lane.get("experimental", False):
+                continue
+            for reference_kind in reference_kinds:
+                specs.append(
+                    _build_gv_entry(
+                        reference_kind=reference_kind,
+                        geometry=geometry,
+                        **lane,
+                    )
+                )
+    return tuple(specs)
 
 
-def iter_gv_surrogate_catalog_entries(*, include_experimental: bool = False) -> tuple[SurrogateCatalogEntry, ...]:
+GV_SURROGATE_SPECS: tuple[SurrogateCatalogEntry, ...] = _build_gv_specs()
+
+
+def iter_gv_surrogate_catalog_entries(
+    *,
+    include_experimental: bool = False,
+    experiments: tuple[str, ...] | None = None,
+    geometries: tuple[str, ...] | None = None,
+) -> tuple[SurrogateCatalogEntry, ...]:
     entries: list[SurrogateCatalogEntry] = []
-    for entry in GV_SURROGATE_SPECS:
-        if entry.metadata.get("experimental") and not include_experimental:
+    experiment_filter = set(experiments or ())
+    geometry_filter = set(geometries or ())
+    for entry in _build_gv_specs(include_experimental=include_experimental):
+        if experiment_filter and entry.identity.experiment not in experiment_filter:
+            continue
+        if geometry_filter and entry.identity.geometry not in geometry_filter:
             continue
         entries.append(entry)
     return tuple(entries)
@@ -233,13 +347,19 @@ def resolve_gv_surrogate_catalog_entries(
     *,
     reference_kind: str | None = None,
     include_experimental: bool = False,
+    experiments: tuple[str, ...] | None = None,
+    geometries: tuple[str, ...] | None = None,
 ) -> list[dict[str, Any]]:
     if reference_kind is not None and reference_kind not in SUPPORTED_REFERENCE_KINDS:
         raise ValueError(
             f"Unsupported reference kind '{reference_kind}'. Expected one of {SUPPORTED_REFERENCE_KINDS}."
         )
     resolved: list[dict[str, Any]] = []
-    for entry in iter_gv_surrogate_catalog_entries(include_experimental=include_experimental):
+    for entry in iter_gv_surrogate_catalog_entries(
+        include_experimental=include_experimental,
+        experiments=experiments,
+        geometries=geometries,
+    ):
         if reference_kind is not None and entry.identity.reference_kind != reference_kind:
             continue
         resolved.append(entry.resolve(repo_root))

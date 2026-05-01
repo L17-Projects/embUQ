@@ -20,6 +20,51 @@ GV_HBI_EXPERIMENTAL_FLAG = "MESOUQ_ENABLE_EXPERIMENTAL_GV_HBI"
 GV_PHASE1_SETUP_MANIFEST = "gv_phase1_setup_manifest.json"
 GV_PHASE1_EXECUTION_MANIFEST = "gv_phase1_execution_manifest.json"
 GV_HBI_SETUP_SCHEMA_VERSION = 1
+GV_PHASE1_STRUCTURE = "gv"
+GV_PHASE1_CALIBRATED_PARAMETERS = ("ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c")
+GV_PHASE1_NUISANCE_PARAMETERS = ("sigma",)
+GV_PHASE1_NOISE_MODEL = {"kind": "multiplicative", "parameter": "sigma"}
+
+
+def _require_structure_qualified_dataset_id(dataset_id: str) -> None:
+    parts = str(dataset_id).split(":")
+    if len(parts) < 4 or parts[0] != GV_PHASE1_STRUCTURE or any(not part for part in parts[:4]):
+        raise ValueError(
+            "GV dataset identifiers must be structure-qualified and follow '<gv>:<experiment>:<geometry>:<control>'."
+        )
+
+
+def _is_structure_qualified_dataset_id(dataset_id: str) -> bool:
+    parts = str(dataset_id).split(":")
+    return len(parts) >= 4 and parts[0] == GV_PHASE1_STRUCTURE and all(part for part in parts[:4])
+
+
+def _require_gv_calibrated_contract() -> tuple[str, ...]:
+    calibrated = tuple(get_structure("gv").parameter_contract.calibrated_names)
+    if calibrated != GV_PHASE1_CALIBRATED_PARAMETERS:
+        raise ValueError(
+            "GV calibrated contract mismatch. Expected exact order: "
+            + ", ".join(GV_PHASE1_CALIBRATED_PARAMETERS)
+        )
+    return calibrated
+
+
+def _require_gv_noisy_model(payload: Mapping[str, Any], *, label: str) -> dict[str, str]:
+    noise_model = payload.get("noise_model")
+    if noise_model is None:
+        return dict(GV_PHASE1_NOISE_MODEL)
+    if not isinstance(noise_model, Mapping):
+        raise ValueError(
+            f"{label} requires multiplicative sigma noise semantics: {GV_PHASE1_NOISE_MODEL}"
+        )
+    if (
+        noise_model.get("kind") != GV_PHASE1_NOISE_MODEL["kind"]
+        or noise_model.get("parameter") != GV_PHASE1_NOISE_MODEL["parameter"]
+    ):
+        raise ValueError(
+            f"{label} requires multiplicative sigma noise semantics: {GV_PHASE1_NOISE_MODEL}"
+        )
+    return dict(GV_PHASE1_NOISE_MODEL)
 
 
 def _as_bool(value: Any) -> bool:
@@ -86,7 +131,13 @@ def _surrogate_manifest_map(config: Mapping[str, Any]) -> dict[str, str]:
     raw = config.get("gv_surrogate_manifests") or config.get("surrogate_manifests") or {}
     if not isinstance(raw, Mapping):
         raise ValueError("gv_surrogate_manifests must be a mapping from dataset id to manifest path.")
-    return {str(key): str(value) for key, value in raw.items()}
+    manifest_map: dict[str, str] = {}
+    for key, value in raw.items():
+        dataset_id = str(key)
+        if not _is_structure_qualified_dataset_id(dataset_id):
+            continue
+        manifest_map[dataset_id] = str(value)
+    return manifest_map
 
 
 def _single_surrogate_manifest(config: Mapping[str, Any]) -> str | None:
@@ -130,6 +181,7 @@ def _dataset_manifest_path(
     dataset_count: int,
     inline_manifest_map: Mapping[str, str],
 ) -> str:
+    _require_structure_qualified_dataset_id(dataset_id)
     if dataset_id in inline_manifest_map:
         return inline_manifest_map[dataset_id]
     manifest_map = _surrogate_manifest_map(config)
@@ -193,6 +245,7 @@ def _validate_surrogate_manifest(
         )
     manifest_dataset_id = payload.get("dataset_id")
     if manifest_dataset_id is not None and manifest_dataset_id != dataset_id:
+        _require_structure_qualified_dataset_id(str(manifest_dataset_id))
         raise ValueError(
             f"GV surrogate manifest dataset mismatch: {manifest_dataset_id!r} != {dataset_id!r}"
         )
@@ -254,6 +307,8 @@ def _validate_reference_manifest(
     control: str,
     expected_controls: Mapping[str, float],
 ) -> dict[str, Any]:
+    _require_structure_qualified_dataset_id(dataset_id)
+    noise_model = _require_gv_noisy_model(payload, label="GV reference manifest")
     if payload.get("structure") != "gv":
         raise ValueError("GV reference manifest must declare structure='gv'.")
     if payload.get("experiment") != experiment:
@@ -267,13 +322,10 @@ def _validate_reference_manifest(
             f"{payload.get('geometry')!r} != {geometry!r}"
         )
     manifest_dataset_id = payload.get("dataset_id")
-    if manifest_dataset_id is not None and manifest_dataset_id != dataset_id:
-        raise ValueError(f"GV reference manifest dataset mismatch: {manifest_dataset_id!r} != {dataset_id!r}")
-    noise_model = payload.get("noise_model")
-    if noise_model is not None and noise_model != {"kind": "multiplicative", "parameter": "sigma"}:
-        raise ValueError(
-            "GV Phase 1 DNN execution seam requires multiplicative sigma noise semantics in the reference manifest."
-        )
+    if manifest_dataset_id is not None:
+        _require_structure_qualified_dataset_id(manifest_dataset_id)
+        if manifest_dataset_id != dataset_id:
+            raise ValueError(f"GV reference manifest dataset mismatch: {manifest_dataset_id!r} != {dataset_id!r}")
     controls = _validate_gv_control_values(
         controls=payload.get("controls"),
         experiment_name=experiment,
@@ -285,7 +337,7 @@ def _validate_reference_manifest(
         )
     calibrated = payload.get("calibrated_parameter_names")
     if calibrated is not None:
-        expected_calibrated = list(get_structure("gv").parameter_contract.calibrated_names)
+        expected_calibrated = list(_require_gv_calibrated_contract())
         if list(calibrated) != expected_calibrated:
             raise ValueError(
                 "GV reference manifest calibrated_parameter_names must match the GV parameter contract."
@@ -299,7 +351,7 @@ def _validate_reference_manifest(
     return {
         "dataset_id": dataset_id,
         "reference_kind": payload.get("reference_kind"),
-        "noise_model": {"kind": "multiplicative", "parameter": "sigma"},
+        "noise_model": noise_model,
         "control_label": control,
         "controls": controls,
     }
@@ -525,6 +577,7 @@ def _gv_dataset_entries(
 
     entries: list[dict[str, Any]] = []
     for experiment, geometry, control, dataset_id in requested:
+        _require_structure_qualified_dataset_id(dataset_id)
         manifest_path = _resolve_repo_path(
             repo_root,
             _dataset_manifest_path(
@@ -558,11 +611,18 @@ def _gv_dataset_entries(
 
 
 def _parameter_contract_manifest() -> dict[str, Any]:
+    calibrated = _require_gv_calibrated_contract()
     structure = get_structure("gv")
+    nuisance = tuple(structure.parameter_contract.nuisance_names)
+    for nuisance_name in GV_PHASE1_NUISANCE_PARAMETERS:
+        if nuisance_name not in nuisance:
+            raise ValueError(
+                f"GV nuisance contract is missing required nuisance parameter: {nuisance_name}"
+            )
     noise_model = structure.parameter_contract.noise_model
     return {
-        "calibrated": list(structure.parameter_contract.calibrated_names),
-        "nuisance": list(structure.parameter_contract.nuisance_names),
+        "calibrated": list(calibrated),
+        "nuisance": list(GV_PHASE1_NUISANCE_PARAMETERS),
         "noise_model": None
         if noise_model is None
         else {
@@ -617,7 +677,13 @@ def build_gv_phase1_setup_manifest(
     phase2_specs = phase2_hyperprior_specs(config)
     variable_names = [name for name, _bounds in phase1_specs]
     gv_structure = get_structure("gv")
-    calibrated_names = list(gv_structure.parameter_contract.calibrated_names)
+    calibrated_names = list(_require_gv_calibrated_contract())
+    nuisance_names = list(GV_PHASE1_NUISANCE_PARAMETERS)
+    for nuisance_name in nuisance_names:
+        if nuisance_name not in gv_structure.parameter_contract.nuisance_names:
+            raise ValueError(
+                f"GV nuisance contract is missing required nuisance parameter: {nuisance_name}"
+            )
     registry_experiments = [
         gv_structure.get_experiment(
             experiment.name,
@@ -629,10 +695,11 @@ def build_gv_phase1_setup_manifest(
         {control_name for experiment in registry_experiments for control_name in experiment.control_names}
     )
     control_selections = sorted({control for experiment in selected for control in experiment.controls})
-    control_overlap = sorted(set(control_names).intersection(variable_names))
+    contract_names = set(calibrated_names) | set(nuisance_names) | set(variable_names)
+    control_overlap = sorted(set(control_names).intersection(contract_names))
     if control_overlap:
         raise ValueError(
-            "GV controls must not appear in calibrated or nuisance inference variables: "
+            "GV controls must not appear in calibrated or nuisance variables: "
             + ", ".join(control_overlap)
         )
 
@@ -650,7 +717,7 @@ def build_gv_phase1_setup_manifest(
         "phase1": {
             "problem_type": "Bayesian/Reference",
             "likelihood_model": "Normal",
-            "noise_model": {"kind": "multiplicative", "parameter": "sigma"},
+            "noise_model": dict(GV_PHASE1_NOISE_MODEL),
             "variable_names": variable_names,
             "calibrated_parameter_names": calibrated_names,
             "prior_specs": _bounds_payload(phase1_specs),
@@ -717,6 +784,7 @@ def write_gv_phase1_execution_manifest(
         raise NotImplementedError("GV Phase 1 DNN execution seam currently supports exactly one GV dataset lane.")
 
     dataset = datasets[0]
+    _require_structure_qualified_dataset_id(str(dataset["dataset_id"]))
     surrogate = dataset.get("surrogate")
     if not isinstance(surrogate, Mapping):
         raise ValueError("GV Phase 1 setup manifest is missing surrogate metadata for the selected dataset.")
@@ -750,6 +818,7 @@ def write_gv_phase1_execution_manifest(
         raise ValueError("GV surrogate training report must be a JSON object.")
 
     phase1 = setup_manifest["phase1"]
+    phase1_noise_model = _require_gv_noisy_model(phase1, label="GV setup phase1")
     execution_manifest = {
         "manifest_schema_version": GV_HBI_SETUP_SCHEMA_VERSION,
         "workflow": "gv_phase1_execution",
@@ -762,7 +831,7 @@ def write_gv_phase1_execution_manifest(
         "execution_model": "single_lane_dnn_seam",
         "phase1": {
             "variable_names": list(phase1["variable_names"]),
-            "noise_model": {"kind": "multiplicative", "parameter": "sigma"},
+            "noise_model": phase1_noise_model,
         },
         "controls": {
             "names": list(setup_manifest["controls"]["names"]),

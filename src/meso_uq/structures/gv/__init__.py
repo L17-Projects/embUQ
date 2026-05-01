@@ -1,6 +1,7 @@
 from .controls import ALL_GV_CONTROLS, EXPERIMENT_CONTROLS
 from .experiments import GV_EXPERIMENTS
 from .geometries import DEFAULT_GV_GEOMETRY, build_geometry, geometry_id
+from .observables import GV_OBSERVABLE_SCHEMAS
 from .parameters import GV_NOISE_MODEL, GV_PARAMETER_CONTRACT
 from ..registry import StructureSpec
 
@@ -14,6 +15,7 @@ GV_STRUCTURE = StructureSpec(
     metadata={
         "source_of_truth": "MesoUQ GV structure implementation plan",
         "control_policy": "GV controls are design inputs and excluded from calibrated vectors.",
+        "observable_schema": GV_OBSERVABLE_SCHEMAS,
     },
 )
 
@@ -28,4 +30,5 @@ __all__ = [
     "GV_STRUCTURE",
     "build_geometry",
     "geometry_id",
+    "GV_OBSERVABLE_SCHEMAS",
 ]

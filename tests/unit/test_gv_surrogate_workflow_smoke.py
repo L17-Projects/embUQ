@@ -284,6 +284,23 @@ def test_gv_dnn_smoke_manifest_loaders_report_invalid_inputs(tmp_path: Path) -> 
     with pytest.raises(ValueError, match="controls must be a mapping"):
         smoke_module._load_runtime_manifest(runtime_bad_controls)
 
+    runtime_bad_control_contract = tmp_path / "runtime_bad_control_contract.json"
+    runtime_bad_control_contract.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "geometry_spec": valid_geometry_spec,
+                "controls": {"sigma": 0.12},
+                "dataset_id": "gv:torsion:gv_rad2_height14_28:bpress_-91",
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="cannot collide with calibrated or nuisance parameters"):
+        smoke_module._load_runtime_manifest(runtime_bad_control_contract)
+
     reference_missing = tmp_path / "reference_missing.json"
     reference_missing.write_text(json.dumps({"structure": "gv"}), encoding="utf-8")
     with pytest.raises(ValueError, match="missing required fields"):
@@ -320,6 +337,38 @@ def test_gv_dnn_smoke_manifest_loaders_report_invalid_inputs(tmp_path: Path) -> 
     )
     with pytest.raises(ValueError, match="controls must be a mapping"):
         smoke_module._load_reference_manifest(reference_bad_controls)
+
+    reference_bad_control_contract = tmp_path / "reference_bad_control_contract.json"
+    reference_bad_control_contract.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "controls": {"ka": 0.25},
+                "reference_kind": "synthetic",
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="cannot collide with calibrated or nuisance parameters"):
+        smoke_module._load_reference_manifest(reference_bad_control_contract)
+
+    reference_unknown_controls = tmp_path / "reference_unknown_controls.json"
+    reference_unknown_controls.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "torsion",
+                "geometry": "gv_rad2_height14_28",
+                "controls": {"bogus": 0.25},
+                "reference_kind": "synthetic",
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="Unknown GV controls for torsion"):
+        smoke_module._load_reference_manifest(reference_unknown_controls)
 
     reference_bad_kind = tmp_path / "reference_bad_kind.json"
     reference_bad_kind.write_text(
