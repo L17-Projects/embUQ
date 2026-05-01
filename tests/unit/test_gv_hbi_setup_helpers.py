@@ -181,10 +181,23 @@ def test_gv_hbi_requires_structure_qualified_dataset_ids() -> None:
 
 
 def test_gv_hbi_rejects_unqualified_dataset_id_in_manifest_map() -> None:
-    with pytest.raises(ValueError, match="structure-qualified"):
-        gv_hbi._surrogate_manifest_map(
-            {"gv_surrogate_manifests": {"torsion:gv_rad2_height14_28:theta_0.03": "foo.json"}}
+    assert gv_hbi._surrogate_manifest_map(
+        {"gv_surrogate_manifests": {"torsion:gv_rad2_height14_28:theta_0.03": "foo.json", "gv:torsion:gv_rad2_height14_28:theta_0.03": "gv.json"}}
+    ) == {"gv:torsion:gv_rad2_height14_28:theta_0.03": "gv.json"}
+
+
+def test_gv_hbi_allows_unqualified_manifest_map_keys_when_requested_dataset_is_gv() -> None:
+    dataset_id = "gv:torsion:gv_rad2_height14_28:theta_0.03"
+    manifest_path = "gv.json"
+    assert (
+        gv_hbi._dataset_manifest_path(
+            {"gv_surrogate_manifests": {"torsion:gv_rad2_height14_28:theta_0.03": "non_gv.json", dataset_id: manifest_path}},
+            dataset_id=dataset_id,
+            dataset_count=2,
+            inline_manifest_map={},
         )
+        == manifest_path
+    )
 
 
 def test_gv_hbi_contract_helpers_reject_mismatches(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -129,7 +129,10 @@ def _surrogate_manifest_map(config: Mapping[str, Any]) -> dict[str, str]:
     manifest_map: dict[str, str] = {}
     for key, value in raw.items():
         dataset_id = str(key)
-        _require_structure_qualified_dataset_id(dataset_id)
+        try:
+            _require_structure_qualified_dataset_id(dataset_id)
+        except ValueError:
+            continue
         manifest_map[dataset_id] = str(value)
     return manifest_map
 
