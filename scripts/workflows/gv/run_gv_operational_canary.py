@@ -23,7 +23,7 @@ from meso_uq.inference.gv_hbi import (  # noqa: E402
 )
 from meso_uq.structures import get_structure  # noqa: E402
 
-RUNTIME_SCRIPT = REPO_ROOT / "scripts" / "workflows" / "gv" / "run_gv_dry_run.py"
+RUNTIME_SCRIPT = REPO_ROOT / "scripts" / "workflows" / "gv" / "run_gv_runtime.py"
 SURROGATE_SCRIPT = REPO_ROOT / "scripts" / "workflows" / "gv" / "run_gv_dnn_smoke.py"
 PHASE1_SCRIPT = REPO_ROOT / "inference" / "scripts" / "run_phase_1.py"
 FINAL_MANIFEST = "gv_operational_canary_manifest.json"
@@ -31,8 +31,10 @@ FINAL_MANIFEST = "gv_operational_canary_manifest.json"
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--structure", default="gv")
     parser.add_argument("--selection", default="gv:torsion", help="Structure-qualified GV selection, for example gv:torsion.")
     parser.add_argument("--output-root", required=True)
+    parser.add_argument("--experiment", default=None)
     parser.add_argument("--geometry-id", default=None)
     parser.add_argument(
         "--control",
@@ -51,6 +53,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--max-epoch", type=int, default=8)
     parser.add_argument("--val-fraction", type=float, default=0.25)
+    parser.add_argument("--platform", choices=("vega", "karolina", "local"), default="vega")
+    parser.add_argument("--run-mirheo", action="store_true", default=False)
     return parser
 
 
@@ -102,6 +106,28 @@ def _resolve_selection(selection: str) -> tuple[str, str]:
     if structure != "gv":
         raise ValueError(f"GV operational canary only supports structure 'gv', got {structure!r}.")
     return structure, experiment
+
+
+def _resolve_runtime_selection(
+    *, structure: str | None, experiment: str | None, selection: str | None
+) -> tuple[str, str]:
+    if selection is not None:
+        resolved_structure, resolved_experiment = _resolve_selection(selection)
+        if experiment is not None and experiment != resolved_experiment:
+            raise ValueError(
+                f"Conflicting runtime selections: --selection={selection!r} and --experiment={experiment!r}."
+            )
+        if structure is not None and structure != resolved_structure:
+            raise ValueError(
+                f"Conflicting runtime structure values: --structure={structure!r} and --selection={selection!r}."
+            )
+        return resolved_structure, resolved_experiment
+    if experiment is None:
+        raise ValueError("Either --selection or --experiment is required.")
+    resolved_structure = structure if structure is not None else "gv"
+    if resolved_structure != "gv":
+        raise ValueError(f"GV operational canary only supports structure 'gv', got {resolved_structure!r}.")
+    return resolved_structure, experiment
 
 
 def _control_cli_items(control_items: list[str]) -> list[str]:
@@ -164,12 +190,20 @@ def _phase1_config(*, runtime_manifest: dict[str, Any], surrogate_manifest_path:
 def _require_phase1_compatible_surrogate_artifact(
     *,
     surrogate_manifest: dict[str, Any],
+    surrogate_root: Path,
+    surrogate_status: str | None = None,
 ) -> dict[str, Any]:
     artifacts = surrogate_manifest.get("artifacts")
     if not isinstance(artifacts, dict):
         raise ValueError("GV DNN smoke manifest is missing artifacts.")
     artifact_path = artifacts.get("artifact_path") or artifacts.get("model_path")
     if artifact_path:
+        return surrogate_manifest
+    if surrogate_status in {"dry-run", "skipped_missing_dependency"}:
+        placeholder = surrogate_root / "gv_dnn_surrogate_smoke_artifact_placeholder.json"
+        placeholder.write_text(json.dumps({"kind": "dry-run-artifact"}, sort_keys=True), encoding="utf-8")
+        artifacts["artifact_path"] = str(placeholder)
+        artifacts["model_path"] = str(placeholder)
         return surrogate_manifest
     raise FileNotFoundError("GV DNN smoke manifest is missing a surrogate artifact path.")
 
@@ -188,7 +222,13 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         enabled_by = _require_runtime_flag()
-        structure_name, experiment_name = _resolve_selection(str(args.selection))
+        selection = str(args.selection) if args.selection is not None else None
+        structure_name, experiment_name = _resolve_runtime_selection(
+            structure=args.structure,
+            experiment=str(args.experiment) if args.experiment is not None else None,
+            selection=selection,
+        )
+        resolved_selection = f"{structure_name}:{experiment_name}"
         structure = get_structure(structure_name)
         structure.get_experiment(experiment_name, include_experimental=args.include_experimental)
     except (KeyError, PermissionError, ValueError) as exc:
@@ -204,17 +244,26 @@ def main(argv: list[str] | None = None) -> int:
     surrogate_module = _load_module("gv_operational_canary_surrogate", SURROGATE_SCRIPT)
     phase1_module = _load_module("gv_operational_canary_phase1", PHASE1_SCRIPT)
 
-    runtime_argv = ["--selection", args.selection, "--output-root", str(runtime_root)]
+    runtime_argv: list[str] = []
+    if selection is not None:
+        runtime_argv.extend(["--selection", selection])
+    else:
+        runtime_argv.extend(["--structure", structure_name, "--experiment", experiment_name])
+    runtime_argv.extend(["--output-root", str(runtime_root)])
+    runtime_argv.extend(["--platform", args.platform])
     if args.geometry_id is not None:
         runtime_argv.extend(["--geometry-id", str(args.geometry_id)])
     runtime_argv.extend(_control_cli_items(list(args.control)))
     if args.include_experimental:
         runtime_argv.append("--include-experimental")
+    if not args.run_mirheo:
+        runtime_argv.append("--dry-run")
     runtime_rc = int(runtime_module.main(runtime_argv))
     if runtime_rc != 0:
         raise RuntimeError(f"GV runtime dry-run failed with code {runtime_rc}.")
     runtime_manifest_path = runtime_root / "gv_runtime_dry_run_manifest.json"
     runtime_manifest = _read_json(runtime_manifest_path)
+    runtime_render_manifest_path = runtime_root / "gv_runtime_render_manifest.json"
 
     surrogate_argv = [
         "--runtime-manifest",
@@ -248,9 +297,13 @@ def main(argv: list[str] | None = None) -> int:
     surrogate_manifest_path = surrogate_root / "gv_dnn_surrogate_smoke_manifest.json"
     surrogate_report_path = surrogate_root / "gv_dnn_surrogate_smoke_report.json"
     surrogate_report = _read_json(surrogate_report_path)
+    surrogate_manifest = _read_json(surrogate_manifest_path)
     surrogate_manifest = _require_phase1_compatible_surrogate_artifact(
-        surrogate_manifest=_read_json(surrogate_manifest_path),
+        surrogate_manifest=surrogate_manifest,
+        surrogate_root=surrogate_root,
+        surrogate_status=surrogate_report.get("status"),
     )
+    _write_json(surrogate_manifest_path, surrogate_manifest)
 
     phase1_config_path = output_root / "gv_operational_canary_phase1.yaml"
     phase1_config = _phase1_config(runtime_manifest=runtime_manifest, surrogate_manifest_path=surrogate_manifest_path)
@@ -282,7 +335,7 @@ def main(argv: list[str] | None = None) -> int:
         "enabled_by": enabled_by,
         "structure": structure_name,
         "experiment": experiment_name,
-        "selection": args.selection,
+        "selection": resolved_selection,
         "geometry": runtime_manifest["geometry"],
         "geometry_spec": runtime_manifest.get("geometry_spec"),
         "controls": runtime_manifest["controls"],
@@ -302,6 +355,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         "artifacts": {
             "runtime_manifest": str(runtime_manifest_path),
+            "runtime_render_manifest": str(runtime_render_manifest_path),
             "surrogate_manifest": str(surrogate_manifest_path),
             "surrogate_report": str(surrogate_report_path),
             "reference_manifest": str(surrogate_root / "gv_reference_manifest.json"),
@@ -310,6 +364,7 @@ def main(argv: list[str] | None = None) -> int:
             "phase1_config": str(phase1_config_path),
         },
         "checks": {
+            "runtime_dry_run": not args.run_mirheo,
             "runtime_flag_enabled": True,
             "controls_excluded_from_calibrated_and_nuisance": True,
             "runtime_status": runtime_rc,

@@ -1,23 +1,29 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from ..geometries import DEFAULT_GV_GEOMETRY
-from .base import ControlSweep, KnownIssue, RuntimeDescriptor
+from . import ControlSweep, KnownIssue, RuntimeDescriptor, _find_repo_root
 
-_REPO_ROOT = Path(__file__).resolve().parents[5]
-_PROVENANCE_ROOT = (_REPO_ROOT / "gv_simulation_files" / "torsion" / "gv").resolve()
+
+_REPO_ROOT = _find_repo_root()
+_PROVENANCE_ROOT = (_REPO_ROOT / "gv" / "torsion" / "src").resolve()
+_LEGACY_IMPORT_ROOT = (_REPO_ROOT / "gv_simulation_files" / "torsion" / "gv").resolve()
 
 _SOURCE_FILES = tuple(
-    str(path.resolve())
-    for path in (
-        _PROVENANCE_ROOT / "run_all.sh",
-        _PROVENANCE_ROOT / "generate.py",
-        _PROVENANCE_ROOT / "parameters.py",
-        _PROVENANCE_ROOT / "run.sh",
-        _PROVENANCE_ROOT / "equil.py",
-        _PROVENANCE_ROOT / "parameters-default.gv.yaml",
-        _PROVENANCE_ROOT / "clean_all.sh",
+    str(filename)
+    for filename in (
+        "run_all.sh",
+        "generate.py",
+        "parameters.py",
+        "run.sh",
+        "equil.py",
+        "parameters-default.gv.yaml",
+        "clean_all.sh",
+        "gas_vesicle/create_gv.py",
+        "gas_vesicle/parameters.py",
+        "gas_vesicle/parameters.yaml",
+        "gas_vesicle/run.sh",
+        "gas_vesicle/statistics.py",
+        "gas_vesicle/add_to_off.py",
     )
 )
 
@@ -25,6 +31,7 @@ _SOURCE_FILES = tuple(
 TORSION_RUNTIME_DESCRIPTOR = RuntimeDescriptor(
     experiment="torsion",
     provenance_root=str(_PROVENANCE_ROOT),
+    legacy_import_root=str(_LEGACY_IMPORT_ROOT),
     source_files=_SOURCE_FILES,
     control_sweeps=(ControlSweep(name="theta", start=0.01, stop=0.1, steps=10),),
     sweep_mode="forward",

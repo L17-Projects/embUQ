@@ -3,22 +3,27 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..geometries import DEFAULT_GV_GEOMETRY
-from .base import ControlSweep, DryRunCommand, RuntimeDescriptor
+from .base import ControlSweep, DryRunCommand, RuntimeDescriptor, _find_repo_root
 
-_REPO_ROOT = Path(__file__).resolve().parents[5]
-_PROVENANCE_ROOT = (_REPO_ROOT / "gv_simulation_files" / "eigenmodes" / "gv").resolve()
+_REPO_ROOT = _find_repo_root()
+_PROVENANCE_ROOT = (_REPO_ROOT / "gv" / "eigenmodes" / "src").resolve()
 _ANALYSIS_ROOT = (_PROVENANCE_ROOT / "analysis").resolve()
+_LEGACY_IMPORT_ROOT = (_REPO_ROOT / "gv_simulation_files" / "eigenmodes" / "gv").resolve()
 
 _SOURCE_FILES = tuple(
-    str(path.resolve())
+    str(path)
     for path in (
         _PROVENANCE_ROOT / "run_all.sh",
         _PROVENANCE_ROOT / "generate.py",
         _PROVENANCE_ROOT / "parameters.py",
-        _PROVENANCE_ROOT / "run.sh",
+        Path("run.sh"),
         _PROVENANCE_ROOT / "equil.py",
-        _PROVENANCE_ROOT / "parameters-default.gv.yaml",
-        _PROVENANCE_ROOT / "clean_all.sh",
+        Path("parameters-default.gv.yaml"),
+        Path("clean_all.sh"),
+        Path("gas_vesicle/create_gv.py"),
+        Path("gas_vesicle/parameters.yaml"),
+        Path("gas_vesicle/run.sh"),
+        Path("gas_vesicle/statistics.py"),
         _ANALYSIS_ROOT / "all.sh",
         _ANALYSIS_ROOT / "all_analysis.py",
         _ANALYSIS_ROOT / "combine.py",
@@ -37,6 +42,7 @@ _SOURCE_FILES = tuple(
 EIGENMODES_RUNTIME_DESCRIPTOR = RuntimeDescriptor(
     experiment="eigenmodes",
     provenance_root=str(_PROVENANCE_ROOT),
+    legacy_import_root=str(_LEGACY_IMPORT_ROOT),
     source_files=_SOURCE_FILES,
     control_sweeps=(ControlSweep(name="bpress", start=-91.0, stop=-91.0, steps=1),),
     sweep_mode="forward",
@@ -72,6 +78,7 @@ EIGENMODES_RUNTIME_DESCRIPTOR = RuntimeDescriptor(
             description="Trim the staged eigenpairs to the default reported mode count.",
         ),
     ),
+    generate_script="generate.py",
     notes=(
         "Imported from `run_all.sh`: `python3 generate.py -p bpress -91.0 -91.0 1 --object gv --forward --first`.",
         "Background pressure remains a runtime control and is excluded from calibrated GV parameters.",

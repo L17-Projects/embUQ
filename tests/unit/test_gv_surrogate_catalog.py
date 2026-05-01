@@ -77,10 +77,30 @@ def test_gv_catalog_resolution_carries_structure_identity_and_paths() -> None:
     )
     assert resolved["catalog_key"].endswith(":synthetic:dnn")
     assert resolved["metadata"]["supports_bnn"] is False
-    assert resolved["metadata"]["paths"]["provenance_root"] == "gv_simulation_files/stretching/gv"
+    assert resolved["metadata"]["paths"]["provenance_root"] == "gv/stretching/src"
+    assert resolved["metadata"]["paths"]["source_root"] == "gv/stretching/src"
+    assert resolved["metadata"]["paths"]["legacy_import_root"] == "gv_simulation_files/stretching/gv"
     assert resolved["surrogate_artifact"].endswith(
         "/_runs/gv/stretching/gv_rad2_height14_28/tot_force_500_50000__bpress_-91/synthetic/dnn/model.pt"
     )
+
+
+def test_gv_catalog_paths_and_metadata_distinguish_source_and_legacy_import_roots() -> None:
+    entries = resolve_gv_surrogate_catalog_entries("/repo")
+
+    for entry in entries:
+        metadata_paths = entry["metadata"]["paths"]
+        experiment = str(entry["experiment"])
+
+        assert metadata_paths["provenance_root"] == f"gv/{experiment}/src"
+        assert metadata_paths["source_root"] == f"gv/{experiment}/src"
+        assert "gv_simulation_files" not in metadata_paths["provenance_root"]
+        assert "gv_simulation_files" not in metadata_paths["source_root"]
+        assert metadata_paths["legacy_import_root"].startswith("gv_simulation_files/")
+        if experiment == "shear_flow":
+            assert metadata_paths["legacy_import_root"] == "gv_simulation_files/shear_flow"
+        else:
+            assert metadata_paths["legacy_import_root"] == f"gv_simulation_files/{experiment}/gv"
 
 
 def test_catalog_list_filters_structure_backend_and_reference_kind() -> None:
@@ -133,6 +153,10 @@ def test_gv_catalog_experimental_and_reference_filters_are_explicit() -> None:
     assert shear_entry["metadata"]["experimental"] is True
     assert shear_entry["metadata"]["requires_opt_in"] is True
     assert shear_entry["metadata"]["known_issues"][0]["id"] == "bouncer_collision_candidates_coarse"
+    assert (
+        shear_entry["metadata"]["known_issues"][0]["evidence"]
+        == "gv/shear_flow/src/fixtures/bouncer_collision_candidates_coarse_excerpt.txt"
+    )
 
     with pytest.raises(KeyError, match="shear_flow"):
         resolve_gv_surrogate_catalog_entry(

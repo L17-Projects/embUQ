@@ -232,6 +232,10 @@ def build_manifest_prefix(
         "provenance": {
             "geometry_source": context.geometry.source,
             "runtime_provenance_root": context.runtime_manifest.get("provenance_root"),
+            "runtime_source_root": context.runtime_manifest.get("source_root")
+            or context.runtime_manifest.get("provenance_root"),
+            "runtime_legacy_import_root": context.runtime_manifest.get("legacy_import_root"),
+            "runtime_source_manifest": context.runtime_manifest.get("source_manifest"),
             "source_files": list(context.runtime_manifest.get("source_files", [])),
             "commands": list(context.runtime_manifest.get("commands", [])),
             "analysis_commands": list(context.runtime_manifest.get("analysis_commands", [])),

@@ -5,6 +5,7 @@ from .base import (
     DryRunCommand,
     GV_RUNTIME_DEFAULT_ROOT,
     KnownIssue,
+    _find_repo_root,
     RuntimeDescriptor,
     RuntimeDryRun,
 )
@@ -15,6 +16,7 @@ __all__ = [
     "DryRunCommand",
     "GV_RUNTIME_DEFAULT_ROOT",
     "KnownIssue",
+    "_find_repo_root",
     "RUNTIME_EXPERIMENTS",
     "RuntimeDescriptor",
     "RuntimeDryRun",

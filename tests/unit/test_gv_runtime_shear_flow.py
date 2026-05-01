@@ -40,16 +40,14 @@ def test_dry_run_without_experimental_opt_in_raises_clear_error() -> None:
         module.build_dry_run_manifest()
 
 
-def test_dry_run_with_opt_in_returns_canonical_manifest_without_writes(tmp_path: Path) -> None:
+def test_dry_run_with_opt_in_returns_canonical_manifest_with_staged_sources(tmp_path: Path) -> None:
     module = _import_module()
     assert module.build_descriptor() is module.SHEAR_FLOW_RUNTIME
     run_root = tmp_path / "runtime_runs"
-    before = {path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*")}
 
     manifest = module.build_dry_run_manifest(run_root=run_root, include_experimental=True)
 
-    after = {path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*")}
-    assert before == after
+    work_dir = Path(manifest["paths"]["work_dir"])
     assert manifest["structure"] == "gv"
     assert manifest["experiment"] == "shear_flow"
     assert manifest["identity_axes"] == {
@@ -70,6 +68,8 @@ def test_dry_run_with_opt_in_returns_canonical_manifest_without_writes(tmp_path:
     assert manifest["default_sweep"]["controls"]["ptan"]["values"] == [0.4]
     assert manifest["default_sweep"]["controls"]["afsi"]["value"] == 0.0
     assert manifest["default_sweep"]["controls"]["bpress"]["value"] == -91.0
+    assert Path(manifest["paths"]["source_root"]).as_posix().endswith("gv/shear_flow/src")
+    assert manifest["paths"]["source_root"] == manifest["paths"]["provenance_root"]
 
     runtime_req = manifest["runtime_requirements"]
     assert runtime_req == [
@@ -84,15 +84,14 @@ def test_dry_run_with_opt_in_returns_canonical_manifest_without_writes(tmp_path:
     known_issue = manifest["known_issues"][0]
     assert known_issue["id"] == "bouncer_collision_candidates_coarse"
     assert "triangle collision candidates" in known_issue["summary"]
-    assert known_issue["evidence"].endswith("gv_simulation_files/shear_flow/a0/output.out:841")
+    assert known_issue["evidence"] == "gv/shear_flow/src/fixtures/bouncer_collision_candidates_coarse_excerpt.txt"
 
-    source_root = Path(manifest["paths"]["source_root"]).resolve()
-    provenance_root = Path(manifest["paths"]["provenance_root"]).resolve()
     output_root = Path(manifest["paths"]["output_root"]).resolve()
+    source_root = Path(manifest["paths"]["source_root"]).resolve()
     assert source_root != output_root
-    assert provenance_root != output_root
     assert not output_root.is_relative_to(source_root)
-    assert not output_root.is_relative_to(provenance_root)
-    assert not output_root.exists()
+    assert manifest["paths"]["work_dir"].endswith(f"/{manifest['experiment']}/{manifest['geometry']}/{manifest['control_id']}/work")
+    assert work_dir.is_dir()
+    assert (work_dir / "source_manifest.json").is_file()
     assert manifest["generated_artifacts"] == []
     assert manifest["artifacts_produced"] is False

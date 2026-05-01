@@ -63,7 +63,7 @@ def test_torsion_uses_theta_control_and_imported_default_sweep(tmp_path: Path) -
     assert manifest["control_sweeps"] == [
         {"name": "theta", "start": 0.01, "stop": 0.1, "steps": 10}
     ]
-    assert not any(tmp_path.rglob("*"))
+    assert Path(manifest["source_manifest"]).is_file()
 
 
 def test_eigenmodes_uses_bpress_control_and_tracks_analysis_provenance(tmp_path: Path) -> None:
@@ -83,7 +83,7 @@ def test_eigenmodes_uses_bpress_control_and_tracks_analysis_provenance(tmp_path:
     assert any(path.endswith("analysis/combine.py") for path in analysis_paths)
     assert any(path.endswith("analysis/trim_svd.sh") for path in analysis_paths)
     assert len(manifest["analysis_commands"]) == 4
-    assert not any(tmp_path.rglob("*"))
+    assert Path(manifest["source_manifest"]).is_file()
 
 
 @pytest.mark.parametrize(
@@ -108,9 +108,11 @@ def test_dry_run_manifests_include_identity_axes_and_external_output_roots(
     assert set(manifest["controls"]) in ({"theta"}, {"bpress"})
     assert manifest["dataset_id"]
 
+    assert manifest["source_root"].startswith(REPO_ROOT.as_posix() + "/gv/")
+
     provenance_roots = (
-        REPO_ROOT / "gv_simulation_files" / "torsion" / "gv",
-        REPO_ROOT / "gv_simulation_files" / "eigenmodes" / "gv",
+        REPO_ROOT / "gv" / "torsion" / "src",
+        REPO_ROOT / "gv" / "eigenmodes" / "src",
     )
     output_paths = [Path(manifest["output_root"]), Path(manifest["work_dir"])]
     for output_path in output_paths:

@@ -5,7 +5,7 @@ from typing import Mapping
 
 from ..controls import EXPERIMENT_CONTROLS
 from ..geometries import DEFAULT_GV_GEOMETRY
-from . import ControlSweep, RuntimeDescriptor, RuntimeDryRun
+from . import ControlSweep, RuntimeDescriptor, RuntimeDryRun, _find_repo_root
 
 
 STRUCTURE_NAME = "gv"
@@ -13,17 +13,12 @@ EXPERIMENT_NAME = "stretching"
 REQUIRED_CONTROLS = tuple(control.name for control in EXPERIMENT_CONTROLS[EXPERIMENT_NAME])
 
 
-def _find_repo_root() -> Path:
-    current = Path(__file__).resolve()
-    for parent in current.parents:
-        if (parent / "pyproject.toml").is_file():
-            return parent
-    raise RuntimeError("Could not locate the repository root from the GV stretching runtime descriptor.")
-
-
-PROVENANCE_ROOT = _find_repo_root() / "gv_simulation_files" / EXPERIMENT_NAME / STRUCTURE_NAME
+REPO_ROOT = _find_repo_root()
+SOURCE_ROOT = REPO_ROOT / "gv" / EXPERIMENT_NAME / "src"
+PROVENANCE_ROOT = SOURCE_ROOT
+LEGACY_IMPORT_ROOT = REPO_ROOT / "gv_simulation_files" / EXPERIMENT_NAME / STRUCTURE_NAME
 SOURCE_FILES = tuple(
-    str(PROVENANCE_ROOT / filename)
+    str(filename)
     for filename in (
         "clean_all.sh",
         "run_all.sh",
@@ -32,12 +27,19 @@ SOURCE_FILES = tuple(
         "run.sh",
         "equil.py",
         "parameters-default.gv.yaml",
+        "gas_vesicle/create_gv.py",
+        "gas_vesicle/parameters.py",
+        "gas_vesicle/parameters.yaml",
+        "gas_vesicle/run.sh",
+        "gas_vesicle/statistics.py",
+        "gas_vesicle/add_to_off.py",
     )
 )
 
 RUNTIME_DESCRIPTOR = RuntimeDescriptor(
     experiment=EXPERIMENT_NAME,
     provenance_root=str(PROVENANCE_ROOT),
+    legacy_import_root=str(LEGACY_IMPORT_ROOT),
     source_files=SOURCE_FILES,
     control_sweeps=(
         ControlSweep(name="tot_force", start=500.0, stop=50000.0, steps=80),
@@ -45,11 +47,11 @@ RUNTIME_DESCRIPTOR = RuntimeDescriptor(
     ),
     sweep_mode="forward",
     first_restart=True,
-    generate_script=str(PROVENANCE_ROOT / "generate.py"),
-    run_script=str(PROVENANCE_ROOT / "run_all.sh"),
+    generate_script="generate.py",
+    run_script="run_all.sh",
     generated_subdirs=("logs", "mesh", "anchor", "parameter", "restart"),
     notes=(
-        "Imported from gv_simulation_files/stretching/gv/run_all.sh.",
+        "Imported from gv/stretching/src/run_all.sh.",
         "The staging lane declares bpress as -91.0 -> -100.0 with one step, so the effective default remains -91.0.",
         "Runtime entry points are run_all.sh, generate.py, parameters.py, and equil.py.",
     ),

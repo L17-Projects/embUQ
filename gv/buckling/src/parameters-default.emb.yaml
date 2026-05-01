@@ -1,0 +1,84 @@
+#BOX
+Lx: 25.0
+Ly: 25.0
+Lz: 25.0
+
+#SIMULATION
+numsteps_eq: 100000
+numsteps: 100000
+dt_eq: 0.0001
+dt: 0.0001
+stslik: 100
+stslik_eq: 100
+
+#UNITS
+ul: 0.25e-6
+kbol: 1.3805e-23
+t0: 300.0
+rho_water: 997.0
+rho_gas: 1.293
+rho_shell: 1100.0
+shell_th: 15.0e-9
+energyFactor: 1.0
+
+#ELASTICITY
+#For isotropic elasticity specify Yt
+#For anisotropic specify both Yt and Yl
+fscale: 0.0074
+Yt: 264.0e+6
+Yl: 264.0e+6
+nu: 0.5
+a3: 0.0 
+a4: 0.0 
+b1: 0.0 
+b2: 0.0
+theta: 0.0
+
+#DPD
+aii: 100.0
+alpha: 0.101
+gamma_dpd: 8.0
+gamma_dpd_gas: 2.5
+strong: 1.0
+rc: 1.0
+s: 0.25
+s_g: 0.5
+k_fsi: 0.5
+rhow: 3.0
+rhog: 3.0
+visg: 1.86e-5
+visw: 8.9e-4
+
+# Number of bubbles or gas vesicles: should be 2^n (1,2,4,8,16,...)
+numObjects: 1
+objFile: emb.off
+
+#Bubble
+radp: 4.0
+subDiv: 4
+
+#GV
+radGV: 2.0
+height: 14.28
+
+#Area, volume
+ka_tot: 0.0 
+kv_tot: 0.0 
+
+#Viscoelasticity
+gammaC: 0.0
+
+#Buckling
+buck: 0.0
+
+#Stretch
+fraction: 0.02
+
+#OBMD parameters 
+#bufferSize = 0.15 means 0.15 * Lx
+# bufferTau = 10.0 means 10.0 * dt
+obmd_flag: 1
+bufferSize: 0.15 
+bufferTau: 10.0 
+bufferAlpha: 0.6
+ptan: 0.5 

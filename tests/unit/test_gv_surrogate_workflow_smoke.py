@@ -81,6 +81,12 @@ def test_gv_dnn_smoke_consumes_runtime_manifest_and_writes_reloadable_artifacts(
     assert smoke_manifest["synthetic_fixture"]["num_rows"] == 20
     assert smoke_manifest["training"]["report"]["n_train"] == 15
     assert smoke_manifest["training"]["report"]["n_val"] == 5
+    if smoke_module.torch is None:
+        assert smoke_manifest["execution_mode"] == "dry_run_manifest_only"
+        assert smoke_manifest["reload"]["status"] == "not_run"
+        assert smoke_manifest["artifacts"]["artifact_path"] is None
+        assert smoke_manifest["training"]["report"]["status"] == "skipped_missing_dependency"
+        return
     assert smoke_manifest["reload"]["status"] == "passed"
     assert smoke_manifest["reload"]["passed_val_replay_tol_1e_6"] is True
 

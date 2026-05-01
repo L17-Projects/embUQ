@@ -32,7 +32,10 @@ def test_dpd_generated_gv_reference_manifest_tracks_identity_and_paths(tmp_path:
     assert manifest["surrogate_backend"] == "dnn"
     assert manifest["dataset_id"] == runtime_manifest["dataset_id"]
     assert manifest["controls"] == {"bpress": -91.0}
-    assert manifest["provenance"]["runtime_provenance_root"].endswith("gv_simulation_files/eigenmodes/gv")
+    assert manifest["provenance"]["runtime_provenance_root"].endswith("gv/eigenmodes/src")
+    assert manifest["provenance"]["runtime_source_root"].endswith("gv/eigenmodes/src")
+    assert manifest["provenance"]["runtime_legacy_import_root"].endswith("gv_simulation_files/eigenmodes/gv")
+    assert manifest["provenance"]["runtime_source_manifest"]
     assert manifest["outputs"]["output_root"] == str((tmp_path / "runs").resolve())
     assert manifest["data_reference"]["path"] == str(data_path.resolve())
     assert manifest["data_reference"]["format"] == "dat"

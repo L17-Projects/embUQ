@@ -18,6 +18,7 @@ from meso_uq.structures.gv import (
     build_geometry,
 )
 from meso_uq.structures.gv.runtime import RUNTIME_EXPERIMENTS, plan_runtime
+from meso_uq.surrogate.gv_catalog import resolve_gv_surrogate_catalog_entries
 
 
 def _prior_kwargs() -> dict[str, list[float]]:
@@ -106,3 +107,17 @@ def test_gv_dataset_keys_remain_control_scoped_and_link_runtime_to_surrogate_con
         assert dataset_id.count(":") == 3
         assert experiment.surrogate_dir.parts[-2:] == ("surrogate", "dnn")
         assert "gv_simulation_files" not in experiment.surrogate_dir.parts
+
+
+def test_gv_surrogate_catalog_tracks_legacy_import_roots_separately() -> None:
+    entries = resolve_gv_surrogate_catalog_entries("/repo")
+
+    for entry in entries:
+        paths = entry["metadata"]["paths"]
+        experiment = str(entry["experiment"])
+
+        assert paths["provenance_root"] == f"gv/{experiment}/src"
+        assert paths["source_root"] == f"gv/{experiment}/src"
+        assert paths["legacy_import_root"].startswith("gv_simulation_files/")
+        assert "gv_simulation_files" not in paths["provenance_root"]
+        assert "gv_simulation_files" not in paths["source_root"]
