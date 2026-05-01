@@ -38,8 +38,9 @@ def test_control_sweep_rejects_empty_sweep() -> None:
 def test_runtime_descriptor_builds_manifest_without_writing_outputs(tmp_path: Path) -> None:
     descriptor = RuntimeDescriptor(
         experiment="stretching",
-        provenance_root="gv_simulation_files/stretching/gv",
+        provenance_root="gv/stretching/src",
         source_files=("run_all.sh", "generate.py", "parameters.py", "equil.py"),
+        legacy_import_root="gv_simulation_files/stretching/gv",
         control_sweeps=(
             ControlSweep("tot_force", 500.0, 50000.0, 80),
             ControlSweep("bpress", -91.0, -100.0, 1),
@@ -56,7 +57,9 @@ def test_runtime_descriptor_builds_manifest_without_writing_outputs(tmp_path: Pa
     assert manifest["geometry"] == DEFAULT_GV_GEOMETRY.id
     assert manifest["control_id"] == "tot_force_500_50000__bpress_-91"
     assert manifest["dataset_id"].endswith(":tot_force_500_50000__bpress_-91")
-    assert manifest["provenance_root"] == "gv_simulation_files/stretching/gv"
+    assert manifest["provenance_root"].endswith("gv/stretching/src")
+    assert Path(manifest["source_root"]).resolve() == Path(manifest["provenance_root"]).resolve()
+    assert manifest["legacy_import_root"].endswith("gv_simulation_files/stretching/gv")
     assert manifest["sweep_mode"] == "forward"
     assert manifest["first_restart"] is True
     assert manifest["runtime_package"] == "mirheo"
@@ -79,7 +82,9 @@ def test_runtime_descriptor_builds_manifest_without_writing_outputs(tmp_path: Pa
         "--first",
     ]
     assert manifest["commands"][1]["argv"] == ["bash", "commands.txt"]
-    assert not dry_run.work_dir or not Path(dry_run.work_dir).exists()
+    assert Path(dry_run.source_manifest).is_file()
+    manifest_data = Path(dry_run.source_manifest).read_text(encoding="utf-8")
+    assert "source_files" in manifest_data
 
 
 def test_runtime_descriptor_rejects_unknown_control_override(tmp_path: Path) -> None:
@@ -96,26 +101,72 @@ def test_runtime_descriptor_rejects_unknown_control_override(tmp_path: Path) -> 
         descriptor.plan(output_root=tmp_path, controls={"buck": 0.25})
 
 
-def test_runtime_descriptor_rejects_source_output_root() -> None:
+def test_runtime_descriptor_rejects_source_output_root(tmp_path: Path) -> None:
     descriptor = RuntimeDescriptor(
         experiment="eigenmodes",
-        provenance_root="gv_simulation_files/eigenmodes/gv",
+        provenance_root="gv/eigenmodes/src",
         source_files=("run_all.sh", "generate.py"),
         control_sweeps=(ControlSweep("bpress", -91.0, -91.0, 1),),
         sweep_mode="forward",
         first_restart=True,
     )
 
-    with pytest.raises(ValueError, match="must not be inside gv_simulation_files"):
+    with pytest.raises(ValueError, match=r"must not be inside '/.*(gv_simulation_files|src)'"):
         descriptor.plan(output_root=Path("gv_simulation_files") / "scratch")
-    with pytest.raises(ValueError, match="must not be a source directory"):
+    with pytest.raises(ValueError, match=r"must not be (inside '/.*/src'|a source directory)"):
         descriptor.plan(output_root=Path("src"))
+    with pytest.raises(ValueError, match="repository root 'gv'"):
+        descriptor.plan(output_root=tmp_path / "gv")
+
+
+def test_runtime_descriptor_rejects_missing_or_outside_source_files(tmp_path: Path) -> None:
+    source_root = tmp_path / "sources"
+    source_root.mkdir()
+    nested = source_root / "nested"
+    nested.mkdir()
+    (nested / "run.sh").write_text("echo nested", encoding="utf-8")
+    outside = tmp_path / "outside.py"
+    outside.write_text("print('outside')", encoding="utf-8")
+
+    missing_descriptor = RuntimeDescriptor(
+        experiment="custom",
+        provenance_root=str(source_root),
+        source_files=("missing.py",),
+        control_sweeps=(ControlSweep("seed", 1.0, 1.0, 1),),
+        sweep_mode="forward",
+        first_restart=False,
+    )
+    with pytest.raises(ValueError, match="source file not found"):
+        missing_descriptor.plan(output_root=tmp_path / "runtime-missing")
+
+    outside_descriptor = RuntimeDescriptor(
+        experiment="custom",
+        provenance_root=str(source_root),
+        source_files=(str(outside),),
+        control_sweeps=(ControlSweep("seed", 1.0, 1.0, 1),),
+        sweep_mode="forward",
+        first_restart=False,
+    )
+    with pytest.raises(ValueError, match="must be under source root"):
+        outside_descriptor.plan(output_root=tmp_path / "runtime-outside")
+
+    no_root_descriptor = RuntimeDescriptor(
+        experiment="custom",
+        provenance_root=str(tmp_path / "does-not-exist"),
+        source_files=("run.sh",),
+        control_sweeps=(ControlSweep("seed", 1.0, 1.0, 1),),
+        sweep_mode="forward",
+        first_restart=False,
+    )
+    with pytest.raises(FileNotFoundError, match="source root does not exist"):
+        no_root_descriptor.plan(output_root=tmp_path / "runtime-no-root")
 
 
 def test_experimental_runtime_requires_opt_in(tmp_path: Path) -> None:
     descriptor = RuntimeDescriptor(
         experiment="shear_flow",
-        provenance_root="gv_simulation_files/shear_flow/a0",
+        provenance_root="gv/shear_flow/src",
+        legacy_import_root="gv_simulation_files/shear_flow",
         source_files=("run_all_HPC.sh", "generate.py", "equil.py"),
         control_sweeps=(ControlSweep("ptan", 0.4, 0.4, 1),),
         sweep_mode="parallel",
@@ -137,6 +188,7 @@ def test_experimental_runtime_requires_opt_in(tmp_path: Path) -> None:
 
     manifest = descriptor.plan(output_root=tmp_path, include_experimental=True).to_manifest()
     assert manifest["experimental"] is True
+    assert manifest["legacy_import_root"].endswith("gv_simulation_files/shear_flow")
     assert manifest["runtime_package"] == "mirheoOBMD"
     assert manifest["known_issues"][0]["id"] == "shear-flow-bouncer-candidates"
 
@@ -163,7 +215,8 @@ def test_runtime_catalog_loads_real_descriptor_and_plans_dry_run(tmp_path: Path)
     assert manifest["geometry"] == "gv_rad2_height14_28"
     assert manifest["controls"]["tot_force"] == 750.0
     assert manifest["dataset_id"].startswith("gv:stretching:")
-    assert not any(tmp_path.rglob("*"))
+    assert Path(manifest["source_manifest"]).is_file()
+    assert Path(manifest["work_dir"]).is_dir()
 
 
 def test_runtime_catalog_preserves_shear_flow_execution_contract(tmp_path: Path) -> None:
@@ -175,11 +228,11 @@ def test_runtime_catalog_preserves_shear_flow_execution_contract(tmp_path: Path)
     )
     manifest = dry_run.to_manifest()
 
-    assert descriptor.provenance_root.endswith("gv_simulation_files/shear_flow/a0")
+    assert descriptor.provenance_root.endswith("gv/shear_flow/src")
     assert manifest["runtime_package"] == "mirheoOBMD"
     assert manifest["commands"][0]["argv"] == [
         "python3",
-        str(Path(descriptor.provenance_root) / "generate.py"),
+        "generate.py",
         "-p",
         "ptan",
         "0_4",
@@ -201,7 +254,7 @@ def test_runtime_catalog_preserves_shear_flow_execution_contract(tmp_path: Path)
         "--first",
     ]
     assert manifest["commands"][1]["argv"] == ["sbatch", "run_HPC.sbatch"]
-    assert any(path.endswith("gv_simulation_files/shear_flow/a0/run_all_HPC.sh") for path in manifest["source_files"])
+    assert "run_all_HPC.sh" in manifest["source_files"]
 
 
 def test_runtime_catalog_rejects_module_without_descriptor(monkeypatch: pytest.MonkeyPatch) -> None:

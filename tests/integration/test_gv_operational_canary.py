@@ -137,11 +137,45 @@ def test_gv_operational_canary_helper_edges(tmp_path: Path, monkeypatch: pytest.
         module._resolve_selection("torsion")
     with pytest.raises(ValueError, match="only supports structure 'gv'"):
         module._resolve_selection("emb:compression")
+    with pytest.raises(ValueError, match="Conflicting runtime selections"):
+        module._resolve_runtime_selection(structure="gv", experiment="stretching", selection="gv:torsion")
+    with pytest.raises(ValueError, match="Conflicting runtime structure"):
+        module._resolve_runtime_selection(structure="emb", experiment="torsion", selection="gv:torsion")
+    with pytest.raises(ValueError, match="Either --selection or --experiment"):
+        module._resolve_runtime_selection(structure="gv", experiment=None, selection=None)
+    with pytest.raises(ValueError, match="only supports structure 'gv'"):
+        module._resolve_runtime_selection(structure="emb", experiment="compression", selection=None)
+    assert module._resolve_runtime_selection(structure=None, experiment="torsion", selection=None) == ("gv", "torsion")
 
     with pytest.raises(ValueError, match="missing artifacts"):
-        module._require_phase1_compatible_surrogate_artifact(surrogate_manifest={})
+        module._require_phase1_compatible_surrogate_artifact(
+            surrogate_manifest={},
+            surrogate_root=tmp_path,
+        )
     with pytest.raises(FileNotFoundError, match="missing a surrogate artifact path"):
-        module._require_phase1_compatible_surrogate_artifact(surrogate_manifest={"artifacts": {}})
+        module._require_phase1_compatible_surrogate_artifact(
+            surrogate_manifest={"artifacts": {}},
+            surrogate_root=tmp_path,
+            surrogate_status="passed",
+        )
+    existing_artifact_manifest = {"artifacts": {"artifact_path": str(tmp_path / "model.pt")}}
+    assert (
+        module._require_phase1_compatible_surrogate_artifact(
+            surrogate_manifest=existing_artifact_manifest,
+            surrogate_root=tmp_path,
+            surrogate_status="passed",
+        )
+        is existing_artifact_manifest
+    )
+    dry_run_manifest = {"artifacts": {}}
+    returned_manifest = module._require_phase1_compatible_surrogate_artifact(
+        surrogate_manifest=dry_run_manifest,
+        surrogate_root=tmp_path,
+        surrogate_status="dry-run",
+    )
+    placeholder_path = Path(returned_manifest["artifacts"]["artifact_path"])
+    assert placeholder_path.is_file()
+    assert returned_manifest["artifacts"]["model_path"] == str(placeholder_path)
 
     assert module._build_verdict(
         surrogate_report={"status": "failed"},
@@ -198,7 +232,8 @@ def test_gv_operational_canary_stitches_runtime_surrogate_and_phase1(
 
     assert rc == 0
     manifest = json.loads((output_root / "gv_operational_canary_manifest.json").read_text(encoding="utf-8"))
-    runtime_manifest = json.loads((output_root / "runtime" / "gv_runtime_dry_run_manifest.json").read_text(encoding="utf-8"))
+    runtime_manifest_path = output_root / "runtime" / "gv_runtime_dry_run_manifest.json"
+    runtime_manifest = json.loads(runtime_manifest_path.read_text(encoding="utf-8"))
     surrogate_manifest = json.loads((output_root / "surrogate" / "gv_dnn_surrogate_smoke_manifest.json").read_text(encoding="utf-8"))
     phase1_setup_manifest = json.loads(
         (output_root / "phase1" / "results_phase_1" / gv_hbi.GV_PHASE1_SETUP_MANIFEST).read_text(encoding="utf-8")
@@ -224,6 +259,7 @@ def test_gv_operational_canary_stitches_runtime_surrogate_and_phase1(
     assert manifest["noise_parameters"] == ["sigma"]
     assert "theta" not in set(manifest["calibrated_parameters"]) | set(manifest["nuisance_parameters"])
     assert manifest["checks"]["runtime_flag_enabled"] is True
+    assert manifest["checks"]["runtime_dry_run"] is True
     assert manifest["checks"]["controls_excluded_from_calibrated_and_nuisance"] is True
     assert manifest["checks"]["phase1_status"] == "phase1_korali_completed"
     assert manifest["checks"]["phase1_execution_model"] == "single_lane_dnn_korali"
@@ -236,5 +272,8 @@ def test_gv_operational_canary_stitches_runtime_surrogate_and_phase1(
     assert phase1_execution_manifest["controls"]["fixed_outside_inferred_variables"] is True
     assert phase1_execution_manifest["runtime"]["korali_invoked"] is True
     assert fake_korali.created_engines[-1].sample_data["Reference Evaluations"] == [1.0] * 4
+    runtime_render_manifest = json.loads((output_root / "runtime" / "gv_runtime_render_manifest.json").read_text(encoding="utf-8"))
+    assert runtime_render_manifest["runtime_manifest"] == str(runtime_manifest_path)
+    assert all(command["status"] == "skipped-dry-run" for command in runtime_render_manifest["commands"])
     assert Path(manifest["artifacts"]["phase1_config"]).is_file()
     assert Path(manifest["artifacts"]["reference_manifest"]).is_file()

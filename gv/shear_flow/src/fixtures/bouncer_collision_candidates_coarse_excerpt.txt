@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/ceph/hpc/home/ntarakasn/shear_mar2025_25mar/shear_mar2025_afsi/a0/equil.py", line 241, in <module>
+    u.run(numsteps, dt = dt)
+  File "/ceph/hpc/home/ntarakasn/.local/lib/python3.10/site-packages/mirheoOBMD/__init__.py", line 100, in wrapper
+    return o(*args, **kwargs)
+RuntimeError: Mirheo has encountered a fatal error and will quit now.
+The error message follows, and more details can be found in the log
+***************************************
+Found too many triangle collision candidates (coarse) (1481863, max 14020) in bouncer 'membrane_bounce'.
+***************************************
+MPI_ABORT was invoked on rank 0 in communicator MPI_COMM_WORLD
+with errorcode -1.

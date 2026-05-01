@@ -91,8 +91,6 @@ def test_runtime_catalog_keeps_structure_qualified_control_scoped_identity(
 def test_runtime_dry_run_canaries_stay_offline_and_provenance_backed(
     tmp_path: Path,
 ) -> None:
-    before = list(tmp_path.rglob("*"))
-
     for experiment_name in RUNTIME_EXPERIMENTS:
         dry_run = plan_runtime(
             experiment_name,
@@ -101,20 +99,21 @@ def test_runtime_dry_run_canaries_stay_offline_and_provenance_backed(
         )
         manifest = dry_run.to_manifest()
         provenance_root = Path(dry_run.provenance_root)
-        experiment_root = provenance_root.parent
-        staging_available = provenance_root.is_dir()
+        work_dir = Path(dry_run.work_dir)
+
+        assert provenance_root == REPO_ROOT / "gv" / experiment_name / "src"
+        assert dry_run.legacy_import_root.startswith(str(REPO_ROOT / "gv_simulation_files"))
+        assert work_dir.is_dir()
+        assert Path(dry_run.source_manifest).is_file()
 
         for source_file in manifest["source_files"]:
             source_path = Path(source_file)
-            assert "gv_simulation_files" in source_path.parts
-            assert provenance_root in source_path.parents or experiment_root in source_path.parents
-            if staging_available:
-                assert source_path.is_file()
+            assert "gv_simulation_files" not in source_path.parts
+            assert not source_path.is_absolute()
+            assert (provenance_root / source_path).is_file()
+            assert (work_dir / source_path).is_file()
 
         for command in manifest["commands"]:
             argv = command["argv"]
             assert argv
             assert command["cwd"] == dry_run.work_dir
-
-    after = list(tmp_path.rglob("*"))
-    assert before == after == []

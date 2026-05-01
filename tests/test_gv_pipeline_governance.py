@@ -54,8 +54,9 @@ def test_gv_runtime_plans_route_generated_outputs_outside_canonical_source(tmp_p
 
         assert GV_SIMULATION_ROOT not in output_root.parents
         assert GV_SIMULATION_ROOT not in work_dir.parents
-        assert work_dir.parent == output_root / "gv" / experiment_name / dry_run.geometry
-        assert provenance_root.parts[: len(GV_SIMULATION_ROOT.parts)] == GV_SIMULATION_ROOT.parts
+        assert work_dir == output_root / experiment_name / dry_run.geometry / dry_run.control_id / "work"
+        assert provenance_root == REPO_ROOT / "gv" / experiment_name / "src"
+        assert dry_run.legacy_import_root.startswith(str(GV_SIMULATION_ROOT))
         for generated_subdir in dry_run.generated_subdirs:
             generated_path = work_dir / generated_subdir
             assert GV_SIMULATION_ROOT not in generated_path.parents

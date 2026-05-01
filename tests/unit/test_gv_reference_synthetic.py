@@ -75,9 +75,11 @@ def test_synthetic_gv_reference_manifest_includes_contract_and_runtime_metadata(
     assert manifest["controls"] == {"theta": 0.01}
     assert manifest["calibrated_parameter_names"] == list(GV_PARAMETER_CONTRACT.calibrated_names)
     assert manifest["noise_model"]["kind"] == "multiplicative"
-    assert manifest["provenance"]["runtime_provenance_root"].endswith("gv_simulation_files/torsion/gv")
+    assert manifest["provenance"]["runtime_provenance_root"].endswith("gv/torsion/src")
+    assert manifest["provenance"]["runtime_source_root"].endswith("gv/torsion/src")
+    assert manifest["provenance"]["runtime_legacy_import_root"].endswith("gv_simulation_files/torsion/gv")
     assert manifest["outputs"]["output_root"] == str(tmp_path.resolve())
-    assert manifest["outputs"]["work_dir"].endswith("/gv/torsion/gv_rad2_height14_28/theta_0_01_0_1")
+    assert manifest["outputs"]["work_dir"].endswith("/torsion/gv_rad2_height14_28/theta_0_01_0_1/work")
     assert len(manifest["points"]) == 64
     assert len(manifest["values"]) == 64
 
@@ -246,7 +248,10 @@ def test_synthetic_materialization_contract_writes_deterministic_npz_and_manifes
         assert manifest["noise_model"]["kind"] == "multiplicative"
         assert manifest["noise_model"]["parameter"] == "sigma"
         assert manifest["reference_kind"] == "synthetic"
-        assert manifest["provenance"]["runtime_provenance_root"].endswith("gv_simulation_files/stretching/gv")
+        assert manifest["provenance"]["runtime_provenance_root"].endswith("gv/stretching/src")
+        assert manifest["provenance"]["runtime_source_root"].endswith("gv/stretching/src")
+        assert manifest["provenance"]["runtime_legacy_import_root"].endswith("gv_simulation_files/stretching/gv")
+        assert manifest["provenance"]["runtime_source_manifest"]
         assert manifest["provenance"]["source_files"] == list(runtime_manifest["source_files"])
         assert manifest["reference_source"]
 

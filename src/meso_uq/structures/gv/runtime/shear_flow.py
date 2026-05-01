@@ -10,8 +10,8 @@ from . import ControlSweep, KnownIssue, RuntimeDescriptor
 
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
-SOURCE_ROOT = REPO_ROOT / "gv_simulation_files" / "shear_flow"
-PROVENANCE_ROOT = SOURCE_ROOT / "a0"
+PROVENANCE_ROOT = REPO_ROOT / "gv" / "shear_flow" / "src"
+LEGACY_IMPORT_ROOT = REPO_ROOT / "gv_simulation_files" / "shear_flow"
 DEFAULT_OUTPUT_ROOT = REPO_ROOT / "_runs" / "gv" / "shear_flow"
 
 STRUCTURE_NAME = "gv"
@@ -19,28 +19,31 @@ EXPERIMENT_NAME = "shear_flow"
 RUNTIME_MODULE_NAME = "mirheoOBMD"
 KNOWN_ISSUE_ID = "bouncer_collision_candidates_coarse"
 KNOWN_ISSUE_SUMMARY = (
-    "Found too many triangle collision candidates (coarse) (1481863, max 14020) "
-    "in bouncer 'membrane_bounce'."
+    "mirheoOBMD reports too many coarse triangle collision candidates in bouncer "
+    "'membrane_bounce'."
 )
-KNOWN_ISSUE_EVIDENCE = "gv_simulation_files/shear_flow/a0/output.out:841"
+KNOWN_ISSUE_EVIDENCE = "gv/shear_flow/src/fixtures/bouncer_collision_candidates_coarse_excerpt.txt"
 
 
 SHEAR_FLOW_RUNTIME = RuntimeDescriptor(
     experiment=EXPERIMENT_NAME,
     provenance_root=str(PROVENANCE_ROOT),
+    legacy_import_root=str(LEGACY_IMPORT_ROOT),
     source_files=(
-        str(SOURCE_ROOT / "README.md"),
-        str(SOURCE_ROOT / "run_all.py"),
-        str(SOURCE_ROOT / "copy_and_modify.py"),
-        str(PROVENANCE_ROOT / "commands.txt"),
-        str(PROVENANCE_ROOT / "run_all_HPC.sh"),
-        str(PROVENANCE_ROOT / "run_HPC.sbatch"),
-        str(PROVENANCE_ROOT / "generate.py"),
-        str(PROVENANCE_ROOT / "parameters.py"),
-        str(PROVENANCE_ROOT / "run.sh"),
-        str(PROVENANCE_ROOT / "equil.py"),
-        str(PROVENANCE_ROOT / "parameters-default.gv.yaml"),
-        str(PROVENANCE_ROOT / "output.out"),
+        "README.md",
+        "run_all.py",
+        "copy_and_modify.py",
+        "run_all_HPC.sh",
+        "generate.py",
+        "parameters.py",
+        "run.sh",
+        "equil.py",
+        "parameters-default.gv.yaml",
+        "gas_vesicle/create_gv.py",
+        "gas_vesicle/parameters.yaml",
+        "gas_vesicle/run.sh",
+        "gas_vesicle/statistics.py",
+        "fixtures/bouncer_collision_candidates_coarse_excerpt.txt",
     ),
     control_sweeps=(
         ControlSweep("ptan", start=0.4, stop=0.4, steps=1),
@@ -50,7 +53,7 @@ SHEAR_FLOW_RUNTIME = RuntimeDescriptor(
     sweep_mode="parallel",
     first_restart=True,
     runtime_package=RUNTIME_MODULE_NAME,
-    generate_script=str(PROVENANCE_ROOT / "generate.py"),
+    generate_script="generate.py",
     execute_argv=("sbatch", "run_HPC.sbatch"),
     execute_description="Submit the generated GV shear-flow job script to Slurm.",
     experimental=True,
@@ -160,7 +163,7 @@ def build_dry_run_manifest(
                 }
             ],
             "paths": {
-                "source_root": str(SOURCE_ROOT),
+                "source_root": str(PROVENANCE_ROOT),
                 "provenance_root": str(PROVENANCE_ROOT),
                 "output_root": manifest["output_root"],
                 "work_dir": manifest["work_dir"],
@@ -181,7 +184,6 @@ __all__ = [
     "PROVENANCE_ROOT",
     "RUNTIME_MODULE_NAME",
     "SHEAR_FLOW_RUNTIME",
-    "SOURCE_ROOT",
     "STRUCTURE_NAME",
     "DESCRIPTOR",
     "build_descriptor",

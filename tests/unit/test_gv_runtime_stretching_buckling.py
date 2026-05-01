@@ -37,10 +37,8 @@ def test_runtime_descriptor_imports_do_not_require_mirheo(monkeypatch: pytest.Mo
 def test_stretching_uses_control_sweeps_from_run_all(tmp_path: Path) -> None:
     module = importlib.import_module("meso_uq.structures.gv.runtime.stretching")
 
-    before = list(tmp_path.rglob("*"))
     dry_run = module.build_dry_run_descriptor(tmp_path / "planner")
     manifest = dry_run.to_manifest()
-    after = list(tmp_path.rglob("*"))
 
     control_sweeps = {sweep.name: sweep for sweep in module.RUNTIME_DESCRIPTOR.control_sweeps}
 
@@ -58,26 +56,32 @@ def test_stretching_uses_control_sweeps_from_run_all(tmp_path: Path) -> None:
     assert manifest["geometry"] == dry_run.geometry
     assert manifest["controls"] == {"tot_force": 500.0, "bpress": -91.0}
     assert manifest["work_dir"].startswith(str((tmp_path / "planner").resolve()))
-    assert str(module.PROVENANCE_ROOT).endswith("gv_simulation_files/stretching/gv")
+    assert str(module.PROVENANCE_ROOT).endswith("gv/stretching/src")
     assert set(module.RUNTIME_DESCRIPTOR.source_files) == {
-        str(module.PROVENANCE_ROOT / "clean_all.sh"),
-        str(module.PROVENANCE_ROOT / "run_all.sh"),
-        str(module.PROVENANCE_ROOT / "generate.py"),
-        str(module.PROVENANCE_ROOT / "parameters.py"),
-        str(module.PROVENANCE_ROOT / "run.sh"),
-        str(module.PROVENANCE_ROOT / "equil.py"),
-        str(module.PROVENANCE_ROOT / "parameters-default.gv.yaml"),
+        "clean_all.sh",
+        "run_all.sh",
+        "generate.py",
+        "parameters.py",
+        "run.sh",
+        "equil.py",
+        "parameters-default.gv.yaml",
+        "gas_vesicle/create_gv.py",
+        "gas_vesicle/parameters.py",
+        "gas_vesicle/parameters.yaml",
+        "gas_vesicle/run.sh",
+        "gas_vesicle/statistics.py",
+        "gas_vesicle/add_to_off.py",
     }
-    assert before == after == []
+    assert Path(manifest["source_manifest"]).is_file()
+    assert manifest["source_manifest"].endswith("/source_manifest.json")
+    assert Path("run_all.sh").name in [Path(path).name for path in manifest["source_files"]]
 
 
 def test_buckling_uses_control_sweeps_from_run_all(tmp_path: Path) -> None:
     module = importlib.import_module("meso_uq.structures.gv.runtime.buckling")
 
-    before = list(tmp_path.rglob("*"))
     dry_run = module.build_dry_run_descriptor(tmp_path / "planner")
     manifest = dry_run.to_manifest()
-    after = list(tmp_path.rglob("*"))
 
     control_sweeps = {sweep.name: sweep for sweep in module.RUNTIME_DESCRIPTOR.control_sweeps}
 
@@ -94,17 +98,23 @@ def test_buckling_uses_control_sweeps_from_run_all(tmp_path: Path) -> None:
     assert manifest["geometry"] == dry_run.geometry
     assert manifest["controls"] == {"buck": 0.0, "bpress": -91.0}
     assert manifest["work_dir"].startswith(str((tmp_path / "planner").resolve()))
-    assert str(module.PROVENANCE_ROOT).endswith("gv_simulation_files/buckling/gv")
+    assert str(module.PROVENANCE_ROOT).endswith("gv/buckling/src")
     assert set(module.RUNTIME_DESCRIPTOR.source_files) == {
-        str(module.PROVENANCE_ROOT / "clean_all.sh"),
-        str(module.PROVENANCE_ROOT / "run_all.sh"),
-        str(module.PROVENANCE_ROOT / "generate.py"),
-        str(module.PROVENANCE_ROOT / "parameters.py"),
-        str(module.PROVENANCE_ROOT / "run.sh"),
-        str(module.PROVENANCE_ROOT / "equil.py"),
-        str(module.PROVENANCE_ROOT / "parameters-default.gv.yaml"),
+        "clean_all.sh",
+        "run_all.sh",
+        "generate.py",
+        "parameters.py",
+        "run.sh",
+        "equil.py",
+        "parameters-default.gv.yaml",
+        "gas_vesicle/create_gv.py",
+        "gas_vesicle/parameters.py",
+        "gas_vesicle/parameters.yaml",
+        "gas_vesicle/run.sh",
+        "gas_vesicle/statistics.py",
+        "gas_vesicle/add_to_off.py",
     }
-    assert before == after == []
+    assert Path(manifest["source_manifest"]).is_file()
 
 
 def test_dry_run_manifests_expose_identity_axes_and_reject_provenance_outputs(tmp_path: Path) -> None:
@@ -123,5 +133,5 @@ def test_dry_run_manifests_expose_identity_axes_and_reject_provenance_outputs(tm
         assert "equil.py" in " ".join(module.RUNTIME_DESCRIPTOR.notes)
         assert "run_all.sh" in " ".join(module.RUNTIME_DESCRIPTOR.notes)
 
-        with pytest.raises(ValueError, match="must not be inside gv_simulation_files"):
+        with pytest.raises(ValueError, match=r"must not be inside '/.*(gv_simulation_files|gv)'"):
             module.build_dry_run_descriptor(module.PROVENANCE_ROOT / "scratch")

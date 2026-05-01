@@ -105,6 +105,8 @@ def test_materialize_gv_reference_source_manifest_copies_portable_inputs(tmp_pat
 
     assert source_copy.is_file()
     assert runtime_manifest.is_file()
+    assert manifest["artifacts"]["source_reference_manifest"].startswith("_runs/gv/")
+    assert manifest["artifacts"]["runtime_manifest"].startswith("_runs/gv/")
     assert manifest["input_manifests"]["source_reference"].startswith("_runs/gv/torsion/")
     assert manifest["input_manifests"]["runtime_dry_run"].startswith("_runs/gv/torsion/")
     _assert_no_local_absolute_paths(manifest, tmp_path)
