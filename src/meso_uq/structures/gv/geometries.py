@@ -4,8 +4,9 @@ from decimal import Decimal
 
 from ..registry import GeometrySpec
 from .geometry_sources import (
+    DEFAULT_GV_HEIGHT,
+    DEFAULT_GV_RADIUS,
     gv_canonical_geometry_default_source,
-    gv_default_geometry_defaults,
 )
 
 
@@ -29,11 +30,8 @@ def build_geometry(*, radius: float, height: float, source: str) -> GeometrySpec
     )
 
 
-_DEFAULT_GV_RADIUS, _DEFAULT_GV_HEIGHT = gv_default_geometry_defaults()
-
-
 DEFAULT_GV_GEOMETRY = build_geometry(
-    radius=_DEFAULT_GV_RADIUS,
-    height=_DEFAULT_GV_HEIGHT,
+    radius=DEFAULT_GV_RADIUS,
+    height=DEFAULT_GV_HEIGHT,
     source=gv_canonical_geometry_default_source(),
 )

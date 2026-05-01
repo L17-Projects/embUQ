@@ -25,6 +25,39 @@ DRY_RUN_WORKFLOW = REPO_ROOT / "scripts" / "workflows" / "gv" / "run_gv_dry_run.
 DEFAULT_OUTPUT_ROOT = REPO_ROOT / "_runs" / "gv" / "runtime"
 GV_RUNTIME_MANIFEST = "gv_runtime_dry_run_manifest.json"
 GV_RUNTIME_RENDER_MANIFEST = "gv_runtime_render_manifest.json"
+_KNOWN_ISSUE_BLOCKED_SEVERITIES = {"error", "blocking", "blocked", "critical"}
+
+
+def _normalize_known_issues(raw_known_issues: object) -> list[dict[str, Any]]:
+    if not isinstance(raw_known_issues, list):
+        return []
+    normalized: list[dict[str, Any]] = []
+    for issue in raw_known_issues:
+        if not isinstance(issue, dict):
+            continue
+        severity = str(issue.get("severity", "")).lower()
+        normalized.append(
+            {
+                "id": str(issue.get("id", "")),
+                "summary": str(issue.get("summary", "")),
+                "evidence": str(issue.get("evidence", "")),
+                "severity": severity,
+                "classification": "experimental_blocked" if severity in _KNOWN_ISSUE_BLOCKED_SEVERITIES else "observed",
+            }
+        )
+    return normalized
+
+
+def _build_runtime_stage(runtime_manifest: dict[str, Any]) -> dict[str, Any]:
+    is_experimental = bool(runtime_manifest.get("experimental", False))
+    known_issues = _normalize_known_issues(runtime_manifest.get("known_issues", []))
+    return {
+        "experimental": is_experimental,
+        "runtime_package": str(runtime_manifest.get("runtime_package", "")),
+        "runtime_package_source": str(runtime_manifest.get("source_root", "")),
+        "known_issues": known_issues,
+        "blocked_issue_count": sum(1 for issue in known_issues if issue.get("classification") == "experimental_blocked"),
+    }
 
 
 def _load_gv_dry_run_module():
@@ -287,6 +320,7 @@ def _to_render_manifest(
         "commands": command_records,
         "include_experimental": args.include_experimental,
         "dry_run": dry_run,
+        "runtime_stage": _build_runtime_stage(runtime_manifest),
         "returncode": returncode,
     }
 

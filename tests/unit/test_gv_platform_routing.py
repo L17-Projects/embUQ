@@ -259,6 +259,84 @@ def test_gv_runtime_workflow_helper_edge_cases(tmp_path, monkeypatch) -> None:
     with pytest.raises(ValueError, match="controls"):
         module._load_runtime_manifest(bad_controls_json)
 
+
+def test_gv_runtime_render_manifest_records_classified_known_issues(tmp_path, monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_runtime.py"),
+        "gv_runtime_known_issues_render_test",
+    )
+
+    manifest = {
+        "structure": "gv",
+        "experiment": "shear_flow",
+        "geometry": "gv_rad2_height14_28",
+        "control_id": "theta_0_03",
+        "controls": {"theta": 0.03},
+        "dataset_id": "gv:shear_flow:gv_rad2_height14_28:theta_0_03",
+        "output_root": str(tmp_path / "runtime"),
+        "work_dir": str(tmp_path / "runtime" / "work"),
+        "geometry_spec": {"id": "gv_rad2_height14_28", "parameters": {"radius": 2.0, "height": 14.28}},
+        "source_root": str(tmp_path / "sources" / "shear_flow"),
+        "runtime_package": "mirheoOBMD",
+        "experimental": True,
+        "known_issues": [
+            {
+                "id": "bouncer_overflow",
+                "summary": "Observed triangle overlap candidates.",
+                "evidence": "gv/shear_flow/src/fixtures/bouncer.txt",
+                "severity": "Blocking",
+            },
+            {
+                "id": "artifact_stale",
+                "summary": "Reference artifact timestamp drift.",
+                "evidence": "artifacts/state.csv",
+                "severity": "warning",
+            },
+        ],
+        "commands": [],
+        "analysis_commands": [],
+        "generated_subdirs": [],
+    }
+    manifest_path = tmp_path / "runtime" / module.GV_RUNTIME_MANIFEST
+
+    def _fake_dry_run(argv: list[str]) -> int:
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        (manifest_path.parent / "work").mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return 0
+
+    monkeypatch.setattr(module, "RUN_GV_DRY_RUN_MAIN", _fake_dry_run)
+    def _forbidden_run(*args, **kwargs) -> None:
+        raise AssertionError("runtime commands should not execute under --dry-run")
+
+    monkeypatch.setattr(module.subprocess, "run", _forbidden_run)
+
+    rc = module.main(["--selection", "gv:torsion", "--output-root", str(tmp_path / "runtime"), "--dry-run"])
+    assert rc == 0
+
+    rendered = json.loads((tmp_path / "runtime" / module.GV_RUNTIME_RENDER_MANIFEST).read_text(encoding="utf-8"))
+    runtime_stage = rendered["runtime_stage"]
+    assert runtime_stage["experimental"] is True
+    assert runtime_stage["runtime_package"] == "mirheoOBMD"
+    assert runtime_stage["runtime_package_source"] == str(manifest["source_root"])
+    assert runtime_stage["blocked_issue_count"] == 1
+    assert runtime_stage["known_issues"] == [
+        {
+            "id": "bouncer_overflow",
+            "summary": "Observed triangle overlap candidates.",
+            "evidence": "gv/shear_flow/src/fixtures/bouncer.txt",
+            "severity": "blocking",
+            "classification": "experimental_blocked",
+        },
+        {
+            "id": "artifact_stale",
+            "summary": "Reference artifact timestamp drift.",
+            "evidence": "artifacts/state.csv",
+            "severity": "warning",
+            "classification": "observed",
+        },
+    ]
+
     assert module._normalize_command_value(("python3", "generate.py")) == ["python3", "generate.py"]
     with pytest.raises(ValueError, match="Expected a command list"):
         module._normalize_command_value("python3 generate.py")
