@@ -169,6 +169,79 @@ def test_gv_hbi_setup_helper_selection_and_gate_paths(tmp_path: Path, monkeypatc
         gv_hbi._dataset_manifest_path({}, dataset_id=dataset_id, dataset_count=2, inline_manifest_map={})
 
 
+def test_gv_hbi_requires_structure_qualified_dataset_ids() -> None:
+    assert (
+        gv_hbi._require_structure_qualified_dataset_id("gv:torsion:gv_rad2_height14_28:theta_0.03")
+        is None
+    )
+    with pytest.raises(ValueError, match="structure-qualified"):
+        gv_hbi._require_structure_qualified_dataset_id("torsion:gv_rad2_height14_28:theta_0.03")
+    with pytest.raises(ValueError, match="structure-qualified"):
+        gv_hbi._require_structure_qualified_dataset_id("gv:torsion::theta_0.03")
+
+
+def test_gv_hbi_rejects_unqualified_dataset_id_in_manifest_map() -> None:
+    with pytest.raises(ValueError, match="structure-qualified"):
+        gv_hbi._surrogate_manifest_map(
+            {"gv_surrogate_manifests": {"torsion:gv_rad2_height14_28:theta_0.03": "foo.json"}}
+        )
+
+
+def test_gv_hbi_contract_helpers_reject_mismatches(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _ContractWithoutSigma:
+        calibrated_names = gv_hbi.GV_PHASE1_CALIBRATED_PARAMETERS
+        nuisance_names: tuple[str, ...] = ()
+        noise_model = None
+
+    class _ContractWithWrongCalibrated:
+        calibrated_names = ("ka",)
+        nuisance_names = gv_hbi.GV_PHASE1_NUISANCE_PARAMETERS
+        noise_model = None
+
+    class _StructureWithoutSigma:
+        parameter_contract = _ContractWithoutSigma()
+
+    class _StructureWithWrongCalibrated:
+        parameter_contract = _ContractWithWrongCalibrated()
+
+    monkeypatch.setattr(gv_hbi, "get_structure", lambda _name: _StructureWithWrongCalibrated())
+    with pytest.raises(ValueError, match="calibrated contract mismatch"):
+        gv_hbi._require_gv_calibrated_contract()
+
+    monkeypatch.setattr(gv_hbi, "get_structure", lambda _name: _StructureWithoutSigma())
+    with pytest.raises(ValueError, match="missing required nuisance parameter"):
+        gv_hbi._parameter_contract_manifest()
+
+    with pytest.raises(ValueError, match="multiplicative sigma"):
+        gv_hbi._require_gv_noisy_model({"noise_model": "sigma"}, label="test payload")
+
+
+def test_gv_hbi_reference_manifest_defaults_to_multiplicative_noise_model() -> None:
+    payload = {
+        "structure": "gv",
+        "experiment": "torsion",
+        "geometry": "gv_rad2_height14_28",
+        "controls": {"theta": 0.03},
+        "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+        "reference_kind": "synthetic",
+        "calibrated_parameter_names": list(gv_hbi.GV_PHASE1_CALIBRATED_PARAMETERS),
+        "noise_model": {
+            "kind": "multiplicative",
+            "parameter": "sigma",
+            "description": "Apply multiplicative observation noise.",
+        },
+    }
+    validated = gv_hbi._validate_reference_manifest(
+        payload,
+        experiment="torsion",
+        geometry="gv_rad2_height14_28",
+        dataset_id="gv:torsion:gv_rad2_height14_28:theta_0.03",
+        control="theta_0.03",
+        expected_controls={"theta": 0.03},
+    )
+    assert validated["noise_model"] == gv_hbi.GV_PHASE1_NOISE_MODEL
+
+
 @pytest.mark.parametrize(
     ("payload_updates", "artifacts", "match"),
     (
@@ -279,6 +352,11 @@ def test_gv_hbi_rejects_reference_manifest_that_calibrates_controls(monkeypatch:
             return _Experiment()
 
     monkeypatch.setattr(gv_hbi, "get_structure", lambda _name: _Structure())
+    monkeypatch.setattr(
+        gv_hbi,
+        "_require_gv_calibrated_contract",
+        lambda: ("ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c", "theta"),
+    )
 
     with pytest.raises(ValueError, match="controls separate from calibrated parameters"):
         gv_hbi._validate_reference_manifest(
@@ -289,7 +367,7 @@ def test_gv_hbi_rejects_reference_manifest_that_calibrates_controls(monkeypatch:
                 "controls": {"theta": 0.03},
                 "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
                 "noise_model": {"kind": "multiplicative", "parameter": "sigma"},
-                "calibrated_parameter_names": ["ka", "kb", "theta"],
+                "calibrated_parameter_names": ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c", "theta"],
             },
             experiment="torsion",
             geometry="gv_rad2_height14_28",
@@ -741,6 +819,102 @@ def test_gv_hbi_build_manifest_rejects_empty_selection_and_control_overlap(
     monkeypatch.setattr(gv_hbi, "phase2_hyperprior_specs", lambda _config: [])
     monkeypatch.setattr(gv_hbi, "active_hierarchical_variable_names", lambda _config: [])
     with pytest.raises(ValueError, match="GV controls must not appear"):
+        gv_hbi.build_gv_phase1_setup_manifest(
+            config,
+            [_experiment(tmp_path)],
+            repo_root=tmp_path,
+            output_root=tmp_path / "out",
+        )
+
+
+def test_gv_hbi_build_manifest_rejects_controls_in_calibrated_or_nuisance_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path = _surrogate_manifest(tmp_path)
+    config = _gv_config(manifest_path)
+    class _FakeExperiment:
+        control_names = ("sigma",)
+
+    class _FakeContract:
+        calibrated_names = gv_hbi.GV_PHASE1_CALIBRATED_PARAMETERS
+        nuisance_names = gv_hbi.GV_PHASE1_NUISANCE_PARAMETERS
+
+    class _FakeStructure:
+        parameter_contract = _FakeContract()
+
+        @staticmethod
+        def get_experiment(_name: str, include_experimental: bool = True) -> _FakeExperiment:
+            return _FakeExperiment()
+
+    original_get_structure = gv_hbi.get_structure
+    monkeypatch.setattr(
+        gv_hbi,
+        "get_structure",
+        lambda name: _FakeStructure() if name == "gv" else original_get_structure(name),
+    )
+    monkeypatch.setattr(gv_hbi, "_gv_dataset_entries", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        gv_hbi,
+        "phase1_prior_specs",
+        lambda _config: [
+            ("ka", [0.1, 1.1]),
+            ("kb", [0.2, 1.2]),
+            ("mu", [0.3, 1.3]),
+            ("b1", [0.4, 1.4]),
+            ("b2", [0.5, 1.5]),
+            ("a3", [0.6, 1.6]),
+            ("a4", [0.7, 1.7]),
+            ("mu_l", [0.8, 1.8]),
+            ("c", [0.9, 1.9]),
+        ],
+    )
+    monkeypatch.setattr(gv_hbi, "phase2_hyperprior_specs", lambda _config: [])
+    monkeypatch.setattr(gv_hbi, "active_hierarchical_variable_names", lambda _config: [])
+
+    with pytest.raises(ValueError, match="GV controls must not appear in calibrated or nuisance variables"):
+        gv_hbi.build_gv_phase1_setup_manifest(
+            config,
+            [_experiment(tmp_path)],
+            repo_root=tmp_path,
+            output_root=tmp_path / "out",
+        )
+
+
+def test_gv_hbi_build_manifest_rejects_missing_required_nuisance_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path = _surrogate_manifest(tmp_path)
+    config = _gv_config(manifest_path)
+
+    class _FakeContract:
+        calibrated_names = gv_hbi.GV_PHASE1_CALIBRATED_PARAMETERS
+        nuisance_names: tuple[str, ...] = ()
+
+    class _FakeStructure:
+        parameter_contract = _FakeContract()
+
+    monkeypatch.setattr(gv_hbi, "get_structure", lambda _name: _FakeStructure())
+    monkeypatch.setattr(gv_hbi, "_gv_dataset_entries", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        gv_hbi,
+        "phase1_prior_specs",
+        lambda _config: [
+            ("ka", [0.1, 1.1]),
+            ("kb", [0.2, 1.2]),
+            ("mu", [0.3, 1.3]),
+            ("b1", [0.4, 1.4]),
+            ("b2", [0.5, 1.5]),
+            ("a3", [0.6, 1.6]),
+            ("a4", [0.7, 1.7]),
+            ("mu_l", [0.8, 1.8]),
+            ("c", [0.9, 1.9]),
+        ],
+    )
+    monkeypatch.setattr(gv_hbi, "phase2_hyperprior_specs", lambda _config: [])
+
+    with pytest.raises(ValueError, match="missing required nuisance parameter"):
         gv_hbi.build_gv_phase1_setup_manifest(
             config,
             [_experiment(tmp_path)],
