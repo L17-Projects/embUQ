@@ -101,7 +101,7 @@ def test_runtime_descriptor_rejects_unknown_control_override(tmp_path: Path) -> 
         descriptor.plan(output_root=tmp_path, controls={"buck": 0.25})
 
 
-def test_runtime_descriptor_rejects_source_output_root() -> None:
+def test_runtime_descriptor_rejects_source_output_root(tmp_path: Path) -> None:
     descriptor = RuntimeDescriptor(
         experiment="eigenmodes",
         provenance_root="gv/eigenmodes/src",
@@ -115,6 +115,51 @@ def test_runtime_descriptor_rejects_source_output_root() -> None:
         descriptor.plan(output_root=Path("gv_simulation_files") / "scratch")
     with pytest.raises(ValueError, match=r"must not be (inside '/.*/src'|a source directory)"):
         descriptor.plan(output_root=Path("src"))
+    with pytest.raises(ValueError, match="repository root 'gv'"):
+        descriptor.plan(output_root=tmp_path / "gv")
+
+
+def test_runtime_descriptor_rejects_missing_or_outside_source_files(tmp_path: Path) -> None:
+    source_root = tmp_path / "sources"
+    source_root.mkdir()
+    nested = source_root / "nested"
+    nested.mkdir()
+    (nested / "run.sh").write_text("echo nested", encoding="utf-8")
+    outside = tmp_path / "outside.py"
+    outside.write_text("print('outside')", encoding="utf-8")
+
+    missing_descriptor = RuntimeDescriptor(
+        experiment="custom",
+        provenance_root=str(source_root),
+        source_files=("missing.py",),
+        control_sweeps=(ControlSweep("seed", 1.0, 1.0, 1),),
+        sweep_mode="forward",
+        first_restart=False,
+    )
+    with pytest.raises(ValueError, match="source file not found"):
+        missing_descriptor.plan(output_root=tmp_path / "runtime-missing")
+
+    outside_descriptor = RuntimeDescriptor(
+        experiment="custom",
+        provenance_root=str(source_root),
+        source_files=(str(outside),),
+        control_sweeps=(ControlSweep("seed", 1.0, 1.0, 1),),
+        sweep_mode="forward",
+        first_restart=False,
+    )
+    with pytest.raises(ValueError, match="must be under source root"):
+        outside_descriptor.plan(output_root=tmp_path / "runtime-outside")
+
+    no_root_descriptor = RuntimeDescriptor(
+        experiment="custom",
+        provenance_root=str(tmp_path / "does-not-exist"),
+        source_files=("run.sh",),
+        control_sweeps=(ControlSweep("seed", 1.0, 1.0, 1),),
+        sweep_mode="forward",
+        first_restart=False,
+    )
+    with pytest.raises(FileNotFoundError, match="source root does not exist"):
+        no_root_descriptor.plan(output_root=tmp_path / "runtime-no-root")
 
 
 def test_experimental_runtime_requires_opt_in(tmp_path: Path) -> None:

@@ -137,6 +137,15 @@ def test_gv_operational_canary_helper_edges(tmp_path: Path, monkeypatch: pytest.
         module._resolve_selection("torsion")
     with pytest.raises(ValueError, match="only supports structure 'gv'"):
         module._resolve_selection("emb:compression")
+    with pytest.raises(ValueError, match="Conflicting runtime selections"):
+        module._resolve_runtime_selection(structure="gv", experiment="stretching", selection="gv:torsion")
+    with pytest.raises(ValueError, match="Conflicting runtime structure"):
+        module._resolve_runtime_selection(structure="emb", experiment="torsion", selection="gv:torsion")
+    with pytest.raises(ValueError, match="Either --selection or --experiment"):
+        module._resolve_runtime_selection(structure="gv", experiment=None, selection=None)
+    with pytest.raises(ValueError, match="only supports structure 'gv'"):
+        module._resolve_runtime_selection(structure="emb", experiment="compression", selection=None)
+    assert module._resolve_runtime_selection(structure=None, experiment="torsion", selection=None) == ("gv", "torsion")
 
     with pytest.raises(ValueError, match="missing artifacts"):
         module._require_phase1_compatible_surrogate_artifact(
@@ -149,6 +158,24 @@ def test_gv_operational_canary_helper_edges(tmp_path: Path, monkeypatch: pytest.
             surrogate_root=tmp_path,
             surrogate_status="passed",
         )
+    existing_artifact_manifest = {"artifacts": {"artifact_path": str(tmp_path / "model.pt")}}
+    assert (
+        module._require_phase1_compatible_surrogate_artifact(
+            surrogate_manifest=existing_artifact_manifest,
+            surrogate_root=tmp_path,
+            surrogate_status="passed",
+        )
+        is existing_artifact_manifest
+    )
+    dry_run_manifest = {"artifacts": {}}
+    returned_manifest = module._require_phase1_compatible_surrogate_artifact(
+        surrogate_manifest=dry_run_manifest,
+        surrogate_root=tmp_path,
+        surrogate_status="dry-run",
+    )
+    placeholder_path = Path(returned_manifest["artifacts"]["artifact_path"])
+    assert placeholder_path.is_file()
+    assert returned_manifest["artifacts"]["model_path"] == str(placeholder_path)
 
     assert module._build_verdict(
         surrogate_report={"status": "failed"},
