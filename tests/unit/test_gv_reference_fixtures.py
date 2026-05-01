@@ -169,6 +169,21 @@ def test_validate_gv_reference_manifest_rejects_missing_schema_fields() -> None:
             validate_gv_reference_manifest(incomplete)
 
 
+def test_validate_gv_reference_manifest_allows_missing_extended_fields_for_v1() -> None:
+    manifest = build_gv_synthetic_reference_manifest(
+        seed=17,
+        experiment="torsion",
+        geometry="gv_rad2_height14_28",
+        controls={"theta": 0.03},
+        point_count=2,
+    )
+    legacy_manifest = dict(manifest)
+    legacy_manifest["manifest_schema_version"] = 1
+    for field in ("geometry_parameters", "geometry_spec", "observable_schema", "generation_seed"):
+        legacy_manifest.pop(field)
+    validate_gv_reference_manifest(legacy_manifest)
+
+
 def test_validate_gv_reference_manifest_rejects_schema_contract_mismatches() -> None:
     manifest = build_gv_synthetic_reference_manifest(
         seed=17,

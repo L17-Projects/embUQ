@@ -14,9 +14,52 @@ from meso_uq.workflow_acceleration import GV_CALIBRATED_PARAMETER_ORDER
 
 DEFAULT_SURROGATE_BACKEND = "dnn"
 GV_REFERENCE_KINDS = ("synthetic", "dpd_generated")
-_MANIFEST_SCHEMA_VERSION = 1
+_MANIFEST_SCHEMA_VERSION = 2
 _GV_GEOMETRY_PARAMETER_NAMES = ("radius", "height")
 _REQUIRED_DATASET_ID_COMPONENTS = 4
+_GV_REFERENCE_MANIFEST_VERSION_V1 = 1
+_GV_REFERENCE_MANIFEST_VERSION_V2 = 2
+_SUPPORTED_GV_REFERENCE_MANIFEST_VERSIONS = (_GV_REFERENCE_MANIFEST_VERSION_V1, _GV_REFERENCE_MANIFEST_VERSION_V2)
+_GV_REFERENCE_MANIFEST_REQUIRED_FIELDS: dict[int, tuple[str, ...]] = {
+    _GV_REFERENCE_MANIFEST_VERSION_V1: (
+        "manifest_schema_version",
+        "structure",
+        "experiment",
+        "geometry",
+        "controls",
+        "control_id",
+        "dataset_id",
+        "reference_kind",
+        "surrogate_backend",
+        "observable_names",
+        "calibrated_parameter_names",
+        "nuisance_parameter_names",
+        "noise_model",
+        "provenance",
+        "outputs",
+    ),
+    _GV_REFERENCE_MANIFEST_VERSION_V2: (
+        "manifest_schema_version",
+        "structure",
+        "experiment",
+        "geometry",
+        "controls",
+        "control_id",
+        "dataset_id",
+        "reference_kind",
+        "surrogate_backend",
+        "observable_names",
+        "geometry_parameters",
+        "calibrated_parameter_names",
+        "nuisance_parameter_names",
+        "noise_model",
+        "provenance",
+        "outputs",
+        "geometry_spec",
+        "observable_schema",
+        "generation_seed",
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -222,36 +265,17 @@ def _build_observable_schema(context: GVReferenceContext) -> list[dict[str, str]
 
 
 def validate_gv_reference_manifest(manifest: Mapping[str, Any], *, context: GVReferenceContext | None = None) -> None:
-    required = [
-        "manifest_schema_version",
-        "structure",
-        "experiment",
-        "geometry",
-        "controls",
-        "control_id",
-        "dataset_id",
-        "reference_kind",
-        "surrogate_backend",
-        "observable_names",
-        "geometry_parameters",
-        "calibrated_parameter_names",
-        "nuisance_parameter_names",
-        "noise_model",
-        "provenance",
-        "outputs",
-        "geometry_spec",
-        "observable_schema",
-        "generation_seed",
-    ]
+    manifest_schema_version = manifest.get("manifest_schema_version")
+    if manifest_schema_version not in _SUPPORTED_GV_REFERENCE_MANIFEST_VERSIONS:
+        raise ValueError(
+            f"Unsupported GV reference manifest schema version {manifest_schema_version!r}. "
+            f"Expected one of {_SUPPORTED_GV_REFERENCE_MANIFEST_VERSIONS}."
+        )
+
+    required = _GV_REFERENCE_MANIFEST_REQUIRED_FIELDS[manifest_schema_version]
     missing = [field for field in required if field not in manifest]
     if missing:
         raise ValueError("GV reference manifest is missing required schema fields: " + ", ".join(missing))
-
-    if manifest["manifest_schema_version"] != _MANIFEST_SCHEMA_VERSION:
-        raise ValueError(
-            f"Unsupported GV reference manifest schema version {manifest['manifest_schema_version']!r}. "
-            f"Expected {_MANIFEST_SCHEMA_VERSION}."
-        )
 
     structure = manifest["structure"]
     if str(structure) != "gv":
@@ -278,32 +302,35 @@ def validate_gv_reference_manifest(manifest: Mapping[str, Any], *, context: GVRe
     if list(calibrated) != expected_calibrated:
         raise ValueError("GV reference manifest calibrated_parameter_names must match the GV parameter contract.")
 
-    geometry_parameters = manifest["geometry_parameters"]
-    if not isinstance(geometry_parameters, Mapping):
-        raise ValueError("GV reference manifest geometry_parameters must be a mapping.")
-    for axis in _GV_GEOMETRY_PARAMETER_NAMES:
-        if axis not in geometry_parameters:
-            raise ValueError(f"GV reference manifest geometry_parameters missing '{axis}'.")
+    if manifest_schema_version >= _MANIFEST_SCHEMA_VERSION:
+        geometry_parameters = manifest["geometry_parameters"]
+        if not isinstance(geometry_parameters, Mapping):
+            raise ValueError("GV reference manifest geometry_parameters must be a mapping.")
+        for axis in _GV_GEOMETRY_PARAMETER_NAMES:
+            if axis not in geometry_parameters:
+                raise ValueError(f"GV reference manifest geometry_parameters missing '{axis}'.")
 
-    observable_schema = manifest["observable_schema"]
-    if not isinstance(observable_schema, Sequence):
-        raise ValueError("GV reference manifest observable_schema must be a sequence.")
-    if context is not None and len(observable_schema) != len(context.experiment.observables):
-        raise ValueError("GV reference manifest observable_schema must match the experiment observables.")
+    if manifest_schema_version >= _MANIFEST_SCHEMA_VERSION:
+        observable_schema = manifest["observable_schema"]
+        if not isinstance(observable_schema, Sequence):
+            raise ValueError("GV reference manifest observable_schema must be a sequence.")
+        if context is not None and len(observable_schema) != len(context.experiment.observables):
+            raise ValueError("GV reference manifest observable_schema must match the experiment observables.")
 
     provenance = manifest["provenance"]
     if not isinstance(provenance, Mapping):
         raise ValueError("GV reference manifest provenance must be a mapping.")
 
-    geometry_spec = manifest["geometry_spec"]
-    if not isinstance(geometry_spec, Mapping):
-        raise ValueError("GV reference manifest geometry_spec must be a mapping.")
-    geometry_spec_parameters = geometry_spec.get("parameters")
-    if not isinstance(geometry_spec_parameters, Mapping):
-        raise ValueError("GV reference manifest geometry_spec.parameters must be a mapping.")
-    for axis in _GV_GEOMETRY_PARAMETER_NAMES:
-        if axis not in geometry_spec_parameters:
-            raise ValueError(f"GV reference manifest geometry_spec.parameters missing '{axis}'.")
+    if manifest_schema_version >= _MANIFEST_SCHEMA_VERSION:
+        geometry_spec = manifest["geometry_spec"]
+        if not isinstance(geometry_spec, Mapping):
+            raise ValueError("GV reference manifest geometry_spec must be a mapping.")
+        geometry_spec_parameters = geometry_spec.get("parameters")
+        if not isinstance(geometry_spec_parameters, Mapping):
+            raise ValueError("GV reference manifest geometry_spec.parameters must be a mapping.")
+        for axis in _GV_GEOMETRY_PARAMETER_NAMES:
+            if axis not in geometry_spec_parameters:
+                raise ValueError(f"GV reference manifest geometry_spec.parameters missing '{axis}'.")
 
     noise_model = manifest["noise_model"]
     if not isinstance(noise_model, Mapping):
@@ -311,9 +338,10 @@ def validate_gv_reference_manifest(manifest: Mapping[str, Any], *, context: GVRe
     if noise_model.get("kind") != "multiplicative" or noise_model.get("parameter") != "sigma":
         raise ValueError("GV reference manifest noise_model must be multiplicative sigma.")
 
-    generation_seed = manifest["generation_seed"]
-    if generation_seed is not None and not isinstance(generation_seed, (int, float)):
-        raise ValueError("GV reference manifest generation_seed must be numeric when set.")
+    if manifest_schema_version >= _MANIFEST_SCHEMA_VERSION:
+        generation_seed = manifest["generation_seed"]
+        if generation_seed is not None and not isinstance(generation_seed, (int, float)):
+            raise ValueError("GV reference manifest generation_seed must be numeric when set.")
 
 
 def build_manifest_prefix(
