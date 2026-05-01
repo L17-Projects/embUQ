@@ -336,6 +336,8 @@ def test_gv_runtime_render_manifest_records_classified_known_issues(tmp_path, mo
             "classification": "observed",
         },
     ]
+    assert module._normalize_known_issues("not-a-list") == []
+    assert module._normalize_known_issues(["not-a-dict"]) == []
 
     assert module._normalize_command_value(("python3", "generate.py")) == ["python3", "generate.py"]
     with pytest.raises(ValueError, match="Expected a command list"):
