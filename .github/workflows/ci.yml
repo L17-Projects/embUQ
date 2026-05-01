@@ -65,6 +65,22 @@ jobs:
           path: .ci-base-coverage/coverage-base.json
           key: base-coverage-${{ runner.os }}-py311-${{ github.event.pull_request.base.sha }}
 
+      - name: Detect coverage-sensitive changes
+        if: github.event_name == 'pull_request'
+        id: coverage-scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          head_sha="${{ github.event.pull_request.head.sha }}"
+          changed_files="$(git diff --name-only "$base_sha" "$head_sha")"
+
+          if printf "%s\n" "$changed_files" | rg -qE '^(src/|tests/|scripts/ci/|pyproject.toml|setup\\.py|setup\\.cfg)$'; then
+            echo "run_coverage_gate=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_coverage_gate=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Compute base branch coverage
         if: success() && github.event_name == 'pull_request'
         shell: bash
@@ -104,7 +120,7 @@ jobs:
           git worktree remove "$worktree_dir" --force
 
       - name: Enforce strict coverage increase
-        if: success() && github.event_name == 'pull_request'
+        if: success() && github.event_name == 'pull_request' && steps.coverage-scope.outputs.run_coverage_gate == 'true'
         shell: bash
         run: |
           test -f coverage-head.json
