@@ -9,7 +9,7 @@ import json
 import random
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import numpy as np
 
@@ -183,6 +183,21 @@ def _validate_geometry_parameters(manifest: dict[str, Any], *, manifest_path: Pa
     return geometry_spec
 
 
+def _validate_controls_against_contract(experiment_name: str, controls: Mapping[str, Any]) -> None:
+    structure = get_structure("gv")
+    experiment = structure.get_experiment(experiment_name, include_experimental=True)
+    calibrated = set(structure.parameter_contract.calibrated_names)
+    nuisance = set(structure.parameter_contract.nuisance_names)
+    collision = {name for name in controls if name in calibrated or name in nuisance}
+    if collision:
+        raise ValueError(
+            "GV reference controls must remain fixed design inputs and cannot collide with calibrated or nuisance parameters."
+        )
+    unknown = sorted(set(controls) - set(experiment.control_names))
+    if unknown:
+        raise ValueError(f"Unknown GV controls for {experiment_name}: {', '.join(unknown)}")
+
+
 def _load_runtime_manifest(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     required = ("structure", "experiment", "geometry", "controls")
@@ -195,6 +210,7 @@ def _load_runtime_manifest(path: Path) -> dict[str, Any]:
         raise ValueError(f"GV smoke workflow only supports structure='gv', got {payload['structure']!r}.")
     if not isinstance(payload["controls"], dict):
         raise ValueError("runtime manifest controls must be a mapping.")
+    _validate_controls_against_contract(str(payload["experiment"]), payload["controls"])
     _validate_geometry_parameters(payload, manifest_path=path)
     normalized = dict(payload)
     normalized["manifest_path"] = str(path.resolve())
@@ -213,6 +229,7 @@ def _load_reference_manifest(path: Path) -> dict[str, Any]:
         raise ValueError(f"GV smoke workflow only supports structure='gv', got {payload['structure']!r}.")
     if not isinstance(payload["controls"], dict):
         raise ValueError("reference manifest controls must be a mapping.")
+    _validate_controls_against_contract(str(payload["experiment"]), payload["controls"])
     if payload["reference_kind"] not in REFERENCE_KINDS:
         raise ValueError(f"Unsupported GV reference kind {payload['reference_kind']!r}. Expected one of {REFERENCE_KINDS}.")
     normalized = dict(payload)
