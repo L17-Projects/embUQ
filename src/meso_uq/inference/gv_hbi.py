@@ -34,6 +34,11 @@ def _require_structure_qualified_dataset_id(dataset_id: str) -> None:
         )
 
 
+def _is_structure_qualified_dataset_id(dataset_id: str) -> bool:
+    parts = str(dataset_id).split(":")
+    return len(parts) >= 4 and parts[0] == GV_PHASE1_STRUCTURE and all(part for part in parts[:4])
+
+
 def _require_gv_calibrated_contract() -> tuple[str, ...]:
     calibrated = tuple(get_structure("gv").parameter_contract.calibrated_names)
     if calibrated != GV_PHASE1_CALIBRATED_PARAMETERS:
@@ -129,9 +134,7 @@ def _surrogate_manifest_map(config: Mapping[str, Any]) -> dict[str, str]:
     manifest_map: dict[str, str] = {}
     for key, value in raw.items():
         dataset_id = str(key)
-        try:
-            _require_structure_qualified_dataset_id(dataset_id)
-        except ValueError:
+        if not _is_structure_qualified_dataset_id(dataset_id):
             continue
         manifest_map[dataset_id] = str(value)
     return manifest_map

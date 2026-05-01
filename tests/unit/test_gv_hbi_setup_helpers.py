@@ -200,6 +200,21 @@ def test_gv_hbi_allows_unqualified_manifest_map_keys_when_requested_dataset_is_g
     )
 
 
+def test_gv_hbi_surrogate_manifest_map_does_not_call_strict_validator_for_map_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _unexpected_validate(_dataset_id: str) -> None:
+        raise AssertionError("strict dataset id validator must not be used for manifest-map iteration")
+
+    monkeypatch.setattr(gv_hbi, "_require_structure_qualified_dataset_id", _unexpected_validate)
+    assert gv_hbi._surrogate_manifest_map(
+        {
+            "gv_surrogate_manifests": {
+                "torsion:gv_rad2_height14_28:theta_0.03": "bad.json",
+                "gv:torsion:gv_rad2_height14_28:theta_0.03": "good.json",
+            }
+        }
+    ) == {"gv:torsion:gv_rad2_height14_28:theta_0.03": "good.json"}
+
+
 def test_gv_hbi_contract_helpers_reject_mismatches(monkeypatch: pytest.MonkeyPatch) -> None:
     class _ContractWithoutSigma:
         calibrated_names = gv_hbi.GV_PHASE1_CALIBRATED_PARAMETERS
