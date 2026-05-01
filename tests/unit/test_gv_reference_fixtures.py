@@ -6,6 +6,12 @@ import sys
 from pathlib import Path
 
 import pytest
+from meso_uq.references import build_gv_synthetic_reference_manifest
+from meso_uq.references.gv_common import (
+    resolve_gv_reference_context,
+    validate_gv_dataset_id,
+    validate_gv_reference_manifest,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src"
@@ -146,3 +152,81 @@ def test_fixture_rejects_unknown_or_missing_controls_and_non_dnn_backend() -> No
             sigma=0.01,
             surrogate_backend="bnn",
         )
+
+
+def test_validate_gv_reference_manifest_rejects_missing_schema_fields() -> None:
+    manifest = build_gv_synthetic_reference_manifest(
+        seed=17,
+        experiment="torsion",
+        geometry="gv_rad2_height14_28",
+        controls={"theta": 0.03},
+        point_count=2,
+    )
+    for field in ("observable_schema", "generation_seed", "geometry_spec", "geometry_parameters"):
+        incomplete = dict(manifest)
+        incomplete.pop(field)
+        with pytest.raises(ValueError, match="missing required schema fields"):
+            validate_gv_reference_manifest(incomplete)
+
+
+def test_validate_gv_reference_manifest_rejects_schema_contract_mismatches() -> None:
+    manifest = build_gv_synthetic_reference_manifest(
+        seed=17,
+        experiment="torsion",
+        geometry="gv_rad2_height14_28",
+        controls={"theta": 0.03},
+        point_count=2,
+    )
+    invalid_payloads = [
+        ({"manifest_schema_version": 99}, "Unsupported GV reference manifest schema version"),
+        ({"structure": "emb"}, "structure='gv'"),
+        ({"reference_kind": "real"}, "Unsupported GV reference kind"),
+        ({"controls": []}, "controls must be a mapping"),
+        ({"calibrated_parameter_names": 3}, "calibrated_parameter_names must be a sequence"),
+        ({"calibrated_parameter_names": ["ka"]}, "calibrated_parameter_names must match"),
+        ({"geometry_parameters": []}, "geometry_parameters must be a mapping"),
+        ({"geometry_parameters": {"radius": 2.0}}, "geometry_parameters missing 'height'"),
+        ({"observable_schema": 3}, "observable_schema must be a sequence"),
+        ({"provenance": []}, "provenance must be a mapping"),
+        ({"geometry_spec": []}, "geometry_spec must be a mapping"),
+        (
+            {"geometry_spec": {"id": "gv_rad2_height14_28", "parameters": []}},
+            "geometry_spec.parameters must be a mapping",
+        ),
+        (
+            {"geometry_spec": {"id": "gv_rad2_height14_28", "parameters": {"radius": 2.0}}},
+            "geometry_spec.parameters missing 'height'",
+        ),
+        ({"noise_model": []}, "noise_model must be a mapping"),
+        ({"noise_model": {"kind": "additive", "parameter": "sigma"}}, "noise_model must be multiplicative sigma"),
+        ({"generation_seed": "seed"}, "generation_seed must be numeric"),
+    ]
+    for updates, match in invalid_payloads:
+        invalid = dict(manifest)
+        invalid.update(updates)
+        with pytest.raises(ValueError, match=match):
+            validate_gv_reference_manifest(invalid)
+
+    context = resolve_gv_reference_context(
+        experiment="torsion",
+        geometry="gv_rad2_height14_28",
+        controls={"theta": 0.03},
+    )
+    invalid_schema = dict(manifest)
+    invalid_schema["observable_schema"] = [*manifest["observable_schema"], {"name": "extra"}]
+    with pytest.raises(ValueError, match="observable_schema must match"):
+        validate_gv_reference_manifest(invalid_schema, context=context)
+
+
+def test_validate_gv_dataset_id_rejects_collisions() -> None:
+    valid_gv_dataset = "gv:torsion:gv_rad2_height14_28:theta_0.03"
+    invalid_structure = "emb:torsion:gv_rad2_height14_28:theta_0.03"
+    malformed = "gv:torsion:theta_0.03"
+
+    validate_gv_dataset_id(valid_gv_dataset, structure_name="gv")
+    with pytest.raises(ValueError, match="must be strings"):
+        validate_gv_dataset_id(3, structure_name="gv")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="structure-qualified"):
+        validate_gv_dataset_id(invalid_structure, structure_name="gv")
+    with pytest.raises(ValueError, match="4 components"):
+        validate_gv_dataset_id(malformed, structure_name="gv")

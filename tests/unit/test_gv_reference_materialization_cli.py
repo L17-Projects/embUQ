@@ -80,11 +80,39 @@ def test_materialize_gv_reference_source_manifest_copies_portable_inputs(tmp_pat
     source_manifest_path.write_text(
         json.dumps(
             {
+                "manifest_schema_version": 1,
                 "structure": "gv",
                 "experiment": "torsion",
                 "geometry": "gv_rad2_height14_28",
                 "controls": {"theta": 0.03},
+                "control_id": "theta_0.03",
+                "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+                "surrogate_backend": "dnn",
                 "reference_kind": "synthetic",
+                "observable_names": ["torsion_response"],
+                "geometry_parameters": {"radius": 2.0, "height": 14.28},
+                "calibrated_parameter_names": ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c"],
+                "nuisance_parameter_names": ["sigma"],
+                "provenance": {
+                    "geometry_source": "test",
+                },
+                "outputs": {},
+                "geometry_spec": {
+                    "id": "gv_rad2_height14_28",
+                    "label": "gv_rad2_height14_28",
+                    "shape": "cylinder",
+                    "parameters": {"radius": 2.0, "height": 14.28},
+                    "source": "test",
+                },
+                "observable_schema": [
+                    {
+                        "name": "torsion_response",
+                        "description": "Torsion response under applied end rotation.",
+                        "units": "curve",
+                    }
+                ],
+                "noise_model": {"kind": "multiplicative", "parameter": "sigma"},
+                "generation_seed": None,
                 "points": [0.0, 1.0],
                 "values": [0.2, 0.4],
             }
@@ -237,38 +265,80 @@ def test_materialize_gv_reference_helper_validation_paths(tmp_path: Path) -> Non
     with pytest.raises(ValueError, match="Reference manifest .* missing required fields"):
         module._normalize_reference_manifest({"structure": "gv"}, path=reference_path)
 
-    with pytest.raises(ValueError, match="structure='gv'"):
-        module._normalize_reference_manifest(
+    valid_reference_payload = {
+        "manifest_schema_version": 1,
+        "structure": "gv",
+        "experiment": "torsion",
+        "geometry": "gv_rad2_height14_28",
+        "control_id": "theta_0.03",
+        "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+        "surrogate_backend": "dnn",
+        "controls": {"theta": 0.03},
+        "reference_kind": "synthetic",
+        "observable_names": ["torsion_response"],
+        "geometry_parameters": {"radius": 2.0, "height": 14.28},
+        "calibrated_parameter_names": ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c"],
+        "nuisance_parameter_names": ["sigma"],
+        "noise_model": {"kind": "multiplicative", "parameter": "sigma"},
+        "provenance": {},
+        "outputs": {},
+        "geometry_spec": {
+            "id": "gv_rad2_height14_28",
+            "label": "gv_rad2_height14_28",
+            "shape": "cylinder",
+            "parameters": {"radius": 2.0, "height": 14.28},
+            "source": "test",
+        },
+        "observable_schema": [
             {
-                "structure": "emb",
-                "experiment": "torsion",
-                "geometry": "gv_rad2_height14_28",
-                "controls": {"theta": 0.03},
-                "reference_kind": "synthetic",
-            },
-            path=reference_path,
-        )
+                "name": "torsion_response",
+                "description": "Torsion response under applied end rotation.",
+                "units": "curve",
+            }
+        ],
+        "generation_seed": None,
+    }
+
+    with pytest.raises(ValueError, match="structure='gv'"):
+        module._normalize_reference_manifest({**valid_reference_payload, "structure": "emb"}, path=reference_path)
 
     with pytest.raises(ValueError, match="controls must be a mapping"):
-        module._normalize_reference_manifest(
-            {
-                "structure": "gv",
-                "experiment": "torsion",
-                "geometry": "gv_rad2_height14_28",
-                "controls": [],
-                "reference_kind": "synthetic",
-            },
-            path=reference_path,
-        )
+        module._normalize_reference_manifest({**valid_reference_payload, "controls": []}, path=reference_path)
 
     with pytest.raises(ValueError, match="Unsupported GV reference kind"):
         module._normalize_reference_manifest(
             {
+                "manifest_schema_version": 1,
                 "structure": "gv",
                 "experiment": "torsion",
                 "geometry": "gv_rad2_height14_28",
+                "control_id": "theta_0.03",
+                "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0.03",
+                "surrogate_backend": "dnn",
                 "controls": {"theta": 0.03},
                 "reference_kind": "real",
+                "observable_names": ["torsion_response"],
+                "geometry_parameters": {"radius": 2.0, "height": 14.28},
+                "calibrated_parameter_names": ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c"],
+                "nuisance_parameter_names": ["sigma"],
+                "noise_model": {"kind": "multiplicative", "parameter": "sigma"},
+                "provenance": {},
+                "outputs": {},
+                "geometry_spec": {
+                    "id": "gv_rad2_height14_28",
+                    "label": "gv_rad2_height14_28",
+                    "shape": "cylinder",
+                    "parameters": {"radius": 2.0, "height": 14.28},
+                    "source": "test",
+                },
+                "observable_schema": [
+                    {
+                        "name": "torsion_response",
+                        "description": "Torsion response under applied end rotation.",
+                        "units": "curve",
+                    }
+                ],
+                "generation_seed": None,
             },
             path=reference_path,
         )
