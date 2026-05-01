@@ -242,6 +242,27 @@ def test_gv_hbi_reference_manifest_defaults_to_multiplicative_noise_model() -> N
     assert validated["noise_model"] == gv_hbi.GV_PHASE1_NOISE_MODEL
 
 
+def test_gv_hbi_requires_default_multiplicative_noise_model_when_missing() -> None:
+    assert gv_hbi._require_gv_noisy_model({}, label="GV reference manifest") == gv_hbi.GV_PHASE1_NOISE_MODEL
+
+
+def test_gv_hbi_loads_gv_dnn_model_state_with_fake_loader(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    expected = object()
+
+    def fake_load_model_states(path: str) -> tuple[object, list[float], list[float], list[float], list[float]]:
+        assert path == str(tmp_path / "state.pkl")
+        return expected, [1.0, 2.0], [3.0, 4.0], [5.0], [6.0]
+
+    monkeypatch.setitem(sys.modules, "meso_uq.surrogate.model", types.SimpleNamespace(load_model_states=fake_load_model_states))
+
+    model, xshift, xscale, yshift, yscale = gv_hbi._load_gv_dnn_model_state(tmp_path / "state.pkl")
+    assert model is expected
+    assert np.array_equal(xshift, np.array([1.0, 2.0]))
+    assert np.array_equal(xscale, np.array([3.0, 4.0]))
+    assert np.array_equal(yshift, np.array([5.0]))
+    assert np.array_equal(yscale, np.array([6.0]))
+
+
 @pytest.mark.parametrize(
     ("payload_updates", "artifacts", "match"),
     (
@@ -651,6 +672,63 @@ def test_gv_hbi_predicts_with_loaded_dnn_state() -> None:
         np.asarray([[1.0, 2.0], [0.0, 0.0]], dtype=np.float64),
     )
     assert predictions.tolist() == pytest.approx([18.0, 2.0])
+
+
+def test_gv_hbi_predicts_with_mocked_torch_tensor(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeTensor:
+        def __init__(self, values: np.ndarray) -> None:
+            self._values = values
+
+        def detach(self) -> "FakeTensor":
+            return self
+
+        def cpu(self) -> "FakeTensor":
+            return self
+
+        def numpy(self) -> np.ndarray:
+            return self._values
+
+    class FakeTorchInferenceMode:
+        def __enter__(self) -> None:
+            return None
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+    class FakeTorch:
+        float32 = "float32"
+
+        @staticmethod
+        def as_tensor(value: np.ndarray, dtype: object) -> np.ndarray:
+            assert dtype == "float32"
+            return np.asarray(value, dtype=np.float64)
+
+        @staticmethod
+        def inference_mode() -> FakeTorchInferenceMode:
+            return FakeTorchInferenceMode()
+
+    class FakeModel:
+        def eval(self) -> None:
+            return None
+
+        def __call__(self, x_norm: np.ndarray) -> FakeTensor:
+            return FakeTensor(np.sum(x_norm, axis=1) * 2.0)
+
+    model = FakeModel()
+
+    monkeypatch.setitem(sys.modules, "torch", FakeTorch)
+
+    predictions = gv_hbi._predict_gv_dnn(
+        (
+            model,
+            np.asarray([0.0, 0.0]),
+            np.asarray([1.0, 1.0]),
+            np.asarray([1.0]),
+            np.asarray([2.0]),
+        ),
+        np.asarray([[1.0, 2.0], [3.0, 4.0]], dtype=np.float64),
+    )
+    assert predictions.tolist() == pytest.approx([13.0, 29.0])
 
 
 def test_gv_phase1_execution_rejects_non_surrogate_config(tmp_path: Path) -> None:
