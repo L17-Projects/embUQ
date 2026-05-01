@@ -103,10 +103,10 @@ mvert = rho_shell * shell_th * tot_area * ul**2 / um / nverts
 ######################################################
 # elasticity
 
-ka_tot = parameters_default["ka_tot"] 
+ka_tot = parameters_default["ka_tot"]
 kv_tot = parameters_default["kv_tot"]
 gammaC = parameters_default["gammaC"]
-kBT = kbt 
+kBT = kbt
 
 # engineering constants (Young's moduli, Poisson's ratio, ...)
 fscale = parameters_default["fscale"]
@@ -205,7 +205,7 @@ def testDistance(sample, rtol):
     for i in range(numObjects):
         for j in range(numObjects):
             rel = sample[j] - sample[i]
-            r = np.linalg.norm(rel)  
+            r = np.linalg.norm(rel)
             if(i is not j and r < rtol):
                 sample[i] -= rel * 0.5 * (1.03 * rtol - r)
                 sample[j] += rel * 0.5 * (1.03 * rtol - r)
@@ -216,7 +216,7 @@ def testDistance(sample, rtol):
         return sample, True
 
 ok = False
-while(not ok):  
+while(not ok):
     sample, ok = testDistance(sample, rtol)
 
 x = sample[:,0]
@@ -241,7 +241,7 @@ else:
         if(rand_rot):
             quatr = [np.sqrt(1 - u) * np.sin(2 * np.pi * v), np.sqrt(1 - u) * np.cos(2 * np.pi * v), np.sqrt(u) * np.sin(2 * np.pi * w), np.sqrt(u) * np.cos(2 * np.pi * w)]
         pos_q.append([x[i], y[i], z[i], quatr[0], quatr[1], quatr[2], quatr[3]])
-        
+
 ######################################################
 # write computed parameters to parameters.yaml
 

@@ -11,7 +11,7 @@ staggered: True #True    #staggered circles ... True probably better
 #CGAL parameters
 #adjust so that you get a properly triangulated object
 #sometimes sharp edges are a problem #usually one needs to increase the "mesher" parameter
- 
+
 #sphere tip = 2
 #tip = 2
 #npts = 10
@@ -25,7 +25,7 @@ af1: 40.0 	#maximum facet length
 
 #scale_space_alpha (using weighted pca smoother)
 neigh: 6  		#neighbors	is the number of neighbors a point's neighborhood should contain on average
-samples: 10000 	#samples	is the number of points sampled to estimate the neighborhood radius. 
+samples: 10000 	#samples	is the number of points sampled to estimate the neighborhood radius.
 scalea: 1		#scale iterations
 
 #afm2

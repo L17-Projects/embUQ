@@ -13,8 +13,8 @@ with open(filename_default, 'rb') as f:
     parameters_default = yaml.load(f, Loader = yaml.CLoader)
 
 
-radius = parameters_default["radGV"] 
-height = parameters_default["height"] 
+radius = parameters_default["radGV"]
+height = parameters_default["height"]
 
 def read_off_file(filename):
     points = []
@@ -50,7 +50,7 @@ for f in faces:
     volume_tmp = np.dot(loc_cms,vec)/6      #signed volume tetrahedron (negative)
     #print(f'partial volume = {volume_tmp}')
     volume.append(volume_tmp)
-    
+
 def find_neighbors(T, points):
     stats = []
     neighbors = {}
@@ -62,7 +62,7 @@ def find_neighbors(T, points):
         neighbors[simplex[2]] += [simplex[0],simplex[1]]
     for n in neighbors.values():
         stats.append(len(list(dict.fromkeys(n))))
-    counter = collections.Counter(stats)    
+    counter = collections.Counter(stats)
     return stats, counter
 
 stats,counter = find_neighbors(T,vertices)
@@ -71,17 +71,17 @@ import trimesh
 
 mesh = trimesh.load('out.off')
 
-vert = mesh.vertices 
+vert = mesh.vertices
 
 mesh.vertices  = mesh.vertices  - np.mean(mesh.vertices, axis=0)
 
 mesh.export('out.off')
 
 print(f'''Average triangle area = {np.mean(area)} +- {np.std(area)}.
-Total area = {np.sum(area)}. 
+Total area = {np.sum(area)}.
 Total volume = {-np.sum(volume)}.
 Orientation of triangles: clockwise (normals point inside).
-Nt = {int(len(area))} triangles 
+Nt = {int(len(area))} triangles
 Ne = {int(len(area))+int(len(vertices))-2} edges.
 Nv = {int(len(vertices))} vertices.
 Nv - Ne + Nt = 2.

@@ -31,7 +31,7 @@ af1 =       40.0 	#maximum facet length
 
 #scale_space_alpha (using weighted pca smoother)
 neigh =     6  		#neighbors	is the number of neighbors a point's neighborhood should contain on average
-samples =   10000 	#samples	is the number of points sampled to estimate the neighborhood radius. 
+samples =   10000 	#samples	is the number of points sampled to estimate the neighborhood radius.
 scalea =    1		#scale iterations
 
 #afm2

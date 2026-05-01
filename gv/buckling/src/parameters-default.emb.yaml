@@ -28,9 +28,9 @@ fscale: 0.0074
 Yt: 264.0e+6
 Yl: 264.0e+6
 nu: 0.5
-a3: 0.0 
-a4: 0.0 
-b1: 0.0 
+a3: 0.0
+a4: 0.0
+b1: 0.0
 b2: 0.0
 theta: 0.0
 
@@ -62,8 +62,8 @@ radGV: 2.0
 height: 14.28
 
 #Area, volume
-ka_tot: 0.0 
-kv_tot: 0.0 
+ka_tot: 0.0
+kv_tot: 0.0
 
 #Viscoelasticity
 gammaC: 0.0
@@ -74,11 +74,11 @@ buck: 0.0
 #Stretch
 fraction: 0.02
 
-#OBMD parameters 
+#OBMD parameters
 #bufferSize = 0.15 means 0.15 * Lx
 # bufferTau = 10.0 means 10.0 * dt
 obmd_flag: 1
-bufferSize: 0.15 
-bufferTau: 10.0 
+bufferSize: 0.15
+bufferTau: 10.0
 bufferAlpha: 0.6
-ptan: 0.5 
+ptan: 0.5

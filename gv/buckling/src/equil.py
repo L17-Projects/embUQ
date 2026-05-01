@@ -36,10 +36,10 @@ if(args.restart):
 filename_default = 'parameter/parameters-default' + args.simnum + '.yaml'
 with open(filename_default, 'rb') as f:
     parameters_default = yaml.load(f, Loader = yaml.CLoader)
-    
+
 filename = 'parameter/parameters' + args.simnum + '.yaml'
 with open(filename, 'rb') as f:
-    parameters = yaml.load(f, Loader = yaml.CLoader)    
+    parameters = yaml.load(f, Loader = yaml.CLoader)
 
 filename_prms = 'parameter/parameters.prms' + args.simnum + '.yaml'
 with open(filename_prms, 'rb') as f:
@@ -65,7 +65,7 @@ gamma_dpd_gas = parameters_default["gamma_dpd_gas"]
 gamma_fsi = parameters["gamma_fsi"]
 gamma_fsi_gas = parameters["gamma_fsi_gas"]
 rc = parameters_default["rc"]
-s = parameters_default["s"] 
+s = parameters_default["s"]
 s_g = parameters_default["s_g"]
 k_fsi = parameters_default["k_fsi"]
 kbt = parameters["kbt"]
@@ -79,8 +79,8 @@ buck = parameters_default["buck"]
 
 pos_q = np.reshape(np.loadtxt('posq.txt'), (-1, 7))
 
-ranks = (1, 1, 1)                       
-domain = (Lx, Ly, Lz)   
+ranks = (1, 1, 1)
+domain = (Lx, Ly, Lz)
 
 ######################################################
 checkpoint_step = numsteps - 1
@@ -113,7 +113,7 @@ water = mir.ParticleVectors.ParticleVector('water', mass = mw)#, obmd = obmd_fla
 ic_water = mir.InitialConditions.Uniform(number_density = rhow)
 u.registerParticleVector(water, ic_water)
 
-#solvent 
+#solvent
 sol2 = mir.ParticleVectors.ParticleVector('sol2', mass = mg)#, obmd = obmd_flag)
 ic_outer2 = mir.InitialConditions.Uniform(number_density = rhog)
 u.registerParticleVector(sol2, ic_outer2)
@@ -122,7 +122,7 @@ u.registerParticleVector(sol2, ic_outer2)
 #only one can be not null, either inside or outside
 inner_checker_1 = mir.BelongingCheckers.Mesh("inner_checker_1")
 u.registerObjectBelongingChecker(inner_checker_1, emb)
-gas = u.applyObjectBelongingChecker(inner_checker_1, sol2, correct_every = 0, inside = "gas", outside = "") 
+gas = u.applyObjectBelongingChecker(inner_checker_1, sol2, correct_every = 0, inside = "gas", outside = "")
 #https://mirheo.readthedocs.io/en/latest/user/tutorials.html
 
 inner_checker_2 = mir.BelongingCheckers.Mesh("inner_solvent_checker_2")
@@ -135,7 +135,7 @@ radGV = parameters_default["radGV"]
 #buck = buck / radGV
 
 #interactions
-afsi = 2.0 * aii #buck * aii #prej 0.5 * 
+afsi = 2.0 * aii #buck * aii #prej 0.5 *
 lj_fac = parameters_default["lj_fac"]
 facg = parameters_default["facg"]
 bpress = parameters_default["bpress"]
@@ -146,7 +146,7 @@ if(objType == 'gv'):
 else:
     int_emb = mir.Interactions.MembraneForces("int_emb", "Lim", "KantorStressFree", **prms_emb, stress_free = True)
 
-   
+
 t0 = 0.0
 print(u)
 if(u.isComputeTask()):
@@ -168,7 +168,7 @@ lj_int = mir.Interactions.Pairwise('lj_int', lj_fac, kind = "RepulsiveLJ", epsil
 #niter = 10
 #epps = 1e-4
 #fbuck = 0.75
-#delta_buck = fbuck / (niter - 1) 
+#delta_buck = fbuck / (niter - 1)
 a0 = aii
 #if buck > delta_buck - epps:
 #	a0 = aii + buck * aii - delta_buck * aii
@@ -195,7 +195,7 @@ else:
 ######################################## INTEGRATOR ########################################
 #initialize integrator
 # 1step of dt for solvent, substep steps of dt / substeps for membrane
-#substeps = 20 
+#substeps = 20
 #ss = mir.Integrators.SubStep('substep_membrane', substeps, [int_emb])
 #u.registerIntegrator(ss)
 
@@ -207,8 +207,8 @@ u.registerIntegrator(vv)
 #set integrator for various parts
 if args.restart:
     u.setIntegrator(vv, emb)
-    
-#u.setIntegrator(vv, emb) 
+
+#u.setIntegrator(vv, emb)
 u.setIntegrator(vv, water)
 u.setIntegrator(vv, gas)
 
@@ -234,7 +234,7 @@ print('restart odpd')
 #else:
 #	u.setInteraction(dpd, water, water)
 #	print('without odpd')
-    
+
 u.setInteraction(dpd_gas, gas, gas)
 u.setInteraction(dpd, water, gas)
 
@@ -309,7 +309,7 @@ if args.restart:
     u.registerPlugins(mir.Plugins.createDumpMesh('ply_dump', emb, nevery, f"ply_eq/sim{args.simnum}"))
     u.registerPlugins(mir.Plugins.createDumpXYZ('xyz_dump_gas', gas, nevery, f"trj_eq/sim{args.simnum}"))
     u.registerPlugins(mir.Plugins.createVirialPressurePlugin('virial', water, predicate_all_domain, h, nevery, 'pressure/p' + args.simnum))
-    
+
     u.registerPlugins(mir.Plugins.createDumpObjectStats('objStats', emb, nevery, filename = 'stats/object' + args.simnum))
     u.registerPlugins(mir.Plugins.createAnchorParticles("anchor", emb, positions, velocities, pids, nevery, "anchor/"))
     u.run(numsteps, dt = dt)

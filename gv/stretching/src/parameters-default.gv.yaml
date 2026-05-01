@@ -15,7 +15,7 @@ stslik_eq: 100
 ul: 35.0e-9
 kbol: 1.3805e-23
 t0: 300.0
-rho_water: 997.0 
+rho_water: 997.0
 rho_gas: 3.72
 rho_shell: 1320.0
 shell_th: 2.0e-9
@@ -68,8 +68,8 @@ radGV: 2.0
 height: 14.28
 
 #Area, volume
-ka_tot: 0.0 
-kv_tot: 0.0 
+ka_tot: 0.0
+kv_tot: 0.0
 
 #Viscoelasticity
 gammaC: 0.0
@@ -82,11 +82,11 @@ force: 0.0
 tot_force: 0.0
 fraction: 0.15
 
-#OBMD parameters 
+#OBMD parameters
 #bufferSize = 0.15 means 0.15 * Lx
 # bufferTau = 10.0 means 10.0 * dt
 obmd_flag: 1
 bufferSize: 0.15
-bufferTau: 10.0 
+bufferTau: 10.0
 bufferAlpha: 0.6
 ptan: 0.5

@@ -36,10 +36,10 @@ if(args.restart):
 filename_default = 'parameter/parameters-default' + args.simnum + '.yaml'
 with open(filename_default, 'rb') as f:
     parameters_default = yaml.load(f, Loader = yaml.CLoader)
-    
+
 filename = 'parameter/parameters' + args.simnum + '.yaml'
 with open(filename, 'rb') as f:
-    parameters = yaml.load(f, Loader = yaml.CLoader)    
+    parameters = yaml.load(f, Loader = yaml.CLoader)
 
 filename_prms = 'parameter/parameters.prms' + args.simnum + '.yaml'
 with open(filename_prms, 'rb') as f:
@@ -65,7 +65,7 @@ gamma_dpd_gas = parameters_default["gamma_dpd_gas"]
 gamma_fsi = parameters["gamma_fsi"]
 gamma_fsi_gas = parameters["gamma_fsi_gas"]
 rc = parameters_default["rc"]
-s = parameters_default["s"] 
+s = parameters_default["s"]
 s_g = parameters_default["s_g"]
 k_fsi = parameters_default["k_fsi"]
 kbt = parameters["kbt"]
@@ -76,8 +76,8 @@ mg = parameters["mg"]
 
 pos_q = np.reshape(np.loadtxt('posq.txt'), (-1, 7))
 
-ranks = (1, 1, 1)                       
-domain = (Lx, Ly, Lz)   
+ranks = (1, 1, 1)
+domain = (Lx, Ly, Lz)
 
 ######################################################
 checkpoint_step = numsteps - 1
@@ -116,7 +116,7 @@ ic_water = mir.InitialConditions.Uniform(number_density = rhow)
 pv_water = u.registerParticleVector(water, ic_water)
 
 
-#solvent 
+#solvent
 sol2 = mir.ParticleVectors.ParticleVector('sol2', mass = mg)
 ic_outer2 = mir.InitialConditions.Uniform(number_density = rhog)
 u.registerParticleVector(sol2, ic_outer2)
@@ -125,7 +125,7 @@ u.registerParticleVector(sol2, ic_outer2)
 #only one can be not null, either inside or outside
 inner_checker_1 = mir.BelongingCheckers.Mesh("inner_checker_1")
 u.registerObjectBelongingChecker(inner_checker_1, emb)
-gas = u.applyObjectBelongingChecker(inner_checker_1, sol2, correct_every = 0, inside = "gas", outside = "") 
+gas = u.applyObjectBelongingChecker(inner_checker_1, sol2, correct_every = 0, inside = "gas", outside = "")
 #https://mirheo.readthedocs.io/en/latest/user/tutorials.html
 
 inner_checker_2 = mir.BelongingCheckers.Mesh("inner_solvent_checker_2")

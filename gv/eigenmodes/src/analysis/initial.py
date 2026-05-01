@@ -1,9 +1,9 @@
 #! /usr/bin/env python3
 
 import numpy as np
-import yaml 
+import yaml
 import argparse
-import trimesh 
+import trimesh
 
 ##########################
 # set-up simulation type: equilibration or restart

@@ -5,7 +5,7 @@ import numpy as np
 import trimesh
 import yaml
 import argparse
-import os 
+import os
 
 ######################################################
 # set-up simulation type: equilibration or restart
@@ -38,10 +38,10 @@ if(args.restart):
 filename_default = 'parameter/parameters-default' + args.simnum + '.yaml'
 with open(filename_default, 'rb') as f:
     parameters_default = yaml.load(f, Loader = yaml.CLoader)
-    
+
 filename = 'parameter/parameters' + args.simnum + '.yaml'
 with open(filename, 'rb') as f:
-    parameters = yaml.load(f, Loader = yaml.CLoader)    
+    parameters = yaml.load(f, Loader = yaml.CLoader)
 
 filename_prms = 'parameter/parameters.prms' + args.simnum + '.yaml'
 with open(filename_prms, 'rb') as f:
@@ -50,7 +50,7 @@ with open(filename_prms, 'rb') as f:
 def computeForces(vertices, fraction, force):
     vertices= np.array(vertices)
     k = int(fraction * 0.5 * len(vertices))
-    
+
     #k = 1
 
     ind_max = np.argpartition(+vertices[:,2], -k)[-k:]
@@ -59,7 +59,7 @@ def computeForces(vertices, fraction, force):
     #vert1 = np.max(vertices[ind_max][:,2])
     vert2 = np.argmin(vertices[ind_max][:,2])
     print('max vertex', vert2)
-    
+
     forces = np.zeros((len(vertices), 3))
 
     forces[ind_max,2] = +force
@@ -68,7 +68,7 @@ def computeForces(vertices, fraction, force):
 
 def computeTorsionalForces(vertices, z0, force, tol=0.1):
     vertices = np.array(vertices)
-    
+
     # Identify indices of particles near heights z0 and -z0 within tolerance
     ind_max = np.where((vertices[:, 2] > z0 - tol) & (vertices[:, 2] < z0 + tol))[0]
     ind_min = np.where((vertices[:, 2] > -z0 - tol) & (vertices[:, 2] < -z0 + tol))[0]
@@ -103,19 +103,19 @@ def computeTorsionalForces(vertices, z0, force, tol=0.1):
 def rotate_points_around_z(vertices, indices, theta):
     # Convert to radians if theta is provided in degrees (optional)
     # theta = np.radians(theta)
-    
+
     # Extract the points to rotate
     points = vertices[indices, :2]  # Only take XY coordinates for rotation
-    
+
     # Define the rotation matrix in the XY plane
     rotation_matrix = np.array([
         [np.cos(theta), -np.sin(theta)],
         [np.sin(theta),  np.cos(theta)]
     ])
-    
+
     # Apply the rotation to each point in the XY plane
     rotated_points = points @ rotation_matrix.T
-    
+
     # Update the original vertices array with the rotated points
     vertices_rotated = np.copy(vertices)
     vertices_rotated[indices, :2] = rotated_points  # Update only XY coordinates
@@ -124,14 +124,14 @@ def rotate_points_around_z(vertices, indices, theta):
 
 def findpids(vertices, z0, tol = 0.1):
     vertices = np.array(vertices)
-    
+
     # Identify indices of particles near heights z0 and -z0 within tolerance
     #ind_max = np.where((vertices[:, 2] > z0 - tol) & (vertices[:, 2] < z0 + tol))[0]
     #ind_min = np.where((vertices[:, 2] > -z0 - tol) & (vertices[:, 2] < -z0 + tol))[0]
 
     ind_max = np.where(vertices[:, 2] > z0)[0]
     ind_min = np.where(vertices[:, 2] < -z0)[0]
-    
+
     return ind_max, ind_min
 
 
@@ -153,9 +153,9 @@ gamma_dpd_gas = parameters_default["gamma_dpd_gas"]
 gamma_fsi = parameters["gamma_fsi"]
 gamma_fsi_gas = parameters["gamma_fsi_gas"]
 rc = parameters_default["rc"]
-s = parameters_default["s"] 
-s_g = parameters_default["s_g"] 
-k_fsi = parameters_default["k_fsi"] 
+s = parameters_default["s"]
+s_g = parameters_default["s_g"]
+k_fsi = parameters_default["k_fsi"]
 kbt = parameters["kbt"]
 obmd_flag = parameters_default["obmd_flag"]
 mvert = parameters["mvert"]
@@ -165,10 +165,10 @@ lj_fac = parameters_default["lj_fac"]
 
 pos_q = np.reshape(np.loadtxt('posq.txt'), (-1, 7))
 
-ranks = (1, 1, 1)                       
-domain = (Lx, Ly, Lz)  
+ranks = (1, 1, 1)
+domain = (Lx, Ly, Lz)
 
-force = parameters_default["force"]         
+force = parameters_default["force"]
 
 ######################################################
 checkpoint_step = numsteps - 1
@@ -196,7 +196,7 @@ if(not args.vacuum):
     ic_water = mir.InitialConditions.Uniform(number_density = rhow)
     u.registerParticleVector(water, ic_water)
 
-    #solvent 
+    #solvent
     sol2 = mir.ParticleVectors.ParticleVector('sol2', mass = mg)
     ic_outer2 = mir.InitialConditions.Uniform(number_density = rhog)
     u.registerParticleVector(sol2, ic_outer2)
@@ -230,7 +230,7 @@ else:
     int_emb = mir.Interactions.MembraneForces("int_emb", "Lim", "KantorStressFree", **prms_emb, stress_free = True)
 
 if(args.vacuum):
-    dpd0 = mir.Interactions.Pairwise('dpd0', rc, kind = "DPD", a = 0.0, gamma = 1 * gamma_dpd, kBT = 0.015 * kbt, power = s)  
+    dpd0 = mir.Interactions.Pairwise('dpd0', rc, kind = "DPD", a = 0.0, gamma = 1 * gamma_dpd, kBT = 0.015 * kbt, power = s)
 dpd = mir.Interactions.Pairwise('dpd', rc, kind = "DPD", a = 0*aii, gamma = 0*gamma_dpd, kBT = kbt, power = s)
 dpd_wat = mir.Interactions.Pairwise('dpd_wat', rc, kind = "DPD", a = aii, gamma = gamma_dpd, kBT = kbt, power = s)
 dpd_gas = mir.Interactions.Pairwise('dpd_gas', rc, kind = "DPD", a = aii, gamma = gamma_dpd_gas, kBT = kbt, power = s_g)
@@ -304,7 +304,7 @@ def positions(t):
 
 def velocities(t):
 	return [(0.0, 0.0, 0.0), (0.0, 0.0, 0.0)]
-	
+
 
 theta = parameters_default["theta"]
 rot1 = rotate_points_around_z(mesh.vertices, ids_max, theta)
@@ -334,7 +334,7 @@ if args.equil:
     u.registerPlugins(mir.Plugins.createPinObject('pin', emb, nevery, 'force/', velocity, omega))
     #forces = computeTorsionalForces(mesh.vertices, fraction, force).tolist()
     #forces = computeTorsionalForces(mesh.vertices, 0.4 * height, force, tol = 0.1).tolist()
-    
+
     u.registerPlugins(mir.Plugins.createStats('stats', every = nevery))
     u.registerPlugins(mir.Plugins.createDumpXYZ('xyz_dump', emb, nevery, f"trj_eq/sim{args.simnum}"))
     #u.registerPlugins(mir.Plugins.createMembraneExtraForce("extraGVForce", emb, forces))
@@ -354,7 +354,7 @@ if args.restart:
     u.registerPlugins(mir.Plugins.createPinObject('pin', emb, nevery, 'force/', velocity, omega))
     #forces = computeTorsionalForces(mesh.vertices, fraction, force).tolist()
     #forces = computeTorsionalForces(mesh.vertices, 0.4 * height, force, tol = 0.1).tolist()
-    
+
     u.registerPlugins(mir.Plugins.createStats('stats', every = nevery))
     u.registerPlugins(mir.Plugins.createDumpXYZ('xyz_dump', emb, nevery, f"trj_eq/sim{args.simnum}"))
     #u.registerPlugins(mir.Plugins.createMembraneExtraForce("extraGVForce", emb, forces))

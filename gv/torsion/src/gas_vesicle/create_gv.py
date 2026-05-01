@@ -22,7 +22,7 @@ def make_off_file_for_cgal(filename,points):
     for p in points:
         file.write(f'{p[0]} {p[1]} {p[2]}\n')
     file.close()
-    
+
 def make_xyz_file_for_ovito(filename,points):
     file = open(filename,'w')
     file.write(f'{len(points)}\n')
@@ -69,10 +69,10 @@ def gen_cone(radius, height, k, rho, sign = 1, shift = 0.5):
     for i in range(k - 1):
         radtmp = radius * (1 - i / (k - 1))
         npts = max(int(2 * rho * 2 * np.pi * radtmp), 3)
-        
+
         dfi = 2 * np.pi / npts
         fi0 = np.linspace(dfi, 2 * np.pi + dfi, npts, endpoint = False)
-        
+
         fi = fi0 + 0.5 * (1 - (-1)**(i+1)) * dfi * shift
         #fi = fi0 + i * dfi * shift
         x = radtmp * np.cos(fi)
@@ -84,8 +84,8 @@ def gen_cone(radius, height, k, rho, sign = 1, shift = 0.5):
     arr_out.append([0, 0, sign * (height - dh/2)])
     return np.array(arr_out).reshape((-1, 3))
 
-radius0 = parameters_default["radGV"] 
-height0 = parameters_default["height"] 
+radius0 = parameters_default["radGV"]
+height0 = parameters_default["height"]
 rho0 = den_fac # parameters_default["den_fac"]
 
 k0 = int(80 / 14.28 * height0)   #80/14.28 empirical factor that works well
@@ -117,7 +117,7 @@ obj.append(cone_top.tolist())
 obj = flatten_list(obj)
 arr = np.array(obj).reshape((-1, 3))
 arr_center = np.mean(arr, axis = 0)
-arr = arr - arr_center 
+arr = arr - arr_center
 
 make_off_file_for_cgal('test.off', arr)
 make_xyz_file_for_ovito('test.xyz', arr)
@@ -157,7 +157,7 @@ def _find_scale_space_tool() -> Path:
 
 scale_space_exe = _find_scale_space_tool()
 
-print('Running scale_space') 
+print('Running scale_space')
 
 result = subprocess.run([str(scale_space_exe), str(scale), str(af1)])
 if result.returncode != 0:

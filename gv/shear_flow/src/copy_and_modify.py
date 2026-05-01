@@ -36,20 +36,20 @@ def update_generate(file_path, afsi_value):
 # Iterate over afsi values
 for afsi in range(int(a_start), int(a_end + a_step), int(a_step)):
     new_folder = f"a{afsi}"
-    
+
     # Copy the base folder to create a new simulation folder
     if os.path.exists(new_folder):
         print(f"Folder {new_folder} already exists. Skipping.")
         continue
     shutil.copytree(base_folder, new_folder)
-    
+
     # Update equil.py
     parameters_path = os.path.join(new_folder, parameters_file)
     update_parameters(parameters_path, float(afsi))
-    
+
     # Update generate.py
     generate_path = os.path.join(new_folder, generate_file)
     update_generate(generate_path, float(afsi))
-    
+
     print(f"Created and updated {new_folder}")
 

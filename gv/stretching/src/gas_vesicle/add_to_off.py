@@ -13,7 +13,7 @@ def read_test_off_file(filename):
         points.append([float(linetmp[0]),float(linetmp[1]),float(linetmp[2])])
     file.close()
     return np.array(points)
-    
+
 def read_out_off_file(filename):
     indices = []
     file = open(filename,'r')

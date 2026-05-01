@@ -11,6 +11,6 @@ nranks=${3:-2}
 mkdir -p logs restart mesh parameter force trj_eq stats
 
 echo "Simulation number: $simnum"
- 
+
 python3 parameters.py --simnum ${simnum}
 mpirun -np ${nranks} python3 equil.py $mode --simnum ${simnum} #--vacuum

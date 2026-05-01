@@ -37,10 +37,10 @@ if(args.restart):
 filename_default = 'parameter/parameters-default' + args.simnum + '.yaml'
 with open(filename_default, 'rb') as f:
     parameters_default = yaml.load(f, Loader = yaml.CLoader)
-    
+
 filename = 'parameter/parameters' + args.simnum + '.yaml'
 with open(filename, 'rb') as f:
-    parameters = yaml.load(f, Loader = yaml.CLoader)    
+    parameters = yaml.load(f, Loader = yaml.CLoader)
 
 filename_prms = 'parameter/parameters.prms' + args.simnum + '.yaml'
 with open(filename_prms, 'rb') as f:
@@ -64,9 +64,9 @@ gamma_dpd_gas = parameters_default["gamma_dpd_gas"]
 gamma_fsi = parameters["gamma_fsi"]
 gamma_fsi_gas = parameters["gamma_fsi_gas"]
 rc = parameters_default["rc"]
-s = parameters_default["s"] 
-s_g = parameters_default["s_g"] 
-k_fsi = parameters_default["k_fsi"] 
+s = parameters_default["s"]
+s_g = parameters_default["s_g"]
+k_fsi = parameters_default["k_fsi"]
 kbt = parameters["kbt"]
 obmd_flag = parameters_default["obmd_flag"]
 mvert = parameters["mvert"]
@@ -82,8 +82,8 @@ if not args.restart:
     "bufferSize" : parameters_default["bufferSize"] * Lx,
     "bufferAlpha" : parameters_default["bufferAlpha"],
     "bufferTau" : parameters_default["bufferTau"] * dt,
-    "pext" : pext, 
-    "ptan": 0.0 
+    "pext" : pext,
+    "ptan": 0.0
     }
 
 else:
@@ -91,12 +91,12 @@ else:
     "bufferSize" : parameters_default["bufferSize"] * Lx,
     "bufferAlpha" : parameters_default["bufferAlpha"],
     "bufferTau" : parameters_default["bufferTau"] * dt,
-    "pext" : pext, 
-    "ptan": parameters_default["ptan"] 
+    "pext" : pext,
+    "ptan": parameters_default["ptan"]
     }
 
-ranks = (1, 1, 1)                       
-domain = (Lx, Ly, Lz)   
+ranks = (1, 1, 1)
+domain = (Lx, Ly, Lz)
 
 ######################################################
 
@@ -142,7 +142,7 @@ water = mir.ParticleVectors.ParticleVector('water', mass = mw, obmd = obmd_flag)
 ic_water = mir.InitialConditions.Uniform(number_density = rhow)
 u.registerParticleVector(water, ic_water)
 
-#solvent 
+#solvent
 sol2 = mir.ParticleVectors.ParticleVector('sol2', mass = mg, obmd = 0)
 ic_outer2 = mir.InitialConditions.Uniform(number_density = rhog)
 u.registerParticleVector(sol2, ic_outer2)
@@ -174,7 +174,7 @@ lj_int = mir.Interactions.Pairwise('lj_int', lj_fac, kind = "RepulsiveLJ", epsil
 
 ######################################## INTEGRATOR ########################################
 #initialize and register substep integrator
-#substeps = 2 
+#substeps = 2
 #ss = mir.Integrators.SubStep('substep_membrane', substeps, [int_emb])
 #u.registerIntegrator(ss)
 

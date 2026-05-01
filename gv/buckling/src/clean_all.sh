@@ -12,8 +12,8 @@ del_all() {
 }
 
 cases () {
-	case $1 in 
-		[yY]) 
+	case $1 in
+		[yY])
 		printf "\n"
 		del_all
 		printf "\nCleaned!\n" ;;
@@ -24,15 +24,15 @@ cases () {
 	esac
 }
 
-read -n 1 -p $'Are you sure you want to clean all? [yY/nN] \n' reply; 
+read -n 1 -p $'Are you sure you want to clean all? [yY/nN] \n' reply;
 
 cases $reply
 
-#case ${reply1} in 
+#case ${reply1} in
 #    [nN])
 #    printf "\nExiting without cleaning\n" ;;
-#    [yY]) 
-#    read -n 1 -p $'\nReally? [yY/nN] \n' reply2; 
+#    [yY])
+#    read -n 1 -p $'\nReally? [yY/nN] \n' reply2;
 #    cases $reply2
 #    ;;
 #    *)

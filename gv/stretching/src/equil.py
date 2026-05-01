@@ -5,7 +5,7 @@ import numpy as np
 import trimesh
 import yaml
 import argparse
-import os 
+import os
 
 ######################################################
 # set-up simulation type: equilibration or restart
@@ -38,10 +38,10 @@ if(args.restart):
 filename_default = 'parameter/parameters-default' + args.simnum + '.yaml'
 with open(filename_default, 'rb') as f:
     parameters_default = yaml.load(f, Loader = yaml.CLoader)
-    
+
 filename = 'parameter/parameters' + args.simnum + '.yaml'
 with open(filename, 'rb') as f:
-    parameters = yaml.load(f, Loader = yaml.CLoader)    
+    parameters = yaml.load(f, Loader = yaml.CLoader)
 
 filename_prms = 'parameter/parameters.prms' + args.simnum + '.yaml'
 with open(filename_prms, 'rb') as f:
@@ -50,55 +50,55 @@ with open(filename_prms, 'rb') as f:
 
 def computeForces1(vertices, force, z0, tolerance):
     vertices = np.array(vertices)
-    
+
     z_max = np.max(vertices[:, 2])
     z_min = np.min(vertices[:, 2])
-    
+
     # Select points close to z_max - z0 and z_min + z0 within the tolerance
     top_mask = np.abs(vertices[:, 2] - (z_max - z0)) <= tolerance
     bottom_mask = np.abs(vertices[:, 2] - (z_min + z0)) <= tolerance
-    
+
     top_indices = np.where(top_mask)[0]
     bottom_indices = np.where(bottom_mask)[0]
-    
+
     forces = np.zeros((len(vertices), 3))
-    
+
     forces[top_indices, 2] = +force
     forces[bottom_indices, 2] = -force
-    
+
     return forces
 
 
 def computeForces(vertices, force, distance):
     vertices = np.array(vertices)
-    
+
     z_max = np.max(vertices[:, 2])
     z_min = np.min(vertices[:, 2])
-    
+
     # Select points above (z_max - distance) or below (z_min + distance)
     top_mask = vertices[:, 2] >= (z_max - distance)
     bottom_mask = vertices[:, 2] <= (z_min + distance)
-    
+
     top_indices = np.where(top_mask)[0]
     bottom_indices = np.where(bottom_mask)[0]
-    
+
     forces = np.zeros((len(vertices), 3))
-    
+
     forces[top_indices, 2] = +force
     forces[bottom_indices, 2] = -force
-    
+
     return forces
 
 def computeIndices1(vertices, z0, tolerance):
     vertices = np.array(vertices)
-    
+
     z_max = np.max(vertices[:, 2])
     z_min = np.min(vertices[:, 2])
-    
+
     # Select points close to z_max - z0 and z_min + z0 within the tolerance
     top_mask = np.abs(vertices[:, 2] - (z_max - z0)) <= tolerance
     bottom_mask = np.abs(vertices[:, 2] - (z_min + z0)) <= tolerance
-    
+
     top_indices = np.where(top_mask)[0]
     bottom_indices = np.where(bottom_mask)[0]
 
@@ -106,14 +106,14 @@ def computeIndices1(vertices, z0, tolerance):
 
 def computeIndices(vertices, distance):
     vertices = np.array(vertices)
-    
+
     z_max = np.max(vertices[:, 2])
     z_min = np.min(vertices[:, 2])
-    
+
     # Select points above (z_max - distance) or below (z_min + distance)
     top_mask = vertices[:, 2] >= (z_max - distance)
     bottom_mask = vertices[:, 2] <= (z_min + distance)
-    
+
     top_indices = np.where(top_mask)[0]
     bottom_indices = np.where(bottom_mask)[0]
 
@@ -138,9 +138,9 @@ gamma_dpd_gas = parameters_default["gamma_dpd_gas"]
 gamma_fsi = parameters["gamma_fsi"]
 gamma_fsi_gas = parameters["gamma_fsi_gas"]
 rc = parameters_default["rc"]
-s = parameters_default["s"] 
-s_g = parameters_default["s_g"] 
-k_fsi = parameters_default["k_fsi"] 
+s = parameters_default["s"]
+s_g = parameters_default["s_g"]
+k_fsi = parameters_default["k_fsi"]
 kbt = parameters["kbt"]
 obmd_flag = parameters_default["obmd_flag"]
 mvert = parameters["mvert"]
@@ -150,10 +150,10 @@ lj_fac = parameters_default["lj_fac"]
 
 pos_q = np.reshape(np.loadtxt('posq.txt'), (-1, 7))
 
-ranks = (1, 1, 1)                       
-domain = (Lx, Ly, Lz)  
+ranks = (1, 1, 1)
+domain = (Lx, Ly, Lz)
 
-force = parameters_default["force"]         
+force = parameters_default["force"]
 
 ######################################################
 checkpoint_step = numsteps - 1
@@ -190,7 +190,7 @@ if(not args.vacuum):
     ic_water = mir.InitialConditions.Uniform(number_density = rhow)
     u.registerParticleVector(water, ic_water)
 
-    #solvent 
+    #solvent
     sol2 = mir.ParticleVectors.ParticleVector('sol2', mass = mg)
     ic_outer2 = mir.InitialConditions.Uniform(number_density = rhog)
     u.registerParticleVector(sol2, ic_outer2)
@@ -224,7 +224,7 @@ else:
     int_emb = mir.Interactions.MembraneForces("int_emb", "Lim", "KantorStressFree", **prms_emb, stress_free = True)
 
 if(args.vacuum):
-    dpd0 = mir.Interactions.Pairwise('dpd0', rc, kind = "DPD", a = 0.0, gamma = 3 * gamma_dpd, kBT = 0.015 * kbt, power = s)    
+    dpd0 = mir.Interactions.Pairwise('dpd0', rc, kind = "DPD", a = 0.0, gamma = 3 * gamma_dpd, kBT = 0.015 * kbt, power = s)
 dpd = mir.Interactions.Pairwise('dpd', rc, kind = "DPD", a = 0*aii, gamma = 0*gamma_dpd, kBT = kbt, power = s)
 dpd_wat = mir.Interactions.Pairwise('dpd_wat', rc, kind = "DPD", a = aii, gamma = gamma_dpd, kBT = kbt, power = s)
 dpd_gas = mir.Interactions.Pairwise('dpd_gas', rc, kind = "DPD", a = 0.0 * aii, gamma = gamma_dpd_gas, kBT = kbt, power = s_g)

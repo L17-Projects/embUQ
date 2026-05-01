@@ -5,7 +5,7 @@ import numpy as np
 import os, fnmatch
 import warnings
 from MDAnalysis.analysis import pca
-import yaml 
+import yaml
 from timeit import default_timer as timer
 
 import argparse
@@ -59,7 +59,7 @@ for i in range(trajs):
 
 f = open('output/ref1.xyz', 'w')
 f.write(f'{num_vertices}\n')
-f.write(f'# generated in MDAnalysis\n')    
+f.write(f'# generated in MDAnalysis\n')
 cols = np.column_stack((nicle, av))
 np.savetxt(f, cols)
 f.close()
@@ -107,7 +107,7 @@ if(method == 'svd'):
     np.savetxt('output/eigvalues.txt', eigvalues[0:nlim].real)
     np.savetxt('output/eigvectors.txt', U.T.real[0:nlim])
 if(method == 'eig'):
-    idx = eigvalues.argsort()[::-1]   
+    idx = eigvalues.argsort()[::-1]
     eigvalues = eigvalues[idx]
     eigvectors = eigvectors[:,idx]
     np.savetxt('output/eigvalues.txt', eigvalues[0:nlim].real)
@@ -129,7 +129,7 @@ for i in range(trajs):
 
 f = open('output/ref.xyz', 'w')
 f.write(f'{num_vertices}\n')
-f.write(f'# generated in MDAnalysis\n')    
+f.write(f'# generated in MDAnalysis\n')
 cols = np.column_stack((nicle, av))
 np.savetxt(f, cols)
 f.close()'''

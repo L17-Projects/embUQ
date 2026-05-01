@@ -69,8 +69,8 @@ radGV: 2.0
 height: 14.28
 
 #Area, volume
-ka_tot: 0.0 
-kv_tot: 0.0 
+ka_tot: 0.0
+kv_tot: 0.0
 
 #Viscoelasticity
 gammaC: 0.0
@@ -84,11 +84,11 @@ tot_force: 0.0
 fraction: 0.2
 theta: 0.0
 
-#OBMD parameters 
+#OBMD parameters
 #bufferSize = 0.15 means 0.15 * Lx
 # bufferTau = 10.0 means 10.0 * dt
 obmd_flag: 1
 bufferSize: 0.15
-bufferTau: 10.0 
+bufferTau: 10.0
 bufferAlpha: 0.6
 ptan: 0.5

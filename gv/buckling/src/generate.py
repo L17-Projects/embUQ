@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-import os 
+import os
 import yaml
 from argparse import ArgumentParser
 
-parser = ArgumentParser()       
+parser = ArgumentParser()
 
 # which parameters to iterate through: --parameter par_name start stop steps
 parser.add_argument('-p', '--parameter', dest = 'par', action = 'append', nargs = 4, default = None)
@@ -54,7 +54,7 @@ if(args.par == None):
     os.system('rm -r parameter/* 2>/dev/null')
     os.system(f'cp parameters-default.{args.obj}.yaml parameter/parameters-default00001.yaml')
     cnt = 1
-    
+
 else:
     tipi = [str, float, float, int]
     parsed = [[tipi[i](args.par[j][i]) for i in range(len(args.par[j]))] for j in range(len(args.par))]
