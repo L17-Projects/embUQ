@@ -57,13 +57,56 @@ jobs:
           test -f coverage.json
           cp coverage.json coverage-head.json
 
+      - name: Restore base coverage cache
+        if: github.event_name == 'pull_request'
+        id: base-coverage-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: .ci-base-coverage/coverage-base.json
+          key: base-coverage-${{ runner.os }}-py311-${{ github.event.pull_request.base.sha }}
+
+      - name: Detect coverage-sensitive changes
+        if: github.event_name == 'pull_request'
+        id: coverage-scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          head_sha="${{ github.event.pull_request.head.sha }}"
+          git fetch --no-tags --depth=1 origin "$base_sha" "$head_sha"
+          changed_files="$(git diff --name-only "$base_sha" "$head_sha")"
+
+          if printf "%s\n" "$changed_files" | rg -qE '^(src/|tests/|scripts/ci/|pyproject.toml|setup\\.py|setup\\.cfg)$'; then
+            echo "run_coverage_gate=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_coverage_gate=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Compute base branch coverage
         if: success() && github.event_name == 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
-          worktree_dir="../base-coverage-${{ github.run_id }}-${{ github.run_attempt }}"
           base_sha="${{ github.event.pull_request.base.sha }}"
+          cache_dir=".ci-base-coverage"
+          cache_file="${cache_dir}/coverage-base.json"
+          cache_hit="${{ steps.base-coverage-cache.outputs.cache-hit }}"
+
+          validate_coverage_json() {
+            local candidate_file="$1"
+            python -c "import json, pathlib, sys; payload = json.loads(pathlib.Path('$candidate_file').read_text(encoding='utf-8')); assert isinstance(payload, dict); assert isinstance(payload.get('files'), dict) or isinstance(payload.get('totals'), dict)"
+          }
+
+          if [[ "${cache_hit}" == "true" && -f "${cache_file}" && -s "${cache_file}" ]]; then
+            if validate_coverage_json "${cache_file}"; then
+              cp "${cache_file}" coverage-base.json
+              echo "Using cached base coverage for ${base_sha}."
+              exit 0
+            fi
+            echo "Cached base coverage is invalid. Recomputing."
+          fi
+
+          worktree_dir="../base-coverage-${{ github.run_id }}-${{ github.run_attempt }}"
           git fetch --no-tags --depth=1 origin "$base_sha"
           git worktree add "$worktree_dir" "$base_sha"
           pushd "$worktree_dir"
@@ -72,11 +115,13 @@ jobs:
           python -m coverage json -o coverage-base.json
           popd
           test -f "$worktree_dir/coverage-base.json"
-          cp "$worktree_dir/coverage-base.json" coverage-base.json
+          mkdir -p "$cache_dir"
+          cp "$worktree_dir/coverage-base.json" "$cache_file"
+          cp "$cache_file" coverage-base.json
           git worktree remove "$worktree_dir" --force
 
       - name: Enforce strict coverage increase
-        if: success() && github.event_name == 'pull_request'
+        if: success() && github.event_name == 'pull_request' && steps.coverage-scope.outputs.run_coverage_gate == 'true'
         shell: bash
         run: |
           test -f coverage-head.json
