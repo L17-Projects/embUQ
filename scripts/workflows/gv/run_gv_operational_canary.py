@@ -526,6 +526,10 @@ def main(argv: list[str] | None = None) -> int:
 
     phase1_status = phase1_execution_manifest["status"]
     reference_manifest_path = surrogate_root / "gv_reference_manifest.json"
+    surrogate_artifacts = surrogate_manifest["artifacts"]
+    surrogate_artifact_path = surrogate_artifacts.get("artifact_path") or surrogate_artifacts.get("model_path")
+    if surrogate_artifact_path is None:
+        raise FileNotFoundError("GV DNN smoke manifest is missing a surrogate artifact path.")
     acceptance_trace = {
         "git": load_git_metadata(REPO_ROOT),
         "selection_scope": _resolve_selection_scope(experiment_name),
@@ -546,7 +550,7 @@ def main(argv: list[str] | None = None) -> int:
             "surrogate": {
                 "manifest": str(surrogate_manifest_path),
                 "report": str(surrogate_report_path),
-                "artifact": str(surrogate_manifest["artifacts"]["artifact_path"]),
+                "artifact": str(surrogate_artifact_path),
             },
             "hbi": {
                 "config": str(phase1_config_path),

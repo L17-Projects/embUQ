@@ -608,7 +608,9 @@ def test_gv_operational_canary_skips_phase1_on_missing_dependency(
             "reference_kind": "synthetic",
             "backend": "dnn",
             "dataset_id": runtime_manifest["dataset_id"],
-            "artifacts": {},
+            "artifacts": {
+                "model_path": str(surrogate_dir / "model-only.pkl"),
+            },
         }
         surrogate_dir.joinpath("gv_dnn_surrogate_smoke_manifest.json").write_text(
             json.dumps(surrogate_manifest),
@@ -666,6 +668,16 @@ def test_gv_operational_canary_skips_phase1_on_missing_dependency(
     assert manifest["checks"]["phase1_execution_model"] == "skipped"
     assert manifest["verdict"] == "skip"
     assert manifest["acceptance_trace"]["command_summaries"]["hbi"][0]["status"] == "skipped"
+    assert manifest["acceptance_trace"]["artifact_paths"]["surrogate"]["artifact"] == str(
+        tmp_path / "gv_operational_canary" / "surrogate" / "model-only.pkl"
+    )
+    surrogate_manifest = json.loads(
+        (tmp_path / "gv_operational_canary" / "surrogate" / "gv_dnn_surrogate_smoke_manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "artifact_path" not in surrogate_manifest["artifacts"]
+    assert surrogate_manifest["artifacts"]["model_path"].endswith("model-only.pkl")
     phase1_setup_manifest = json.loads(
         (
             tmp_path
