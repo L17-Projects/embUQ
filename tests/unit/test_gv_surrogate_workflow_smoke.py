@@ -66,6 +66,7 @@ def test_gv_dnn_smoke_consumes_runtime_manifest_and_writes_reloadable_artifacts(
             "2",
             "--batch-size",
             "4",
+            "--include-experimental",
         ]
     )
     assert rc == 0
@@ -146,7 +147,15 @@ def test_gv_dnn_smoke_rejects_runtime_manifest_without_geometry_parameters(
     )
 
     with pytest.raises(SystemExit):
-        smoke_module.main(["--runtime-manifest", str(runtime_manifest_path), "--output-root", str(tmp_path / "out")])
+        smoke_module.main(
+            [
+                "--runtime-manifest",
+                str(runtime_manifest_path),
+                "--output-root",
+                str(tmp_path / "out"),
+                "--include-experimental",
+            ]
+        )
     assert "geometry_spec.parameters.radius" in capsys.readouterr().err
 
 

@@ -206,7 +206,17 @@ A good order for an outside user is:
 4. extract MAP samples
 5. generate validation and posterior plots
 
-## 10. HUQ-EMB Vega production rebuild
+## 10. GV extension closeout scope (provisional)
+
+The GV extension closeout slice documents a constrained non-shear rollout:
+
+1. Mirheo execution from canonical GV runtime sources for `stretching`, `buckling`, `torsion`, and `eigenmodes`,
+2. DNN surrogate prediction for those generated outputs,
+3. hierarchical inference on the resulting lane artifacts.
+
+For the exact parameter and governance constraints, see `GV_EXTENSION_CLOSEOUT.md`.
+
+## 11. HUQ-EMB Vega production rebuild
 
 For the real 50k HUQ-EMB rebuild on Vega, use:
 - `scripts/workflows/emb/huq_emb/run_vega_50k_campaign.py`

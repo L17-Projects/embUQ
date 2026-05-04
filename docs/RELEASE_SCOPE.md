@@ -9,6 +9,7 @@ The public line already includes:
 - the supported workflow spine for `Phase 1`, `Phase 2`, and `Phase 3b` plus canonical production configs
 - reduced-model public wrappers for `Phase 1`, `Phase 2`, and `Phase 3b`
 - compression and indentation evalkit support needed by the workflow spine
+- provisional non-shear GV workflow scaffolding (`stretching`, `buckling`, `torsion`, `eigenmodes`) under the MES-78 hardening slice
 - surrogate retraining and evaluation entrypoints for compression and indentation
 - Sobol sensitivity helpers and a lightweight Latin-hypercube design generator
 - MAP extraction and plotting/postprocessing helpers
@@ -22,6 +23,8 @@ The following remain intentionally outside the current public boundary:
 - every internal/private convenience script from the research line
 - full propagation execution pipelines beyond the current public plotting/postprocessing layer
 - manuscript-specific `_paper` content
+- `shear_flow` production acceptance in GV
+- active-learning rollout decisions and deferred canary experiments that are not yet merged as evidence
 
 ## Why the scope is curated
 
@@ -39,6 +42,7 @@ If you are using the repo now, the intended public strengths are:
 - full-model and reduced-model hierarchical inference through `Phase 1`, `Phase 2`, and `Phase 3b`
 - MAP extraction and plotting
 - understanding the vendored Korali patch surface that supports those workflows
+- the provisional GV closeout slice documented in `GV_EXTENSION_CLOSEOUT.md`
 
 If you need large-scale data generation or cluster-specific Mirheo production pipelines, treat those as later extension work rather than a guaranteed part of the current public alpha line.
 The repo now includes the bootstrap/runtime contract for Mirheo itself, but the heavy generated results remain intentionally outside the repository.

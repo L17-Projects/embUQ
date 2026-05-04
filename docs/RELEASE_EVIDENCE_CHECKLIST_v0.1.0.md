@@ -71,6 +71,21 @@ Treat the release as blocked until:
 - the required hardware-validated reports exist and are archived
 - the release manifest validates cleanly
 
+## Provisional GV hardening overlay (MES-78 / MES-81)
+
+Current MesoUQ GV Extension closeout work is being tracked as a provisional release-hardening layer.
+It must not be marked complete until merge evidence exists for the corresponding Linear item and PR thread checks.
+
+Required before final GV closeout:
+
+- canonical GV non-shear chain is documented and runnable (`Mirheo -> DNN surrogate -> hierarchical inference`),
+- GV calibrated parameters are explicitly `ka`, `kb`, `mu`, `b1`, `b2`, `a3`, `a4`, `mu_l`, `c`,
+- GV controls remain non-calibrated design inputs,
+- the initial GV noise model is multiplicative `sigma`,
+- disk hygiene rules are followed for generated GV runtime/surrogate artifacts,
+- `shear_flow` remains excluded from non-experimental rollout until `MES-81`,
+- active-learning rollout planning remains a follow-up reminder and is not yet productionized.
+
 ## Recommended archive layout
 
 Keep the evidence bundle together under one release root, for example:

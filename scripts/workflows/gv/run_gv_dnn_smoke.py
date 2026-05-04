@@ -183,9 +183,14 @@ def _validate_geometry_parameters(manifest: dict[str, Any], *, manifest_path: Pa
     return geometry_spec
 
 
-def _validate_controls_against_contract(experiment_name: str, controls: Mapping[str, Any]) -> None:
+def _validate_controls_against_contract(
+    experiment_name: str,
+    controls: Mapping[str, Any],
+    *,
+    include_experimental: bool,
+) -> None:
     structure = get_structure("gv")
-    experiment = structure.get_experiment(experiment_name, include_experimental=True)
+    experiment = structure.get_experiment(experiment_name, include_experimental=include_experimental)
     calibrated = set(structure.parameter_contract.calibrated_names)
     nuisance = set(structure.parameter_contract.nuisance_names)
     collision = {name for name in controls if name in calibrated or name in nuisance}
@@ -198,7 +203,7 @@ def _validate_controls_against_contract(experiment_name: str, controls: Mapping[
         raise ValueError(f"Unknown GV controls for {experiment_name}: {', '.join(unknown)}")
 
 
-def _load_runtime_manifest(path: Path) -> dict[str, Any]:
+def _load_runtime_manifest(path: Path, *, include_experimental: bool = False) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     required = ("structure", "experiment", "geometry", "controls")
     missing = [key for key in required if key not in payload]
@@ -210,14 +215,18 @@ def _load_runtime_manifest(path: Path) -> dict[str, Any]:
         raise ValueError(f"GV smoke workflow only supports structure='gv', got {payload['structure']!r}.")
     if not isinstance(payload["controls"], dict):
         raise ValueError("runtime manifest controls must be a mapping.")
-    _validate_controls_against_contract(str(payload["experiment"]), payload["controls"])
+    _validate_controls_against_contract(
+        str(payload["experiment"]),
+        payload["controls"],
+        include_experimental=include_experimental,
+    )
     _validate_geometry_parameters(payload, manifest_path=path)
     normalized = dict(payload)
     normalized["manifest_path"] = str(path.resolve())
     return normalized
 
 
-def _load_reference_manifest(path: Path) -> dict[str, Any]:
+def _load_reference_manifest(path: Path, *, include_experimental: bool = False) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     required = ("structure", "experiment", "geometry", "controls", "reference_kind")
     missing = [key for key in required if key not in payload]
@@ -229,7 +238,11 @@ def _load_reference_manifest(path: Path) -> dict[str, Any]:
         raise ValueError(f"GV smoke workflow only supports structure='gv', got {payload['structure']!r}.")
     if not isinstance(payload["controls"], dict):
         raise ValueError("reference manifest controls must be a mapping.")
-    _validate_controls_against_contract(str(payload["experiment"]), payload["controls"])
+    _validate_controls_against_contract(
+        str(payload["experiment"]),
+        payload["controls"],
+        include_experimental=include_experimental,
+    )
     if payload["reference_kind"] not in REFERENCE_KINDS:
         raise ValueError(f"Unsupported GV reference kind {payload['reference_kind']!r}. Expected one of {REFERENCE_KINDS}.")
     normalized = dict(payload)
@@ -259,7 +272,7 @@ def _build_reference_manifest(args: argparse.Namespace) -> dict[str, Any]:
         if args.reference_manifest is not None:
             raise ValueError("Use either --runtime-manifest or --reference-manifest, not both.")
         runtime_manifest_path = Path(args.runtime_manifest).expanduser().resolve()
-        runtime = _load_runtime_manifest(runtime_manifest_path)
+        runtime = _load_runtime_manifest(runtime_manifest_path, include_experimental=args.include_experimental)
         return {
             "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
             "structure": "gv",
@@ -281,7 +294,10 @@ def _build_reference_manifest(args: argparse.Namespace) -> dict[str, Any]:
         }
 
     if args.reference_manifest is not None:
-        return _load_reference_manifest(Path(args.reference_manifest).resolve())
+        return _load_reference_manifest(
+            Path(args.reference_manifest).resolve(),
+            include_experimental=args.include_experimental,
+        )
 
     structure_name, experiment_name = _resolve_selected_experiment(args)
 

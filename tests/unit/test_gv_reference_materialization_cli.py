@@ -16,6 +16,45 @@ MATERIALIZE_SCRIPT_PATH = REPO_ROOT / "scripts" / "workflows" / "gv" / "material
 SMOKE_SCRIPT_PATH = REPO_ROOT / "scripts" / "workflows" / "gv" / "run_gv_dnn_smoke.py"
 
 
+_SHEAR_FLOW_CONTROLS = {"ptan": 0.4, "afsi": 0.0, "bpress": -91.0}
+
+
+def _shear_flow_reference_manifest() -> dict[str, object]:
+    return {
+        "manifest_schema_version": 2,
+        "structure": "gv",
+        "experiment": "shear_flow",
+        "geometry": "gv_rad2_height14_28",
+        "control_id": "ptan_0_4__afsi_0__bpress_-91",
+        "dataset_id": "gv:shear_flow:gv_rad2_height14_28:ptan_0_4__afsi_0__bpress_-91",
+        "surrogate_backend": "dnn",
+        "controls": _SHEAR_FLOW_CONTROLS,
+        "reference_kind": "synthetic",
+        "observable_names": ["shear_flow_response"],
+        "geometry_parameters": {"radius": 2.0, "height": 14.28},
+        "calibrated_parameter_names": ["ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c"],
+        "nuisance_parameter_names": ["sigma"],
+        "noise_model": {"kind": "multiplicative", "parameter": "sigma"},
+        "provenance": {},
+        "outputs": {},
+        "geometry_spec": {
+            "id": "gv_rad2_height14_28",
+            "label": "gv_rad2_height14_28",
+            "shape": "cylinder",
+            "parameters": {"radius": 2.0, "height": 14.28},
+            "source": "test",
+        },
+        "observable_schema": [
+            {
+                "name": "shear_flow_response",
+                "description": "Response under shear-flow forcing.",
+                "units": "curve",
+            }
+        ],
+        "generation_seed": None,
+    }
+
+
 def _load_module(path: Path, name: str):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
@@ -235,6 +274,110 @@ def test_gv_dnn_smoke_consumes_materialized_reference_stage(tmp_path: Path) -> N
     assert smoke_manifest["reference_stage"]["status"] == "available"
     assert smoke_manifest["reference_stage"]["reference_dataset"] == str(materialized_dataset.resolve())
     assert smoke_manifest["artifacts"]["reference_dataset"] == str(materialized_dataset.resolve())
+
+
+def test_materialize_gv_reference_rejects_shear_flow_manifest_without_experimental(tmp_path: Path) -> None:
+    module = _load_module(MATERIALIZE_SCRIPT_PATH, "mesouq_test_gv_reference_materialize_experimental_gate")
+    runtime_manifest_path = tmp_path / "runtime_manifest.json"
+    reference_manifest_path = tmp_path / "reference_manifest.json"
+
+    runtime_manifest_path.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "shear_flow",
+                "geometry": "gv_rad2_height14_28",
+                "controls": _SHEAR_FLOW_CONTROLS,
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    reference_manifest_path.write_text(
+        json.dumps(_shear_flow_reference_manifest(), sort_keys=True),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="requires include_experimental=True"):
+        module._build_requests(module.build_parser().parse_args(["--runtime-manifest", str(runtime_manifest_path)]))
+    with pytest.raises(ValueError, match="requires include_experimental=True"):
+        module._build_requests(
+            module.build_parser().parse_args(["--reference-manifest", str(reference_manifest_path)])
+        )
+
+
+def test_gv_dnn_smoke_rejects_shear_flow_reference_manifest_without_experimental(tmp_path: Path) -> None:
+    module = _load_module(SMOKE_SCRIPT_PATH, "mesouq_test_gv_smoke_experimental_gate")
+    reference_manifest_path = tmp_path / "reference_manifest.json"
+    reference_manifest_path.write_text(
+        json.dumps(
+            {
+                "structure": "gv",
+                "experiment": "shear_flow",
+                "geometry": "gv_rad2_height14_28",
+                "controls": _SHEAR_FLOW_CONTROLS,
+                "reference_kind": "synthetic",
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="requires include_experimental=True"):
+        module._build_reference_manifest(
+            module.build_parser().parse_args(
+                ["--reference-manifest", str(reference_manifest_path), "--output-root", str(tmp_path / "smoke")]
+            )
+        )
+
+
+def test_gv_dnn_smoke_accepts_shear_flow_reference_manifest_with_experimental(tmp_path: Path) -> None:
+    module = _load_module(SMOKE_SCRIPT_PATH, "mesouq_test_gv_smoke_experimental_gate_positive")
+    reference_manifest_path = tmp_path / "reference_manifest.json"
+    output_root = tmp_path / "smoke"
+    reference_manifest_path.write_text(
+        json.dumps(_shear_flow_reference_manifest(), sort_keys=True),
+        encoding="utf-8",
+    )
+
+    assert (
+        module.main(
+            [
+                "--reference-manifest",
+                str(reference_manifest_path),
+                "--output-root",
+                str(output_root),
+                "--num-curves",
+                "2",
+                "--points-per-curve",
+                "2",
+                "--max-epoch",
+                "1",
+                "--width",
+                "4",
+                "--depth",
+                "1",
+                "--batch-size",
+                "2",
+                "--val-fraction",
+                "0.5",
+                "--include-experimental",
+            ]
+        )
+        == 0
+    )
+
+    smoke_manifest = json.loads((output_root / "gv_dnn_surrogate_smoke_manifest.json").read_text(encoding="utf-8"))
+    smoke_report = json.loads((output_root / "gv_dnn_surrogate_smoke_report.json").read_text(encoding="utf-8"))
+    dataset_header = (output_root / "gv_surrogate_smoke_dataset.csv").read_text(encoding="utf-8").splitlines()[0]
+    assert smoke_manifest["experiment"] == "shear_flow"
+    assert smoke_manifest["selection"] == "gv:shear_flow"
+    assert smoke_manifest["target_column"] == "shear_response"
+    assert smoke_manifest["input_manifests"]["reference_manifest"] == str(reference_manifest_path.resolve())
+    assert smoke_report["status"] in {"passed", "dry-run"}
+    assert "shear_coord" in dataset_header
+    assert "shear_response" in dataset_header
+    assert Path(smoke_manifest["artifacts"]["reference_manifest"]).is_file()
 
 
 def test_materialize_gv_reference_helper_validation_paths(tmp_path: Path) -> None:

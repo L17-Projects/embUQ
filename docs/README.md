@@ -19,6 +19,7 @@ This directory hosts the public documentation set for the `v0.1.0` release line.
 - `VEGA_PRODUCTION_SANITY.md` for the canonical reduced-cost production smoke command
 - `VEGA_WORKFLOW_HELPERS.md` for split Vega workflow helpers and sbatch templates
 - `VEGA_VALIDATION_MATRIX.md` for the public Vega validation matrix and report surface
+- `GV_EXTENSION_CLOSEOUT.md` for provisional MES-78 release hardening scope and GV rollout gate
 - `VALIDATION_CONFIGS.md` for the tiny validation config bundle
 
 ## Workflow and operator guides
