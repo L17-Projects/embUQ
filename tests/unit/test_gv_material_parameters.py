@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from collections.abc import Iterator
 
 import pytest
 import yaml
 
+from meso_uq.structures.gv import material_parameters as material_parameters_module
 from meso_uq.structures.gv.material_parameters import (
     apply_material_overrides_to_glob,
     apply_material_overrides_to_files,
@@ -59,6 +61,20 @@ def test_validate_material_overrides_accepts_muL_alias() -> None:
     aliases["muL"] = aliases.pop("mu_l")
     normalized = validate_material_parameter_overrides(aliases)
     assert normalized["mu_l"] == _VALID_MATERIAL_PARAMETER_OVERRIDES["mu_l"]
+
+
+def test_validate_material_overrides_defensive_extra_branch(monkeypatch: pytest.MonkeyPatch) -> None:
+    class WeirdNames:
+        def __contains__(self, item: object) -> bool:
+            return item in _VALID_MATERIAL_PARAMETER_OVERRIDES
+
+        def __iter__(self) -> Iterator[str]:
+            return iter(tuple(name for name in _VALID_MATERIAL_PARAMETER_OVERRIDES if name != "c"))
+
+    monkeypatch.setattr(material_parameters_module, "GV_MATERIAL_PARAMETER_NAMES", WeirdNames())
+
+    with pytest.raises(ValueError, match="Unexpected GV material parameters: c"):
+        validate_material_parameter_overrides(_VALID_MATERIAL_PARAMETER_OVERRIDES)
 
 
 def test_apply_material_overrides_to_yaml_preserves_existing_muL_alias(tmp_path: Path) -> None:

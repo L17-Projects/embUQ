@@ -13,6 +13,9 @@ if str(SRC_ROOT) not in sys.path:
 
 from meso_uq.structures.gv.geometries import DEFAULT_GV_GEOMETRY
 from meso_uq.structures.gv.runtime import ControlSweep, KnownIssue, RuntimeDescriptor
+from meso_uq.structures.gv.runtime import base as runtime_base
+from meso_uq.structures.gv.runtime import buckling as runtime_buckling
+from meso_uq.structures.gv.runtime import stretching as runtime_stretching
 from meso_uq.structures.gv.runtime.catalog import (
     load_runtime_descriptor,
     plan_runtime,
@@ -172,6 +175,11 @@ def test_runtime_plan_records_material_parameter_overrides(tmp_path: Path) -> No
     assert source_manifest["material_parameter_overrides"] == material_overrides
 
 
+def test_runtime_plan_rejects_non_mapping_material_overrides() -> None:
+    with pytest.raises(TypeError, match="must be a mapping"):
+        runtime_base._normalize_material_parameter_overrides(["not", "a", "mapping"])
+
+
 def test_runtime_descriptor_rejects_source_output_root(tmp_path: Path) -> None:
     descriptor = RuntimeDescriptor(
         experiment="eigenmodes",
@@ -288,6 +296,22 @@ def test_runtime_catalog_loads_real_descriptor_and_plans_dry_run(tmp_path: Path)
     assert manifest["dataset_id"].startswith("gv:stretching:")
     assert Path(manifest["source_manifest"]).is_file()
     assert Path(manifest["work_dir"]).is_dir()
+
+
+def test_runtime_module_dry_run_helpers_plan_real_stretching_and_buckling(tmp_path: Path) -> None:
+    stretching_manifest = runtime_stretching.build_dry_run_descriptor(
+        tmp_path / "stretching",
+        controls={"tot_force": 750.0},
+    ).to_manifest()
+    buckling_manifest = runtime_buckling.build_dry_run_descriptor(
+        tmp_path / "buckling",
+        controls={"buck": 0.25},
+    ).to_manifest()
+
+    assert stretching_manifest["experiment"] == "stretching"
+    assert stretching_manifest["controls"]["tot_force"] == 750.0
+    assert buckling_manifest["experiment"] == "buckling"
+    assert buckling_manifest["controls"]["buck"] == 0.25
 
 
 def test_runtime_catalog_preserves_shear_flow_execution_contract(tmp_path: Path) -> None:

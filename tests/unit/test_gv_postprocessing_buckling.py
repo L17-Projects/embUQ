@@ -130,6 +130,48 @@ def test_parse_buckling_fixture_channels_rejects_missing_response_channel() -> N
         buckling.parse_buckling_fixture_channels(fixture)
 
 
+def test_buckling_helpers_handle_empty_names_and_skip_non_string_keys() -> None:
+    assert buckling._canonical_channel_name("!!!") == ""
+
+    channels = buckling.parse_buckling_fixture_channels(
+        {
+            "channels": {
+                1: [99.0],
+                "shape": [0.1, 0.2],
+            }
+        }
+    )
+
+    assert set(channels) == {"shape_amplitude"}
+
+
+def test_parse_buckling_fixture_channels_accepts_root_channel_mapping() -> None:
+    channels = buckling.parse_buckling_fixture_channels(
+        {
+            "buck": [0.0, 0.25],
+            "response": [1.0, 0.8],
+            "unregistered_optional": [5.0, 6.0],
+        }
+    )
+
+    assert set(channels) == {"buck", "buckling_response", "unregistered_optional"}
+
+
+def test_parse_buckling_fixture_channels_rejects_non_mapping_fixture() -> None:
+    with pytest.raises(ValueError, match="fixture_like must be a mapping"):
+        buckling.parse_buckling_fixture_channels(["not", "a", "mapping"])
+
+
+def test_parse_buckling_fixture_channels_rejects_non_mapping_observables() -> None:
+    with pytest.raises(ValueError, match="No numeric channel mapping found"):
+        buckling.parse_buckling_fixture_channels({"observables": ["bad-payload"]})
+
+
+def test_parse_buckling_fixture_channels_rejects_empty_candidate_mapping() -> None:
+    with pytest.raises(ValueError, match="received no numeric channels"):
+        buckling.parse_buckling_fixture_channels({"observables": {1: [1.0], 2: [2.0]}})
+
+
 def test_parse_buckling_fixture_channels_rejects_non_finite_observables() -> None:
     fixture = {
         "channels": {

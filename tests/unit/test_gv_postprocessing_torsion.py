@@ -88,6 +88,46 @@ def test_parse_torsion_fixture_channels_rejects_missing_required_channel() -> No
         torsion.parse_torsion_fixture_channels(fixture)
 
 
+def test_torsion_helpers_cover_empty_names_observables_and_filtered_channels() -> None:
+    assert torsion._canonicalize_channel_name("!!!") == ""
+
+    channels = torsion.parse_torsion_fixture_channels(
+        {
+            "observables": {
+                "theta": [0.0, 0.25],
+                "response": [1.0, 0.8],
+                "cap_angle": [0.0, 0.05],
+                1: [99.0, 98.0],
+            }
+        },
+        include_optional_channels=False,
+    )
+
+    assert set(channels) == {"torsion_coord", "torsion_response"}
+
+
+def test_parse_torsion_fixture_channels_accepts_root_channel_mapping() -> None:
+    channels = torsion.parse_torsion_fixture_channels(
+        {
+            "theta": [0.0, 0.25],
+            "response": [1.0, 0.8],
+            "cap_angle": [0.0, 0.05],
+        }
+    )
+
+    assert set(channels) == {"torsion_coord", "torsion_response", "cap_angular_displacement"}
+
+
+def test_parse_torsion_fixture_channels_rejects_non_mapping_fixture() -> None:
+    with pytest.raises(ValueError, match="fixture_like must be a mapping"):
+        torsion.parse_torsion_fixture_channels(["bad-payload"])
+
+
+def test_parse_torsion_fixture_channels_rejects_non_mapping_observables() -> None:
+    with pytest.raises(ValueError, match="No numeric channel mapping found"):
+        torsion.parse_torsion_fixture_channels({"observables": ["bad-payload"]})
+
+
 def test_parse_torsion_fixture_channels_rejects_non_finite_observables() -> None:
     fixture = {
         "channels": {
@@ -98,6 +138,19 @@ def test_parse_torsion_fixture_channels_rejects_non_finite_observables() -> None
 
     with pytest.raises(ValueError, match="non-finite"):
         torsion.parse_torsion_fixture_channels(fixture)
+
+
+def test_quality_flags_for_torsion_channels_track_non_finite_values() -> None:
+    flags = torsion._quality_flags_for_channels(
+        {
+            "torsion_coord": np.array([0.0, 0.25]),
+            "torsion_response": np.array([1.0, np.nan]),
+        }
+    )
+
+    assert flags["finite_observables"] is False
+    assert flags["finite_observable_ratio"] == pytest.approx(0.75)
+    assert flags["canary_failures"] == ("torsion_response:1 non-finite",)
 
 
 def test_process_torsion_numerical_dataset_writes_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -162,6 +215,30 @@ def test_process_torsion_numerical_dataset_rejects_material_control_collision() 
             raw_provenance={"source": "fixture-like"},
             fixture_like={"channels": {"theta": [0.0], "response": [1.0], "force": [2.0]}},
             quality_flags={"finite_observables": True, "finite_observable_ratio": 1.0, "canary_failures": ()},
+        )
+
+
+def test_process_torsion_numerical_dataset_rejects_non_finite_channels_when_strict(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        torsion,
+        "parse_torsion_fixture_channels",
+        lambda *_, **__: {
+            "torsion_coord": np.array([0.0, 0.25]),
+            "torsion_response": np.array([1.0, np.nan]),
+        },
+    )
+
+    with pytest.raises(ValueError, match="contain non-finite observables"):
+        torsion.process_torsion_numerical_dataset(
+            campaign_id="campaign-torsion-nonfinite",
+            geometry_radius=2.0,
+            geometry_height=14.28,
+            material_parameters=_BASE_MATERIAL_PARAMETERS,
+            controls={"theta": 0.03},
+            raw_provenance={"source": "fixture-like"},
+            fixture_like={"channels": {"theta": [0.0], "response": [1.0]}},
         )
 
 

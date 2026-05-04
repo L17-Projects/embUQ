@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -96,6 +97,23 @@ def test_common_jsonable_and_manifest_validation_branches() -> None:
         common._manifest_to_payload(object())
 
 
+def test_import_h5py_success_branch_when_dependency_is_available() -> None:
+    fake_h5py = SimpleNamespace(File=object())
+    old_h5py = sys.modules.get("h5py")
+    sys.modules["h5py"] = fake_h5py
+    try:
+        assert common._import_h5py() is fake_h5py
+    finally:
+        if old_h5py is None:
+            sys.modules.pop("h5py", None)
+        else:
+            sys.modules["h5py"] = old_h5py
+
+    pytest.importorskip("h5py")
+
+    assert common._import_h5py().File is not None
+
+
 def test_write_numerical_dataset_artifacts_writes_manifest_and_hdf5(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     manifest = _base_manifest()
 
@@ -169,6 +187,17 @@ def test_write_numerical_dataset_artifacts_rejects_empty_channel_mapping(tmp_pat
         common.write_numerical_dataset_artifacts(manifest=manifest, channels={})
 
     assert recorded.file is None
+
+
+def test_write_numerical_dataset_artifacts_rejects_paths_outside_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    manifest = _base_manifest()
+    monkeypatch.setattr(common, "campaign_dataset_hdf5_path", lambda **_kwargs: Path("outside.h5"))
+
+    with pytest.raises(ValueError, match="under the _runs tree"):
+        common.write_numerical_dataset_artifacts(
+            manifest=manifest,
+            channels={"tot_force": [1.0], "force": [2.0], "displacement": [3.0]},
+        )
 
 
 def test_hdf5_manifest_attrs_cover_scalar_and_structured_metadata() -> None:

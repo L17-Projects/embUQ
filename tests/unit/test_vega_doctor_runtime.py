@@ -70,10 +70,16 @@ def test_scale_space_resolution_checks_env_root_path_and_missing_libs(tmp_path, 
 
     monkeypatch.delenv("GV_SCALE_SPACE_BINARY")
     cgal_root = tmp_path / "cgal"
+    direct_cgal = cgal_root / "scale_space"
+    direct_cgal.parent.mkdir(parents=True)
+    direct_cgal.write_text("binary", encoding="utf-8")
+    monkeypatch.setenv("GV_CGAL_TOOLS_ROOT", str(cgal_root))
+    assert module._resolve_scale_space_binary() == (str(direct_cgal), "GV_CGAL_TOOLS_ROOT")
+
+    direct_cgal.unlink()
     nested = cgal_root / "build" / "cgal_scripts" / "scale_space"
     nested.parent.mkdir(parents=True)
     nested.write_text("binary", encoding="utf-8")
-    monkeypatch.setenv("GV_CGAL_TOOLS_ROOT", str(cgal_root))
     assert module._resolve_scale_space_binary() == (str(nested), "GV_CGAL_TOOLS_ROOT")
 
     monkeypatch.setattr(module, "_command_path", lambda name: "/usr/bin/scale_space" if name == "scale_space" else "")
@@ -96,6 +102,16 @@ def test_scale_space_resolution_checks_env_root_path_and_missing_libs(tmp_path, 
     ok, details = module._resolve_scale_space_dynamic_libs("/bad")
     assert ok is False
     assert "missing dynamic libs" in details
+
+    monkeypatch.setattr(
+        module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="libok.so => /x/libok.so\n", stderr=""),
+    )
+    assert module._resolve_scale_space_dynamic_libs("/good") == (True, "all dynamic libs resolved")
+
+    monkeypatch.setattr(module, "_command_path", lambda _name: "")
+    assert module._resolve_scale_space_binary() == ("", "")
 
 
 def test_doctor_core_and_tex_diagnostics_cover_warning_paths(tmp_path, monkeypatch):
@@ -165,3 +181,46 @@ def test_doctor_main_reports_json_and_strict_failure(monkeypatch, capsys):
     assert '"repo_root": "/repo"' in capsys.readouterr().out
     assert module.main(["--strict"]) == 1
     assert "[WARN] x: missing" in capsys.readouterr().out
+
+
+def test_doctor_core_diagnostics_warn_when_korali_import_is_not_repo_local(tmp_path, monkeypatch):
+    module = _load_doctor_module()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / "pyproject.toml").write_text("[project]\nname='mesouq'\n", encoding="utf-8")
+    (repo_root / "extern" / "korali").mkdir(parents=True)
+    monkeypatch.setattr(module, "REPO_ROOT", repo_root)
+    monkeypatch.setenv("LOADEDMODULES", "Python/3.10")
+    monkeypatch.setattr(module, "_command_path", lambda name: "/bin/tool" if name in {"python", "mpicxx", "nvcc", "pkg-config", "meson", "ninja"} else "")
+    monkeypatch.setattr(module, "_pkg_config_version", lambda _name: "1.0")
+
+    def fake_spec(name: str) -> str:
+        if name == "meso_uq":
+            return str(repo_root / "src" / "meso_uq.py")
+        if name == "korali":
+            return "/opt/korali/korali/__init__.py"
+        return f"/x/{name}.py"
+
+    monkeypatch.setattr(module, "_python_module_spec", fake_spec)
+
+    report = module.collect_diagnostics("python")
+    checks = {entry["name"]: entry for entry in report["checks"]}
+
+    assert checks["python:korali"]["status"] == "warn"
+    assert checks["python:korali"]["details"] == "/opt/korali/korali/__init__.py"
+
+
+def test_doctor_core_diagnostics_omits_openmpi_lib_check_when_mpicxx_is_absent(tmp_path, monkeypatch):
+    module = _load_doctor_module()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / "pyproject.toml").write_text("[project]\nname='mesouq'\n", encoding="utf-8")
+    (repo_root / "extern" / "korali").mkdir(parents=True)
+    monkeypatch.setattr(module, "REPO_ROOT", repo_root)
+    monkeypatch.setattr(module, "_command_path", lambda _name: "")
+    monkeypatch.setattr(module, "_python_module_spec", lambda _name: "")
+
+    report = module.collect_diagnostics("python")
+    check_names = {entry["name"] for entry in report["checks"]}
+
+    assert "openmpi_lib_path" not in check_names

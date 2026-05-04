@@ -12,6 +12,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from meso_uq.structures.gv.generator import generate_gv_numerical_data
+from meso_uq.structures.gv import generator as generator_module
 from meso_uq.structures.gv.geometries import DEFAULT_GV_GEOMETRY
 from meso_uq.structures.gv.postprocessing import common
 
@@ -245,4 +246,86 @@ def test_generate_gv_numerical_data_rejects_invalid_material_controls_and_struct
             geometry_height=14.28,
             campaign_id="campaign/bad",
             material_parameters=_MATERIAL_PARAMETERS,
+        )
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"geometry_height": 14.28}, "Both geometry size components are required"),
+        ({"geometry_radius": float("inf"), "geometry_height": 14.28}, "must be finite values"),
+        ({"geometry_radius": 0.0, "geometry_height": 14.28}, "geometry_radius must be positive"),
+        ({"geometry_radius": 2.0, "geometry_height": 0.0}, "geometry_height must be positive"),
+        ({"geometry_radius": 2.0, "geometry_height": 14.28, "controls": []}, "controls must be a mapping"),
+    ],
+)
+def test_generate_gv_numerical_data_rejects_bad_geometry_and_controls(
+    kwargs, message: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    base_kwargs = {
+        "experiment": "stretching",
+        "campaign_id": "campaign-invalid-shape",
+        "material_parameters": _MATERIAL_PARAMETERS,
+        "controls": {"tot_force": 750.0},
+    }
+    if "controls" in kwargs:
+        base_kwargs.pop("controls")
+
+    with pytest.raises(ValueError, match=message):
+        generate_gv_numerical_data(**base_kwargs, **kwargs)
+
+
+def test_generate_gv_numerical_data_preserves_explicit_quality_flags_for_staging(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    result = generate_gv_numerical_data(
+        experiment="stretching",
+        geometry_radius=2.0,
+        geometry_height=14.28,
+        campaign_id="campaign-quality-flags",
+        material_parameters=_MATERIAL_PARAMETERS,
+        controls={"tot_force": 750.0},
+        quality_flags={"finite_observables": True, "finite_observable_ratio": 0.5, "canary_failures": ["gpu_busy"]},
+    )
+
+    assert result.expected_manifest["quality_flags"] == {
+        "finite_observables": True,
+        "finite_observable_ratio": 0.5,
+        "canary_failures": ["gpu_busy"],
+    }
+
+
+def test_generate_gv_numerical_data_rejects_non_mapping_fixture_like_before_postprocessing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(ValueError, match="fixture_like must be a mapping"):
+        generate_gv_numerical_data(
+            experiment="stretching",
+            geometry_radius=2.0,
+            geometry_height=14.28,
+            campaign_id="campaign-fixture-type",
+            material_parameters=_MATERIAL_PARAMETERS,
+            controls={"tot_force": 750.0},
+            fixture_like=[],
+        )
+
+
+def test_generate_gv_numerical_data_rejects_missing_postprocessor_for_fixture_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delitem(generator_module.POSTPROCESSORS, "gv:stretching", raising=False)
+
+    with pytest.raises(ValueError, match="No postprocessor is registered"):
+        generate_gv_numerical_data(
+            experiment="stretching",
+            geometry_radius=2.0,
+            geometry_height=14.28,
+            campaign_id="campaign-missing-postprocessor",
+            material_parameters=_MATERIAL_PARAMETERS,
+            controls={"tot_force": 750.0},
+            fixture_like=_fixture_for_experiment("stretching"),
         )

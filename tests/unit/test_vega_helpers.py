@@ -183,6 +183,17 @@ def test_render_mirheo_env_script_exports_local_paths(tmp_path):
     assert str(paths.mirheo_snapshot_path) in env_script
 
 
+def test_render_mirheo_env_script_omits_snapshot_when_not_provided(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    paths = get_vega_paths(repo_root)
+    source_root = tmp_path / "Mirheo"
+    source_root.mkdir()
+
+    env_script = render_mirheo_env_script(paths, source_root=source_root)
+
+    assert "MIRHEO_SOURCE_SNAPSHOT" not in env_script
+
+
 def test_render_gv_venv_env_script_exports_openmpi_and_scale_space_paths(tmp_path):
     repo_root = _make_repo(tmp_path)
     paths = get_vega_paths(repo_root)
@@ -205,6 +216,17 @@ def test_render_gv_venv_env_script_exports_openmpi_and_scale_space_paths(tmp_pat
     assert "GV_CGAL_TOOLS_ROOT" in env_script
     assert "MESOUQ_OPENMPI_LIB_DIR" in env_script
     assert str(paths.mirheo_snapshot_path) in env_script
+
+
+def test_render_gv_venv_env_script_omits_snapshot_when_not_provided(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    paths = get_vega_paths(repo_root)
+    source_root = tmp_path / "Mirheo"
+    source_root.mkdir()
+
+    env_script = render_gv_venv_env_script(paths, source_root=source_root)
+
+    assert "MIRHEO_SOURCE_SNAPSHOT" not in env_script
 
 
 def test_gather_mirheo_source_snapshot_ignores_build_artifacts(tmp_path):

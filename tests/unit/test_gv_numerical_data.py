@@ -186,6 +186,17 @@ def test_build_gv_numerical_manifest_rejects_missing_geometry_axes(monkeypatch) 
         )
 
 
+def test_build_gv_numerical_manifest_rejects_ambiguous_experiment(monkeypatch) -> None:
+    monkeypatch.setattr(numerical_data, "EMB_EXPERIMENTS", numerical_data.EMB_EXPERIMENTS | {"torsion"})
+
+    with pytest.raises(ValueError, match="ambiguous across structures"):
+        build_gv_numerical_dataset_manifest(
+            structure="gv",
+            experiment="torsion",
+            **_GV_MANIFEST_BASE,
+        )
+
+
 @pytest.mark.parametrize(
     ("units", "message"),
     [
@@ -256,6 +267,19 @@ def test_build_gv_numerical_manifest_accepts_string_canary_failure() -> None:
     )
 
     assert manifest.to_manifest()["quality_flags"]["canary_failures"] == ["gn58_cuda_busy"]
+
+
+def test_build_gv_numerical_manifest_rejects_non_positive_material_value() -> None:
+    invalid = dict(_GV_MANIFEST_BASE)
+    invalid["material_parameters"] = dict(_GV_MANIFEST_BASE["material_parameters"])
+    invalid["material_parameters"]["c"] = 0.0
+
+    with pytest.raises(ValueError, match="must be positive"):
+        build_gv_numerical_dataset_manifest(
+            structure="gv",
+            experiment="torsion",
+            **invalid,
+        )
 
 
 @pytest.mark.parametrize(
@@ -330,6 +354,35 @@ def test_validate_gv_numerical_manifest_rejects_payload_schema_errors() -> None:
     bad_raw = dict(payload, raw_provenance=[])
     with pytest.raises(ValueError, match="raw_provenance must be a mapping"):
         validate_gv_numerical_manifest(bad_raw)
+
+    bad_raw_json = dict(payload, raw_provenance={"bad": object()})
+    with pytest.raises(ValueError, match="JSON-serializable"):
+        validate_gv_numerical_manifest(bad_raw_json)
+
+
+def test_validate_gv_numerical_dataset_id_rejects_path_traversal_in_control() -> None:
+    with pytest.raises(ValueError, match="path traversal"):
+        numerical_data.validate_gv_numerical_dataset_id(
+            "gv:torsion:gv_rad2_height14_28:..control",
+            structure="gv",
+        )
+
+
+def test_validate_gv_numerical_manifest_rejects_noncanonical_geometry_parameters(monkeypatch) -> None:
+    payload = build_gv_numerical_dataset_manifest(
+        structure="gv",
+        experiment="torsion",
+        **_GV_MANIFEST_BASE,
+    ).to_manifest()
+
+    class GeometryWithCanonicalizedHeight:
+        id = payload["geometry"]
+        parameters = {"radius": 2.0, "height": 14.0}
+
+    monkeypatch.setattr(numerical_data, "build_geometry", lambda **_kwargs: GeometryWithCanonicalizedHeight())
+
+    with pytest.raises(ValueError, match="should include only numeric radius and height values"):
+        validate_gv_numerical_manifest(payload)
 
 
 def test_campaign_dataset_root_rejects_bad_campaign_id() -> None:

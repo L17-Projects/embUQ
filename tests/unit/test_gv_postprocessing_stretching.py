@@ -83,6 +83,46 @@ def test_parse_stretching_fixture_channels_rejects_missing_required_channels() -
         stretching.parse_stretching_fixture_channels(parsed)
 
 
+def test_parse_stretching_fixture_channels_rejects_non_mapping_fixture() -> None:
+    with pytest.raises(ValueError, match="fixture_like must be a mapping"):
+        stretching.parse_stretching_fixture_channels(["bad-payload"])
+
+
+def test_parse_stretching_fixture_channels_rejects_non_mapping_observables() -> None:
+    with pytest.raises(ValueError, match="No numeric channel mapping found"):
+        stretching.parse_stretching_fixture_channels({"observables": ["bad-payload"]})
+
+
+def test_parse_stretching_fixture_channels_filters_optional_and_non_string_observables() -> None:
+    channels = stretching.parse_stretching_fixture_channels(
+        {
+            "observables": {
+                "tot_force": [500.0, 1000.0],
+                "force": [10.0, 20.0],
+                "displacement": [0.1, 0.2],
+                "extra_metric": [3.0, 4.0],
+                1: [9.0, 9.0],
+            }
+        },
+        include_optional_channels=False,
+    )
+
+    assert set(channels) == {"tot_force", "force", "displacement"}
+
+
+def test_parse_stretching_fixture_channels_accepts_root_channel_mapping() -> None:
+    channels = stretching.parse_stretching_fixture_channels(
+        {
+            "tot_force": [500.0, 750.0],
+            "force": [1.0, 1.2],
+            "displacement": [0.1, 0.2],
+            "extra_metric": [3.0, 4.0],
+        }
+    )
+
+    assert set(channels) == {"tot_force", "force", "displacement", "extra_metric"}
+
+
 def test_process_stretching_numerical_dataset_writes_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     state = _fake_h5py(monkeypatch)
