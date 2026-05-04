@@ -56,6 +56,7 @@ This release turns the repository from a partial public skeleton into a substant
 - `docs/VALIDATION_MATRIX.md`
 - `docs/VEGA_ACCEPTANCE_CHECKLIST.md`
 - `docs/HPC_GPU_BATCHED_REDUCED_INDENTATION.md`
+- `docs/GV_EXTENSION_CLOSEOUT.md` (provisional roll-forward for MES-78/MES-81)
 
 ## Tag intent
 

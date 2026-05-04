@@ -7,6 +7,7 @@ import argparse
 import importlib.util
 import json
 import os
+import shlex
 import sys
 from pathlib import Path
 from typing import Any
@@ -18,9 +19,13 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from meso_uq.inference.gv_hbi import (  # noqa: E402
     GV_HBI_EXPERIMENTAL_FLAG,
+    GV_PHASE1_CALIBRATED_PARAMETERS,
+    GV_PHASE1_NUISANCE_PARAMETERS,
     GV_PHASE1_EXECUTION_MANIFEST,
     GV_PHASE1_SETUP_MANIFEST,
+    GV_PHASE1_NOISE_MODEL,
 )
+from meso_uq.campaign_manifests import load_git_metadata  # noqa: E402
 from meso_uq.structures import get_structure  # noqa: E402
 
 RUNTIME_SCRIPT = REPO_ROOT / "scripts" / "workflows" / "gv" / "run_gv_runtime.py"
@@ -175,6 +180,69 @@ def _summarize_runtime_known_issues(runtime_manifest: dict[str, Any]) -> list[di
     return summaries
 
 
+def _command_to_string(argv: list[str]) -> str:
+    return " ".join(shlex.quote(part) for part in argv)
+
+
+def _summarize_command_records(command_records: list[Any]) -> list[dict[str, Any]]:
+    summaries: list[dict[str, Any]] = []
+    for entry in command_records:
+        if not isinstance(entry, dict):
+            continue
+        argv = entry.get("argv")
+        if not isinstance(argv, list):
+            continue
+        summary: dict[str, Any] = {
+            "argv": [str(part) for part in argv],
+            "command": _command_to_string([str(part) for part in argv]),
+            "status": entry.get("status", "unknown"),
+        }
+        if "returncode" in entry:
+            summary["returncode"] = entry.get("returncode")
+        if "cwd" in entry:
+            summary["cwd"] = str(entry.get("cwd"))
+        summaries.append(summary)
+    return summaries
+
+
+def _build_command_invocation_summary(
+    *, stage: str, argv: list[str], status: str, returncode: int | None = None
+) -> list[dict[str, Any]]:
+    entry: dict[str, Any] = {
+        "name": stage,
+        "argv": [str(item) for item in argv],
+        "command": _command_to_string([str(item) for item in argv]),
+        "status": status,
+    }
+    if returncode is not None:
+        entry["returncode"] = returncode
+    return [entry]
+
+
+def _build_phase1_skip_manifests(
+    *,
+    dataset_id: str,
+    reason: str,
+    enabled_by: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    setup_manifest = {
+        "status": "phase1_skipped_dependency",
+        "reason": reason,
+        "enabled_by": enabled_by,
+        "parameter_contract": {"calibrated": list(GV_PHASE1_CALIBRATED_PARAMETERS)},
+    }
+    execution_manifest = {
+        "status": "phase1_skipped_dependency",
+        "execution_model": "skipped",
+        "dataset": {"dataset_id": dataset_id},
+        "phase1": {
+            "noise_model": dict(GV_PHASE1_NOISE_MODEL),
+            "variable_names": list(GV_PHASE1_CALIBRATED_PARAMETERS) + list(GV_PHASE1_NUISANCE_PARAMETERS),
+        },
+    }
+    return setup_manifest, execution_manifest
+
+
 def _phase1_config(*, runtime_manifest: dict[str, Any], surrogate_manifest_path: Path) -> dict[str, Any]:
     return {
         "pop_size": 32,
@@ -247,11 +315,30 @@ def _require_phase1_compatible_surrogate_artifact(
 
 
 def _build_verdict(*, surrogate_report: dict[str, Any], phase1_execution_manifest: dict[str, Any]) -> str:
-    if surrogate_report.get("status") not in {"passed", "dry-run"}:
+    surrogate_status = str(surrogate_report.get("status"))
+    if surrogate_status in {"dry-run", "skipped_missing_dependency"}:
+        return "skip"
+    if surrogate_status != "passed":
         return "fail"
     if phase1_execution_manifest.get("status") != "phase1_korali_completed":
         return "fail"
     return "pass"
+
+
+def _resolve_selection_scope(experiment_name: str) -> str:
+    experiment = get_structure("gv").get_experiment(experiment_name, include_experimental=True)
+    if experiment.experimental or experiment.requires_opt_in:
+        return "experimental"
+    return "non-shear"
+
+
+def _is_missing_dependency_surrogate_run(surrogate_report: dict[str, Any]) -> bool:
+    if surrogate_report.get("status") in {"dry-run", "skipped_missing_dependency"}:
+        return True
+    training = surrogate_report.get("training")
+    if isinstance(training, dict):
+        return str(training.get("status")) == "skipped_missing_dependency"
+    return False
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -269,6 +356,10 @@ def main(argv: list[str] | None = None) -> int:
             selection=selection,
         )
         resolved_selection = f"{structure_name}:{experiment_name}"
+        experiment = get_structure(structure_name).get_experiment(experiment_name, include_experimental=True)
+        if experiment.requires_opt_in and not args.include_experimental:
+            flag = experiment.opt_in_flag or "--include-experimental"
+            raise ValueError(f"GV operational canary selection {resolved_selection!r} requires {flag}.")
         structure = get_structure(structure_name)
         structure.get_experiment(experiment_name, include_experimental=args.include_experimental)
     except (KeyError, PermissionError, ValueError) as exc:
@@ -345,20 +436,35 @@ def main(argv: list[str] | None = None) -> int:
         surrogate_status=surrogate_report.get("status"),
     )
     _write_json(surrogate_manifest_path, surrogate_manifest)
+    surrogate_missing_dependency = _is_missing_dependency_surrogate_run(surrogate_report)
 
     phase1_config_path = output_root / "gv_operational_canary_phase1.yaml"
     phase1_config = _phase1_config(runtime_manifest=runtime_manifest, surrogate_manifest_path=surrogate_manifest_path)
     phase1_config_path.write_text(yaml.safe_dump(phase1_config, sort_keys=False), encoding="utf-8")
-    phase1_module.run_inference(
-        dry_run=False,
-        config_path=str(phase1_config_path),
-        output_dir=str(phase1_root),
-        device="cpu",
-    )
-
     phase1_manifest_root = phase1_root / "results_phase_1"
-    phase1_setup_manifest = _read_json(phase1_manifest_root / GV_PHASE1_SETUP_MANIFEST)
-    phase1_execution_manifest = _read_json(phase1_manifest_root / GV_PHASE1_EXECUTION_MANIFEST)
+    phase1_manifest_root.mkdir(parents=True, exist_ok=True)
+    if surrogate_missing_dependency:
+        reason = "GV DNN smoke dependency was not available."
+        if isinstance(surrogate_report.get("training"), dict) and "missing_dependency" in surrogate_report["training"]:
+            reason = f"GV DNN smoke dependency missing: {surrogate_report['training']['missing_dependency']}."
+        if "execution_mode" in surrogate_report:
+            reason = f"{surrogate_report['execution_mode']} mode: {reason}"
+        phase1_setup_manifest, phase1_execution_manifest = _build_phase1_skip_manifests(
+            dataset_id=runtime_manifest["dataset_id"],
+            reason=reason,
+            enabled_by=enabled_by,
+        )
+        _write_json(phase1_manifest_root / GV_PHASE1_SETUP_MANIFEST, phase1_setup_manifest)
+        _write_json(phase1_manifest_root / GV_PHASE1_EXECUTION_MANIFEST, phase1_execution_manifest)
+    else:
+        phase1_module.run_inference(
+            dry_run=False,
+            config_path=str(phase1_config_path),
+            output_dir=str(phase1_root),
+            device="cpu",
+        )
+        phase1_setup_manifest = _read_json(phase1_manifest_root / GV_PHASE1_SETUP_MANIFEST)
+        phase1_execution_manifest = _read_json(phase1_manifest_root / GV_PHASE1_EXECUTION_MANIFEST)
     calibrated = list(phase1_setup_manifest["parameter_contract"]["calibrated"])
     phase1_variable_names = list(phase1_execution_manifest["phase1"]["variable_names"])
     noise_parameter = str(phase1_execution_manifest["phase1"]["noise_model"]["parameter"])
@@ -371,8 +477,93 @@ def main(argv: list[str] | None = None) -> int:
             + ", ".join(control_overlap)
         )
 
+    runtime_render_manifest = _read_json(runtime_render_manifest_path) if runtime_render_manifest_path.exists() else {}
+    runtime_command_summaries = _summarize_command_records(runtime_render_manifest.get("commands", []))
+    surrogate_command_argv = ["run_gv_dnn_smoke", *surrogate_argv]
+    reference_command_summaries = _build_command_invocation_summary(
+        stage="reference_manifest",
+        argv=surrogate_command_argv,
+        status="prepared",
+    )
+    surrogate_command_summaries = _build_command_invocation_summary(
+        stage="run_gv_dnn_smoke",
+        argv=surrogate_command_argv,
+        status="failed" if surrogate_rc != 0 else ("skipped" if surrogate_missing_dependency else "passed"),
+        returncode=surrogate_rc,
+    )
+    if surrogate_missing_dependency:
+        hbi_command_summaries = _build_command_invocation_summary(
+            stage="run_phase_1",
+            argv=[
+                "python",
+                str(PHASE1_SCRIPT),
+                "--config",
+                str(phase1_config_path),
+                "--output-dir",
+                str(phase1_root),
+                "--device",
+                "cpu",
+            ],
+            status="skipped",
+            returncode=0,
+        )
+    else:
+        hbi_command_summaries = _build_command_invocation_summary(
+            stage="run_phase_1",
+            argv=[
+                "python",
+                str(PHASE1_SCRIPT),
+                "--config",
+                str(phase1_config_path),
+                "--output-dir",
+                str(phase1_root),
+                "--device",
+                "cpu",
+            ],
+            status="passed",
+            returncode=0,
+        )
+
+    phase1_status = phase1_execution_manifest["status"]
+    reference_manifest_path = surrogate_root / "gv_reference_manifest.json"
+    surrogate_artifacts = surrogate_manifest["artifacts"]
+    surrogate_artifact_path = surrogate_artifacts.get("artifact_path") or surrogate_artifacts.get("model_path")
+    if surrogate_artifact_path is None:
+        raise FileNotFoundError("GV DNN smoke manifest is missing a surrogate artifact path.")
+    acceptance_trace = {
+        "git": load_git_metadata(REPO_ROOT),
+        "selection_scope": _resolve_selection_scope(experiment_name),
+        "command_summaries": {
+            "runtime": runtime_command_summaries,
+            "reference": reference_command_summaries,
+            "surrogate": surrogate_command_summaries,
+            "hbi": hbi_command_summaries,
+        },
+        "artifact_paths": {
+            "runtime": {
+                "manifest": str(runtime_manifest_path),
+                "render_manifest": str(runtime_render_manifest_path),
+            },
+            "reference": {
+                "manifest": str(reference_manifest_path),
+            },
+            "surrogate": {
+                "manifest": str(surrogate_manifest_path),
+                "report": str(surrogate_report_path),
+                "artifact": str(surrogate_artifact_path),
+            },
+            "hbi": {
+                "config": str(phase1_config_path),
+                "setup_manifest": str(phase1_manifest_root / GV_PHASE1_SETUP_MANIFEST),
+                "execution_manifest": str(phase1_manifest_root / GV_PHASE1_EXECUTION_MANIFEST),
+                "results_root": str(phase1_root),
+            },
+        },
+    }
+
     final_manifest = {
         "workflow": "gv_operational_canary",
+        "selection_scope": _resolve_selection_scope(experiment_name),
         "enabled_by": enabled_by,
         "structure": structure_name,
         "experiment": experiment_name,
@@ -414,8 +605,10 @@ def main(argv: list[str] | None = None) -> int:
             "controls_excluded_from_calibrated_and_nuisance": True,
             "runtime_status": runtime_rc,
             "surrogate_status": surrogate_report["status"],
-            "phase1_status": phase1_execution_manifest["status"],
+            "phase1_status": phase1_status,
             "phase1_execution_model": phase1_execution_manifest["execution_model"],
+            "surrogate_dependency_skipped": surrogate_missing_dependency,
+            "runtime_reference_generated": reference_manifest_path.exists(),
         },
         "runtime_stage": {
             "runtime_package": runtime_manifest.get("runtime_package"),
@@ -423,6 +616,7 @@ def main(argv: list[str] | None = None) -> int:
             "experimental": bool(runtime_manifest.get("experimental", False)),
             "known_issues": runtime_known_issues,
         },
+        "acceptance_trace": acceptance_trace,
         "verdict": _build_verdict(
             surrogate_report=surrogate_report,
             phase1_execution_manifest=phase1_execution_manifest,

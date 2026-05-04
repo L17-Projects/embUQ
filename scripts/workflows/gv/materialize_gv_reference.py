@@ -151,6 +151,11 @@ def _resolve_selected_experiments(args: argparse.Namespace) -> list[str]:
     return deduped
 
 
+def _require_gv_experiment_access(experiment_name: str, *, include_experimental: bool) -> None:
+    structure = get_structure("gv")
+    structure.get_experiment(experiment_name, include_experimental=include_experimental)
+
+
 def _parse_controls(control_items: list[str], experiment_name: str, structure: StructureSpec) -> dict[str, float]:
     experiment = structure.get_experiment(experiment_name, include_experimental=True)
     allowed = set(experiment.control_names)
@@ -215,6 +220,7 @@ def _build_requests(args: argparse.Namespace) -> list[MaterializationRequest]:
     for raw_path in args.runtime_manifest:
         path = Path(raw_path).expanduser().resolve()
         runtime_manifest = _normalize_runtime_manifest(_load_json(path, label="runtime manifest"), path=path)
+        _require_gv_experiment_access(str(runtime_manifest["experiment"]), include_experimental=args.include_experimental)
         context = resolve_gv_reference_context(runtime_manifest=runtime_manifest)
         requests.append(
             MaterializationRequest(
@@ -231,6 +237,10 @@ def _build_requests(args: argparse.Namespace) -> list[MaterializationRequest]:
     for raw_path in args.reference_manifest:
         path = Path(raw_path).expanduser().resolve()
         source_reference_manifest = _normalize_reference_manifest(_load_json(path, label="reference manifest"), path=path)
+        _require_gv_experiment_access(
+            str(source_reference_manifest["experiment"]),
+            include_experimental=args.include_experimental,
+        )
         context = resolve_gv_reference_context(
             experiment=str(source_reference_manifest["experiment"]),
             geometry=source_reference_manifest.get("geometry_spec") or str(source_reference_manifest["geometry"]),

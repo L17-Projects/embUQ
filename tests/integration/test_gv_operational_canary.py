@@ -5,6 +5,7 @@ import json
 import sys
 import types
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -109,6 +110,28 @@ def _install_fake_phase1_runtime(module, monkeypatch: pytest.MonkeyPatch) -> _Fa
     return fake_korali
 
 
+def _write_fake_reference_manifest(*, surrogate_root: Path, runtime_manifest: dict[str, Any]) -> None:
+    reference_manifest = {
+        "structure": runtime_manifest["structure"],
+        "experiment": runtime_manifest["experiment"],
+        "geometry": runtime_manifest["geometry"],
+        "geometry_spec": {
+            "id": runtime_manifest.get("geometry"),
+            "parameters": {
+                "radius": 2.0,
+                "height": 14.28,
+            },
+        },
+        "controls": runtime_manifest["controls"],
+        "reference_kind": "synthetic",
+        "dataset_id": runtime_manifest["dataset_id"],
+        "upstream_contract": {"required_runtime_manifest_fields": ["structure", "experiment", "geometry", "controls"]},
+        "selection": f"gv:{runtime_manifest['experiment']}",
+    }
+    _write_path = surrogate_root / "gv_reference_manifest.json"
+    _write_path.write_text(json.dumps(reference_manifest), encoding="utf-8")
+
+
 def test_gv_operational_canary_requires_runtime_flag(tmp_path: Path) -> None:
     module = _load_module(SCRIPT_PATH, "gv_operational_canary_flag_test")
 
@@ -196,6 +219,27 @@ def test_gv_operational_canary_helper_edges(tmp_path: Path, monkeypatch: pytest.
         phase1_execution_manifest={"status": "setup_validated"},
     ) == "fail"
     assert module._summarize_runtime_known_issues({"known_issues": "not-a-list"}) == []
+    assert module._resolve_selection_scope("torsion") == "non-shear"
+    assert module._resolve_selection_scope("shear_flow") == "experimental"
+    assert module._is_missing_dependency_surrogate_run({"status": "dry-run"}) is True
+    assert module._is_missing_dependency_surrogate_run({"status": "passed"}) is False
+    assert module._is_missing_dependency_surrogate_run({"training": {"status": "skipped_missing_dependency"}}) is True
+    assert module._is_missing_dependency_surrogate_run({"training": {"status": "passed"}}) is False
+    assert module._summarize_command_records(
+        [
+            "bad-record",
+            {"argv": "bad-argv"},
+            {"argv": ["python", "stage.py"], "status": "passed", "returncode": 0, "cwd": tmp_path},
+        ]
+    ) == [
+        {
+            "argv": ["python", "stage.py"],
+            "command": "python stage.py",
+            "status": "passed",
+            "returncode": 0,
+            "cwd": str(tmp_path),
+        }
+    ]
     assert module._summarize_runtime_known_issues(
         {
             "known_issues": [
@@ -301,6 +345,7 @@ def test_gv_operational_canary_cli_defaults_do_not_shadow_experiment(
             ),
             encoding="utf-8",
         )
+        _write_fake_reference_manifest(surrogate_root=surrogate_dir, runtime_manifest=runtime_manifest)
         surrogate_dir.joinpath("gv_dnn_surrogate_smoke_report.json").write_text(
             json.dumps({"status": "passed"}),
             encoding="utf-8",
@@ -356,8 +401,25 @@ def test_gv_operational_canary_cli_defaults_do_not_shadow_experiment(
     assert module.main(["--output-root", str(default_output), "--include-experimental"]) == 0
     default_manifest = json.loads((default_output / module.FINAL_MANIFEST).read_text(encoding="utf-8"))
     assert default_manifest["selection"] == module.DEFAULT_SELECTION
+    assert default_manifest["selection_scope"] == "non-shear"
     assert "--selection" in runtime_calls[-1]
     assert runtime_calls[-1][runtime_calls[-1].index("--selection") + 1] == module.DEFAULT_SELECTION
+    assert default_manifest["acceptance_trace"]["selection_scope"] == "non-shear"
+    assert default_manifest["acceptance_trace"]["git"]["git_commit"] is not None
+    assert set(default_manifest["acceptance_trace"]["command_summaries"]) == {"runtime", "reference", "surrogate", "hbi"}
+    assert default_manifest["acceptance_trace"]["artifact_paths"]["runtime"]["manifest"] == str(
+        default_output / "runtime" / "gv_runtime_dry_run_manifest.json"
+    )
+    assert default_manifest["acceptance_trace"]["artifact_paths"]["surrogate"]["manifest"] == str(
+        default_output / "surrogate" / "gv_dnn_surrogate_smoke_manifest.json"
+    )
+    assert default_manifest["acceptance_trace"]["artifact_paths"]["hbi"]["config"] == str(
+        default_output / "gv_operational_canary_phase1.yaml"
+    )
+    reference_argv = default_manifest["acceptance_trace"]["command_summaries"]["reference"][0]["argv"]
+    assert reference_argv[0] == "run_gv_dnn_smoke"
+    assert "--runtime-manifest" in reference_argv
+    assert "--include-experimental" in reference_argv
 
     experiment_output = tmp_path / "experiment_only"
     assert module.main(["--output-root", str(experiment_output), "--experiment", "stretching", "--include-experimental"]) == 0
@@ -422,6 +484,213 @@ def test_gv_operational_canary_surfaces_stage_failures(tmp_path: Path, monkeypat
         module.main(["--output-root", str(tmp_path / "surrogate_failure"), "--selection", "gv:torsion", "--include-experimental"])
 
 
+def test_gv_operational_canary_requires_experimental_for_shear_flow(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module(SCRIPT_PATH, "gv_operational_canary_shear_flow_experiment_guard")
+
+    monkeypatch.setenv(gv_hbi.GV_HBI_EXPERIMENTAL_FLAG, "1")
+    with pytest.raises(SystemExit) as exc:
+        module.main(["--output-root", str(tmp_path / "gv_operational_canary"), "--selection", "gv:shear_flow"])
+    assert exc.value.code == 2
+
+
+def test_gv_operational_canary_rejects_controls_in_calibrated_or_nuisance(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = _load_module(SCRIPT_PATH, "gv_operational_canary_control_exclusion")
+
+    def _fake_runtime_main(argv: list[str]) -> int:
+        runtime_dir = Path(argv[argv.index("--output-root") + 1]).resolve()
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        runtime_manifest = {
+            "structure": "gv",
+            "experiment": "torsion",
+            "geometry": "gv_rad2_height14_28",
+            "geometry_spec": {
+                "id": "gv_rad2_height14_28",
+                "parameters": {"radius": 2.0, "height": 14.28},
+            },
+            "controls": {"ka": 0.1},
+            "control_id": "ka_0_1",
+            "dataset_id": "gv:torsion:gv_rad2_height14_28:ka_0_1",
+            "runtime_package": "mirheoOBMD",
+            "source_root": str(tmp_path / "sources" / "torsion"),
+            "experimental": True,
+            "known_issues": [],
+        }
+        runtime_dir.joinpath("gv_runtime_dry_run_manifest.json").write_text(json.dumps(runtime_manifest), encoding="utf-8")
+        return 0
+
+    def _fake_surrogate_main(argv: list[str]) -> int:
+        surrogate_dir = Path(argv[argv.index("--output-root") + 1]).resolve()
+        surrogate_dir.mkdir(parents=True, exist_ok=True)
+        runtime_manifest = json.loads(Path(argv[argv.index("--runtime-manifest") + 1]).read_text(encoding="utf-8"))
+        surrogate_dir.joinpath("gv_dnn_surrogate_smoke_manifest.json").write_text(
+            json.dumps(
+                {
+                    "workflow": "gv_dnn_surrogate_smoke",
+                    "reference_kind": "synthetic",
+                    "backend": "dnn",
+                    "dataset_id": runtime_manifest["dataset_id"],
+                    "artifacts": {
+                        "artifact_path": str(surrogate_dir / "model.pt"),
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        surrogate_dir.joinpath("gv_dnn_surrogate_smoke_report.json").write_text(
+            json.dumps(
+                {
+                    "status": "skipped_missing_dependency",
+                    "training": {"status": "skipped_missing_dependency", "missing_dependency": "torch"},
+                }
+            ),
+            encoding="utf-8",
+        )
+        _write_fake_reference_manifest(surrogate_root=surrogate_dir, runtime_manifest=runtime_manifest)
+        return 0
+
+    def patched_loader(module_name: str, path: Path):
+        if path == module.RUNTIME_SCRIPT:
+            return types.SimpleNamespace(main=_fake_runtime_main)
+        if path == module.SURROGATE_SCRIPT:
+            return types.SimpleNamespace(main=_fake_surrogate_main)
+        if path == module.PHASE1_SCRIPT:
+            return types.SimpleNamespace(run_inference=lambda **kwargs: None)
+        raise AssertionError(f"Unexpected module load: {module_name} from {path}")
+
+    monkeypatch.setenv(gv_hbi.GV_HBI_EXPERIMENTAL_FLAG, "1")
+    monkeypatch.setattr(module, "_load_module", patched_loader)
+
+    with pytest.raises(ValueError, match="GV operational canary detected controls inside calibrated/nuisance variables"):
+        module.main(["--output-root", str(tmp_path / "bad_control"), "--selection", "gv:torsion", "--include-experimental"])
+
+
+def test_gv_operational_canary_skips_phase1_on_missing_dependency(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module(SCRIPT_PATH, "gv_operational_canary_missing_dependency")
+
+    def _fake_runtime_main(argv: list[str]) -> int:
+        runtime_dir = Path(argv[argv.index("--output-root") + 1]).resolve()
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        runtime_manifest = {
+            "structure": "gv",
+            "experiment": "torsion",
+            "geometry": "gv_rad2_height14_28",
+            "geometry_spec": {
+                "id": "gv_rad2_height14_28",
+                "parameters": {"radius": 2.0, "height": 14.28},
+            },
+            "controls": {"theta": 0.03},
+            "control_id": "theta_0_03",
+            "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0_03",
+            "runtime_package": "mirheoOBMD",
+            "source_root": str(tmp_path / "sources" / "torsion"),
+            "experimental": True,
+            "known_issues": [],
+            "commands": [],
+        }
+        runtime_dir.joinpath("gv_runtime_dry_run_manifest.json").write_text(json.dumps(runtime_manifest), encoding="utf-8")
+        runtime_dir.joinpath("gv_runtime_render_manifest.json").write_text(
+            json.dumps({"runtime_manifest": str(runtime_dir / "gv_runtime_dry_run_manifest.json"), "commands": []}),
+            encoding="utf-8",
+        )
+        return 0
+
+    def _fake_surrogate_main(argv: list[str]) -> int:
+        surrogate_dir = Path(argv[argv.index("--output-root") + 1]).resolve()
+        runtime_manifest = json.loads(Path(argv[argv.index("--runtime-manifest") + 1]).read_text(encoding="utf-8"))
+        surrogate_dir.mkdir(parents=True, exist_ok=True)
+        surrogate_manifest = {
+            "workflow": "gv_dnn_surrogate_smoke",
+            "structure": "gv",
+            "reference_kind": "synthetic",
+            "backend": "dnn",
+            "dataset_id": runtime_manifest["dataset_id"],
+            "artifacts": {
+                "model_path": str(surrogate_dir / "model-only.pkl"),
+            },
+        }
+        surrogate_dir.joinpath("gv_dnn_surrogate_smoke_manifest.json").write_text(
+            json.dumps(surrogate_manifest),
+            encoding="utf-8",
+        )
+        _write_fake_reference_manifest(surrogate_root=surrogate_dir, runtime_manifest=runtime_manifest)
+        surrogate_dir.joinpath("gv_dnn_surrogate_smoke_report.json").write_text(
+            json.dumps(
+                {
+                    "status": "skipped_missing_dependency",
+                    "execution_mode": "dry_run_manifest_only",
+                    "training": {
+                        "status": "skipped_missing_dependency",
+                        "missing_dependency": "torch",
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        return 0
+
+    phase1_calls: list[list[str]] = []
+
+    def _fake_run_inference(**kwargs: object) -> None:
+        phase1_calls.append(list(kwargs))
+
+    def patched_loader(module_name: str, path: Path):
+        if path == module.RUNTIME_SCRIPT:
+            return types.SimpleNamespace(main=_fake_runtime_main)
+        if path == module.SURROGATE_SCRIPT:
+            return types.SimpleNamespace(main=_fake_surrogate_main)
+        if path == module.PHASE1_SCRIPT:
+            return types.SimpleNamespace(run_inference=_fake_run_inference)
+        raise AssertionError(f"Unexpected module load: {module_name} from {path}")
+
+    monkeypatch.setattr(module, "_load_module", patched_loader)
+    monkeypatch.setenv(gv_hbi.GV_HBI_EXPERIMENTAL_FLAG, "1")
+
+    rc = module.main(
+        [
+            "--output-root",
+            str(tmp_path / "gv_operational_canary"),
+            "--selection",
+            "gv:torsion",
+            "--include-experimental",
+            "--max-epoch",
+            "1",
+        ]
+    )
+
+    assert rc == 0
+    manifest = json.loads((tmp_path / "gv_operational_canary" / module.FINAL_MANIFEST).read_text(encoding="utf-8"))
+    assert manifest["checks"]["surrogate_dependency_skipped"] is True
+    assert manifest["checks"]["phase1_status"] == "phase1_skipped_dependency"
+    assert manifest["checks"]["phase1_execution_model"] == "skipped"
+    assert manifest["verdict"] == "skip"
+    assert manifest["acceptance_trace"]["command_summaries"]["hbi"][0]["status"] == "skipped"
+    assert manifest["acceptance_trace"]["artifact_paths"]["surrogate"]["artifact"] == str(
+        tmp_path / "gv_operational_canary" / "surrogate" / "model-only.pkl"
+    )
+    surrogate_manifest = json.loads(
+        (tmp_path / "gv_operational_canary" / "surrogate" / "gv_dnn_surrogate_smoke_manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "artifact_path" not in surrogate_manifest["artifacts"]
+    assert surrogate_manifest["artifacts"]["model_path"].endswith("model-only.pkl")
+    phase1_setup_manifest = json.loads(
+        (
+            tmp_path
+            / "gv_operational_canary"
+            / "phase1"
+            / "results_phase_1"
+            / module.GV_PHASE1_SETUP_MANIFEST
+        ).read_text(encoding="utf-8")
+    )
+    assert phase1_setup_manifest["reason"] == "dry_run_manifest_only mode: GV DNN smoke dependency missing: torch."
+    assert phase1_calls == []
+
+
 def test_gv_operational_canary_stitches_runtime_surrogate_and_phase1(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -429,12 +698,102 @@ def test_gv_operational_canary_stitches_runtime_surrogate_and_phase1(
     module = _load_module(SCRIPT_PATH, "gv_operational_canary_test")
     phase1_module = _load_module(PHASE1_SCRIPT_PATH, "gv_operational_canary_phase1_runtime")
     fake_korali = _install_fake_phase1_runtime(phase1_module, monkeypatch)
-    original_loader = module._load_module
+
+    def _fake_runtime_main(argv: list[str]) -> int:
+        runtime_dir = Path(argv[argv.index("--output-root") + 1]).resolve()
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        runtime_manifest = {
+            "structure": "gv",
+            "experiment": "torsion",
+            "geometry": "gv_rad2_height14_28",
+            "geometry_spec": {
+                "id": "gv_rad2_height14_28",
+                "parameters": {"radius": 2.0, "height": 14.28},
+            },
+            "controls": {"theta": 0.03},
+            "control_id": "theta_0_03",
+            "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0_03",
+            "runtime_package": "mirheoOBMD",
+            "source_root": str(tmp_path / "sources" / "torsion"),
+            "experimental": True,
+            "known_issues": [],
+        }
+        runtime_dir.joinpath("gv_runtime_dry_run_manifest.json").write_text(
+            json.dumps(runtime_manifest),
+            encoding="utf-8",
+        )
+        runtime_dir.joinpath("gv_runtime_render_manifest.json").write_text(
+            json.dumps(
+                {
+                    "runtime_manifest": str(runtime_dir / "gv_runtime_dry_run_manifest.json"),
+                    "commands": [
+                        {
+                            "argv": ["python", "run_gv_runtime.py", "--dry-run"],
+                            "returncode": 0,
+                            "status": "skipped-dry-run",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return 0
+
+    def _fake_surrogate_main(argv: list[str]) -> int:
+        surrogate_dir = Path(argv[argv.index("--output-root") + 1]).resolve()
+        runtime_manifest = json.loads(Path(argv[argv.index("--runtime-manifest") + 1]).read_text(encoding="utf-8"))
+        surrogate_dir.mkdir(parents=True, exist_ok=True)
+        surrogate_manifest = {
+            "workflow": "gv_dnn_surrogate_smoke",
+            "structure": "gv",
+            "experiment": runtime_manifest["experiment"],
+            "reference_kind": "synthetic",
+            "backend": "dnn",
+            "dataset_id": runtime_manifest["dataset_id"],
+            "geometry": runtime_manifest["geometry"],
+            "controls": runtime_manifest["controls"],
+            "artifacts": {
+                "artifact_path": str(surrogate_dir / "model.pt"),
+                "model_path": str(surrogate_dir / "model.pt"),
+                "dataset_csv": str(surrogate_dir / "gv_surrogate_smoke_dataset.csv"),
+                "training_report": str(surrogate_dir / "gv_surrogate_dnn_training_report.json"),
+                "reference_manifest": str(surrogate_dir / "gv_reference_manifest.json"),
+            },
+        }
+        surrogate_dir.joinpath("gv_dnn_surrogate_smoke_manifest.json").write_text(
+            json.dumps(surrogate_manifest),
+            encoding="utf-8",
+        )
+        surrogate_dir.joinpath("model.pt").write_text("fake-model", encoding="utf-8")
+        surrogate_dir.joinpath("gv_surrogate_smoke_dataset.csv").write_text(
+            "\n".join(
+                [
+                    "source_curve_id,ka,kb,mu,b1,b2,a3,a4,mu_l,c,radius,height,theta,axis,torsion_response",
+                    "curve0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,2.0,14.28,0.03,0.0,1.0",
+                    "curve0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,2.0,14.28,0.03,1.0,1.5",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        surrogate_dir.joinpath("gv_surrogate_dnn_training_report.json").write_text(
+            json.dumps({"status": "passed"}),
+            encoding="utf-8",
+        )
+        _write_fake_reference_manifest(surrogate_root=surrogate_dir, runtime_manifest=runtime_manifest)
+        surrogate_dir.joinpath("gv_dnn_surrogate_smoke_report.json").write_text(
+            json.dumps({"status": "passed"}),
+            encoding="utf-8",
+        )
+        return 0
 
     def patched_loader(module_name: str, path: Path):
+        if path == module.RUNTIME_SCRIPT:
+            return types.SimpleNamespace(main=_fake_runtime_main)
+        if path == module.SURROGATE_SCRIPT:
+            return types.SimpleNamespace(main=_fake_surrogate_main)
         if path == module.PHASE1_SCRIPT:
             return phase1_module
-        return original_loader(module_name, path)
+        raise AssertionError(f"Unexpected module load: {module_name} from {path}")
 
     monkeypatch.setattr(module, "_load_module", patched_loader)
     monkeypatch.setenv(gv_hbi.GV_HBI_EXPERIMENTAL_FLAG, "1")
@@ -493,8 +852,30 @@ def test_gv_operational_canary_stitches_runtime_surrogate_and_phase1(
     assert manifest["checks"]["runtime_flag_enabled"] is True
     assert manifest["checks"]["runtime_dry_run"] is True
     assert manifest["checks"]["controls_excluded_from_calibrated_and_nuisance"] is True
+    assert manifest["checks"]["surrogate_dependency_skipped"] is False
+    assert manifest["checks"]["runtime_reference_generated"] is True
     assert manifest["checks"]["phase1_status"] == "phase1_korali_completed"
     assert manifest["checks"]["phase1_execution_model"] == "single_lane_dnn_korali"
+    assert manifest["selection_scope"] == "non-shear"
+    assert manifest["acceptance_trace"]["selection_scope"] == "non-shear"
+    assert manifest["acceptance_trace"]["command_summaries"]["runtime"] == [
+        {
+            "argv": ["python", "run_gv_runtime.py", "--dry-run"],
+            "command": "python run_gv_runtime.py --dry-run",
+            "status": "skipped-dry-run",
+            "returncode": 0,
+        }
+    ]
+    assert manifest["acceptance_trace"]["command_summaries"]["reference"][0]["name"] == "reference_manifest"
+    assert manifest["acceptance_trace"]["command_summaries"]["reference"][0]["argv"] == manifest["acceptance_trace"][
+        "command_summaries"
+    ]["surrogate"][0]["argv"]
+    assert manifest["acceptance_trace"]["command_summaries"]["surrogate"][0]["status"] == "passed"
+    assert manifest["acceptance_trace"]["command_summaries"]["hbi"][0]["status"] == "passed"
+    assert manifest["acceptance_trace"]["artifact_paths"]["runtime"]["manifest"] == str(runtime_manifest_path)
+    assert manifest["acceptance_trace"]["artifact_paths"]["surrogate"]["artifact"] == str(
+        output_root / "surrogate" / "model.pt"
+    )
     assert manifest["verdict"] == "pass"
 
     assert surrogate_manifest["dataset_id"] == manifest["dataset_id"]
@@ -503,7 +884,7 @@ def test_gv_operational_canary_stitches_runtime_surrogate_and_phase1(
     assert phase1_execution_manifest["dataset"]["dataset_id"] == manifest["dataset_id"]
     assert phase1_execution_manifest["controls"]["fixed_outside_inferred_variables"] is True
     assert phase1_execution_manifest["runtime"]["korali_invoked"] is True
-    assert fake_korali.created_engines[-1].sample_data["Reference Evaluations"] == [1.0] * 4
+    assert fake_korali.created_engines[-1].sample_data["Reference Evaluations"] == [1.0] * 2
     runtime_render_manifest = json.loads((output_root / "runtime" / "gv_runtime_render_manifest.json").read_text(encoding="utf-8"))
     assert runtime_render_manifest["runtime_manifest"] == str(runtime_manifest_path)
     assert all(command["status"] == "skipped-dry-run" for command in runtime_render_manifest["commands"])
@@ -548,6 +929,13 @@ def test_gv_operational_canary_records_runtime_blocked_issue_status(tmp_path: Pa
             "generated_subdirs": [],
         }
         (runtime_dir / "gv_runtime_dry_run_manifest.json").write_text(json.dumps(runtime_manifest), encoding="utf-8")
+        (runtime_dir / "gv_runtime_render_manifest.json").write_text(
+            json.dumps(
+                {"runtime_manifest": str(runtime_dir / "gv_runtime_dry_run_manifest.json"), "commands": []},
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
         return 0
 
     def _fake_surrogate_main(argv: list[str]) -> int:
@@ -565,6 +953,7 @@ def test_gv_operational_canary_records_runtime_blocked_issue_status(tmp_path: Pa
             json.dumps(surrogate_manifest),
             encoding="utf-8",
         )
+        _write_fake_reference_manifest(surrogate_root=surrogate_dir, runtime_manifest=runtime_manifest)
         surrogate_dir.joinpath("gv_dnn_surrogate_smoke_report.json").write_text(
             json.dumps({"status": "passed"}),
             encoding="utf-8",
@@ -633,6 +1022,7 @@ def test_gv_operational_canary_records_runtime_blocked_issue_status(tmp_path: Pa
     assert manifest["checks"]["runtime_experimental"] is True
     assert manifest["checks"]["runtime_blocked_issue_count"] == 1
     assert manifest["runtime_stage"]["experimental"] is True
+    assert manifest["selection_scope"] == "experimental"
     assert manifest["runtime_stage"]["runtime_package"] == "mirheoOBMD"
     assert manifest["runtime_stage"]["source_root"] == str(tmp_path / "sources" / "shear_flow")
     assert manifest["runtime_stage"]["known_issues"] == [
