@@ -225,6 +225,21 @@ def test_gv_operational_canary_helper_edges(tmp_path: Path, monkeypatch: pytest.
     assert module._is_missing_dependency_surrogate_run({"status": "passed"}) is False
     assert module._is_missing_dependency_surrogate_run({"training": {"status": "skipped_missing_dependency"}}) is True
     assert module._is_missing_dependency_surrogate_run({"training": {"status": "passed"}}) is False
+    assert module._summarize_command_records(
+        [
+            "bad-record",
+            {"argv": "bad-argv"},
+            {"argv": ["python", "stage.py"], "status": "passed", "returncode": 0, "cwd": tmp_path},
+        ]
+    ) == [
+        {
+            "argv": ["python", "stage.py"],
+            "command": "python stage.py",
+            "status": "passed",
+            "returncode": 0,
+            "cwd": str(tmp_path),
+        }
+    ]
     assert module._summarize_runtime_known_issues(
         {
             "known_issues": [
@@ -601,7 +616,16 @@ def test_gv_operational_canary_skips_phase1_on_missing_dependency(
         )
         _write_fake_reference_manifest(surrogate_root=surrogate_dir, runtime_manifest=runtime_manifest)
         surrogate_dir.joinpath("gv_dnn_surrogate_smoke_report.json").write_text(
-            json.dumps({"status": "skipped_missing_dependency", "training": {"status": "skipped_missing_dependency"}}),
+            json.dumps(
+                {
+                    "status": "skipped_missing_dependency",
+                    "execution_mode": "dry_run_manifest_only",
+                    "training": {
+                        "status": "skipped_missing_dependency",
+                        "missing_dependency": "torch",
+                    },
+                }
+            ),
             encoding="utf-8",
         )
         return 0
@@ -642,6 +666,16 @@ def test_gv_operational_canary_skips_phase1_on_missing_dependency(
     assert manifest["checks"]["phase1_execution_model"] == "skipped"
     assert manifest["verdict"] == "skip"
     assert manifest["acceptance_trace"]["command_summaries"]["hbi"][0]["status"] == "skipped"
+    phase1_setup_manifest = json.loads(
+        (
+            tmp_path
+            / "gv_operational_canary"
+            / "phase1"
+            / "results_phase_1"
+            / module.GV_PHASE1_SETUP_MANIFEST
+        ).read_text(encoding="utf-8")
+    )
+    assert phase1_setup_manifest["reason"] == "dry_run_manifest_only mode: GV DNN smoke dependency missing: torch."
     assert phase1_calls == []
 
 
