@@ -123,6 +123,7 @@ def test_run_exact_uqdpd_asset_port_infers_single_campaign_and_emits_report(
         if script_name == "stage_dnn_figure_inputs.py":
             assert command[0] == "python3"
             assert command[command.index("--python-bin") + 1] == "python3"
+            assert command[command.index("--device") + 1] == "cuda"
             staging_root = campaign_root / "postprocess_graph" / "dnn_figure_input_staging"
             _write_staging_report(
                 staging_root / "dnn_figure_input_staging_report.json",
@@ -193,6 +194,7 @@ def test_run_exact_uqdpd_asset_port_skip_supplementary_validates_partial_mode(
         del cwd, text, capture_output, check
         script_name = Path(command[1]).name
         if script_name == "stage_dnn_figure_inputs.py":
+            assert command[command.index("--device") + 1] == "cpu"
             staging_root = campaign_root / "postprocess_graph" / "dnn_figure_input_staging"
             _write_staging_report(
                 staging_root / "dnn_figure_input_staging_report.json",
@@ -216,6 +218,8 @@ def test_run_exact_uqdpd_asset_port_skip_supplementary_validates_partial_mode(
             str(paper_data_root),
             "--campaign-id",
             "camp2",
+            "--staging-device",
+            "cpu",
             "--skip-supplementary",
         ]
     )
