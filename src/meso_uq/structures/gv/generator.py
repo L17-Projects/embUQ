@@ -76,11 +76,15 @@ def _coerce_controls(
     controls: Mapping[str, object] | None,
 ) -> Mapping[str, float] | None:
     if controls is None:
-        return None
+        raise ValueError(
+            "controls are required for GV numerical data generation so each dataset manifest maps to one control point."
+        )
     if not isinstance(controls, Mapping):
         raise ValueError("controls must be a mapping.")
     if not controls:
-        return None
+        raise ValueError(
+            "controls must include at least one explicit control for GV numerical data generation."
+        )
     normalized: dict[str, float] = {}
     for name, value in controls.items():
         normalized_value = float(value)

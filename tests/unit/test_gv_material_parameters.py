@@ -8,6 +8,7 @@ import yaml
 
 from meso_uq.structures.gv.material_parameters import (
     apply_material_overrides_to_glob,
+    apply_material_overrides_to_files,
     apply_material_overrides_to_yaml,
     main,
     validate_material_parameter_overrides,
@@ -35,6 +36,9 @@ def test_validate_material_overrides_rejects_missing_values() -> None:
 
 
 def test_validate_material_overrides_rejects_non_finite_and_unknown_fields() -> None:
+    with pytest.raises(ValueError, match="must be numeric"):
+        validate_material_parameter_overrides({**_VALID_MATERIAL_PARAMETER_OVERRIDES, "ka": object()})
+
     with pytest.raises(ValueError, match="must be finite and > 0"):
         validate_material_parameter_overrides({**_VALID_MATERIAL_PARAMETER_OVERRIDES, "ka": -1})
 
@@ -43,6 +47,11 @@ def test_validate_material_overrides_rejects_non_finite_and_unknown_fields() -> 
 
     with pytest.raises(ValueError, match="Unexpected material parameter"):
         validate_material_parameter_overrides({**_VALID_MATERIAL_PARAMETER_OVERRIDES, "not_a_param": 1.0})
+
+    duplicate_alias = dict(_VALID_MATERIAL_PARAMETER_OVERRIDES)
+    duplicate_alias["muL"] = duplicate_alias["mu_l"]
+    with pytest.raises(ValueError, match="duplicated"):
+        validate_material_parameter_overrides(duplicate_alias)
 
 
 def test_validate_material_overrides_accepts_muL_alias() -> None:
@@ -129,6 +138,30 @@ def test_apply_material_overrides_to_glob_updates_parameters_prms_yaml_files_onl
     assert yaml.safe_load((tmp_path / "ignore.yaml").read_text(encoding="utf-8"))["ka"] == 99
 
 
+def test_material_override_file_helpers_reject_bad_paths_and_payloads(tmp_path: Path) -> None:
+    missing = tmp_path / "missing.yaml"
+    with pytest.raises(FileNotFoundError, match="File not found"):
+        apply_material_overrides_to_yaml(missing, _VALID_MATERIAL_PARAMETER_OVERRIDES)
+
+    non_mapping = tmp_path / "parameters.prms00001.yaml"
+    non_mapping.write_text("- not\n- a\n- mapping\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="Expected YAML mapping"):
+        apply_material_overrides_to_yaml(non_mapping, _VALID_MATERIAL_PARAMETER_OVERRIDES)
+
+    with pytest.raises(NotADirectoryError, match="Expected a directory"):
+        apply_material_overrides_to_glob(tmp_path / "not-a-dir", _VALID_MATERIAL_PARAMETER_OVERRIDES)
+
+    empty_dir = tmp_path / "empty"
+    empty_dir.mkdir()
+    with pytest.raises(FileNotFoundError, match="No parameter files matched"):
+        apply_material_overrides_to_glob(empty_dir, _VALID_MATERIAL_PARAMETER_OVERRIDES)
+
+    mapping = tmp_path / "parameters.prms00002.yaml"
+    mapping.write_text(yaml.safe_dump({"ka": 2.0}), encoding="utf-8")
+    updated = apply_material_overrides_to_files([mapping], _VALID_MATERIAL_PARAMETER_OVERRIDES)
+    assert updated == [mapping]
+
+
 def test_material_parameter_cli_applies_json_overrides(tmp_path: Path) -> None:
     payload_path = tmp_path / "parameters.prms00001.yaml"
     payload_path.write_text(
@@ -161,6 +194,14 @@ def test_material_parameter_cli_applies_json_overrides(tmp_path: Path) -> None:
     assert rc == 0
     assert updated["ka"] == 1.1
     assert updated["muL"] == 0.6
+
+
+def test_material_parameter_cli_rejects_non_mapping_json(tmp_path: Path) -> None:
+    payload_path = tmp_path / "parameters.prms00001.yaml"
+    payload_path.write_text(yaml.safe_dump({"ka": 2.0}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="must decode to a mapping"):
+        main([str(payload_path), "--overrides-json", json.dumps([1, 2, 3])])
 
 
 @pytest.mark.parametrize("experiment", ["stretching", "buckling", "torsion", "eigenmodes"])

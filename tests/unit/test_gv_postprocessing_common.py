@@ -65,8 +65,35 @@ def _install_fake_h5py(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_validate_numeric_channels_rejects_non_finite_arrays() -> None:
+    with pytest.raises(ValueError, match="channels must be a mapping"):
+        common.validate_numeric_channels([])
+
+    with pytest.raises(ValueError, match="Channel names must be strings"):
+        common.validate_numeric_channels({1: [1.0]})
+
+    with pytest.raises(ValueError, match="must contain data"):
+        common.validate_numeric_channels({"force": []})
+
+    with pytest.raises(ValueError, match="must be numeric"):
+        common.validate_numeric_channels({"force": [object()]})
+
     with pytest.raises(ValueError, match="non-finite"):
         common.validate_numeric_channels({"force": [1.0, np.nan]})
+
+
+def test_common_jsonable_and_manifest_validation_branches() -> None:
+    payload = common._as_jsonable(
+        {
+            "path": Path("raw/out"),
+            "tuple": (np.float64(1.0), np.array([2.0, 3.0])),
+            "flag": np.bool_(True),
+        }
+    )
+
+    assert payload == {"path": "raw/out", "tuple": [1.0, [2.0, 3.0]], "flag": True}
+
+    with pytest.raises(ValueError, match="manifest must be"):
+        common._manifest_to_payload(object())
 
 
 def test_write_numerical_dataset_artifacts_writes_manifest_and_hdf5(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -131,3 +158,47 @@ def test_write_numerical_dataset_artifacts_requires_h5py(monkeypatch: pytest.Mon
         / "numerical_dataset_manifest.json"
     )
     assert not manifest_path.exists()
+
+
+def test_write_numerical_dataset_artifacts_rejects_empty_channel_mapping(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    recorded = _install_fake_h5py(monkeypatch)
+    manifest = _base_manifest()
+
+    with pytest.raises(ValueError, match="At least one numeric channel"):
+        common.write_numerical_dataset_artifacts(manifest=manifest, channels={})
+
+    assert recorded.file is None
+
+
+def test_hdf5_manifest_attrs_cover_scalar_and_structured_metadata() -> None:
+    class RaisingAttrs(dict):
+        def __setitem__(self, key, value):
+            if key == "bad_json":
+                raise TypeError("cannot store")
+            super().__setitem__(key, value)
+
+    class FakeHandle:
+        def __init__(self):
+            self.attrs = RaisingAttrs()
+
+    handle = FakeHandle()
+    common._write_hdf5_manifest_attrs(
+        handle,
+        {
+            "name": "dataset",
+            "flag": True,
+            "count": 3,
+            "ratio": 0.5,
+            "missing": None,
+            "structured": {"path": Path("raw")},
+            "bad": {"key": "value"},
+        },
+    )
+
+    assert handle.attrs["name"] == "dataset"
+    assert handle.attrs["flag"] is True
+    assert handle.attrs["count"] == 3
+    assert handle.attrs["ratio"] == 0.5
+    assert handle.attrs["missing"] == "null"
+    assert handle.attrs["structured_json"] == '{"path": "raw"}'

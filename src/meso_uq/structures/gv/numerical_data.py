@@ -378,6 +378,15 @@ def parse_gv_dataset_id(dataset_id: str) -> tuple[str, str, str, str]:
     return parts[0], parts[1], parts[2], parts[3]
 
 
+def _validate_dataset_path_token(component: str, *, field_name: str) -> None:
+    if not component:
+        raise ValueError(f"GV dataset_id must include a non-empty {field_name} component.")
+    if "/" in component or "\\" in component:
+        raise ValueError(f"GV dataset_id {field_name} component must not contain path separators.")
+    if ".." in component:
+        raise ValueError(f"GV dataset_id {field_name} component must not contain path traversal segments.")
+
+
 def validate_gv_numerical_dataset_id(dataset_id: str, *, structure: str) -> None:
     _validate_structure(structure)
     dataset_structure, experiment, geometry, control_id = parse_gv_dataset_id(dataset_id)
@@ -386,10 +395,8 @@ def validate_gv_numerical_dataset_id(dataset_id: str, *, structure: str) -> None
             f"GV dataset_id structure mismatch: expected {structure!r}, got {dataset_structure!r}."
         )
     _validate_experiment(structure, experiment)
-    if not geometry:
-        raise ValueError("GV dataset_id must include a non-empty geometry component.")
-    if not control_id:
-        raise ValueError("GV dataset_id must include a non-empty control component.")
+    _validate_dataset_path_token(geometry, field_name="geometry")
+    _validate_dataset_path_token(control_id, field_name="control")
 
 
 def validate_gv_numerical_manifest(payload: Mapping[str, Any]) -> None:

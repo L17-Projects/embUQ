@@ -106,7 +106,7 @@ def test_generate_gv_numerical_data_stages_runtime_and_returns_expected_manifest
     assert result.expected_manifest["quality_flags"]["canary_failures"] == ["postprocessing_not_run"]
 
 
-def test_generate_gv_numerical_data_accepts_radgv_and_height_aliases_with_default_controls(tmp_path, monkeypatch) -> None:
+def test_generate_gv_numerical_data_accepts_radgv_and_height_aliases_with_explicit_controls(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     result = generate_gv_numerical_data(
         experiment="buckling",
@@ -114,6 +114,7 @@ def test_generate_gv_numerical_data_accepts_radgv_and_height_aliases_with_defaul
         height=14.28,
         campaign_id="campaign-alias",
         material_parameters=_MATERIAL_PARAMETERS,
+        controls={"buck": 0.0},
     )
 
     assert result.experiment == "buckling"
@@ -216,6 +217,25 @@ def test_generate_gv_numerical_data_rejects_invalid_material_controls_and_struct
             campaign_id="campaign-invalid-control-value",
             material_parameters=_MATERIAL_PARAMETERS,
             controls={"tot_force": float("inf")},
+        )
+
+    with pytest.raises(ValueError, match="controls are required"):
+        generate_gv_numerical_data(
+            experiment="stretching",
+            geometry_radius=2.0,
+            geometry_height=14.28,
+            campaign_id="campaign-missing-controls",
+            material_parameters=_MATERIAL_PARAMETERS,
+        )
+
+    with pytest.raises(ValueError, match="at least one explicit control"):
+        generate_gv_numerical_data(
+            experiment="stretching",
+            geometry_radius=2.0,
+            geometry_height=14.28,
+            campaign_id="campaign-empty-controls",
+            material_parameters=_MATERIAL_PARAMETERS,
+            controls={},
         )
 
     with pytest.raises(ValueError, match="path separators"):
