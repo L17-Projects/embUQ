@@ -31,4 +31,22 @@ __all__ = [
     "build_geometry",
     "geometry_id",
     "GV_OBSERVABLE_SCHEMAS",
+    "GVNumericalGenerationResult",
+    "generate_gv_numerical_data",
 ]
+
+
+def __getattr__(name: str):
+    if name == "GVNumericalGenerationResult":
+        from .generator import GVNumericalGenerationResult
+
+        return GVNumericalGenerationResult
+    if name == "generate_gv_numerical_data":
+        from .generator import generate_gv_numerical_data
+
+        return generate_gv_numerical_data
+    raise AttributeError(f"module 'meso_uq.structures.gv' has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return sorted(list(globals()) + ["GVNumericalGenerationResult", "generate_gv_numerical_data"])

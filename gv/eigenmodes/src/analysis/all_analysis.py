@@ -75,22 +75,23 @@ for i in range(trajs):
 
 ###########################################################
 
-print(f'Step:::::Calculating covariance matrix of size {trj_np.shape}.')
-a = np.cov(trj_np.T)
-
-mdiag = np.sqrt(parameters["mvert"] * np.diag(np.ones(len(a))))
-
-a = np.matmul(mdiag, np.matmul(a, mdiag))
+print(f'Step:::::Preparing mass-weighted trajectory matrix of size {trj_np.shape}.')
+trj_np *= np.sqrt(parameters["mvert"])
 ###########################################################
 
 method = 'svd' # 'eig', 'svd', 'mdanalysis'
 print(f'Step:::::Calculating eigenvalues and eigenvectors using np.{method} method.')
 if(method == 'eigh'):
+    a = np.cov(trj_np.T)
     eigvalues, eigvectors = np.linalg.eigh(a)
 elif(method == 'eig'):
+    a = np.cov(trj_np.T)
     eigvalues, eigvectors = np.linalg.eig(a)
 elif(method == 'svd'):
-    U, eigvalues, Vh = np.linalg.svd(a)
+    _, singular_values, Vh = np.linalg.svd(trj_np, full_matrices=False)
+    denominator = max(trajs - 1, 1)
+    eigvalues = singular_values**2 / denominator
+    U = Vh.T
 elif(method == 'mdanalysis'):
     pc = pca.PCA(trj, select='all', mean=None, n_components=None).run()
 
@@ -144,5 +145,4 @@ f.close()'''
 #160 s for 2562 and eigh
 #274 s for 2562 and eig
 #262 s for 2562 and svd
-
 

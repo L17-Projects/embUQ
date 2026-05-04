@@ -37,15 +37,18 @@ MAP_MIRHEO_DATASET_NAME="${MAP_MIRHEO_DATASET_NAME:-}"
 GPU_TIME_LIMIT="${GPU_TIME_LIMIT:-02:00:00}"
 
 module purge
-module load Python/3.10.8-GCCcore-12.2.0 openmpi/4.1.2.1 CUDA/12.2.2 GSL/2.7-GCC-12.2.0 Eigen/3.4.0-GCCcore-12.2.0 HDF5/1.14.0-gompi-2022b
+module load Python/3.10.8-GCCcore-12.2.0 OpenMPI/4.1.4-GCC-12.2.0 CUDA/12.2.2 GSL/2.7-GCC-12.2.0 Eigen/3.4.0-GCCcore-12.2.0 HDF5/1.14.0-gompi-2022b MPFR/4.2.0-GCCcore-12.2.0 GMP/6.2.1-GCCcore-12.2.0
 
 source "${REPO_ROOT}/_vega/venv/bin/activate"
 source "${REPO_ROOT}/_vega/korali/env.sh"
-if [[ ! -f "${REPO_ROOT}/_vega/mirheo/env.sh" ]]; then
+if [[ -f "${REPO_ROOT}/_vega/gv_venv/env.sh" ]]; then
+  source "${REPO_ROOT}/_vega/gv_venv/env.sh"
+elif [[ -f "${REPO_ROOT}/_vega/mirheo/env.sh" ]]; then
+  source "${REPO_ROOT}/_vega/mirheo/env.sh"
+else
   echo "ERROR: repo-local Mirheo bootstrap missing. Run scripts/platforms/hpc/bootstrap_mirheo.sh first." >&2
   exit 1
 fi
-source "${REPO_ROOT}/_vega/mirheo/env.sh"
 
 cd "${REPO_ROOT}"
 

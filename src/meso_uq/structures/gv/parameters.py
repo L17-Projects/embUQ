@@ -3,6 +3,8 @@ from __future__ import annotations
 from ..registry import NoiseModelSpec, ParameterContract, ParameterSpec
 
 
+GV_MATERIAL_PARAMETER_NAMES = ("ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c")
+
 GV_KA = ParameterSpec("ka", r"$k_a$", "In-plane area modulus.", "DPD energy / area")
 GV_KB = ParameterSpec("kb", r"$k_b$", "Bending modulus.", "DPD energy")
 GV_MU = ParameterSpec("mu", r"$\mu$", "In-plane shear modulus.", "DPD energy / area")

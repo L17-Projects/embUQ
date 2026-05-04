@@ -1,11 +1,13 @@
 from pathlib import Path
 
 from meso_uq.vega import (
+    build_gv_runtime_pythonpath,
     build_runtime_pythonpath,
     find_external_korali_entries,
     gather_mirheo_source_snapshot,
     get_vega_paths,
     load_mirheo_source_lock,
+    render_gv_venv_env_script,
     render_mirheo_env_script,
     render_korali_env_script,
     render_tinytex_env_script,
@@ -34,6 +36,8 @@ def test_vega_paths_use_repo_local_visible_state(tmp_path):
     assert paths.tinytex_env_script == repo_root / "_vega" / "tinytex" / "env.sh"
     assert paths.mirheo_prefix == repo_root / "_vega" / "mirheo" / "install"
     assert paths.mirheo_env_script == repo_root / "_vega" / "mirheo" / "env.sh"
+    assert paths.gv_venv_root == repo_root / "_vega" / "gv_venv"
+    assert paths.gv_venv_env_script == repo_root / "_vega" / "gv_venv" / "env.sh"
 
 
 def test_resolve_repo_root_finds_root_from_nested_file(tmp_path):
@@ -68,6 +72,16 @@ def test_build_runtime_pythonpath_prefers_repo_local_korali(tmp_path):
     ]
     assert str(external_site) not in entries
     assert str(other_entry) in entries
+
+
+def test_build_gv_runtime_pythonpath_sets_gv_site_prefix(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    paths = get_vega_paths(repo_root)
+    built = build_gv_runtime_pythonpath(repo_root, gv_venv_site_packages=paths.gv_venv_site_packages)
+
+    entries = built.split(":")
+    assert entries[0] == str(paths.gv_venv_site_packages)
+    assert entries[1:] == [str(repo_root / "src"), str(repo_root)]
 
 
 def test_find_external_korali_entries_reports_user_global_path(tmp_path):
@@ -167,6 +181,52 @@ def test_render_mirheo_env_script_exports_local_paths(tmp_path):
     assert str(source_root.resolve()) in env_script
     assert str(paths.mirheo_build_dir) in env_script
     assert str(paths.mirheo_snapshot_path) in env_script
+
+
+def test_render_mirheo_env_script_omits_snapshot_when_not_provided(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    paths = get_vega_paths(repo_root)
+    source_root = tmp_path / "Mirheo"
+    source_root.mkdir()
+
+    env_script = render_mirheo_env_script(paths, source_root=source_root)
+
+    assert "MIRHEO_SOURCE_SNAPSHOT" not in env_script
+
+
+def test_render_gv_venv_env_script_exports_openmpi_and_scale_space_paths(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    paths = get_vega_paths(repo_root)
+    source_root = tmp_path / "Mirheo"
+    source_root.mkdir()
+    snapshot = paths.mirheo_snapshot_path
+    snapshot.parent.mkdir(parents=True, exist_ok=True)
+    snapshot.write_text("{}")
+
+    env_script = render_gv_venv_env_script(paths, source_root=source_root, snapshot_path=snapshot)
+
+    assert "MESOUQ_GV_VENV_ROOT" in env_script
+    assert str(paths.gv_venv_root) in env_script
+    assert "MESOUQ_GV_ENV_SCRIPT" in env_script
+    assert str(paths.gv_venv_env_script) in env_script
+    assert "VIRTUAL_ENV" in env_script
+    assert "${MESOUQ_GV_VENV_ROOT}/bin" in env_script
+    assert "GV_SCALE_SPACE_BINARY" in env_script
+    assert "_vega/gv_cgal_tools/bin/scale_space" in env_script
+    assert "GV_CGAL_TOOLS_ROOT" in env_script
+    assert "MESOUQ_OPENMPI_LIB_DIR" in env_script
+    assert str(paths.mirheo_snapshot_path) in env_script
+
+
+def test_render_gv_venv_env_script_omits_snapshot_when_not_provided(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    paths = get_vega_paths(repo_root)
+    source_root = tmp_path / "Mirheo"
+    source_root.mkdir()
+
+    env_script = render_gv_venv_env_script(paths, source_root=source_root)
+
+    assert "MIRHEO_SOURCE_SNAPSHOT" not in env_script
 
 
 def test_gather_mirheo_source_snapshot_ignores_build_artifacts(tmp_path):

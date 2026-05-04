@@ -31,12 +31,14 @@ def plan_runtime(
     output_root: str | Path = GV_RUNTIME_DEFAULT_ROOT,
     geometry: str | None = None,
     controls: Mapping[str, float] | None = None,
+    material_parameter_overrides: Mapping[str, float] | None = None,
     include_experimental: bool = False,
 ) -> RuntimeDryRun:
     descriptor = load_runtime_descriptor(experiment)
     kwargs = {
         "output_root": output_root,
         "controls": controls,
+        "material_parameter_overrides": material_parameter_overrides,
         "include_experimental": include_experimental,
     }
     if geometry is not None:

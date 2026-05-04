@@ -23,7 +23,7 @@ mesh = trimesh.load(objFile)
 vertices = mesh.vertices
 nicle = np.zeros(len(vertices))
 
-file0 = open('xyz0.xyz', 'w')
+file0 = open('emb_0000000.xyz', 'w')
 
 file0.write(f'{len(vertices)}\n')
 file0.write('# generated using trimesh\n')
