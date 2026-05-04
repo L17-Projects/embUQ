@@ -1,24 +1,26 @@
 # GV Extension Closeout
 
-Status and rollout rules for the MesoUQ GV extension closeout slice (MES-78/MES-81).
+Status and rollout rules for the MesoUQ GV extension closeout slice (MES-98).
 
 ## Current status
 
-- Scope: GV non-shear experiments only (`stretching`, `buckling`, `torsion`, `eigenmodes`).
-- `shear_flow` is excluded from non-experimental acceptance and deferred under `MES-81`.
-- This closeout package is **provisional** until merge evidence exists in Linear and repository history.
+- Scope is the core non-shear GV numerical generation stack: `stretching`, `buckling`, `torsion`, `eigenmodes`.
+- `shear_flow` is intentionally excluded from non-experimental acceptance and stays behind experimental opt-in.
+- Keep acceptance evidence scoped to this slice until post-hardening canary and handoff evidence is available per experiment.
 
 ## Canonical GV operational chain
 
-The intended operational acceptance chain is:
+The acceptance chain for this slice is:
 
-1. Mirheo runtime for canonical non-shear GV experiments.
-2. DNN surrogate training / prediction path over the generated GV outputs.
-3. Hierarchical Bayesian inference using the same shared phase-chain controls (`phase1`, `phase2`, `phase3b`).
+1. Mirheo runtime for canonical GV experiments.
+2. DNN surrogate training / prediction over generated GV outputs.
+3. Hierarchical Bayesian inference through the same shared phase-chain (`phase1`, `phase2`, `phase3b`).
 
-The non-shear flow must demonstrate this `Mirheo -> DNN surrogate -> hierarchical inference` chain end-to-end for rollout.
+The non-shear stack must demonstrate this `Mirheo -> DNN surrogate -> hierarchical inference` chain end-to-end before hard closeout.
 
-## Parameter and control contract for release hardening
+See also [GV_NUMERICAL_DATA_GENERATION.md](GV_NUMERICAL_DATA_GENERATION.md) for the full numerical-data handoff schema.
+
+## Parameter and control contract
 
 GV material calibration is constrained to exactly these parameters:
 
@@ -32,24 +34,27 @@ GV material calibration is constrained to exactly these parameters:
 - `mu_l`
 - `c`
 
-GV controls are experiment design inputs and must remain excluded from calibrated vectors.
+GV experiment controls are campaign design variables and are excluded from calibration vectors.
 
-The GV noise model for this release-hardening slice is multiplicative `sigma`.
+The GV noise model for this slice is multiplicative `sigma`.
 
-## Disk hygiene rules
+## Disk policy
 
-To keep GV rollout storage-bounded on shared accounts:
+- Raw runtime products stay under ignored `_runs` trees.
+- Canonical aggregated numerical datasets are authored under `_runs/gv/numerical_data/<campaign_id>/datasets/`.
+- Numerical canary/campaign footprints are kept under the `25GB` GV data cap.
 
-- keep generated artifacts in ignored runtime/workspace roots such as `_runs`, `_vega`, and temporary staging trees,
-- avoid tracking generated mesh/runtime objects, logs, or scratch under source-controlled paths,
-- clean stale staging directories once accepted runs are archived,
-- preserve only canonical manifests and small handoff records.
+## Deferrals and active-learning reminder
 
-## Deferrals and active learning reminder
+- `shear_flow` remains in experimental scope and deferred from the non-shear core closeout.
+- After the core GV stack is accepted, schedule an active-learning brainstorming session on adaptive control selection before any production rollout decisions.
 
-- `shear_flow` remains behind experimental opt-in and deferred as `MES-81`.
-- after non-shear stack operability, hold a dedicated active-learning brainstorm on whether adaptive GV control selection can reduce canary and DNN warm-start cost before any production rollout decisions.
+## Merge evidence and hardening gate
 
-## Merge-evidence rule
+Keep this slice blocked until campaign and PR evidence is recorded (campaign IDs, merged merge commits, and required review-thread checks).
 
-Treat this item as blocked for hard closeout until merge evidence is recorded (merge commit, merged PR links, and required review-thread checks).
+## Runtime guardrails
+
+- For `gv:stretching`, `gv:torsion`, `gv:buckling`, and `gv:eigenmodes`, generated command staging should run with `_vega/gv_venv/env.sh` sourced.
+- `doctor_vega --with-gv-runtime` remains the hardening check for Mirheo import/lib path, `scale_space` resolution, dynamic-library checks, MDAnalysis importability, and OpenMPI wiring.
+- The GV runtime sbatch wrapper and generated command staging (`commands.txt`) require `_vega/gv_venv/env.sh` and fail fast if that environment script is missing.
