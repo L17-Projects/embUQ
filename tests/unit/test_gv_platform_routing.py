@@ -10,6 +10,19 @@ from types import SimpleNamespace
 import pytest
 
 
+_VALID_MATERIAL_PARAMETER_OVERRIDES = {
+    "ka": 1.1,
+    "kb": 1.2,
+    "mu": 0.9,
+    "b1": 0.1,
+    "b2": 0.2,
+    "a3": 0.3,
+    "a4": 0.4,
+    "mu_l": 0.5,
+    "c": 0.6,
+}
+
+
 def _load_module(path: Path, name: str):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
@@ -140,6 +153,17 @@ def test_gv_runtime_rendering_targets_staged_work_dir_and_generates_scheduler(tm
                 {"argv": ["bash", "commands.txt"], "cwd": "analysis"},
             ],
             "generated_subdirs": ["logs", "analysis", "mesh"],
+            "material_parameter_overrides": {
+                "ka": 1.1,
+                "kb": 1.2,
+                "mu": 0.9,
+                "b1": 0.1,
+                "b2": 0.2,
+                "a3": 0.3,
+                "a4": 0.4,
+                "mu_l": 0.5,
+                "c": 0.6,
+            },
             "runtime_package": "mirheoOBMD",
         }
         (parsed_root / "gv_runtime_dry_run_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -181,6 +205,194 @@ def test_gv_runtime_rendering_targets_staged_work_dir_and_generates_scheduler(tm
     contents = commands_txt.read_text(encoding="utf-8")
     assert "generate.py" in contents
     assert "run_HPC.sbatch" in contents
+    assert "_vega/gv_venv/env.sh" in contents
+    assert "_vega/mirheo/env.sh" not in contents
+    assert "Missing required GV runtime environment" in contents
+    assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in contents
+    assert '"mu_l": 0.5' in contents
+    assert "source" in contents
+
+    scheduler_contents = (work_dir / "run_HPC.sbatch").read_text(encoding="utf-8")
+    assert "_vega/gv_venv/env.sh" in scheduler_contents
+    assert "_vega/mirheo/env.sh" not in scheduler_contents
+    assert "Missing required GV runtime environment" in scheduler_contents
+
+
+def test_gv_dry_run_material_parser_validates_overrides() -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_dry_run.py"),
+        "gv_dry_run_material_parser_validation_test",
+    )
+    raw_overrides = [f"{name}={value}" for name, value in _VALID_MATERIAL_PARAMETER_OVERRIDES.items()]
+
+    parsed_overrides = module._parse_material_overrides(raw_overrides)
+    assert parsed_overrides == _VALID_MATERIAL_PARAMETER_OVERRIDES
+    assert module._parse_material_overrides([]) is None
+
+    with pytest.raises(ValueError, match="Expected NAME=VALUE"):
+        module._parse_material_overrides(["ka1.1"])
+    with pytest.raises(ValueError, match="duplicated"):
+        module._parse_material_overrides(["ka=1.1", "ka=1.2"])
+    with pytest.raises(ValueError, match="Missing required GV material parameters"):
+        module._parse_material_overrides(["ka=1.1", "kb=1.2"])
+    with pytest.raises(ValueError, match="Unexpected material parameter"):
+        module._parse_material_overrides(["ka=1.1", "oops=2.0"])
+
+
+@pytest.mark.parametrize("experiment_name", ("stretching", "buckling", "torsion", "eigenmodes"))
+def test_gv_generated_mirheo_jobs_source_runtime_environment_and_preserve_materials(
+    experiment_name: str,
+) -> None:
+    generate_script = Path("gv") / experiment_name / "src" / "generate.py"
+    contents = generate_script.read_text(encoding="utf-8")
+
+    assert "MESOUQ_GV_ENV_SCRIPT" in contents
+    assert "_vega' / 'gv_venv' / 'env.sh" in contents
+    assert "source {shlex.quote(env_script)}" in contents
+    assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in contents
+    assert "bash commands.txt" in contents
+    assert "ntasks_per_node = num_gpus" in contents
+    assert "f'{num_gpus}'" in contents
+    assert "module load Python/3.10.8-GCCcore-12.2.0" in contents
+    assert "module load OpenMPI/4.1.4-GCC-12.2.0" in contents
+    assert "module load CUDA/12.2.2" in contents
+
+
+@pytest.mark.parametrize("experiment_name", ("stretching", "buckling", "torsion", "eigenmodes"))
+def test_gv_mirheo_launchers_disable_openmpi_binding_on_vega(experiment_name: str) -> None:
+    run_script = Path("gv") / experiment_name / "src" / "run.sh"
+    contents = run_script.read_text(encoding="utf-8")
+
+    assert "nranks=${3:-1}" in contents
+    assert "mpirun --bind-to none -np ${nranks}" in contents
+
+
+def test_gv_eigenmodes_analysis_accepts_restart_backed_trajectory() -> None:
+    analysis_root = Path("gv/eigenmodes/src/analysis")
+
+    combine_contents = (analysis_root / "combine.py").read_text(encoding="utf-8")
+    assert "combine_restart_position_files" in combine_contents
+    assert "emb.PV-*.h5" in combine_contents
+    assert "../restart" in combine_contents
+
+    initial_contents = (analysis_root / "initial.py").read_text(encoding="utf-8")
+    assert "emb_0000000.xyz" in initial_contents
+
+    all_analysis_contents = (analysis_root / "all_analysis.py").read_text(encoding="utf-8")
+    assert "np.linalg.svd(trj_np, full_matrices=False)" in all_analysis_contents
+
+
+def test_gv_dry_run_plan_receives_material_overrides_only_when_provided() -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_dry_run.py"),
+        "gv_dry_run_material_plan_call_test",
+    )
+    captured: dict[str, object] = {}
+
+    class _Descriptor:
+        def plan(self, **kwargs):
+            captured.clear()
+            captured.update(kwargs)
+            return {"material_parameter_overrides": kwargs.get("material_parameter_overrides", {})}
+
+    request = {
+        "geometry": "gv_rad2_height14_28",
+        "controls": {},
+        "output_root": Path("unused"),
+        "include_experimental": False,
+    }
+
+    module._plan_runtime_dry_run(
+        _Descriptor(),
+        {**request, "material_parameter_overrides": _VALID_MATERIAL_PARAMETER_OVERRIDES},
+    )
+    assert captured["material_parameter_overrides"] == _VALID_MATERIAL_PARAMETER_OVERRIDES
+
+    module._plan_runtime_dry_run(_Descriptor(), {**request, "material_parameter_overrides": None})
+    assert "material_parameter_overrides" not in captured
+
+
+def test_gv_runtime_builds_and_forwards_material_arguments_to_dry_run(tmp_path, monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_runtime.py"),
+        "gv_runtime_material_forwarding_test",
+    )
+    captured_argv: list[str] = []
+
+    def _fake_dry_run(argv: list[str]) -> int:
+        captured_argv.extend(argv)
+        parsed_root = Path(argv[argv.index("--output-root") + 1]).expanduser().resolve()
+        parsed_root.mkdir(parents=True, exist_ok=True)
+        work_dir = (
+            parsed_root
+            / "stretching"
+            / "gv_rad2_height14_28"
+            / "theta_0_03"
+            / "work"
+        )
+        overrides = {}
+        for index, item in enumerate(argv):
+            if item == "--material":
+                name, raw_value = argv[index + 1].split("=", 1)
+                overrides[name] = float(raw_value)
+        manifest = {
+            "structure": "gv",
+            "experiment": "stretching",
+            "geometry": "gv_rad2_height14_28",
+            "controls": {"theta": 0.03},
+            "control_id": "theta_0_03",
+            "dataset_id": "gv:stretching:gv_rad2_height14_28:theta_0_03",
+            "output_root": str(parsed_root),
+            "work_dir": str(work_dir),
+            "commands": [{"argv": ["bash", "run.sh"], "cwd": "{work_dir}"}],
+            "material_parameter_overrides": overrides,
+        }
+        work_dir.mkdir(parents=True, exist_ok=True)
+        (parsed_root / "gv_runtime_dry_run_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        return 0
+
+    monkeypatch.setattr(module, "RUN_GV_DRY_RUN_MAIN", _fake_dry_run)
+    monkeypatch.setattr(
+        module.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout="", stderr=""),
+    )
+
+    material_args = [f"{name}={value}" for name, value in _VALID_MATERIAL_PARAMETER_OVERRIDES.items()]
+    material_flags: list[str] = []
+    for item in material_args:
+        material_flags.extend(["--material", item])
+
+    rc = module.main(
+        [
+            "--selection",
+            "gv:stretching",
+            "--output-root",
+            str(tmp_path / "runtime"),
+            "--control",
+            "theta=0.03",
+            *material_flags,
+            "--dry-run",
+        ]
+    )
+
+    assert rc == 0
+    assert captured_argv.count("--material") == len(material_args)
+    for item in material_args:
+        assert item in captured_argv
+    runtime_output_root = tmp_path / "runtime"
+    manifest = json.loads((runtime_output_root / "gv_runtime_render_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["dry_run"] is True
+    commands_txt = (
+        runtime_output_root
+        / "stretching"
+        / "gv_rad2_height14_28"
+        / "theta_0_03"
+        / "work"
+        / "commands.txt"
+    )
+    contents = commands_txt.read_text(encoding="utf-8")
+    assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in contents
 
 
 def test_gv_runtime_workflow_helper_edge_cases(tmp_path, monkeypatch) -> None:
@@ -234,6 +446,30 @@ def test_gv_runtime_workflow_helper_edge_cases(tmp_path, monkeypatch) -> None:
     with pytest.raises(ValueError, match="must be a JSON object"):
         module._load_runtime_manifest(list_json)
 
+
+def test_gv_runtime_command_execution_exports_material_overrides(tmp_path, monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_runtime.py"),
+        "gv_runtime_material_override_env_test",
+    )
+    captured_env: list[str] = []
+
+    def _fake_run(command, cwd, env, capture_output, text, check):
+        captured_env.append(env["MESOUQ_GV_MATERIAL_OVERRIDES_JSON"])
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", _fake_run)
+
+    records, returncode = module._run_commands(
+        commands=[(("bash", "run.sh"), tmp_path)],
+        dry_run=False,
+        material_overrides_json='{"ka": 1.1}',
+    )
+
+    assert returncode == 0
+    assert records[0]["status"] == "completed"
+    assert captured_env == ['{"ka": 1.1}']
+
     missing_json = tmp_path / "missing.json"
     missing_json.write_text(json.dumps({"structure": "gv"}), encoding="utf-8")
     with pytest.raises(ValueError, match="missing required field"):
@@ -258,6 +494,29 @@ def test_gv_runtime_workflow_helper_edge_cases(tmp_path, monkeypatch) -> None:
     )
     with pytest.raises(ValueError, match="controls"):
         module._load_runtime_manifest(bad_controls_json)
+
+
+def test_gv_runtime_command_execution_without_material_overrides_does_not_pass_env(tmp_path, monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_runtime.py"),
+        "gv_runtime_material_override_absent_env_test",
+    )
+    captured_kwargs: list[dict[str, object]] = []
+
+    def _fake_run(command, **kwargs):
+        captured_kwargs.append(dict(kwargs))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", _fake_run)
+
+    records, returncode = module._run_commands(
+        commands=[(("bash", "run.sh"), tmp_path)],
+        dry_run=False,
+    )
+
+    assert returncode == 0
+    assert records[0]["status"] == "completed"
+    assert "env" not in captured_kwargs[0]
 
 
 def test_gv_runtime_render_manifest_records_classified_known_issues(tmp_path, monkeypatch) -> None:

@@ -19,6 +19,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from meso_uq.vega import (
     DEFAULT_VEGA_MIRHEO_MODULES,
     DEFAULT_VEGA_MODULES,
+    DEFAULT_VEGA_RUNTIME_MODULES,
     find_external_korali_entries,
     get_vega_paths,
     load_mirheo_source_lock,
@@ -49,6 +50,55 @@ def _pkg_config_version(package: str) -> str:
     return (result.stdout or "").strip()
 
 
+def _resolve_scale_space_binary() -> tuple[str, str]:
+    env_binary = os.environ.get("GV_SCALE_SPACE_BINARY", "").strip()
+    if env_binary and Path(env_binary).is_file():
+        return env_binary, "GV_SCALE_SPACE_BINARY"
+
+    cgal_root = os.environ.get("GV_CGAL_TOOLS_ROOT", "").strip()
+    if cgal_root:
+        candidates = (
+            Path(cgal_root) / "scale_space",
+            Path(cgal_root) / "cgal_scripts" / "scale_space",
+            Path(cgal_root) / "build" / "cgal_scripts" / "scale_space",
+        )
+        for candidate in candidates:
+            if candidate.is_file():
+                return str(candidate), "GV_CGAL_TOOLS_ROOT"
+
+    which_binary = _command_path("scale_space")
+    if which_binary:
+        return which_binary, "PATH"
+    return "", ""
+
+
+def _resolve_scale_space_dynamic_libs(binary: str) -> tuple[bool, str]:
+    if not binary:
+        return False, "scale_space binary was not resolved"
+    result = subprocess.run(["ldd", binary], text=True, capture_output=True, check=False)
+    if result.returncode != 0:
+        return False, f"ldd failed: {(result.stderr or result.stdout).strip()}"
+    output = ((result.stdout or "") + (result.stderr or "")).strip()
+    missing: list[str] = [
+        line.strip()
+        for line in output.splitlines()
+        if "not found" in line
+    ]
+    if missing:
+        return False, "missing dynamic libs: " + ", ".join(missing)
+    return True, "all dynamic libs resolved"
+
+
+def _find_mirheo_lib_paths(paths) -> list[str]:
+    candidates = []
+    for root in (paths.mirheo_prefix, paths.mirheo_package_dir, paths.gv_venv_site_packages):
+        prefix = Path(root)
+        if not prefix.is_dir():
+            continue
+        candidates.extend(str(path) for path in prefix.glob("**/libmirheo*.so*"))
+    return candidates
+
+
 def _check(name: str, status: str, details: str) -> dict[str, str]:
     return {"name": name, "status": status, "details": details}
 
@@ -72,11 +122,21 @@ def collect_diagnostics(
     python_bin: str,
     *,
     with_mirheo: bool = False,
+    with_gv_runtime: bool = False,
     with_tex: bool = False,
 ) -> dict[str, object]:
     paths = get_vega_paths(REPO_ROOT)
     checks: list[dict[str, str]] = []
-    recommended_modules = list(DEFAULT_VEGA_MIRHEO_MODULES if with_mirheo else DEFAULT_VEGA_MODULES)
+    include_mirheo_checks = with_mirheo or with_gv_runtime
+    if with_gv_runtime:
+        recommended_modules = list(
+            DEFAULT_VEGA_MIRHEO_MODULES
+            + DEFAULT_VEGA_RUNTIME_MODULES[len(DEFAULT_VEGA_MODULES) :]
+        )
+    elif with_mirheo:
+        recommended_modules = list(DEFAULT_VEGA_MIRHEO_MODULES)
+    else:
+        recommended_modules = list(DEFAULT_VEGA_MODULES)
 
     loaded_modules = os.environ.get("LOADEDMODULES", "")
     checks.append(
@@ -87,8 +147,10 @@ def collect_diagnostics(
         )
     )
 
-    required_commands = ["python", "mpicxx", "nvcc", "pkg-config", "meson", "ninja"]
-    if with_mirheo:
+    required_commands = ["python", "mpicxx", "nvcc", "pkg-config"]
+    if not with_gv_runtime:
+        required_commands.extend(["meson", "ninja"])
+    if include_mirheo_checks:
         required_commands.extend(["cmake", "make", "h5dump"])
     if with_tex:
         required_commands.extend(["latex", "pdflatex", "kpsewhich", "dvipng"])
@@ -112,9 +174,13 @@ def collect_diagnostics(
             )
         )
 
-    python_modules = ["meso_uq", "mpi4py", "pybind11", "mesonbuild"]
-    if with_mirheo:
+    python_modules = ["meso_uq"]
+    if not with_gv_runtime:
+        python_modules.extend(["mpi4py", "pybind11", "mesonbuild"])
+    if include_mirheo_checks:
         python_modules.extend(["h5py", "mirheo"])
+    if with_gv_runtime:
+        python_modules.append("MDAnalysis")
     for module_name in python_modules:
         origin = _python_module_spec(module_name)
         checks.append(
@@ -125,47 +191,48 @@ def collect_diagnostics(
             )
         )
 
-    local_korali_init = paths.korali_site_packages / "korali" / "__init__.py"
-    checks.append(
-        _check(
-            "repo_local_korali",
-            "ok" if local_korali_init.is_file() else "warn",
-            str(local_korali_init if local_korali_init.is_file() else paths.korali_prefix),
+    if not with_gv_runtime:
+        local_korali_init = paths.korali_site_packages / "korali" / "__init__.py"
+        checks.append(
+            _check(
+                "repo_local_korali",
+                "ok" if local_korali_init.is_file() else "warn",
+                str(local_korali_init if local_korali_init.is_file() else paths.korali_prefix),
+            )
         )
-    )
 
-    korali_origin = _python_module_spec("korali")
-    if korali_origin:
-        status = "ok" if str(paths.korali_site_packages) in korali_origin else "warn"
-        details = korali_origin
-    else:
-        status = "warn"
-        details = "korali is not importable in the current Python environment"
-    checks.append(_check("python:korali", status, details))
+        korali_origin = _python_module_spec("korali")
+        if korali_origin:
+            status = "ok" if str(paths.korali_site_packages) in korali_origin else "warn"
+            details = korali_origin
+        else:
+            status = "warn"
+            details = "korali is not importable in the current Python environment"
+        checks.append(_check("python:korali", status, details))
 
-    external_korali = find_external_korali_entries(
-        os.environ.get("PYTHONPATH", ""),
-        paths.repo_root,
-        paths.korali_site_packages,
-    )
-    checks.append(
-        _check(
-            "pythonpath:external_korali",
-            "warn" if external_korali else "ok",
-            ", ".join(external_korali) if external_korali else "none",
+        external_korali = find_external_korali_entries(
+            os.environ.get("PYTHONPATH", ""),
+            paths.repo_root,
+            paths.korali_site_packages,
         )
-    )
-
-    env_script_exists = paths.korali_env_script.is_file()
-    checks.append(
-        _check(
-            "repo_local_env_script",
-            "ok" if env_script_exists else "warn",
-            str(paths.korali_env_script),
+        checks.append(
+            _check(
+                "pythonpath:external_korali",
+                "warn" if external_korali else "ok",
+                ", ".join(external_korali) if external_korali else "none",
+            )
         )
-    )
 
-    if with_mirheo:
+        env_script_exists = paths.korali_env_script.is_file()
+        checks.append(
+            _check(
+                "repo_local_env_script",
+                "ok" if env_script_exists else "warn",
+                str(paths.korali_env_script),
+            )
+        )
+
+    if include_mirheo_checks:
         mirheo_lock = load_mirheo_source_lock(REPO_ROOT)
         checks.append(
             _check(
@@ -197,6 +264,47 @@ def collect_diagnostics(
                 str(paths.mirheo_snapshot_path),
             )
         )
+        libmirheo_paths = _find_mirheo_lib_paths(paths)
+        checks.append(
+            _check(
+                "mirheo_libmirheo",
+                "ok" if libmirheo_paths else "warn",
+                ", ".join(libmirheo_paths) if libmirheo_paths else "libmirheo .so not found in repo-local Mirheo install area",
+            )
+        )
+        checks.append(
+            _check(
+                "repo_local_gv_venv_env_script",
+                "ok" if paths.gv_venv_env_script.is_file() else "warn",
+                str(paths.gv_venv_env_script),
+            )
+        )
+        scale_binary, scale_origin = _resolve_scale_space_binary()
+        if scale_binary:
+            scale_status, scale_details = _resolve_scale_space_dynamic_libs(scale_binary)
+            checks.append(
+                _check(
+                    f"scale_space_binary:{scale_origin}",
+                    "ok" if scale_status else "warn",
+                    f"{scale_binary}: {scale_details}",
+                )
+            )
+        else:
+            checks.append(
+                _check(
+                    "scale_space_binary",
+                    "warn",
+                    "GV_SCALE_SPACE_BINARY was not set and scale_space is not resolvable from PATH/GV_CGAL_TOOLS_ROOT",
+                )
+            )
+        if any(check["name"] == "command:mpicxx" and check["status"] == "ok" for check in checks):
+            checks.append(
+                _check(
+                    "openmpi_lib_path",
+                    "ok" if bool(os.environ.get("MESOUQ_OPENMPI_LIB_DIR")) else "warn",
+                    os.environ.get("MESOUQ_OPENMPI_LIB_DIR", "MESOUQ_OPENMPI_LIB_DIR is not set; runtime env script should infer it"),
+                )
+            )
     if with_tex:
         checks.append(
             _check(
@@ -242,9 +350,13 @@ def collect_diagnostics(
             "mirheo_prefix": str(paths.mirheo_prefix),
             "mirheo_env_script": str(paths.mirheo_env_script),
             "mirheo_snapshot_path": str(paths.mirheo_snapshot_path),
+            "gv_venv_root": str(paths.gv_venv_root),
+            "gv_venv_site_packages": str(paths.gv_venv_site_packages),
+            "gv_venv_env_script": str(paths.gv_venv_env_script),
         },
         "checks": checks,
         "with_mirheo": with_mirheo,
+        "with_gv_runtime": with_gv_runtime,
         "with_tex": with_tex,
     }
 
@@ -278,6 +390,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Include repo-local Mirheo bootstrap/runtime checks in addition to the core Korali checks.",
     )
     parser.add_argument(
+        "--with-gv-runtime",
+        action="store_true",
+        default=False,
+        help="Include GV runtime hardening checks (Mirheo artifacts, scale_space, OpenMPI lib path, MDAnalysis).",
+    )
+    parser.add_argument(
         "--with-tex",
         action="store_true",
         default=False,
@@ -288,6 +406,7 @@ def main(argv: list[str] | None = None) -> int:
     report = collect_diagnostics(
         args.python_bin,
         with_mirheo=args.with_mirheo,
+        with_gv_runtime=args.with_gv_runtime,
         with_tex=args.with_tex,
     )
     if args.json:

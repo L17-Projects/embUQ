@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import json
 from pathlib import Path
 
 import pytest
@@ -99,6 +100,76 @@ def test_runtime_descriptor_rejects_unknown_control_override(tmp_path: Path) -> 
 
     with pytest.raises(ValueError, match="Unknown controls"):
         descriptor.plan(output_root=tmp_path, controls={"buck": 0.25})
+
+
+def test_runtime_descriptor_uses_control_overrides_in_generated_command(tmp_path: Path) -> None:
+    descriptor = RuntimeDescriptor(
+        experiment="stretching",
+        provenance_root="gv/stretching/src",
+        source_files=("run_all.sh", "generate.py", "parameters.py", "equil.py"),
+        control_sweeps=(
+            ControlSweep("tot_force", 500.0, 50000.0, 80),
+            ControlSweep("bpress", -91.0, -100.0, 1),
+        ),
+        sweep_mode="forward",
+        first_restart=True,
+    )
+
+    dry_run = descriptor.plan(output_root=tmp_path, controls={"tot_force": 750.0})
+    manifest = dry_run.to_manifest()
+
+    assert manifest["control_id"] == "bpress_-91__tot_force_750"
+    assert manifest["control_sweeps"][0] == {"name": "tot_force", "start": 750.0, "stop": 750.0, "steps": 1}
+    assert manifest["commands"][0]["argv"] == [
+        "python3",
+        "generate.py",
+        "-p",
+        "tot_force",
+        "750",
+        "750",
+        "1",
+        "-p",
+        "bpress",
+        "-91",
+        "-100",
+        "1",
+        "--object",
+        "gv",
+        "--forward",
+        "--first",
+    ]
+
+
+def test_runtime_plan_records_material_parameter_overrides(tmp_path: Path) -> None:
+    descriptor = RuntimeDescriptor(
+        experiment="stretching",
+        provenance_root="gv/stretching/src",
+        source_files=("run_all.sh", "generate.py", "parameters.py", "equil.py"),
+        legacy_import_root="gv_simulation_files/stretching/gv",
+        control_sweeps=(
+            ControlSweep("tot_force", 500.0, 50000.0, 80),
+            ControlSweep("bpress", -91.0, -100.0, 1),
+        ),
+        sweep_mode="forward",
+        first_restart=True,
+    )
+    material_overrides = {
+        "ka": 1.1,
+        "kb": 0.9,
+        "mu": 0.7,
+        "b1": 0.2,
+        "b2": 0.3,
+        "a3": 0.4,
+        "a4": 0.5,
+        "mu_l": 0.6,
+        "c": 0.8,
+    }
+    dry_run = descriptor.plan(output_root=tmp_path, material_parameter_overrides=material_overrides)
+    manifest = dry_run.to_manifest()
+    assert manifest["material_parameter_overrides"] == material_overrides
+
+    source_manifest = json.loads(Path(manifest["source_manifest"]).read_text(encoding="utf-8"))
+    assert source_manifest["material_parameter_overrides"] == material_overrides
 
 
 def test_runtime_descriptor_rejects_source_output_root(tmp_path: Path) -> None:

@@ -64,8 +64,14 @@ def build_dry_run_descriptor(
     *,
     geometry: str = DEFAULT_GV_GEOMETRY.id,
     controls: Mapping[str, float] | None = None,
+    material_parameter_overrides: Mapping[str, float] | None = None,
 ) -> RuntimeDryRun:
-    return RUNTIME_DESCRIPTOR.plan(output_root=output_root, geometry=geometry, controls=controls)
+    return RUNTIME_DESCRIPTOR.plan(
+        output_root=output_root,
+        geometry=geometry,
+        controls=controls,
+        material_parameter_overrides=material_parameter_overrides,
+    )
 
 
 def get_runtime_descriptor() -> RuntimeDescriptor:

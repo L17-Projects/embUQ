@@ -80,11 +80,13 @@ print(f"MIRHEO_BUILD_DIR={paths.mirheo_build_dir}")
 print(f"MIRHEO_PREFIX={paths.mirheo_prefix}")
 print(f"MIRHEO_PACKAGE_DIR={paths.mirheo_package_dir}")
 print(f"MIRHEO_ENV_SCRIPT={paths.mirheo_env_script}")
+print(f"GV_VENV_ROOT={paths.gv_venv_root}")
+print(f"GV_VENV_ENV_SCRIPT={paths.gv_venv_env_script}")
 print(f"MIRHEO_SNAPSHOT_PATH={paths.mirheo_snapshot_path}")
 PY
 )"
 
-mkdir -p "$LOGS_DIR" "$(dirname "$MIRHEO_ENV_SCRIPT")"
+mkdir -p "$LOGS_DIR" "$(dirname "$MIRHEO_ENV_SCRIPT")" "$GV_VENV_ROOT"
 log_file="$LOGS_DIR/bootstrap_mirheo.log"
 exec > >(tee "$log_file") 2>&1
 
@@ -93,6 +95,7 @@ echo "Log file:       $log_file"
 echo "Mirheo source:  $MIRHEO_SOURCE"
 echo "Build dir:      $MIRHEO_BUILD_DIR"
 echo "Install prefix: $MIRHEO_PREFIX"
+echo "GV venv:        $GV_VENV_ROOT"
 
 if [[ ! -f "$MIRHEO_SOURCE/CMakeLists.txt" || ! -f "$MIRHEO_SOURCE/setup.py" ]]; then
   echo "Mirheo source path is missing required files: $MIRHEO_SOURCE" >&2
@@ -117,11 +120,18 @@ fi
 
 echo "Compile jobs: $build_jobs"
 
+if [[ ! -x "$GV_VENV_ROOT/bin/python" ]]; then
+  echo "Creating dedicated GV runtime venv at $GV_VENV_ROOT"
+  "$python_bin" -m venv "$GV_VENV_ROOT"
+fi
+runtime_python="$GV_VENV_ROOT/bin/python"
+
 if [[ "$install_python_deps" -eq 1 ]]; then
-  "$python_bin" -m pip install h5py
+  "$runtime_python" -m pip install --upgrade pip
+  "$runtime_python" -m pip install h5py MDAnalysis
 fi
 
-for command in "$python_bin" mpicxx nvcc cmake make; do
+for command in "$runtime_python" mpicxx nvcc cmake make; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "Missing required command: $command" >&2
     exit 1
@@ -140,6 +150,7 @@ cmake_args=(
   -DCMAKE_BUILD_TYPE=Release
   -DCMAKE_INSTALL_PREFIX="$MIRHEO_PREFIX"
   -DPYBIND11_FINDPYTHON=ON
+  -DPython_EXECUTABLE="$runtime_python"
   -DMIR_DOUBLE_PRECISION=OFF
   -DMIR_MEMBRANE_DOUBLE=OFF
   -DMIR_ENABLE_STACKTRACE=OFF
@@ -171,10 +182,10 @@ if [[ -f "$MIRHEO_SOURCE/README.md" ]]; then
 fi
 ln -sfn "$MIRHEO_BUILD_DIR" "$MIRHEO_PACKAGE_DIR/build"
 
-echo "Installing Mirheo Python package into the active environment"
-"$python_bin" -m pip install --no-deps --force-reinstall "$MIRHEO_PACKAGE_DIR"
+echo "Installing Mirheo Python package into the dedicated GV runtime venv"
+"$runtime_python" -m pip install --no-deps --force-reinstall "$MIRHEO_PACKAGE_DIR"
 
-"$python_bin" - <<'PY' "$repo_root" "$MIRHEO_SOURCE" "$MIRHEO_SNAPSHOT_PATH" "$MIRHEO_ENV_SCRIPT"
+"$runtime_python" - <<'PY' "$repo_root" "$MIRHEO_SOURCE" "$MIRHEO_SNAPSHOT_PATH" "$MIRHEO_ENV_SCRIPT" "$GV_VENV_ENV_SCRIPT"
 from pathlib import Path
 import json
 import sys
@@ -183,8 +194,14 @@ repo_root = Path(sys.argv[1]).resolve()
 source_root = Path(sys.argv[2]).resolve()
 snapshot_path = Path(sys.argv[3]).resolve()
 env_script = Path(sys.argv[4]).resolve()
+gv_env_script = Path(sys.argv[5]).resolve()
 sys.path.insert(0, str(repo_root / "src"))
-from meso_uq.vega import gather_mirheo_source_snapshot, get_vega_paths, render_mirheo_env_script  # noqa: E402
+from meso_uq.vega import (
+    gather_mirheo_source_snapshot,
+    get_vega_paths,
+    render_gv_venv_env_script,
+    render_mirheo_env_script,  # noqa: E402
+)
 
 paths = get_vega_paths(repo_root)
 snapshot = gather_mirheo_source_snapshot(source_root)
@@ -197,17 +214,27 @@ env_script.write_text(
     render_mirheo_env_script(paths, source_root=source_root, snapshot_path=snapshot_path),
     encoding="utf-8",
 )
+gv_env_script.write_text(
+    render_gv_venv_env_script(
+        paths,
+        source_root=source_root,
+        snapshot_path=snapshot_path,
+    ),
+    encoding="utf-8",
+)
 PY
 
-chmod +x "$MIRHEO_ENV_SCRIPT"
+chmod +x "$MIRHEO_ENV_SCRIPT" "$GV_VENV_ENV_SCRIPT"
 
 echo "Verifying Mirheo and h5py imports"
-"$python_bin" - <<'PY'
+"$runtime_python" - <<'PY'
 import h5py
 import inspect
+import MDAnalysis
 import mirheo
 
 print(f"h5py={h5py.__version__}")
+print(f"MDAnalysis={MDAnalysis.__version__}")
 print(f"mirheo={inspect.getfile(mirheo)}")
 PY
 
@@ -215,5 +242,6 @@ echo ""
 echo "Mirheo bootstrap completed."
 echo "Source the repo-local runtime before running MAP Mirheo workflows:"
 echo "  source $MIRHEO_ENV_SCRIPT"
+echo "  source $GV_VENV_ENV_SCRIPT"
 echo "Then re-run the doctor in strict mode:"
-echo "  $python_bin $repo_root/scripts/platforms/vega/doctor_vega.py --strict --with-mirheo"
+echo "  $runtime_python $repo_root/scripts/platforms/vega/doctor_vega.py --strict --with-gv-runtime"

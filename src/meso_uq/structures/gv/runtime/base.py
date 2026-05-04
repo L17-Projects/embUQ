@@ -3,12 +3,13 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from meso_uq.experiments import canonical_dataset_id
 
+from ..material_parameters import validate_material_parameter_overrides
 from ..geometries import DEFAULT_GV_GEOMETRY
 
 
@@ -100,6 +101,7 @@ class RuntimeDryRun:
     generated_subdirs: tuple[str, ...]
     runtime_package: str
     sweep_mode: str
+    material_parameter_overrides: Mapping[str, float] = field(default_factory=dict)
     first_restart: bool = False
     analysis_commands: tuple[DryRunCommand, ...] = ()
     experimental: bool = False
@@ -127,6 +129,7 @@ class RuntimeDryRun:
             "generated_subdirs": list(self.generated_subdirs),
             "runtime_package": self.runtime_package,
             "sweep_mode": self.sweep_mode,
+            "material_parameter_overrides": dict(self.material_parameter_overrides),
             "first_restart": self.first_restart,
             "experimental": self.experimental,
             "known_issues": [issue.to_manifest() for issue in self.known_issues],
@@ -168,15 +171,18 @@ class RuntimeDescriptor:
         output_root: str | Path = GV_RUNTIME_DEFAULT_ROOT,
         geometry: str = DEFAULT_GV_GEOMETRY.id,
         controls: Mapping[str, float] | None = None,
+        material_parameter_overrides: Mapping[str, object] | None = None,
         include_experimental: bool = False,
     ) -> RuntimeDryRun:
         if self.experimental and not include_experimental:
             raise ValueError(f"Experiment '{self.experiment}' requires {self.opt_in_flag}.")
+        control_overrides = controls or {}
         selected_controls = _normalize_controls(
             default_controls=self.default_controls(),
-            overrides=controls or {},
+            overrides=control_overrides,
             allowed_controls=self.control_names,
         )
+        command_sweeps = self._command_sweeps(control_overrides=control_overrides)
         resolved_output_root = _safe_output_root(output_root)
         control_id = (
             control_identifier(selected_controls)
@@ -184,6 +190,9 @@ class RuntimeDescriptor:
             else sweep_identifier(self.control_sweeps)
         )
         dataset_id = canonical_dataset_id("gv", self.experiment, geometry, control_id)
+        selected_material_overrides = _normalize_material_parameter_overrides(
+            material_parameter_overrides
+        )
         work_dir = (
             resolved_output_root
             / self.experiment
@@ -202,6 +211,7 @@ class RuntimeDescriptor:
             source_files=source_files,
             geometry=geometry,
             controls=selected_controls,
+            material_parameter_overrides=selected_material_overrides,
             control_id=control_id,
             dataset_id=dataset_id,
         )
@@ -210,7 +220,7 @@ class RuntimeDescriptor:
             experiment=self.experiment,
             geometry=geometry,
             controls=selected_controls,
-            control_sweeps=self.control_sweeps,
+            control_sweeps=command_sweeps,
             control_id=control_id,
             dataset_id=dataset_id,
             provenance_root=self.provenance_root,
@@ -218,10 +228,11 @@ class RuntimeDescriptor:
             legacy_import_root=self.legacy_import_root,
             output_root=str(resolved_output_root),
             work_dir=str(work_dir),
-            commands=self._dry_run_commands(work_dir),
+            commands=self._dry_run_commands(work_dir, control_sweeps=command_sweeps),
             source_files=tuple(str(path) for path in source_files),
             source_manifest=str(source_manifest),
             generated_subdirs=self.generated_subdirs,
+            material_parameter_overrides=selected_material_overrides or {},
             runtime_package=self.runtime_package,
             sweep_mode=self.sweep_mode,
             first_restart=self.first_restart,
@@ -231,9 +242,14 @@ class RuntimeDescriptor:
             notes=self.notes,
         )
 
-    def _dry_run_commands(self, work_dir: Path) -> tuple[DryRunCommand, ...]:
+    def _dry_run_commands(
+        self,
+        work_dir: Path,
+        *,
+        control_sweeps: Sequence[ControlSweep],
+    ) -> tuple[DryRunCommand, ...]:
         parameter_args: list[str] = []
-        for sweep in self.control_sweeps:
+        for sweep in control_sweeps:
             parameter_args.extend(
                 [
                     "-p",
@@ -266,6 +282,20 @@ class RuntimeDescriptor:
             ),
         )
 
+    def _command_sweeps(self, *, control_overrides: Mapping[str, float]) -> tuple[ControlSweep, ...]:
+        override_names = set(control_overrides)
+        return tuple(
+            ControlSweep(
+                name=sweep.name,
+                start=float(control_overrides[sweep.name]),
+                stop=float(control_overrides[sweep.name]),
+                steps=1,
+            )
+            if sweep.name in override_names
+            else sweep
+            for sweep in self.control_sweeps
+        )
+
     def _normalize_source_file_entries(
         self,
         source_root: Path,
@@ -294,6 +324,7 @@ class RuntimeDescriptor:
         source_files: Sequence[Path],
         geometry: str,
         controls: Mapping[str, float],
+        material_parameter_overrides: Mapping[str, float] | None,
         control_id: str,
         dataset_id: str,
     ) -> Path:
@@ -336,6 +367,7 @@ class RuntimeDescriptor:
             "source_sha256": digest.hexdigest(),
             "generated_subdirs": list(self.generated_subdirs),
             "generated_files": [],
+            "material_parameter_overrides": dict(material_parameter_overrides or {}),
             "runtime_package": self.runtime_package,
             "experimental": self.experimental,
             "known_issues": [issue.to_manifest() for issue in self.known_issues],
@@ -367,6 +399,16 @@ def _normalize_controls(
     normalized = dict(default_controls)
     normalized.update({name: float(value) for name, value in overrides.items()})
     return {name: normalized[name] for name in allowed_controls}
+
+
+def _normalize_material_parameter_overrides(
+    material_parameter_overrides: Mapping[str, object] | None,
+) -> dict[str, float] | None:
+    if material_parameter_overrides is None:
+        return None
+    if not isinstance(material_parameter_overrides, Mapping):
+        raise TypeError("GV runtime material_parameter_overrides must be a mapping.")
+    return validate_material_parameter_overrides(material_parameter_overrides)
 
 
 def _safe_output_root(output_root: str | Path) -> Path:

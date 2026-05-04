@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
 import os
+import shlex
 import yaml
 from argparse import ArgumentParser
+from pathlib import Path
 
 parser = ArgumentParser()
 
@@ -40,12 +42,47 @@ args = parser.parse_args()
 num_gpus = args.g
 num_nodes = args.N
 
-ntasks_per_node = num_gpus * 2  # Adjust as needed
+ntasks_per_node = num_gpus
 mem_per_gpu = 20  # Memory in GB per GPU, adjust as needed
 total_mem = mem_per_gpu * num_gpus
 
 
 os.system(f'cp parameters-default.{args.obj}.yaml parameters-default.yaml')
+
+
+def _find_repo_root():
+    env_root = os.environ.get('MESOUQ_REPO_ROOT')
+    if env_root:
+        return Path(env_root).expanduser().resolve()
+    for parent in Path(__file__).resolve().parents:
+        if (parent / 'pyproject.toml').is_file():
+            return parent
+    return None
+
+
+def _gv_env_script():
+    env_script = os.environ.get('MESOUQ_GV_ENV_SCRIPT')
+    if env_script:
+        return str(Path(env_script).expanduser().resolve())
+    repo_root = _find_repo_root()
+    if repo_root is None:
+        return ''
+    return str((repo_root / '_vega' / 'gv_venv' / 'env.sh').resolve())
+
+
+def _write_runtime_preamble(file_commands):
+    env_script = _gv_env_script()
+    if env_script:
+        file_commands.write(f'if [[ -f {shlex.quote(env_script)} ]]; then\n')
+        file_commands.write(f'  source {shlex.quote(env_script)}\n')
+        file_commands.write('fi\n')
+    material_overrides = os.environ.get('MESOUQ_GV_MATERIAL_OVERRIDES_JSON', '')
+    if material_overrides:
+        file_commands.write(
+            'export MESOUQ_GV_MATERIAL_OVERRIDES_JSON='
+            f'{shlex.quote(material_overrides)}\n'
+        )
+    file_commands.write('\n')
 
 if(args.par == None):
     os.system('mkdir -p parameter')
@@ -103,6 +140,7 @@ else:
 
 def write_commands(filename, runscript, extra = ""):
 	file_commands = open(filename, 'w')
+	_write_runtime_preamble(file_commands)
 	cnt0 = cnt
 	cnt_sim = cnt
 	cnt_par = cnt
@@ -141,7 +179,7 @@ def write_commands(filename, runscript, extra = ""):
 	file_commands.close()
 	return cnt_sim, cnt_par
 
-cnt_sim, cnt_par = write_commands('commands.txt', 'run.sh', f'{2 * num_gpus}')
+cnt_sim, cnt_par = write_commands('commands.txt', 'run.sh', f'{num_gpus}')
 
 os.system(f'rm parameters-default.yaml')
 
@@ -161,6 +199,20 @@ file_vega.write(f'''#!/bin/bash
 #SBATCH --mem={total_mem}GB
 #SBATCH --output=output.out
 #SBATCH --signal=INT@60
+
+module --force purge >/dev/null 2>&1 || true
+module load Python/3.10.8-GCCcore-12.2.0
+module load OpenMPI/4.1.4-GCC-12.2.0
+module load CUDA/12.2.2
+module load GSL/2.7-GCC-12.2.0
+module load Eigen/3.4.0-GCCcore-12.2.0
+module load HDF5/1.14.0-gompi-2022b
+module load MPFR/4.2.0-GCCcore-12.2.0
+module load GMP/6.2.1-GCCcore-12.2.0
+
+if [[ -f {shlex.quote(_gv_env_script())} ]]; then
+  source {shlex.quote(_gv_env_script())}
+fi
 
 bash commands.txt
 ''')

@@ -16,6 +16,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from meso_uq.hpc_paths import default_runs_root  # noqa: E402
 from meso_uq.structures.gv import DEFAULT_GV_GEOMETRY, build_geometry  # noqa: E402
 from meso_uq.structures.registry import GeometrySpec, StructureSpec, get_structure  # noqa: E402
+from meso_uq.structures.gv.material_parameters import validate_material_parameter_overrides
 
 DEFAULT_RUNTIME_MODULE_ROOT = "meso_uq.structures.gv.runtime"
 DEFAULT_WORKFLOW_NAME = "gv_runtime"
@@ -36,6 +37,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         metavar="NAME=VALUE",
         help="Repeatable control override, for example --control bpress=-0.001.",
+    )
+    parser.add_argument(
+        "--material",
+        action="append",
+        default=[],
+        metavar="NAME=VALUE",
+        help="Repeatable GV material override, for example --material ka=1.2.",
     )
     parser.add_argument("--output-root", default=None)
     parser.add_argument("--site", default=None)
@@ -66,6 +74,24 @@ def _parse_controls(control_items: list[str], experiment_name: str, structure: S
                 f"Invalid value for control '{name}': {raw_value!r}. Expected a float."
             ) from exc
     return parsed
+
+
+def _parse_material_overrides(material_items: list[str]) -> dict[str, float] | None:
+    if not material_items:
+        return None
+
+    raw_overrides: dict[str, str] = {}
+    seen_names: set[str] = set()
+    for item in material_items:
+        if "=" not in item:
+            raise ValueError(f"Invalid material override '{item}'. Expected NAME=VALUE.")
+        name, raw_value = item.split("=", 1)
+        name = name.strip()
+        if name in seen_names:
+            raise ValueError(f"Material parameter '{name}' is duplicated in overrides.")
+        seen_names.add(name)
+        raw_overrides[name] = raw_value
+    return validate_material_parameter_overrides(raw_overrides)
 
 
 def _resolve_selected_experiment(args: argparse.Namespace) -> tuple[str, str]:
@@ -167,12 +193,15 @@ def _jsonify(value: Any) -> Any:
 
 
 def _plan_runtime_dry_run(descriptor, request: dict[str, Any]) -> Any:
-    return descriptor.plan(
-        output_root=request["output_root"],
-        geometry=request["geometry"],
-        controls=request["controls"],
-        include_experimental=request["include_experimental"],
-    )
+    plan_kwargs = {
+        "output_root": request["output_root"],
+        "geometry": request["geometry"],
+        "controls": request["controls"],
+        "include_experimental": request["include_experimental"],
+    }
+    if request.get("material_parameter_overrides") is not None:
+        plan_kwargs["material_parameter_overrides"] = request["material_parameter_overrides"]
+    return descriptor.plan(**plan_kwargs)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -188,6 +217,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         geometry = _resolve_geometry(args, structure)
         controls = _parse_controls(args.control, experiment_name, structure)
+        material_parameter_overrides = _parse_material_overrides(args.material)
         output_root = _resolve_output_root(args)
     except (KeyError, ValueError) as exc:
         parser.error(str(exc))
@@ -201,6 +231,7 @@ def main(argv: list[str] | None = None) -> int:
         "experiment": experiment_name,
         "geometry": geometry.id,
         "controls": controls,
+        "material_parameter_overrides": material_parameter_overrides,
         "output_root": output_root,
         "include_experimental": args.include_experimental,
         "dry_run": True,

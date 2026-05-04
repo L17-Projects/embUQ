@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -26,6 +27,7 @@ DEFAULT_OUTPUT_ROOT = REPO_ROOT / "_runs" / "gv" / "runtime"
 GV_RUNTIME_MANIFEST = "gv_runtime_dry_run_manifest.json"
 GV_RUNTIME_RENDER_MANIFEST = "gv_runtime_render_manifest.json"
 _KNOWN_ISSUE_BLOCKED_SEVERITIES = {"error", "blocking", "blocked", "critical"}
+_GV_VENV_ENV_SCRIPT = str((REPO_ROOT / "_vega" / "gv_venv" / "env.sh").resolve())
 
 
 def _normalize_known_issues(raw_known_issues: object) -> list[dict[str, Any]]:
@@ -91,6 +93,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         metavar="NAME=VALUE",
         help="Repeatable control override, for example --control tot_force=750.",
+    )
+    parser.add_argument(
+        "--material",
+        action="append",
+        default=[],
+        metavar="NAME=VALUE",
+        help="Repeatable GV material override, for example --material ka=1.2.",
     )
     parser.add_argument("--output-root", default=None)
     parser.add_argument("--run-tag", default=None)
@@ -174,11 +183,33 @@ def _quoted_command(command: tuple[str, ...]) -> str:
     return " ".join(shlex.quote(part) for part in command)
 
 
-def _write_commands_txt(commands: list[tuple[tuple[str, ...], Path]], commands_path: Path) -> None:
+def _material_overrides_json(manifest: dict[str, Any]) -> str:
+    overrides = manifest.get("material_parameter_overrides", {})
+    if not isinstance(overrides, dict) or not overrides:
+        return ""
+    return json.dumps(overrides, sort_keys=True)
+
+
+def _write_commands_txt(
+    commands: list[tuple[tuple[str, ...], Path]],
+    commands_path: Path,
+    *,
+    material_overrides_json: str = "",
+) -> None:
     commands_path.parent.mkdir(parents=True, exist_ok=True)
     with commands_path.open("w", encoding="utf-8") as handle:
         handle.write("#!/usr/bin/env bash\n")
         handle.write("set -euo pipefail\n")
+        handle.write(f"if [[ ! -f {_GV_VENV_ENV_SCRIPT!r} ]]; then\n")
+        handle.write("  echo 'Missing required GV runtime environment: _vega/gv_venv/env.sh' >&2\n")
+        handle.write("  exit 1\n")
+        handle.write("fi\n")
+        handle.write(f"source {_GV_VENV_ENV_SCRIPT!r}\n\n")
+        if material_overrides_json:
+            handle.write(
+                "export MESOUQ_GV_MATERIAL_OVERRIDES_JSON="
+                f"{shlex.quote(material_overrides_json)}\n\n"
+            )
         for command, cwd in commands:
             handle.write(f"(cd {shlex.quote(str(cwd))} && {_quoted_command(command)})\n")
         handle.write("\n")
@@ -199,6 +230,11 @@ def _default_sbatch_script(
     script += "#SBATCH --error=gv-runtime-%j.err\n"
     script += "set -euo pipefail\n"
     script += "cd \"$(dirname \"$0\")\"\n\n"
+    script += f'if [[ ! -f {_GV_VENV_ENV_SCRIPT!r} ]]; then\n'
+    script += "  echo 'Missing required GV runtime environment: _vega/gv_venv/env.sh' >&2\n"
+    script += "  exit 1\n"
+    script += "fi\n"
+    script += f'source {_GV_VENV_ENV_SCRIPT!r}\n\n'
     script += "if [ -x ./run_all_HPC.sh ]; then\n"
     script += "  bash ./run_all_HPC.sh\n"
     script += "elif [ -x ./run.sh ]; then\n"
@@ -261,6 +297,7 @@ def _run_commands(
     commands: list[tuple[tuple[str, ...], Path]],
     *,
     dry_run: bool,
+    material_overrides_json: str = "",
 ) -> tuple[list[dict[str, Any]], int]:
     records: list[dict[str, Any]] = []
     if dry_run:
@@ -277,7 +314,19 @@ def _run_commands(
             )
         return records, 0
     for command, cwd in commands:
-        proc = subprocess.run(command, cwd=str(cwd), capture_output=True, text=True, check=False)
+        env = None
+        if material_overrides_json:
+            env = dict(os.environ)
+            env["MESOUQ_GV_MATERIAL_OVERRIDES_JSON"] = material_overrides_json
+        run_kwargs: dict[str, Any] = {
+            "cwd": str(cwd),
+            "capture_output": True,
+            "text": True,
+            "check": False,
+        }
+        if env is not None:
+            run_kwargs["env"] = env
+        proc = subprocess.run(command, **run_kwargs)
         records.append(
             {
                 "argv": list(command),
@@ -339,6 +388,8 @@ def _build_runtime_argv(args: argparse.Namespace) -> list[str]:
         argv.extend(["--height", str(args.height)])
     for item in args.control:
         argv.extend(["--control", item])
+    for item in getattr(args, "material", []):
+        argv.extend(["--material", item])
     if args.run_tag is not None:
         argv.extend(["--run-tag", str(args.run_tag)])
     if args.include_experimental:
@@ -365,18 +416,25 @@ def main(argv: list[str] | None = None) -> int:
     work_dir = Path(runtime_manifest["work_dir"]).resolve()
     _ensure_generated_directories(work_dir=work_dir, manifest=runtime_manifest)
     platform = args.platform
+    material_overrides_json = _material_overrides_json(runtime_manifest)
 
     commands_path = work_dir / "commands.txt"
-    _write_commands_txt(commands=command_list, commands_path=commands_path)
+    _write_commands_txt(
+        commands=command_list,
+        commands_path=commands_path,
+        material_overrides_json=material_overrides_json,
+    )
     generated_scripts = _ensure_scheduler_scripts(
         command_list=command_list,
         manifest=runtime_manifest,
         platform=platform,
     )
 
-    command_records, returncode = _run_commands(commands=command_list, dry_run=args.dry_run)
-    if returncode != 0 and not args.dry_run:
-        raise RuntimeError(f"GV runtime command execution failed with code {returncode}.")
+    command_records, returncode = _run_commands(
+        commands=command_list,
+        dry_run=args.dry_run,
+        material_overrides_json=material_overrides_json,
+    )
 
     render_manifest_path = runtime_output_root / GV_RUNTIME_RENDER_MANIFEST
     render_manifest = _to_render_manifest(
@@ -394,6 +452,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"GV runtime manifest: {manifest_path}")
     print(f"GV runtime render manifest: {render_manifest_path}")
     print(f"GV runtime work dir: {work_dir}")
+    if returncode != 0 and not args.dry_run:
+        raise RuntimeError(
+            f"GV runtime command execution failed with code {returncode}; "
+            f"see {render_manifest_path}."
+        )
     return 0
 
 
