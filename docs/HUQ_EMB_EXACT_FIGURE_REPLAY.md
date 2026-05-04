@@ -41,4 +41,5 @@ This keeps the replay command portable on machines that do not have the original
 ## Useful flags
 
 - `--force`: rerun DNN staging and rebuild the exact replay stage from scratch
+- `--staging-device cpu|cuda`: choose the device used for grouped-holdout/Sobol staging
 - `--skip-supplementary`: development-only partial mode; skips supplementary figure generation and validates only the main-figure subset plus non-supplementary tables

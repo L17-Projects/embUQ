@@ -294,6 +294,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--python-bin", default=_default_python_bin())
     parser.add_argument("--site", choices=["vega", "karolina"], default="vega")
     parser.add_argument("--staging-dirname", default="dnn_figure_input_staging")
+    parser.add_argument(
+        "--staging-device",
+        default="cuda",
+        help="Device passed to the DNN holdout/Sobol staging step, for example cuda or cpu.",
+    )
     parser.add_argument("--texdeps-dir", default=None)
     parser.add_argument("--skip-supplementary", action="store_true", default=False)
     parser.add_argument("--disable-tex", action="store_true", default=False)
@@ -358,6 +363,8 @@ def main(argv: list[str] | None = None) -> int:
         args.site,
         "--staging-dirname",
         args.staging_dirname,
+        "--device",
+        args.staging_device,
     ]
     if args.force:
         stage_command.append("--force")
