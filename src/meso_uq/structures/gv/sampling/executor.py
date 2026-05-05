@@ -42,6 +42,7 @@ def execute_sampling_plan(
     selected_timeout = _default_timeout(timeout_seconds, plan)
     executed: list[str] = []
     return_codes: list[int] = []
+    command_index = 0
 
     runtime_manifest = dict(plan.runtime_manifest)
     work_dir = runtime_manifest.get("work_dir")
@@ -52,7 +53,9 @@ def execute_sampling_plan(
             cwd = _normalize_cwd(command.cwd, plan)
             if work_dir is not None:
                 _guard_command_within_workdir(cwd, str(work_dir))
+            command_index += 1
             result = _run_command(command, cwd, timeout=selected_timeout, env=env)
+            _write_command_capture(cwd, command_index, result)
             executed.append(" ".join(command.argv))
             return_codes.append(result.returncode)
             _scan_text_for_failures(
@@ -101,10 +104,35 @@ def _run_command(
             f"Sampling command timed out after {timeout}s: {' '.join(command.argv)}"
         ) from exc
     if result.returncode != 0:
+        _write_command_capture(cwd, -1, result)
         raise GVCommandFailure(
             f"Sampling command failed with exit code {result.returncode}: {' '.join(command.argv)}"
+            f"{_failure_excerpt(result)}"
         )
     return result
+
+
+def _write_command_capture(cwd: Path, index: int, result: subprocess.CompletedProcess[str]) -> None:
+    log_dir = cwd / "sampling_command_logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    prefix = "failed" if index < 0 else f"{index:03d}"
+    (log_dir / f"{prefix}.stdout").write_text(result.stdout or "", encoding="utf-8")
+    (log_dir / f"{prefix}.stderr").write_text(result.stderr or "", encoding="utf-8")
+
+
+def _failure_excerpt(result: subprocess.CompletedProcess[str]) -> str:
+    pieces = []
+    if result.stdout:
+        pieces.append("stdout: " + _tail(result.stdout))
+    if result.stderr:
+        pieces.append("stderr: " + _tail(result.stderr))
+    if not pieces:
+        return ""
+    return "\n" + "\n".join(pieces)
+
+
+def _tail(text: str, *, max_lines: int = 12) -> str:
+    return "\n".join(text.splitlines()[-max_lines:])
 
 
 def _default_timeout(timeout_seconds: int | None, plan: GVSamplingPlan) -> int:

@@ -47,6 +47,8 @@ def test_executor_runs_command_list_synchronously_with_timeout(tmp_path: Path) -
     )
     assert run_mock.call_count == 2
     assert run_mock.call_args_list[0].kwargs["timeout"] == 123
+    log_dir = Path(plan.runtime_manifest["work_dir"]) / "sampling_command_logs"
+    assert (log_dir / "001.stdout").read_text(encoding="utf-8") == "ok"
 
 
 def test_executor_rejects_missing_cwd(tmp_path: Path) -> None:
@@ -107,6 +109,7 @@ def test_executor_detects_nonzero_exit_code(tmp_path: Path) -> None:
     with patch("meso_uq.structures.gv.sampling.executor.subprocess.run", return_value=failed):
         with pytest.raises(GVCommandFailure):
             execute_sampling_plan(plan)
+    assert (Path(plan.runtime_manifest["work_dir"]) / "sampling_command_logs" / "failed.stderr").is_file()
 
 
 def test_executor_times_out_and_raises(tmp_path: Path) -> None:
