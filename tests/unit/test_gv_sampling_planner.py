@@ -37,7 +37,7 @@ def _extract_parameter_sweep(command_argv: tuple[str, ...], axis: str) -> tuple[
 
 
 def _as_text(value: float) -> str:
-    return f"{value:g}".replace(".", "_")
+    return f"{value:g}"
 
 
 def _build_runtime(tmp_path: Path):
@@ -79,6 +79,18 @@ def test_planner_stages_non_linear_values_per_run(tmp_path: Path) -> None:
             _as_text(expected_value),
             "1",
         )
+
+
+def test_planner_preserves_decimal_control_literals_for_generate_py(tmp_path: Path) -> None:
+    runtime = load_runtime_descriptor("torsion").plan(
+        output_root=tmp_path / "runtime",
+        controls={"theta": 0.03},
+    )
+    plan = build_sampling_plan(runtime, control_axis="theta", values=(0.03,))
+
+    assert runtime.control_id == "theta_0_03"
+    theta = _extract_parameter_sweep(plan.runs[0].command_sequence[0].argv, "theta")
+    assert theta == ("0.03", "0.03", "1")
 
 
 def test_planner_accepts_request_like_object(tmp_path: Path) -> None:

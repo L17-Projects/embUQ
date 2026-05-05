@@ -404,7 +404,7 @@ def _first_non_none(*items: object | None) -> object | None:
 
 
 def _format_float(value: float) -> str:
-    return f"{value:g}".replace(".", "_")
+    return f"{value:g}"
 
 
 __all__ = [
