@@ -251,8 +251,9 @@ def test_gv_generated_mirheo_jobs_source_runtime_environment_and_preserve_materi
     assert "source {shlex.quote(env_script)}" in contents
     assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in contents
     assert "bash commands.txt" in contents
-    assert "ntasks_per_node = num_gpus" in contents
-    assert "f'{num_gpus}'" in contents
+    assert "num_mpi_ranks = int(os.environ.get('MESOUQ_GV_MPI_RANKS', str(num_gpus + 1)))" in contents
+    assert "#SBATCH --ntasks-per-node={num_mpi_ranks}" in contents
+    assert "f'{num_mpi_ranks}'" in contents
     assert "module load Python/3.10.8-GCCcore-12.2.0" in contents
     assert "module load OpenMPI/4.1.4-GCC-12.2.0" in contents
     assert "module load CUDA/12.2.2" in contents
@@ -263,7 +264,7 @@ def test_gv_mirheo_launchers_disable_openmpi_binding_on_vega(experiment_name: st
     run_script = Path("gv") / experiment_name / "src" / "run.sh"
     contents = run_script.read_text(encoding="utf-8")
 
-    assert "nranks=${3:-1}" in contents
+    assert "nranks=${3:-${MESOUQ_GV_MPI_RANKS:-2}}" in contents
     assert "mpirun --bind-to none -np ${nranks}" in contents
 
 
