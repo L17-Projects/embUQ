@@ -94,7 +94,7 @@ def _extract_stretching(root: Path, *, controls: Mapping[str, float]) -> dict[st
 
 
 def _extract_buckling(root: Path, *, controls: Mapping[str, float]) -> dict[str, np.ndarray]:
-    initial = _read_initial_buckling_vertices(root)
+    initial, faces = _read_initial_buckling_mesh(root)
     final = _read_final_buckling_vertices(root)
     if initial.shape != final.shape:
         raise GVSamplingExtractionError(
@@ -110,6 +110,12 @@ def _extract_buckling(root: Path, *, controls: Mapping[str, float]) -> dict[str,
         "deformation_amplitude": np.asarray([deformation], dtype=float),
         "shape_amplitude": np.asarray([float(np.std(radial))], dtype=float),
     }
+    if faces.size:
+        initial_volume = _mesh_volume(initial, faces)
+        final_volume = _mesh_volume(final, faces)
+        if initial_volume <= 0.0:
+            raise GVSamplingExtractionError("Buckling initial mesh volume must be positive.")
+        channels["relative_volume"] = np.asarray([final_volume / initial_volume], dtype=float)
     if "bpress" in controls:
         channels["bpress"] = _control_channel(controls, "bpress", 1)
     return channels
@@ -146,6 +152,8 @@ def _extract_eigenmodes(root: Path, *, mode_count: int = 30) -> dict[str, np.nda
         output_dir / "eigvalues.txt",
         output_dir / "eigvalues_new.txt",
     )
+    if not eigenvalue_path.read_text(encoding="utf-8").strip():
+        raise GVSamplingExtractionError(f"Eigenmodes file contains no eigenvalues: {eigenvalue_path}")
     eigenvalues = np.atleast_1d(np.loadtxt(eigenvalue_path, dtype=float))
     if eigenvalues.size == 0:
         raise GVSamplingExtractionError(f"Eigenmodes file contains no eigenvalues: {eigenvalue_path}")
@@ -203,7 +211,11 @@ def _stretching_displacement(root: Path) -> dict[str, float]:
 
 
 def _read_initial_buckling_vertices(root: Path) -> np.ndarray:
-    return _read_off_vertices(_first_existing(root / "mesh" / "gv00001.off", root / "gas_vesicle" / "gv.off"))
+    return _read_initial_buckling_mesh(root)[0]
+
+
+def _read_initial_buckling_mesh(root: Path) -> tuple[np.ndarray, np.ndarray]:
+    return _read_off_mesh(_first_existing(root / "mesh" / "gv00001.off", root / "gas_vesicle" / "gv.off"))
 
 
 def _read_final_buckling_vertices(root: Path) -> np.ndarray:
@@ -251,6 +263,10 @@ def _read_xyz_positions(path: Path) -> np.ndarray:
 
 
 def _read_off_vertices(path: Path) -> np.ndarray:
+    return _read_off_mesh(path)[0]
+
+
+def _read_off_mesh(path: Path) -> tuple[np.ndarray, np.ndarray]:
     if not path.is_file():
         raise GVSamplingExtractionError(f"OFF mesh output is missing: {path}")
     with path.open("r", encoding="utf-8") as handle:
@@ -261,10 +277,33 @@ def _read_off_vertices(path: Path) -> np.ndarray:
         if not counts:
             raise GVSamplingExtractionError(f"OFF mesh is missing counts: {path}")
         vertex_count = int(counts[0])
-        rows = [[float(item) for item in handle.readline().split()[:3]] for _ in range(vertex_count)]
-    if not rows:
+        face_count = int(counts[1]) if len(counts) > 1 else 0
+        vertices = [[float(item) for item in handle.readline().split()[:3]] for _ in range(vertex_count)]
+        faces: list[list[int]] = []
+        for _ in range(face_count):
+            parts = handle.readline().split()
+            if not parts:
+                continue
+            count = int(parts[0])
+            indices = [int(item) for item in parts[1 : 1 + count]]
+            if len(indices) < 3:
+                continue
+            for offset in range(1, len(indices) - 1):
+                faces.append([indices[0], indices[offset], indices[offset + 1]])
+    if not vertices:
         raise GVSamplingExtractionError(f"OFF mesh contains no vertices: {path}")
-    return np.asarray(rows, dtype=float)
+    return np.asarray(vertices, dtype=float), np.asarray(faces, dtype=int)
+
+
+def _mesh_volume(vertices: np.ndarray, faces: np.ndarray) -> float:
+    if faces.size == 0:
+        raise GVSamplingExtractionError("Mesh volume requires triangular faces.")
+    vertex_count = int(vertices.shape[0])
+    if np.any(faces < 0) or np.any(faces >= vertex_count):
+        raise GVSamplingExtractionError("OFF mesh face index is outside the vertex range.")
+    triangles = vertices[faces]
+    signed = np.einsum("ij,ij->i", triangles[:, 0], np.cross(triangles[:, 1], triangles[:, 2]))
+    return float(abs(np.sum(signed)) / 6.0)
 
 
 def _first_existing(*paths: Path) -> Path:

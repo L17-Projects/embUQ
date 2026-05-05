@@ -96,6 +96,21 @@ def test_parse_torsion_lane_channels_accepts_canonical_gamma_directly() -> None:
     assert np.allclose(channels["sigma_phi_r"], np.array([4.0, 8.0]) / (20.0 * np.pi * 2.0))
 
 
+def test_parse_torsion_lane_channels_accepts_fully_canonical_payload() -> None:
+    channels = torsion.parse_torsion_lane_channels(
+        {
+            "geometry": {"radius": 2.0, "height": 10.0},
+            "channels": {
+                "gamma": [0.0, 0.05],
+                "sigma_phi_r": [0.2, 0.4],
+            },
+        }
+    )
+
+    assert np.allclose(channels["gamma"], [0.0, 0.05])
+    assert np.allclose(channels["sigma_phi_r"], [0.2, 0.4])
+
+
 def test_parse_torsion_lane_channels_rejects_anchor_shape_mismatch() -> None:
     with pytest.raises(ValueError, match="must share the same shape"):
         torsion.parse_torsion_lane_channels(

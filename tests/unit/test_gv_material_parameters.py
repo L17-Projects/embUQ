@@ -63,6 +63,31 @@ def test_validate_material_overrides_accepts_muL_alias() -> None:
     assert normalized["mu_l"] == _VALID_MATERIAL_PARAMETER_OVERRIDES["mu_l"]
 
 
+def test_validate_material_overrides_accepts_zero_coupling_terms() -> None:
+    zero_couplings = {
+        **_VALID_MATERIAL_PARAMETER_OVERRIDES,
+        "b1": 0.0,
+        "b2": 0.0,
+        "a3": 0.0,
+        "a4": 0.0,
+    }
+
+    normalized = validate_material_parameter_overrides(zero_couplings)
+
+    assert normalized["b1"] == 0.0
+    assert normalized["b2"] == 0.0
+    assert normalized["a3"] == 0.0
+    assert normalized["a4"] == 0.0
+
+
+def test_validate_material_overrides_rejects_zero_core_parameters() -> None:
+    with pytest.raises(ValueError, match="must be finite and > 0"):
+        validate_material_parameter_overrides({**_VALID_MATERIAL_PARAMETER_OVERRIDES, "ka": 0.0})
+
+    with pytest.raises(ValueError, match="must be finite and > 0"):
+        validate_material_parameter_overrides({**_VALID_MATERIAL_PARAMETER_OVERRIDES, "c": 0.0})
+
+
 def test_validate_material_overrides_defensive_extra_branch(monkeypatch: pytest.MonkeyPatch) -> None:
     class WeirdNames:
         def __contains__(self, item: object) -> bool:

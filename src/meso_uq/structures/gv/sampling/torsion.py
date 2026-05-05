@@ -266,12 +266,15 @@ def parse_torsion_lane_channels(
 
     theta = None
     gamma = None
+    sigma_phi_r = None
     for raw_name, value in flattened.items():
         canonical = _CHANNEL_ALIASES.get(_canonical_name(raw_name), _canonical_name(raw_name))
         if canonical == "theta" and theta is None:
             theta = _coerce_numeric_array(value, name="theta")
         elif canonical == "gamma" and gamma is None:
             gamma = _coerce_numeric_array(value, name="gamma")
+        elif canonical == "sigma_phi_r" and sigma_phi_r is None:
+            sigma_phi_r = _coerce_numeric_array(value, name="sigma_phi_r")
 
     if gamma is None:
         if theta is None:
@@ -282,12 +285,13 @@ def parse_torsion_lane_channels(
             height=resolved_geometry["height"],
         )
 
-    constrained_force = _resolve_force_source(channel_payload)
-    sigma_phi_r = compute_torsion_sigma_phi_r(
-        constrained_force,
-        radius=resolved_geometry["radius"],
-        height=resolved_geometry["height"],
-    )
+    if sigma_phi_r is None:
+        constrained_force = _resolve_force_source(channel_payload)
+        sigma_phi_r = compute_torsion_sigma_phi_r(
+            constrained_force,
+            radius=resolved_geometry["radius"],
+            height=resolved_geometry["height"],
+        )
 
     if gamma.shape != sigma_phi_r.shape:
         raise ValueError("Torsion canonical gamma and sigma_phi_r must have matching shapes.")

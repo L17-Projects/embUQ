@@ -31,10 +31,16 @@ def _write_xyz(path: Path, points: list[tuple[float, float, float]]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _write_off(path: Path, points: list[tuple[float, float, float]]) -> None:
+def _write_off(
+    path: Path,
+    points: list[tuple[float, float, float]],
+    faces: list[tuple[int, ...]] | None = None,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    lines = ["OFF", f"{len(points)} 0 0"]
+    face_rows = list(faces or [])
+    lines = ["OFF", f"{len(points)} {len(face_rows)} 0"]
     lines.extend(f"{x} {y} {z}" for x, y, z in points)
+    lines.extend(" ".join(str(item) for item in (len(face), *face)) for face in face_rows)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -84,6 +90,25 @@ def test_extract_buckling_channels_from_mesh_and_xyz_outputs(tmp_path: Path) -> 
     assert channels["buck"].tolist() == [0.25]
     assert channels["deformation_amplitude"][0] > 0.0
     assert channels["shape_amplitude"][0] > 0.0
+
+
+def test_extract_buckling_channels_include_relative_volume_when_mesh_faces_exist(tmp_path: Path) -> None:
+    work = tmp_path / "buckling-volume"
+    initial = [(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)]
+    final = [(10, 10, 10), (12, 10, 10), (10, 12, 10), (10, 10, 12)]
+    faces = [(0, 2, 1), (0, 1, 3), (0, 3, 2), (1, 2, 3)]
+    _write_off(work / "mesh" / "gv00001.off", initial, faces=faces)
+    _write_xyz(work / "gas_vesicle" / "test.xyz", final)
+
+    channels = extract_sampling_channels(
+        experiment="buckling",
+        work_dir=work,
+        controls={"buck": 0.25, "bpress": -91.0},
+        sweep=GVSweep("bpress", (-91.0,)),
+        geometry=_geometry(),
+    )
+
+    assert channels["relative_volume"].tolist() == [8.0]
 
 
 def test_extract_torsion_channels_rejects_non_finite_force_output(tmp_path: Path) -> None:

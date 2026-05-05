@@ -387,7 +387,11 @@ def test_vega_sbatch_templates_expose_model_family_and_profile_axes() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     template_dir = repo_root / "scripts" / "platforms" / "vega" / "sbatch"
     templates = sorted(template_dir.glob("*.sbatch"))
-    fixed_scope_templates = {"train_dnn_arch_array.sbatch", "train_dnn_surrogates.sbatch"}
+    fixed_scope_templates = {
+        "gv_paper_figure_replay.sbatch",
+        "train_dnn_arch_array.sbatch",
+        "train_dnn_surrogates.sbatch",
+    }
 
     assert templates
     for template in templates:
@@ -404,6 +408,29 @@ def test_vega_sbatch_templates_expose_model_family_and_profile_axes() -> None:
             "PROFILE" in text or "PROFILES" in text or "SELECTION" in text or "SELECTIONS" in text
         )
         assert "_vega/korali/env.sh" in text
+
+
+def test_gv_paper_figure_replay_template_uses_public_command_and_gv_runtime() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    template = repo_root / "scripts" / "platforms" / "vega" / "sbatch" / "gv_paper_figure_replay.sbatch"
+
+    text = template.read_text(encoding="utf-8")
+
+    assert 'REPO_ROOT="${REPO_ROOT:-${SLURM_SUBMIT_DIR:-$(pwd)}}"' in text
+    assert 'CAMPAIGN_ID="${CAMPAIGN_ID:-}"' in text
+    assert 'LANES="${LANES:-}"' in text
+    assert 'OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/gv/figure_replay/${CAMPAIGN_ID}}"' in text
+    assert "run_paper_figure_replay.py" in text
+    assert 'command+=(--lane "${lane}")' in text
+    assert "_vega/gv_venv/env.sh" in text
+    assert "Missing required GV runtime environment" in text
+    assert "OpenMPI/4.1.4-GCC-12.2.0" in text
+    assert "#SBATCH --partition=gpu" in text
+    assert "#SBATCH --time=24:00:00" in text
+    assert "#SBATCH --ntasks=2" in text
+    assert 'MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"' in text
+    assert 'MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-1}"' in text
+    assert "#SBATCH --gres=gpu:1" in text
 
 
 def test_production_sanity_template_uses_public_command() -> None:
