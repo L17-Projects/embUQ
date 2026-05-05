@@ -83,6 +83,12 @@ def sample_gv(
             height=height,
         )
     )
+    if write_artifacts and not dry_run and len(sweep.values) > 1:
+        raise GVSamplingPlanError(
+            "GV sampling artifact writing currently requires a single sweep value so the scalar "
+            "numerical dataset manifest cannot mislabel a multi-point sweep. Disable write_artifacts "
+            "or call sample_gv once per control value until sweep-aware dataset IDs are available."
+        )
     resolved_campaign = campaign_id or _default_campaign_id()
     gv_geometry = build_geometry(
         radius=validated_geometry.radGV,

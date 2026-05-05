@@ -114,7 +114,17 @@ def test_extract_eigenmodes_and_merge_sweep_channels(tmp_path: Path) -> None:
         sweep=GVSweep("bpress", (-91.0,)),
         geometry=_geometry(),
     )
-    merged = merge_sampling_channels((channels, {"eigenvalues": np.asarray([25.0]), "bpress": np.asarray([-92.0])}))
+    merged = merge_sampling_channels(
+        (
+            channels,
+            {
+                "bpress": np.asarray([-92.0]),
+                "eigenfrequencies": np.asarray([5.0]),
+                "eigenvalues": np.asarray([25.0]),
+                "mode_index": np.asarray([0.0]),
+            },
+        )
+    )
 
     assert channels["eigenfrequencies"].tolist() == [2.0, 3.0, 4.0]
     assert merged["eigenvalues"].tolist() == [4.0, 9.0, 16.0, 25.0]
@@ -203,6 +213,24 @@ def test_extract_eigenmodes_without_vector_file_uses_eigenvalues_only(tmp_path: 
 def test_merge_sampling_channels_rejects_incompatible_shapes() -> None:
     with pytest.raises(GVSamplingExtractionError, match="incompatible shapes"):
         merge_sampling_channels(({"amplitude": np.asarray([[1.0, 2.0], [3.0, 4.0]])}, {"amplitude": np.asarray([1.0, 2.0])}))
+
+
+def test_merge_sampling_channels_rejects_inconsistent_channel_sets() -> None:
+    with pytest.raises(GVSamplingExtractionError, match="inconsistent across sweep values.*missing channels"):
+        merge_sampling_channels(
+            (
+                {"force": np.asarray([1.0]), "time": np.asarray([0.0])},
+                {"force": np.asarray([2.0])},
+            )
+        )
+
+    with pytest.raises(GVSamplingExtractionError, match="inconsistent across sweep values.*extra channels"):
+        merge_sampling_channels(
+            (
+                {"force": np.asarray([1.0])},
+                {"force": np.asarray([2.0]), "time": np.asarray([0.0])},
+            )
+        )
 
 
 def test_merge_sampling_channels_rejects_empty_channels() -> None:

@@ -42,12 +42,26 @@ def merge_sampling_channels(
 
     if not channel_sets:
         raise GVSamplingExtractionError("At least one channel payload is required.")
-    names = sorted({name for channels in channel_sets for name in channels})
+    expected_names = {str(name) for name in channel_sets[0]}
+    for index, channels in enumerate(channel_sets[1:], start=1):
+        names = {str(name) for name in channels}
+        missing = sorted(expected_names - names)
+        extra = sorted(names - expected_names)
+        if missing or extra:
+            details: list[str] = []
+            if missing:
+                details.append(f"missing channels {missing}")
+            if extra:
+                details.append(f"extra channels {extra}")
+            raise GVSamplingExtractionError(
+                f"Channel payload {index} is inconsistent across sweep values: "
+                + "; ".join(details)
+                + "."
+            )
+    names = sorted(expected_names)
     merged: dict[str, np.ndarray] = {}
     for name in names:
-        arrays = [np.asarray(channels[name]) for channels in channel_sets if name in channels]
-        if not arrays:
-            continue
+        arrays = [np.asarray(channels[name]) for channels in channel_sets]
         merged[name] = _concat_compatible(name, arrays)
     return _validate_finite_channels(merged)
 

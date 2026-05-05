@@ -10,6 +10,7 @@ from meso_uq.structures.gv.sampling import (
     GVMaterialGeometry,
     GVRuntimeOptions,
     GVSampleResult,
+    GVSamplingPlanError,
     GVSweep,
     validate_sample_gv_request,
     sample_gv,
@@ -253,6 +254,23 @@ def test_sample_gv_executes_each_sweep_value_and_merges_channels(monkeypatch, tm
     assert calls == [500.0, 750.0]
     assert result.channels["force"].tolist() == [1000.0, 1500.0]
     assert len(result.execution_manifests) == 2
+
+
+def test_sample_gv_rejects_multi_point_artifact_manifest(monkeypatch, tmp_path) -> None:
+    def _fail_plan_runtime(*_args, **_kwargs):
+        raise AssertionError("sample_gv must reject before staging multi-point artifact runs")
+
+    monkeypatch.setattr(sampling_module, "plan_runtime", _fail_plan_runtime)
+
+    with pytest.raises(GVSamplingPlanError, match="artifact writing currently requires a single sweep value"):
+        sample_gv(
+            experiment="stretching",
+            material_parameters=_VALID_MATERIAL_PARAMETERS,
+            geometry=GVMaterialGeometry(radGV=2.0, height=14.28),
+            controls={"tot_force": (500.0, 750.0), "bpress": -91.0},
+            runtime_options=GVRuntimeOptions(output_root=tmp_path / "runtime"),
+            write_artifacts=True,
+        )
 
 
 def test_sample_gv_write_artifacts_records_manifest_and_paths(monkeypatch, tmp_path) -> None:
