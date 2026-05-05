@@ -169,6 +169,29 @@ def test_campaign_low_level_validators_reject_invalid_inputs(tmp_path: Path) -> 
         )
 
 
+def test_collect_git_head_records_clean_worktree_false(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    outputs = {
+        ("rev-parse", "HEAD"): "deadbeef\n",
+        ("rev-parse", "--abbrev-ref", "HEAD"): "feature/test\n",
+        ("status", "--porcelain"): "",
+    }
+
+    def fake_run(command, **_kwargs):
+        args = tuple(command[1:])
+        return SimpleNamespace(returncode=0, stdout=outputs[args])
+
+    monkeypatch.setattr(campaign_module.subprocess, "run", fake_run)
+
+    git_head = campaign_module.collect_git_head(tmp_path)
+
+    assert git_head.commit == "deadbeef"
+    assert git_head.branch == "feature/test"
+    assert git_head.dirty_worktree is False
+
+
 def test_campaign_private_helpers_cover_fallbacks(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

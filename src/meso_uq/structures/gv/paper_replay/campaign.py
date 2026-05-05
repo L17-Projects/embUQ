@@ -33,7 +33,7 @@ def _run_git(repo_root: Path, *args: str) -> str | None:
     if completed.returncode != 0:
         return None
     value = (completed.stdout or "").strip()
-    return value or None
+    return value
 
 
 def _normalize_identifier(value: str, *, field_name: str) -> str:
