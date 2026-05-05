@@ -6,7 +6,7 @@ mode=$1
 simnum0="00001"
 simnum=${2:-${simnum0}}
 
-nranks=${3:-1}
+nranks=${3:-${MESOUQ_GV_MPI_RANKS:-2}}
 
 mkdir -p logs restart mesh parameter force trj_eq stats anchor anchor_min anchor_max
 

@@ -225,8 +225,20 @@ def test_non_shear_gv_run_scripts_apply_material_override_hook(experiment: str) 
     run_script = Path("gv") / experiment / "src" / "run.sh"
     text = run_script.read_text(encoding="utf-8")
 
+    assert "nranks=${3:-${MESOUQ_GV_MPI_RANKS:-2}}" in text
     assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in text
     assert "python3 -m meso_uq.structures.gv.material_parameters" in text
     assert "parameters.prms${simnum}.yaml" in text
     assert text.index("python3 parameters.py") < text.index("MESOUQ_GV_MATERIAL_OVERRIDES_JSON")
     assert text.index("MESOUQ_GV_MATERIAL_OVERRIDES_JSON") < text.index("mpirun")
+
+
+@pytest.mark.parametrize("experiment", ["stretching", "buckling", "torsion", "eigenmodes"])
+def test_non_shear_gv_generators_allocate_postprocess_rank(experiment: str) -> None:
+    generate_script = Path("gv") / experiment / "src" / "generate.py"
+    text = generate_script.read_text(encoding="utf-8")
+
+    assert "MESOUQ_GV_MPI_RANKS" in text
+    assert "str(num_gpus + 1)" in text
+    assert "write_commands('commands.txt', 'run.sh', f'{num_mpi_ranks}')" in text
+    assert "#SBATCH --ntasks-per-node={num_mpi_ranks}" in text

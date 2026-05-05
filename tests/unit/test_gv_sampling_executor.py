@@ -19,10 +19,11 @@ from meso_uq.structures.gv.sampling.failures import (
     GVCwdValidationError,
     GVLogScanFailure,
     GVTimeoutFailure,
+    GVSamplingFailure,
 )
 from meso_uq.structures.gv.sampling.planner import GVSamplingPlan, SamplingCommand, SamplingRun
 from meso_uq.structures.gv.sampling.planner import build_sampling_plan
-from meso_uq.structures.gv.sampling.logs import scan_log_text
+from meso_uq.structures.gv.sampling.logs import scan_log_file, scan_log_text
 
 
 def _build_plan(tmp_path: Path) -> GVSamplingPlan:
@@ -139,3 +140,62 @@ def test_scan_log_text_detects_nan_and_inf_tokens() -> None:
     assert len(issues) == 2
     assert issues[0].token.lower() == "nan"
     assert issues[1].token.lower() == "inf"
+
+
+def test_scan_log_text_respects_issue_limit() -> None:
+    issues = scan_log_text("value NaN\nvalue Inf\nvalue nan\n", source="fake.out", max_issues=1)
+    assert len(issues) == 1
+
+
+def test_scan_log_file_detects_plus_inf_token(tmp_path: Path) -> None:
+    log_path = tmp_path / "run.log"
+    log_path.write_text("load +Inf\n", encoding="utf-8")
+    issues = scan_log_file(log_path)
+    assert len(issues) == 1
+    assert issues[0].token == "+Inf"
+
+
+def test_executor_rejects_non_plan_input() -> None:
+    with pytest.raises(TypeError, match="plan must be a GVSamplingPlan"):
+        execute_sampling_plan("not-a-plan")
+
+
+def test_executor_rejects_invalid_timeout_override() -> None:
+    with pytest.raises(GVSamplingFailure, match="timeout_seconds must be an integer"):
+        execute_sampling_plan(_build_plan(Path(".")), timeout_seconds=1.2)
+
+
+def test_executor_rejects_work_dir_violation(tmp_path: Path) -> None:
+    runtime = {"work_dir": str(tmp_path / "runtime")}
+    bad_run = GVSamplingPlan(
+        runtime_manifest=runtime,
+        control_axis="tot_force",
+        values=(1.0,),
+        linear=True,
+        timeout_seconds=60,
+        runs=(
+            SamplingRun(
+                command_sequence=(
+                    SamplingCommand(argv=("python3", "-c", "print(1)"), cwd=str(tmp_path / "outside")),
+                ),
+                controls={"tot_force": 1.0},
+                provenance={"mode": "exact", "value": 1.0},
+            ),
+        ),
+    )
+    (tmp_path / "runtime").mkdir()
+    (tmp_path / "outside").mkdir()
+
+    with pytest.raises(GVCwdValidationError, match="outside runtime work_dir"):
+        execute_sampling_plan(bad_run)
+
+
+def test_executor_scans_log_file_contents_for_nans(tmp_path: Path) -> None:
+    plan = _build_plan(tmp_path)
+    output_path = Path(plan.runtime_manifest["work_dir"]) / "output.out"
+    output_path.write_text("step: NaN\n", encoding="utf-8")
+
+    good = MagicMock(returncode=0, stdout="", stderr="")
+    with patch("meso_uq.structures.gv.sampling.executor.subprocess.run", return_value=good):
+        with pytest.raises(GVLogScanFailure, match="Detected non-finite"):
+            execute_sampling_plan(plan)
