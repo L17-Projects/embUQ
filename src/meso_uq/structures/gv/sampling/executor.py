@@ -156,6 +156,9 @@ def _guard_scheduler_submission(command: SamplingCommand) -> None:
 
 
 def _normalize_cwd(cwd: str, plan: GVSamplingPlan) -> Path:
+    work_dir = plan.runtime_manifest.get("work_dir")
+    if work_dir is not None:
+        cwd = str(cwd).replace("{work_dir}", str(work_dir))
     path = Path(cwd)
     if not path.is_absolute():
         path = Path.cwd() / path

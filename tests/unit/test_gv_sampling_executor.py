@@ -77,6 +77,18 @@ def test_executor_forwards_environment_overrides_and_relative_cwd(tmp_path: Path
     assert run_mock.call_args.kwargs["env"]["MESOUQ_TEST"] == "1"
 
 
+def test_executor_expands_work_dir_placeholders_for_analysis_commands(tmp_path: Path) -> None:
+    runtime = load_runtime_descriptor("eigenmodes").plan(output_root=tmp_path / "runtime")
+    plan = build_sampling_plan(runtime, control_axis="bpress", values=(-91.0,))
+    mock_result = MagicMock(returncode=0, stdout="", stderr="")
+
+    with patch("meso_uq.structures.gv.sampling.executor.subprocess.run", return_value=mock_result) as run_mock:
+        execute_sampling_plan(plan)
+
+    analysis_cwd = Path(runtime.work_dir) / "analysis"
+    assert run_mock.call_args_list[-1].kwargs["cwd"] == str(analysis_cwd.resolve())
+
+
 def test_executor_rejects_missing_cwd(tmp_path: Path) -> None:
     missing_dir = tmp_path / "missing"
     broken_plan = GVSamplingPlan(
