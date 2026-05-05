@@ -201,3 +201,81 @@ def test_parse_torsion_lane_channels_rejects_unsupported_force_ndim() -> None:
 def test_parse_torsion_lane_controls_requires_theta() -> None:
     with pytest.raises(ValueError, match="requires controls"):
         torsion.parse_torsion_lane_controls({"controls": {"bpress": -91.0}})
+
+
+def test_torsion_wrapper_accepts_direct_fixture_payload_and_metadata_controls() -> None:
+    lane = torsion.parse_torsion_sampling_lane(
+        {
+            "radius": 2.0,
+            "radGV": 99.0,
+            "height": [8.0],
+            "metadata": {"controls": {"angle": np.asarray([0.25])}},
+            "twist_angle": [0.2, 0.4],
+            "anchor_force": [[3.0, 4.0], [0.0, 5.0]],
+            7: "ignored",
+        }
+    )
+
+    assert lane["controls"] == {"theta": 0.25}
+    assert lane["geometry"] == {"radius": 2.0, "height": 8.0}
+    assert np.allclose(lane["channels"]["gamma"], [0.05, 0.1])
+    assert np.allclose(lane["channels"]["sigma_phi_r"], np.asarray([5.0, 5.0]) / (2.0 * np.pi * 2.0 * 8.0))
+
+
+def test_torsion_parsers_accept_explicit_controls_and_geometry_overrides() -> None:
+    assert torsion.parse_torsion_lane_controls({}, controls={"theta": np.asarray([0.2])}) == {"theta": 0.2}
+    assert torsion.parse_torsion_lane_geometry({}, geometry={"R0": [2.0], "H0": [10.0]}) == {
+        "radius": 2.0,
+        "height": 10.0,
+    }
+
+
+def test_torsion_parsers_reject_bad_fixture_shapes_and_missing_channels() -> None:
+    with pytest.raises(ValueError, match="fixture_like must be a mapping"):
+        torsion.parse_torsion_lane_geometry([])
+    with pytest.raises(ValueError, match="fixture_like must be a mapping"):
+        torsion.parse_torsion_lane_channels([])
+    with pytest.raises(ValueError, match="fixture_like must be a mapping"):
+        torsion.parse_torsion_lane_controls([])
+    with pytest.raises(ValueError, match="metadata.controls must be a mapping"):
+        torsion.parse_torsion_lane_controls({"metadata": {"controls": []}})
+    with pytest.raises(ValueError, match="fixture geometry must be a mapping"):
+        torsion.parse_torsion_lane_channels(
+            {
+                "geometry": [],
+                "channels": {"theta": [0.1], "constrained_vertex_forces": [1.0]},
+            }
+        )
+    with pytest.raises(ValueError, match="requires geometry"):
+        torsion.parse_torsion_lane_channels(
+            {
+                "channels": {"theta": [0.1], "constrained_vertex_forces": [1.0]},
+            }
+        )
+    with pytest.raises(ValueError, match="requires a theta"):
+        torsion.parse_torsion_lane_channels(
+            {
+                "geometry": {"radius": 2.0, "height": 10.0},
+                "channels": {"constrained_vertex_forces": [1.0]},
+            }
+        )
+    with pytest.raises(ValueError, match="matching shapes"):
+        torsion.parse_torsion_lane_channels(
+            {
+                "geometry": {"radius": 2.0, "height": 10.0},
+                "channels": {"gamma": [0.1, 0.2], "constrained_vertex_forces": [1.0]},
+            }
+        )
+
+
+def test_torsion_geometry_helpers_reject_nonpositive_stress_and_strain_geometry() -> None:
+    with pytest.raises(ValueError, match="must be positive"):
+        torsion.compute_torsion_gamma([0.1], radius=2.0, height=0.0)
+    with pytest.raises(ValueError, match="must be finite"):
+        torsion.compute_torsion_sigma_phi_r([1.0], radius=float("inf"), height=1.0)
+    with pytest.raises(ValueError, match="must be positive"):
+        torsion.compute_torsion_sigma_phi_r([1.0], radius=2.0, height=-1.0)
+
+
+def test_parse_torsion_lane_controls_ignores_non_string_control_keys() -> None:
+    assert torsion.parse_torsion_lane_controls({"controls": {7: 1.0, "theta": 0.3}}) == {"theta": 0.3}

@@ -350,7 +350,8 @@ def _resolve_request(
     else:
         runtime_payload = runtime_or_request
         if resolved_axis is None and hasattr(runtime_or_request, "__dict__"):
-            _, maybe_axis, maybe_values = _coerce_request(runtime_or_request)
+            maybe_runtime, maybe_axis, maybe_values = _coerce_request(runtime_or_request)
+            runtime_payload = maybe_runtime
             if maybe_axis is not None:
                 resolved_axis = maybe_axis
             if resolved_values is None:

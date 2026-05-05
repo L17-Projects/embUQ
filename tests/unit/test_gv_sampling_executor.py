@@ -52,6 +52,31 @@ def test_executor_runs_command_list_synchronously_with_timeout(tmp_path: Path) -
     assert (log_dir / "001.stdout").read_text(encoding="utf-8") == "ok"
 
 
+def test_executor_forwards_environment_overrides_and_relative_cwd(tmp_path: Path) -> None:
+    work = tmp_path / "work"
+    work.mkdir()
+    plan = GVSamplingPlan(
+        runtime_manifest={},
+        control_axis="tot_force",
+        values=(1.0,),
+        linear=True,
+        timeout_seconds=72,
+        runs=(
+            SamplingRun(
+                command_sequence=(SamplingCommand(argv=("python3", "-c", "print(1)"), cwd=str(work.relative_to(Path.cwd())) if work.is_relative_to(Path.cwd()) else str(work)),),
+                controls={"tot_force": 1.0},
+                provenance={"mode": "exact", "value": 1.0},
+            ),
+        ),
+    )
+    mock_result = MagicMock(returncode=0, stdout="", stderr="")
+
+    with patch("meso_uq.structures.gv.sampling.executor.subprocess.run", return_value=mock_result) as run_mock:
+        execute_sampling_plan(plan, env={"MESOUQ_TEST": "1"})
+
+    assert run_mock.call_args.kwargs["env"]["MESOUQ_TEST"] == "1"
+
+
 def test_executor_rejects_missing_cwd(tmp_path: Path) -> None:
     missing_dir = tmp_path / "missing"
     broken_plan = GVSamplingPlan(
@@ -113,6 +138,15 @@ def test_executor_detects_nonzero_exit_code(tmp_path: Path) -> None:
     assert (Path(plan.runtime_manifest["work_dir"]) / "sampling_command_logs" / "failed.stderr").is_file()
 
 
+def test_executor_failure_excerpt_includes_stdout_and_stderr(tmp_path: Path) -> None:
+    plan = _build_plan(tmp_path)
+    failed = MagicMock(returncode=7, stdout="\n".join(str(i) for i in range(20)), stderr="bad stderr")
+
+    with patch("meso_uq.structures.gv.sampling.executor.subprocess.run", return_value=failed):
+        with pytest.raises(GVCommandFailure, match="stderr: bad stderr"):
+            execute_sampling_plan(plan)
+
+
 def test_executor_times_out_and_raises(tmp_path: Path) -> None:
     plan = _build_plan(tmp_path)
 
@@ -165,6 +199,33 @@ def test_executor_rejects_invalid_timeout_override() -> None:
         execute_sampling_plan(_build_plan(Path(".")), timeout_seconds=1.2)
 
 
+def test_executor_rejects_nonpositive_timeout_override() -> None:
+    with pytest.raises(GVSamplingFailure, match="timeout_seconds must be positive"):
+        execute_sampling_plan(_build_plan(Path(".")), timeout_seconds=0)
+
+
+def test_executor_rejects_cwd_that_is_not_directory(tmp_path: Path) -> None:
+    cwd_file = tmp_path / "not-dir"
+    cwd_file.write_text("", encoding="utf-8")
+    plan = GVSamplingPlan(
+        runtime_manifest={},
+        control_axis="tot_force",
+        values=(1.0,),
+        linear=True,
+        timeout_seconds=72,
+        runs=(
+            SamplingRun(
+                command_sequence=(SamplingCommand(argv=("python3", "-c", "print(1)"), cwd=str(cwd_file)),),
+                controls={"tot_force": 1.0},
+                provenance={"mode": "exact", "value": 1.0},
+            ),
+        ),
+    )
+
+    with pytest.raises(GVCwdValidationError, match="not a directory"):
+        execute_sampling_plan(plan)
+
+
 def test_executor_rejects_work_dir_violation(tmp_path: Path) -> None:
     runtime = {"work_dir": str(tmp_path / "runtime")}
     bad_run = GVSamplingPlan(
@@ -194,6 +255,18 @@ def test_executor_scans_log_file_contents_for_nans(tmp_path: Path) -> None:
     plan = _build_plan(tmp_path)
     output_path = Path(plan.runtime_manifest["work_dir"]) / "output.out"
     output_path.write_text("step: NaN\n", encoding="utf-8")
+
+    good = MagicMock(returncode=0, stdout="", stderr="")
+    with patch("meso_uq.structures.gv.sampling.executor.subprocess.run", return_value=good):
+        with pytest.raises(GVLogScanFailure, match="Detected non-finite"):
+            execute_sampling_plan(plan)
+
+
+def test_executor_scans_globbed_log_files(tmp_path: Path) -> None:
+    plan = _build_plan(tmp_path)
+    logs = Path(plan.runtime_manifest["work_dir"]) / "logs"
+    logs.mkdir(parents=True)
+    (logs / "log_00000000.log").write_text("temperature Inf\n", encoding="utf-8")
 
     good = MagicMock(returncode=0, stdout="", stderr="")
     with patch("meso_uq.structures.gv.sampling.executor.subprocess.run", return_value=good):

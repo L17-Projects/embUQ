@@ -107,6 +107,30 @@ def test_planner_accepts_request_like_object(tmp_path: Path) -> None:
     assert plan.values == (500.0, 1000.0)
 
 
+def test_planner_accepts_mapping_request_without_runtime_manifest_key(tmp_path: Path) -> None:
+    runtime_manifest = _build_runtime(tmp_path).to_manifest()
+    request = {
+        **runtime_manifest,
+        "control_axis": "tot_force",
+        "values": [500.0],
+    }
+
+    plan = build_sampling_plan(request)
+
+    assert plan.values == (500.0,)
+
+
+def test_planner_accepts_runtime_attribute_fallback_and_explicit_axis(tmp_path: Path) -> None:
+    request = SimpleNamespace(
+        runtime=_build_runtime(tmp_path).to_manifest(),
+        control_axis="tot_force",
+    )
+
+    plan = build_sampling_plan(request, values=[500.0])
+
+    assert plan.values == (500.0,)
+
+
 def test_planner_accepts_runtime_manifest_path(tmp_path: Path) -> None:
     runtime_manifest = _build_runtime(tmp_path).to_manifest()
     runtime_path = tmp_path / "runtime_manifest.json"
@@ -213,6 +237,12 @@ def test_planner_rejects_control_value_non_numeric(tmp_path: Path) -> None:
         build_sampling_plan(runtime, control_axis="tot_force", values=("a",))
 
 
+def test_planner_rejects_non_finite_control_value(tmp_path: Path) -> None:
+    runtime = _build_runtime(tmp_path)
+    with pytest.raises(GVSamplingPlanError, match="must be finite"):
+        build_sampling_plan(runtime, control_axis="tot_force", values=(float("inf"),))
+
+
 def test_planner_rejects_empty_values() -> None:
     runtime = _build_runtime(Path("."))
     with pytest.raises(GVSamplingPlanError, match="Sampling values cannot be empty"):
@@ -250,6 +280,14 @@ def test_planner_rejects_command_list_missing_argv_and_unsupported_entry() -> No
         _coerce_command_list({"commands": ({"cwd": "."},)})
     with pytest.raises(GVSamplingPlanError, match="Unsupported runtime command entry type"):
         _coerce_command_list({"commands": (123,)})
+
+
+def test_planner_coerces_command_like_objects() -> None:
+    command_like = SimpleNamespace(argv=["python3", "generate.py"], cwd=".", description="stage")
+
+    commands = _coerce_command_list({"commands": (command_like,)})
+
+    assert commands == (SamplingCommand(("python3", "generate.py"), ".", "stage"),)
 
 
 def test_planner_rejects_non_mapping_runtime_manifest_controls() -> None:
