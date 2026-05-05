@@ -93,6 +93,16 @@ def test_planner_preserves_decimal_control_literals_for_generate_py(tmp_path: Pa
     assert theta == ("0.03", "0.03", "1")
 
 
+def test_planner_appends_analysis_commands_after_mirheo_runtime(tmp_path: Path) -> None:
+    runtime = load_runtime_descriptor("eigenmodes").plan(output_root=tmp_path / "runtime")
+
+    plan = build_sampling_plan(runtime, control_axis="bpress", values=(-91.0,))
+    command_names = [command.argv[0] for command in plan.runs[0].command_sequence]
+
+    assert command_names == ["python3", "bash", "python3", "python3", "python3", "bash"]
+    assert plan.runs[0].command_sequence[-1].argv == ("bash", "trim_svd.sh", "30")
+
+
 def test_planner_accepts_request_like_object(tmp_path: Path) -> None:
     runtime = _build_runtime(tmp_path)
     request = SimpleNamespace(

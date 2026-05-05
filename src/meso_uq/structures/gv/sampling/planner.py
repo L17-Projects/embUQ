@@ -254,8 +254,9 @@ def _coerce_runtime_controls(payload: Mapping[str, Any]) -> dict[str, float]:
 
 
 def _coerce_command_list(payload: Mapping[str, Any]) -> tuple[SamplingCommand, ...]:
-    commands = payload.get("commands")
-    if commands is None:
+    commands = list(payload.get("commands") or ())
+    commands.extend(list(payload.get("analysis_commands") or ()))
+    if not commands:
         return ()
     parsed: list[SamplingCommand] = []
     for entry in commands:
