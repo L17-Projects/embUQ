@@ -239,7 +239,7 @@ def test_gv_dry_run_material_parser_validates_overrides() -> None:
         module._parse_material_overrides(["ka=1.1", "oops=2.0"])
 
 
-@pytest.mark.parametrize("experiment_name", ("stretching", "buckling", "torsion", "eigenmodes"))
+@pytest.mark.parametrize("experiment_name", ("stretching", "buckling", "torsion"))
 def test_gv_generated_mirheo_jobs_source_runtime_environment_and_preserve_materials(
     experiment_name: str,
 ) -> None:
@@ -259,7 +259,20 @@ def test_gv_generated_mirheo_jobs_source_runtime_environment_and_preserve_materi
     assert "module load CUDA/12.2.2" in contents
 
 
-@pytest.mark.parametrize("experiment_name", ("stretching", "buckling", "torsion", "eigenmodes"))
+def test_gv_eigenmodes_runtime_uses_single_physical_rank_by_default() -> None:
+    generate_contents = Path("gv/eigenmodes/src/generate.py").read_text(encoding="utf-8")
+    run_contents = Path("gv/eigenmodes/src/run.sh").read_text(encoding="utf-8")
+
+    assert "MESOUQ_GV_ENV_SCRIPT" in generate_contents
+    assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in generate_contents
+    assert "MESOUQ_GV_EIGENMODES_MPI_RANKS" in generate_contents
+    assert "num_mpi_ranks = int(os.environ.get('MESOUQ_GV_EIGENMODES_MPI_RANKS', str(num_gpus)))" in generate_contents
+    assert "MESOUQ_GV_MPI_RANKS" not in generate_contents
+    assert "nranks=${3:-${MESOUQ_GV_EIGENMODES_MPI_RANKS:-1}}" in run_contents
+    assert "mpirun --bind-to none -np ${nranks}" in run_contents
+
+
+@pytest.mark.parametrize("experiment_name", ("stretching", "buckling", "torsion"))
 def test_gv_mirheo_launchers_disable_openmpi_binding_on_vega(experiment_name: str) -> None:
     run_script = Path("gv") / experiment_name / "src" / "run.sh"
     contents = run_script.read_text(encoding="utf-8")

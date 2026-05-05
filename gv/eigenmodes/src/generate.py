@@ -42,7 +42,7 @@ args = parser.parse_args()
 num_gpus = args.g
 num_nodes = args.N
 
-num_mpi_ranks = int(os.environ.get('MESOUQ_GV_MPI_RANKS', str(num_gpus + 1)))
+num_mpi_ranks = int(os.environ.get('MESOUQ_GV_EIGENMODES_MPI_RANKS', str(num_gpus)))
 mem_per_gpu = 20  # Memory in GB per GPU, adjust as needed
 total_mem = mem_per_gpu * num_gpus
 
