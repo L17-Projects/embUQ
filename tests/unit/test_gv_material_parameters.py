@@ -258,11 +258,11 @@ def test_non_shear_gv_run_scripts_apply_material_override_hook(experiment: str) 
     assert text.index("MESOUQ_GV_MATERIAL_OVERRIDES_JSON") < text.index("mpirun")
 
 
-def test_gv_eigenmodes_run_script_applies_material_hook_with_single_rank_default() -> None:
+def test_gv_eigenmodes_run_script_applies_material_hook_with_postprocess_rank_default() -> None:
     run_script = Path("gv/eigenmodes/src/run.sh")
     text = run_script.read_text(encoding="utf-8")
 
-    assert "nranks=${3:-${MESOUQ_GV_EIGENMODES_MPI_RANKS:-1}}" in text
+    assert "nranks=${3:-${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}}" in text
     assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in text
     assert "python3 -m meso_uq.structures.gv.material_parameters" in text
     assert "parameters.prms${simnum}.yaml" in text
@@ -276,17 +276,43 @@ def test_non_shear_gv_generators_allocate_postprocess_rank(experiment: str) -> N
     text = generate_script.read_text(encoding="utf-8")
 
     assert "MESOUQ_GV_MPI_RANKS" in text
+    assert "MESOUQ_GV_MIRHEO_MODULE" in text
     assert "str(num_gpus + 1)" in text
     assert "write_commands('commands.txt', 'run.sh', f'{num_mpi_ranks}')" in text
     assert "#SBATCH --ntasks-per-node={num_mpi_ranks}" in text
 
 
-def test_gv_eigenmodes_generator_uses_single_physical_rank() -> None:
+@pytest.mark.parametrize("experiment", ["stretching", "buckling", "torsion", "eigenmodes"])
+def test_gv_equil_scripts_support_standard_mirheo_and_mirheo_obmd(experiment: str) -> None:
+    equil_script = Path("gv") / experiment / "src" / "equil.py"
+    text = equil_script.read_text(encoding="utf-8")
+
+    assert 'os.environ.get("MESOUQ_GV_MIRHEO_MODULE", "mirheo")' in text
+    assert '_MIRHEO_MODULE.startswith("mirheoOBMD")' in text
+    assert 'mir.Mirheo(ranks, domain, {}, "open", **kwargs)' in text
+    assert "return mir.Mirheo(ranks, domain, **kwargs)" in text
+    assert "u = _create_mirheo(ranks, domain" in text
+    assert "def _create_particle_vector" in text
+    assert "obmd=obmd" in text
+    assert "_create_particle_vector('water', mass = mw, obmd = obmd_flag)" in text
+    assert "_create_particle_vector('sol2', mass = mg, obmd = 0)" in text
+
+
+def test_gv_buckling_keeps_bpress_out_of_membrane_load_for_paper_replay() -> None:
+    text = Path("gv/buckling/src/equil.py").read_text(encoding="utf-8")
+
+    assert 'prms_emb["bpress"] = 0.0' in text
+    assert 'prms_emb["bpress"] = bpress' not in text
+    assert "ODPD" in text
+
+
+def test_gv_eigenmodes_generator_allocates_postprocess_rank() -> None:
     generate_script = Path("gv/eigenmodes/src/generate.py")
     text = generate_script.read_text(encoding="utf-8")
 
     assert "MESOUQ_GV_EIGENMODES_MPI_RANKS" in text
+    assert "MESOUQ_GV_MIRHEO_MODULE" in text
     assert "MESOUQ_GV_MPI_RANKS" not in text
-    assert "str(num_gpus)" in text
+    assert "str(num_gpus + 1)" in text
     assert "write_commands('commands.txt', 'run.sh', f'{num_mpi_ranks}')" in text
     assert "#SBATCH --ntasks-per-node={num_mpi_ranks}" in text

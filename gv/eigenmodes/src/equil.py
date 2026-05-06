@@ -1,11 +1,27 @@
 #!/usr/bin/env python3
 
-import mirheo as mir
+import importlib
+import os
+
+_MIRHEO_MODULE = os.environ.get("MESOUQ_GV_MIRHEO_MODULE", "mirheo")
+mir = importlib.import_module(_MIRHEO_MODULE)
+
+
+def _create_mirheo(ranks, domain, **kwargs):
+    if _MIRHEO_MODULE.startswith("mirheoOBMD"):
+        return mir.Mirheo(ranks, domain, {}, "open", **kwargs)
+    return mir.Mirheo(ranks, domain, **kwargs)
+
+
+def _create_particle_vector(name, *, mass, obmd):
+    if _MIRHEO_MODULE.startswith("mirheoOBMD"):
+        return mir.ParticleVectors.ParticleVector(name, mass=mass, obmd=obmd)
+    return mir.ParticleVectors.ParticleVector(name, mass=mass)
+
 import numpy as np
 import trimesh
 import yaml
 import argparse
-import os
 
 ######################################################
 # set-up simulation type: equilibration or restart
@@ -83,7 +99,7 @@ domain = (Lx, Ly, Lz)
 checkpoint_step = numsteps - 1
 
 #mirheo coordinator
-u = mir.Mirheo(ranks, domain, debug_level = 3, log_filename = 'logs/log', checkpoint_folder = "restart/", checkpoint_every = checkpoint_step)
+u = _create_mirheo(ranks, domain, debug_level = 3, log_filename = 'logs/log', checkpoint_folder = "restart/", checkpoint_every = checkpoint_step)
 
 #loads the off script
 mesh = trimesh.load_mesh(objFile)
@@ -111,13 +127,13 @@ ic_emb   = mir.InitialConditions.Membrane(pos_q)
 pv_emb = u.registerParticleVector(emb, ic_emb)
 
 #water
-water = mir.ParticleVectors.ParticleVector('water', mass = mw)
+water = _create_particle_vector('water', mass = mw, obmd = obmd_flag)
 ic_water = mir.InitialConditions.Uniform(number_density = rhow)
 pv_water = u.registerParticleVector(water, ic_water)
 
 
 #solvent
-sol2 = mir.ParticleVectors.ParticleVector('sol2', mass = mg)
+sol2 = _create_particle_vector('sol2', mass = mg, obmd = 0)
 ic_outer2 = mir.InitialConditions.Uniform(number_density = rhog)
 u.registerParticleVector(sol2, ic_outer2)
 

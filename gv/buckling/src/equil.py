@@ -1,11 +1,28 @@
 #!/usr/bin/env python3
 
-import mirheo as mir
+import importlib
+import os
+
+_MIRHEO_MODULE = os.environ.get("MESOUQ_GV_MIRHEO_MODULE", "mirheo")
+mir = importlib.import_module(_MIRHEO_MODULE)
+_PAPER_EXACT = os.environ.get("MESOUQ_GV_PAPER_EXACT", "").lower() in {"1", "true", "yes"}
+
+
+def _create_mirheo(ranks, domain, **kwargs):
+    if _MIRHEO_MODULE.startswith("mirheoOBMD"):
+        return mir.Mirheo(ranks, domain, {}, "open", **kwargs)
+    return mir.Mirheo(ranks, domain, **kwargs)
+
+
+def _create_particle_vector(name, *, mass, obmd):
+    if _MIRHEO_MODULE.startswith("mirheoOBMD"):
+        return mir.ParticleVectors.ParticleVector(name, mass=mass, obmd=obmd)
+    return mir.ParticleVectors.ParticleVector(name, mass=mass)
+
 import numpy as np
 import trimesh
 import yaml
 import argparse
-import os
 
 ######################################################
 # set-up simulation type: equilibration or restart
@@ -85,7 +102,7 @@ domain = (Lx, Ly, Lz)
 ######################################################
 checkpoint_step = numsteps - 1
 
-u = mir.Mirheo(ranks, domain, debug_level = 3, log_filename = 'logs/log', checkpoint_folder = "restart/", checkpoint_every = checkpoint_step) #, MPI._addressof(comm))
+u = _create_mirheo(ranks, domain, debug_level = 3, log_filename = 'logs/log', checkpoint_folder = "restart/", checkpoint_every = checkpoint_step) #, MPI._addressof(comm))
 
 
 #loads the off script
@@ -95,12 +112,14 @@ mesh = trimesh.load_mesh(objFile)
 triangle = mesh.vertices[mesh.faces]
 edge1 = triangle[:,1] - triangle[:,0]
 edges = np.linalg.norm(edge1, axis=1)
-lj_fac = 0.8 * np.min(edges)
+mesh_lj_fac = 0.8 * np.min(edges)
+lj_fac = 0.7 * np.min(edges) if _PAPER_EXACT else mesh_lj_fac
 
 #reads vertices, faces
 mesh_emb = mir.ParticleVectors.MembraneMesh(mesh.vertices.tolist(), mesh.faces.tolist())
 
-emb = mir.ParticleVectors.MembraneVector("emb", mass = 100 * mvert, mesh = mesh_emb)
+emb_mass = mvert if _PAPER_EXACT else 100 * mvert
+emb = mir.ParticleVectors.MembraneVector("emb", mass = emb_mass, mesh = mesh_emb)
 
 #initial condition for EMB
 ic_emb  = mir.InitialConditions.Membrane(pos_q)
@@ -109,12 +128,12 @@ ic_emb  = mir.InitialConditions.Membrane(pos_q)
 u.registerParticleVector(emb, ic_emb)
 
 #water
-water = mir.ParticleVectors.ParticleVector('water', mass = mw)#, obmd = obmd_flag) # ne smes imeti istega imena "water" za več "pv"-jev, "water" je ime "pv"-ja znotraj mirhea
+water = _create_particle_vector('water', mass = mw, obmd = obmd_flag)
 ic_water = mir.InitialConditions.Uniform(number_density = rhow)
 u.registerParticleVector(water, ic_water)
 
 #solvent
-sol2 = mir.ParticleVectors.ParticleVector('sol2', mass = mg)#, obmd = obmd_flag)
+sol2 = _create_particle_vector('sol2', mass = mg, obmd = 0)
 ic_outer2 = mir.InitialConditions.Uniform(number_density = rhog)
 u.registerParticleVector(sol2, ic_outer2)
 
@@ -135,13 +154,21 @@ radGV = parameters_default["radGV"]
 #buck = buck / radGV
 
 #interactions
-afsi = 2.0 * aii #buck * aii #prej 0.5 *
-lj_fac = parameters_default["lj_fac"]
+afsi = 10.0 * (2.0 / radGV)**2 * aii if _PAPER_EXACT else 2.0 * aii #buck * aii #prej 0.5 *
+if not _PAPER_EXACT:
+    lj_fac = parameters_default["lj_fac"]
 facg = parameters_default["facg"]
 bpress = parameters_default["bpress"]
 
 if(objType == 'gv'):
-    prms_emb["bpress"] = bpress #-29.0
+    if _PAPER_EXACT:
+        prms_emb["bpress"] = 0.0
+        buck = buck * (2.0 / radGV)**2
+    else:
+        # The Figure 7 buckling protocol keeps bpress as provenance while ODPD
+        # ramps the pressure through buck. Passing bpress into MembraneForces
+        # collapses the GV volume and is not paper-faithful.
+        prms_emb["bpress"] = 0.0
     int_emb = mir.Interactions.MembraneForces("int_emb", "LimUniaxial", "KantorStressFree", **prms_emb, stress_free = True)
 else:
     int_emb = mir.Interactions.MembraneForces("int_emb", "Lim", "KantorStressFree", **prms_emb, stress_free = True)
@@ -156,13 +183,20 @@ print(f'time = {t0}')
 #timestart = t0
 #timeend = (t0 + numsteps * dt if args.restart else t0 + numsteps_eq * dt_eq)
 
-dpd = mir.Interactions.Pairwise('dpd', rc, kind = "DPD", a = 0*aii, gamma = 0*gamma_dpd, kBT = kbt, power = s)
-dpd_gas = mir.Interactions.Pairwise('dpd_gas', rc, kind = "DPD", a = 0*aii, gamma = gamma_dpd_gas, kBT = kbt, power = s_g)
+water_gas_a = aii if _PAPER_EXACT else 0 * aii
+water_gas_gamma = gamma_dpd if _PAPER_EXACT else 0 * gamma_dpd
+gas_a = facg * aii if _PAPER_EXACT else 0 * aii
+gas_fsi_a = afsi if _PAPER_EXACT else 0 * aii
+dpd = mir.Interactions.Pairwise('dpd', rc, kind = "DPD", a = water_gas_a, gamma = water_gas_gamma, kBT = kbt, power = s)
+dpd_gas = mir.Interactions.Pairwise('dpd_gas', rc, kind = "DPD", a = gas_a, gamma = gamma_dpd_gas, kBT = kbt, power = s_g)
 dpd_fsi = mir.Interactions.Pairwise('dpd_fsi', rc, kind = "DPD", a = afsi, gamma = gamma_fsi, kBT = kbt, power = k_fsi)
-dpd_fsi_gas = mir.Interactions.Pairwise('dpd_fsi_gas', rc, kind = "DPD", a = 0*aii, gamma = gamma_fsi_gas, kBT = kbt, power = k_fsi)
+dpd_fsi_gas = mir.Interactions.Pairwise('dpd_fsi_gas', rc, kind = "DPD", a = gas_fsi_a, gamma = gamma_fsi_gas, kBT = kbt, power = k_fsi)
 lj = mir.Interactions.Pairwise('lj', rc, kind = "RepulsiveLJ", epsilon = 0.1, sigma = rc / (2**(1/6)), max_force = 10.0, aware_mode = 'Object')
 #lj_int = mir.Interactions.Pairwise('lj_int', lj_fac * rc, kind = "RepulsiveLJ", epsilon = 0.1, sigma = lj_fac * rc / (2**(1/6)), max_force = 10.0)
-lj_int = mir.Interactions.Pairwise('lj_int', lj_fac, kind = "RepulsiveLJ", epsilon = 10000.0, sigma = lj_fac / (2**(1/6)), max_force = 10000.0)
+lj_epsilon = 1000.0 if _PAPER_EXACT else 10000.0
+lj_sigma = (0.99 * lj_fac if _PAPER_EXACT else lj_fac) / (2**(1/6))
+lj_max_force = 1000.0 if _PAPER_EXACT else 10000.0
+lj_int = mir.Interactions.Pairwise('lj_int', lj_fac, kind = "RepulsiveLJ", epsilon = lj_epsilon, sigma = lj_sigma, max_force = lj_max_force)
 #dpd_int = mir.Interactions.Pairwise('dpd_int', lj_fac , kind = "DPD", a = 10*aii, gamma = 0*gamma_dpd, kBT = kbt, power = s)
 
 #niter = 10
@@ -183,7 +217,9 @@ timeend = (numsteps_eq * dt_eq + numsteps * dt if args.restart else numsteps_eq 
 
 #odpd = mir.Interactions.Pairwise('odpd', rc, kind = "ODPD", a = a0, gamma = gamma_dpd, kBT = kbt, power = s, timestart = timestart, timeend = timeend, amp = buck * aii, mode = 2, stress=True, stress_period = tdump) # 1 = 'hysteresis', 0 - 'forward', 2 - 'forward + equil'
 
-if(args.restart):
+if _PAPER_EXACT:
+    odpd = mir.Interactions.Pairwise('odpd', rc, kind = "ODPD", a = aii, gamma = gamma_dpd, kBT = kbt, power = s, timestart = timestart, timeend = timeend, amp = buck * aii, mode = 2, stress=True, stress_period = tdump) # 1 = 'hysteresis', 0 - 'forward', 2 - 'forward + equil'
+elif(args.restart):
     odpd = mir.Interactions.Pairwise('odpd', rc, kind = "ODPD", a = a0, gamma = gamma_dpd, kBT = kbt, power = s, timestart = timestart, timeend = timeend, amp = buck * aii, mode = 2, stress=True, stress_period = tdump) # 1 = 'hysteresis', 0 - 'forward', 2 - 'forward + equil'
 else:
     odpd = mir.Interactions.Pairwise('odpd', rc, kind = "ODPD", a = aii, gamma = gamma_dpd, kBT = kbt, power = s, timestart = timestart, timeend = timeend, amp = 0 * aii, mode = 2, stress=True, stress_period = tdump) # 1 = 'hysteresis', 0 - 'forward', 2 - 'forward + equil'
@@ -205,7 +241,7 @@ vv = mir.Integrators.VelocityVerlet('vv')
 u.registerIntegrator(vv)
 
 #set integrator for various parts
-if args.restart:
+if _PAPER_EXACT or args.restart:
     u.setIntegrator(vv, emb)
 
 #u.setIntegrator(vv, emb)

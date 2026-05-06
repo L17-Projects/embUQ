@@ -42,12 +42,41 @@ args = parser.parse_args()
 num_gpus = args.g
 num_nodes = args.N
 
-num_mpi_ranks = int(os.environ.get('MESOUQ_GV_EIGENMODES_MPI_RANKS', str(num_gpus)))
+num_mpi_ranks = int(os.environ.get('MESOUQ_GV_EIGENMODES_MPI_RANKS', str(num_gpus + 1)))
 mem_per_gpu = 20  # Memory in GB per GPU, adjust as needed
 total_mem = mem_per_gpu * num_gpus
 
 
 os.system(f'cp parameters-default.{args.obj}.yaml parameters-default.yaml')
+
+_PAPER_EXACT_DEFAULT_OVERRIDES = {
+    'dt': 0.0001,
+    'dt_eq': 0.0001,
+    'gamma_dpd': 16.3,
+    'gamma_dpd_gas': 3.0,
+    'numsteps': 4000000,
+    'numsteps_eq': 50000,
+    's_g': 0.125,
+    'stslik': 20000,
+    'stslik_eq': 100,
+}
+
+
+def _paper_exact_enabled():
+    return os.environ.get('MESOUQ_GV_PAPER_EXACT', '').lower() in {'1', 'true', 'yes'}
+
+
+def _apply_paper_exact_defaults(parameters_default):
+    if not _paper_exact_enabled():
+        return parameters_default
+    resolved = dict(parameters_default)
+    resolved.update(_PAPER_EXACT_DEFAULT_OVERRIDES)
+    return resolved
+
+
+def _write_parameters_default(filename, parameters_default):
+    with open(filename, 'w') as f:
+        yaml.dump(parameters_default, f)
 
 
 def _find_repo_root():
@@ -82,12 +111,29 @@ def _write_runtime_preamble(file_commands):
             'export MESOUQ_GV_MATERIAL_OVERRIDES_JSON='
             f'{shlex.quote(material_overrides)}\n'
         )
+    mirheo_module = os.environ.get('MESOUQ_GV_MIRHEO_MODULE', '')
+    if mirheo_module:
+        file_commands.write(
+            'export MESOUQ_GV_MIRHEO_MODULE='
+            f'{shlex.quote(mirheo_module)}\n'
+        )
+    paper_exact = os.environ.get('MESOUQ_GV_PAPER_EXACT', '')
+    if paper_exact:
+        file_commands.write(
+            'export MESOUQ_GV_PAPER_EXACT='
+            f'{shlex.quote(paper_exact)}\n'
+        )
     file_commands.write('\n')
 
 if(args.par == None):
     os.system('mkdir -p parameter')
     os.system('rm -r parameter/* 2>/dev/null')
     os.system(f'cp parameters-default.{args.obj}.yaml parameter/parameters-default00001.yaml')
+    if _paper_exact_enabled():
+        filename = 'parameter/parameters-default00001.yaml'
+        with open(filename, 'rb') as f:
+            parameters_default = yaml.load(f, Loader=yaml.CLoader)
+        _write_parameters_default(filename, _apply_paper_exact_defaults(parameters_default))
     cnt = 1
 
 else:
@@ -131,6 +177,7 @@ else:
     filename_default = 'parameters-default.yaml'
     with open(filename_default, 'rb') as f:
         parameters_default = yaml.load(f, Loader = yaml.CLoader)
+    parameters_default = _apply_paper_exact_defaults(parameters_default)
 
     os.system('mkdir -p parameter')
     os.system('rm -r parameter/* 2>/dev/null')

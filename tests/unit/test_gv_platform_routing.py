@@ -250,6 +250,7 @@ def test_gv_generated_mirheo_jobs_source_runtime_environment_and_preserve_materi
     assert "_vega' / 'gv_venv' / 'env.sh" in contents
     assert "source {shlex.quote(env_script)}" in contents
     assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in contents
+    assert "MESOUQ_GV_MIRHEO_MODULE" in contents
     assert "bash commands.txt" in contents
     assert "num_mpi_ranks = int(os.environ.get('MESOUQ_GV_MPI_RANKS', str(num_gpus + 1)))" in contents
     assert "#SBATCH --ntasks-per-node={num_mpi_ranks}" in contents
@@ -259,16 +260,21 @@ def test_gv_generated_mirheo_jobs_source_runtime_environment_and_preserve_materi
     assert "module load CUDA/12.2.2" in contents
 
 
-def test_gv_eigenmodes_runtime_uses_single_physical_rank_by_default() -> None:
+def test_gv_eigenmodes_runtime_allocates_postprocess_rank_by_default() -> None:
     generate_contents = Path("gv/eigenmodes/src/generate.py").read_text(encoding="utf-8")
     run_contents = Path("gv/eigenmodes/src/run.sh").read_text(encoding="utf-8")
 
     assert "MESOUQ_GV_ENV_SCRIPT" in generate_contents
     assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in generate_contents
+    assert "MESOUQ_GV_MIRHEO_MODULE" in generate_contents
     assert "MESOUQ_GV_EIGENMODES_MPI_RANKS" in generate_contents
-    assert "num_mpi_ranks = int(os.environ.get('MESOUQ_GV_EIGENMODES_MPI_RANKS', str(num_gpus)))" in generate_contents
+    assert "num_mpi_ranks = int(os.environ.get('MESOUQ_GV_EIGENMODES_MPI_RANKS', str(num_gpus + 1)))" in generate_contents
+    assert "MESOUQ_GV_PAPER_EXACT" in generate_contents
+    assert "'numsteps': 4000000" in generate_contents
+    assert "'stslik': 20000" in generate_contents
+    assert "'gamma_dpd_gas': 3.0" in generate_contents
     assert "MESOUQ_GV_MPI_RANKS" not in generate_contents
-    assert "nranks=${3:-${MESOUQ_GV_EIGENMODES_MPI_RANKS:-1}}" in run_contents
+    assert "nranks=${3:-${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}}" in run_contents
     assert "mpirun --bind-to none -np ${nranks}" in run_contents
 
 
@@ -291,6 +297,8 @@ def test_gv_eigenmodes_analysis_accepts_restart_backed_trajectory() -> None:
 
     initial_contents = (analysis_root / "initial.py").read_text(encoding="utf-8")
     assert "emb_0000000.xyz" in initial_contents
+    assert "sim{simnum}eq" in initial_contents
+    assert "Using equilibrated eigenmode reference frame" in initial_contents
 
     all_analysis_contents = (analysis_root / "all_analysis.py").read_text(encoding="utf-8")
     assert "np.linalg.svd(trj_np, full_matrices=False)" in all_analysis_contents

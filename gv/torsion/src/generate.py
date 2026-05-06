@@ -84,6 +84,12 @@ def _write_runtime_preamble(file_commands):
             'export MESOUQ_GV_MATERIAL_OVERRIDES_JSON='
             f'{shlex.quote(material_overrides)}\n'
         )
+    mirheo_module = os.environ.get('MESOUQ_GV_MIRHEO_MODULE', '')
+    if mirheo_module:
+        file_commands.write(
+            'export MESOUQ_GV_MIRHEO_MODULE='
+            f'{shlex.quote(mirheo_module)}\n'
+        )
     file_commands.write('\n')
 
 if(args.par == None):

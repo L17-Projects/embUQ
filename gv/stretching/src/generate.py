@@ -84,6 +84,18 @@ def _write_runtime_preamble(file_commands):
             'export MESOUQ_GV_MATERIAL_OVERRIDES_JSON='
             f'{shlex.quote(material_overrides)}\n'
         )
+    mirheo_module = os.environ.get('MESOUQ_GV_MIRHEO_MODULE', '')
+    if mirheo_module:
+        file_commands.write(
+            'export MESOUQ_GV_MIRHEO_MODULE='
+            f'{shlex.quote(mirheo_module)}\n'
+        )
+    paper_exact = os.environ.get('MESOUQ_GV_PAPER_EXACT', '')
+    if paper_exact:
+        file_commands.write(
+            'export MESOUQ_GV_PAPER_EXACT='
+            f'{shlex.quote(paper_exact)}\n'
+        )
     file_commands.write('\n')
 
 if(args.par == None):

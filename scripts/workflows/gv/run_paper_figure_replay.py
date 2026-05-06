@@ -77,6 +77,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--dry-run", action="store_true", default=False)
     parser.add_argument("--fixture-mode", action="store_true", default=False)
+    parser.add_argument(
+        "--paper-exact",
+        action="store_true",
+        default=False,
+        help="Use the paper-faithful sweep sizes and controls for operational Mirheo replay lanes.",
+    )
+    parser.add_argument(
+        "--stretching-point-start",
+        type=int,
+        default=None,
+        help="Optional inclusive start index for paper-exact stretching control points.",
+    )
+    parser.add_argument(
+        "--stretching-point-stop",
+        type=int,
+        default=None,
+        help="Optional exclusive stop index for paper-exact stretching control points.",
+    )
     return parser
 
 
@@ -237,6 +255,40 @@ def _slurm_job_ids() -> tuple[str, ...]:
     return tuple(dict.fromkeys(str(item) for item in ids if item))
 
 
+def _active_slurm_partition() -> str | None:
+    value = os.environ.get("SLURM_JOB_PARTITION")
+    if value is None:
+        return None
+    text = value.strip()
+    return text or None
+
+
+def _validate_stretching_partition_policy(
+    *,
+    plan: object,
+    paper_exact: bool,
+    lane: str,
+) -> None:
+    if lane != "stretching" or not paper_exact:
+        return
+    partition = _active_slurm_partition()
+    if partition != "dev":
+        return
+    controls = getattr(plan, "controls", {})
+    if not isinstance(controls, Mapping):
+        return
+    tot_force = controls.get("tot_force")
+    if not isinstance(tot_force, tuple | list):
+        return
+    if len(tot_force) <= 15:
+        return
+    raise ValueError(
+        "Paper-exact stretching sweeps with more than 15 control points are not allowed on the dev partition. "
+        "Use --stretching-point-start/--stretching-point-stop to keep each shard at 15 points or fewer, "
+        "or rerun on the gpu partition."
+    )
+
+
 def _manifest_without_full_channels(result: object) -> dict[str, Any]:
     if hasattr(result, "to_manifest"):
         payload = dict(result.to_manifest())
@@ -336,26 +388,42 @@ def _run_operational_lane(
     campaign_root: Path,
     source_pdfs: tuple[Path, ...],
     runtime_command: tuple[str, ...],
+    paper_exact: bool = False,
+    stretching_point_start: int | None = None,
+    stretching_point_stop: int | None = None,
 ) -> GVPaperReplayLaneRecord:
-    previous_cwd = Path.cwd()
-    os.chdir(REPO_ROOT)
-    profile = load_gv_paper_replay_profile()
-    validate_gv_paper_replay_profile(profile, require_positive_material_parameters=False)
-    material_parameters = profile.material_values()
-    geometry = profile.geometry.values()
-    lane_root_relative = CAMPAIGN_RUN_ROOT / campaign_id / "lanes" / lane
-    lane_root = campaign_root / "lanes" / lane
-    raw_provenance = profile.provenance.to_dict()
-
     try:
+        previous_cwd = Path.cwd()
+        os.chdir(REPO_ROOT)
+        profile = load_gv_paper_replay_profile()
+        validate_gv_paper_replay_profile(profile, require_positive_material_parameters=False)
+        lane_material_values = getattr(profile, "material_values_for_lane", None)
+        material_parameters = (
+            lane_material_values(lane)
+            if paper_exact and callable(lane_material_values)
+            else profile.material_values()
+        )
+        geometry = profile.geometry.values()
+        lane_root_relative = CAMPAIGN_RUN_ROOT / campaign_id / "lanes" / lane
+        lane_root = campaign_root / "lanes" / lane
+        raw_provenance = profile.provenance.to_dict()
+
         if lane == "stretching":
             plan = plan_stretching_paper_replay_lane(
                 campaign_id=campaign_id,
                 geometry_radius=geometry["radGV"],
                 geometry_height=geometry["height"],
                 material_parameters=material_parameters,
+                paper_exact=paper_exact,
                 output_root=lane_root_relative,
                 raw_provenance=raw_provenance,
+                point_start=stretching_point_start,
+                point_stop=stretching_point_stop,
+            )
+            _validate_stretching_partition_policy(
+                plan=plan,
+                paper_exact=paper_exact,
+                lane=lane,
             )
             result = run_stretching_paper_replay_lane(plan)
             plot_paths = (result.plot_path.resolve(),) if result.plot_path is not None else ()
@@ -365,6 +433,7 @@ def _run_operational_lane(
                 geometry_radius=geometry["radGV"],
                 geometry_height=geometry["height"],
                 material_parameters=material_parameters,
+                paper_exact=paper_exact,
                 output_root=lane_root_relative,
                 raw_provenance=raw_provenance,
             )
@@ -375,8 +444,7 @@ def _run_operational_lane(
                 material_parameters=material_parameters,
                 radGV=geometry["radGV"],
                 height=geometry["height"],
-                pressure_differences=(-91.0, -93.25, -95.5, -97.75, -100.0),
-                buck=0.75,
+                paper_exact=paper_exact,
                 output_root=lane_root_relative,
             )
             result = run_buckling_paper_replay_lane(plan)
@@ -392,6 +460,7 @@ def _run_operational_lane(
                 height=geometry["height"],
                 bpress=-91.0,
                 mode_count=30,
+                paper_exact=paper_exact,
                 output_root=lane_root_relative,
             )
             result = run_eigenmodes_paper_replay_lane(plan)
@@ -464,6 +533,9 @@ def main(argv: list[str] | None = None) -> int:
                         campaign_root=campaign_root,
                         source_pdfs=source_pdfs,
                         runtime_command=runtime_command,
+                        paper_exact=bool(args.paper_exact),
+                        stretching_point_start=args.stretching_point_start,
+                        stretching_point_stop=args.stretching_point_stop,
                     )
                 )
 

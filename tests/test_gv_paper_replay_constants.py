@@ -20,6 +20,7 @@ from meso_uq.structures.gv.paper_replay_constants import (
     load_gv_paper_replay_profile,
     validate_gv_paper_replay_profile,
 )
+from meso_uq.structures.gv import paper_replay_constants as constants_module
 from meso_uq.structures.gv.parameters import GV_MATERIAL_PARAMETER_NAMES
 
 
@@ -43,6 +44,20 @@ def test_load_gv_paper_replay_profile_exposes_current_runtime_defaults() -> None
             "a4": 0.0,
             "mu_l": 16733.50000756487,
             "c": 143430.0000648418,
+        }
+    )
+    assert profile.material_values_for_lane("stretching") == pytest.approx(profile.material_values())
+    assert profile.material_values_for_lane("torsion") == pytest.approx(
+        {
+            "ka": 40892.490643486664,
+            "kb": 120.82922175289485,
+            "mu": 17525.353132922857,
+            "b1": 0.0,
+            "b2": 0.0,
+            "a3": 0.0,
+            "a4": 0.0,
+            "mu_l": 17525.353132922857,
+            "c": 175253.53132922857,
         }
     )
     assert profile.geometry.values() == {"radGV": 2.0, "height": 14.28}
@@ -242,3 +257,62 @@ def test_validate_gv_paper_replay_profile_rejects_each_empty_provenance_field(
             replace(profile, provenance=replace(profile.provenance, **replacements)),
             require_positive_material_parameters=False,
         )
+
+
+def test_numeric_runtime_default_helpers_cover_error_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    with pytest.raises(ValueError, match="must be numeric"):
+        constants_module._require_numeric(object(), "value", positive=False)
+    with pytest.raises(ValueError, match="must be finite"):
+        constants_module._require_numeric(float("nan"), "value", positive=False)
+    with pytest.raises(ValueError, match="must be >= 0"):
+        constants_module._require_material_numeric(
+            -1.0,
+            "material",
+            name="b1",
+            strict_positive=False,
+        )
+
+    invalid_yaml = tmp_path / "invalid.yaml"
+    invalid_yaml.write_text("- not-a-mapping\n", encoding="utf-8")
+    monkeypatch.setattr(constants_module, "gv_canonical_geometry_default_path", lambda: invalid_yaml)
+    with pytest.raises(ValueError, match="Expected YAML mapping"):
+        constants_module._load_canonical_runtime_defaults()
+
+
+def test_load_canonical_runtime_defaults_rejects_missing_keys_and_bad_denominator(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    missing_yaml = tmp_path / "missing.yaml"
+    missing_yaml.write_text("ul: 1\n", encoding="utf-8")
+    monkeypatch.setattr(constants_module, "gv_canonical_geometry_default_path", lambda: missing_yaml)
+    with pytest.raises(ValueError, match="missing required keys"):
+        constants_module._load_canonical_runtime_defaults()
+
+    bad_denominator_yaml = tmp_path / "bad-denominator.yaml"
+    bad_denominator_yaml.write_text(
+        "\n".join(
+            (
+                "ul: 1",
+                "kbol: 1",
+                "t0: 1",
+                "shell_th: 1",
+                "fscale: 1",
+                "Yt: 1",
+                "Yl: 1",
+                "nu: 1",
+                "kb_fac: 1",
+                "radGV: 2",
+                "height: 3",
+                "a3: 0",
+                "a4: 0",
+                "b1: 0",
+                "b2: 0",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(constants_module, "gv_canonical_geometry_default_path", lambda: bad_denominator_yaml)
+    with pytest.raises(ValueError, match="denominator must be > 0"):
+        constants_module._load_canonical_runtime_defaults()

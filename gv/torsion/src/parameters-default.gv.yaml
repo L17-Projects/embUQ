@@ -18,7 +18,7 @@ t0: 300.0
 rho_water: 997.0
 rho_gas: 3.72
 rho_shell: 1320.0
-shell_th: 2.0e-9
+shell_th: 2.4e-9
 th_fac: 1.0
 energyFactor: 1.0
 
@@ -28,7 +28,7 @@ energyFactor: 1.0
 fscale: 0.079 #0.079
 Yt: 1.0e+9
 Yl: 4.0e+9
-nu: 0.3
+nu: 0.4
 a3: 0.0
 a4: 0.0
 b1: 0.0

@@ -40,6 +40,19 @@ _AMBIGUITY_NOTES = (
     "The staged GV source defaults set a3, a4, b1, and b2 to 0.0; those coupling defaults are deterministic runtime inputs and are validated as finite non-negative values.",
     "The staged orthotropic scripts overwrite muL with mu before writing YAML outputs; this layer records that serialized runtime convention as mu_l.",
 )
+_LANE_MATERIAL_VALUES = {
+    "torsion": {
+        "ka": 40892.490643486664,
+        "kb": 120.82922175289485,
+        "mu": 17525.353132922857,
+        "b1": 0.0,
+        "b2": 0.0,
+        "a3": 0.0,
+        "a4": 0.0,
+        "mu_l": 17525.353132922857,
+        "c": 175253.53132922857,
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -116,6 +129,12 @@ class GVPaperReplayProfile:
             name: float(self.material_parameters[name].value)
             for name in GV_MATERIAL_PARAMETER_NAMES
         }
+
+    def material_values_for_lane(self, lane: str) -> dict[str, float]:
+        values = _LANE_MATERIAL_VALUES.get(lane)
+        if values is None:
+            return self.material_values()
+        return {name: float(values[name]) for name in GV_MATERIAL_PARAMETER_NAMES}
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -271,6 +290,7 @@ def load_gv_paper_replay_profile() -> GVPaperReplayProfile:
         convention_notes=(
             "The replay layer preserves the nine-key MesoUQ ordering ka, kb, mu, b1, b2, a3, a4, mu_l, c.",
             "Legacy runtime YAML may serialize mu_l as muL; this layer normalizes to mu_l.",
+            "Paper-exact torsion uses the lane-specific parameter tuple serialized in the dropped GV torsion figure bundle.",
         ),
         ambiguity_notes=_AMBIGUITY_NOTES,
     )

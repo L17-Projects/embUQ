@@ -10,4 +10,4 @@ python3 initial.py
 
 python3 all_analysis.py
 
-bash trim.sh
+bash trim_svd.sh

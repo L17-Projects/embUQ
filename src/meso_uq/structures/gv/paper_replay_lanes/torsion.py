@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -12,11 +14,17 @@ from meso_uq.references.gv_common import format_float
 
 from .. import build_geometry
 from ..postprocessing.common import validate_numeric_channels
+from ..runtime import plan_runtime
 from ..sampling import GVRuntimeOptions, sample_gv
-from ..sampling.torsion import extract_torsion_lane
+from ..sampling.executor import execute_sampling_plan
+from ..sampling.extraction import extract_sampling_channels
+from ..sampling.planner import build_sampling_plan
+from ..sampling.torsion import extract_torsion_lane, reconstruct_torsion_anchor_geometry
+from ..sampling.types import GVMaterialGeometry, GVSweep
 
 _DEFAULT_OUTPUT_ROOT = Path("_runs/gv/paper_replay/torsion")
 _DEFAULT_THETA = (0.01, 0.03, 0.05, 0.075, 0.1)
+_PAPER_EXACT_THETA = tuple(np.round(np.linspace(0.01, 0.10, 10), 2))
 
 
 def _jsonable(value: Any) -> Any:
@@ -154,6 +162,14 @@ def _import_matplotlib_pyplot():
         ) from exc
 
 
+def _short_plot_slug(dataset_id: object) -> str:
+    slug = str(dataset_id).replace(":", "__")
+    if len(slug) <= 120:
+        return slug
+    digest = hashlib.sha256(slug.encode("utf-8")).hexdigest()[:12]
+    return f"{slug[:96]}__{digest}"
+
+
 @dataclass(frozen=True)
 class TorsionPaperReplayPlan:
     campaign_id: str
@@ -163,6 +179,7 @@ class TorsionPaperReplayPlan:
     controls: Mapping[str, Any]
     output_root: Path = _DEFAULT_OUTPUT_ROOT
     include_plot: bool = True
+    paper_exact: bool = False
     raw_provenance: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
@@ -209,9 +226,11 @@ def plan_torsion_paper_replay_lane(
     controls: Mapping[str, Any] | None = None,
     output_root: str | Path = _DEFAULT_OUTPUT_ROOT,
     include_plot: bool = True,
+    paper_exact: bool = False,
     raw_provenance: Mapping[str, Any] | None = None,
 ) -> TorsionPaperReplayPlan:
-    resolved_controls = {"theta": _DEFAULT_THETA, **dict(controls or {})}
+    default_theta = _PAPER_EXACT_THETA if paper_exact else _DEFAULT_THETA
+    resolved_controls = {"theta": default_theta, **dict(controls or {})}
     return TorsionPaperReplayPlan(
         campaign_id=campaign_id,
         geometry_radius=float(geometry_radius),
@@ -220,6 +239,7 @@ def plan_torsion_paper_replay_lane(
         controls=resolved_controls,
         output_root=output_root,
         include_plot=include_plot,
+        paper_exact=paper_exact,
         raw_provenance=raw_provenance,
     )
 
@@ -231,6 +251,7 @@ def postprocess_torsion_paper_replay_lane(
 ) -> TorsionPaperReplayResult:
     payload = _result_payload(sample_result)
     lane_controls = _representative_controls(plan.controls)
+    _enforce_paper_raw_anchor_contract(payload, plan=plan, controls=lane_controls)
     lane = extract_torsion_lane(
         {
             "controls": lane_controls,
@@ -271,6 +292,8 @@ def postprocess_torsion_paper_replay_lane(
             "workflow": "gv_paper_replay_lane",
             "lane": "torsion",
             "qualitative_target": "paper_si_torsion_dpd_only",
+            "paper_protocol": "mirheo_anchor_torque_reconstruction",
+            "paper_exact": plan.paper_exact,
             "plot_requested": plan.include_plot,
             "sample_manifest": payload.get("manifest"),
             **dict(plan.raw_provenance or {}),
@@ -286,6 +309,7 @@ def postprocess_torsion_paper_replay_lane(
         "gamma_max": float(np.max(gamma)),
         "sigma_phi_r_min": float(np.min(sigma_phi_r)),
         "sigma_phi_r_max": float(np.max(sigma_phi_r)),
+        "paper_exact": bool(plan.paper_exact),
         "available_channels": tuple(sorted(channels)),
     }
     return TorsionPaperReplayResult(
@@ -303,35 +327,54 @@ def plot_torsion_paper_replay_lane(
     pyplot = _import_matplotlib_pyplot()
     plots_dir = result.plan.output_root / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
-    dataset_slug = str(result.manifest["dataset_id"]).replace(":", "__")
+    dataset_slug = _short_plot_slug(result.manifest["dataset_id"])
     plot_path = plots_dir / f"{dataset_slug}.png"
     metadata_path = plots_dir / f"{dataset_slug}.json"
 
-    figure, axis = pyplot.subplots(figsize=(8.0, 5.0))
+    figure, axis = pyplot.subplots(figsize=(7.2, 5.0))
     gamma = np.asarray(result.channels["gamma"], dtype=float)
     sigma_phi_r = np.asarray(result.channels["sigma_phi_r"], dtype=float)
-    axis.plot(gamma, sigma_phi_r, marker="o", linewidth=2.0, label="DPD replay")
-    axis.set_xlabel("Gamma")
-    axis.set_ylabel("Sigma_phi_r")
-    axis.set_title(
-        f"GV Torsion Paper Replay\n{result.manifest['dataset_id']}"
+    gamma_line = np.linspace(0.0, max(float(np.max(gamma)) * 1.1, 1.0e-12), 100)
+    axis.plot(
+        gamma_line,
+        float(result.plan.material_parameters["mu"]) * gamma_line,
+        linestyle="--",
+        linewidth=2.0,
+        color="crimson",
+        label="Theory",
     )
-    axis.grid(True, alpha=0.3)
-    axis.legend(loc="best")
-    axis.text(
-        0.02,
-        0.02,
-        (
-            f"campaign={result.plan.campaign_id}\n"
-            f"geometry=(R={result.plan.geometry_radius}, H={result.plan.geometry_height})\n"
-            f"controls={json.dumps(dict(result.plan.controls), sort_keys=True)}\n"
-            f"samples={result.summary['sample_count']}"
-        ),
-        transform=axis.transAxes,
-        fontsize=8,
-        verticalalignment="bottom",
-        bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.85},
-    )
+    sigma_std = result.channels.get("sigma_phi_r_std", result.channels.get("sigma_std"))
+    if sigma_std is not None and np.asarray(sigma_std, dtype=float).shape == sigma_phi_r.shape:
+        axis.errorbar(
+            gamma,
+            sigma_phi_r,
+            yerr=np.asarray(sigma_std, dtype=float),
+            marker="o",
+            markersize=7,
+            markerfacecolor="white",
+            markeredgewidth=1.8,
+            linestyle="None",
+            color="royalblue",
+            capsize=2,
+            label="Numerical",
+        )
+    else:
+        axis.plot(
+            gamma,
+            sigma_phi_r,
+            marker="o",
+            markersize=7,
+            markerfacecolor="white",
+            markeredgewidth=1.8,
+            linestyle="None",
+            color="royalblue",
+            label="Numerical",
+        )
+    axis.set_xlabel(r"$\gamma$")
+    axis.set_ylabel(r"$\sigma_{\varphi r}$ [$k_BT_0/r_c^2$]")
+    axis.set_title("GV torsion paper replay")
+    axis.grid(True, alpha=0.25)
+    axis.legend(loc="lower right")
     figure.tight_layout()
     figure.savefig(plot_path, dpi=200)
     pyplot.close(figure)
@@ -342,6 +385,11 @@ def plot_torsion_paper_replay_lane(
                 "manifest": _jsonable(result.manifest),
                 "summary": _jsonable(result.summary),
                 "plot_path": str(plot_path),
+                "plot_provenance": {
+                    "x_label": "gamma = 2 * theta * radGV / dz",
+                    "y_label": "sigma_phi_r = tau_z / (2 * pi * radGV^2)",
+                    "response_definition": "average absolute top/bottom anchor stress over the last 25% timesteps",
+                },
             },
             indent=2,
             sort_keys=True,
@@ -359,16 +407,141 @@ def plot_torsion_paper_replay_lane(
     )
 
 
+def _enforce_paper_raw_anchor_contract(
+    payload: Mapping[str, Any],
+    *,
+    plan: TorsionPaperReplayPlan,
+    controls: Mapping[str, float],
+) -> None:
+    channels = payload.get("channels", payload)
+    if not isinstance(channels, Mapping):
+        return
+    flattened = _flatten_channel_names(channels)
+    canonical_names = {_canonical_channel_name(name) for name in flattened}
+    has_canonical = {"gamma", "sigma_phi_r"} <= canonical_names
+    has_paper_anchor_payload = bool(
+        {
+            "mesh_vertices",
+            "constrained_vertex_forces_min",
+            "constrained_vertex_forces_max",
+        }
+        & canonical_names
+    )
+    if not has_paper_anchor_payload or has_canonical:
+        return
+    reconstruct_torsion_anchor_geometry(
+        {
+            "controls": dict(controls),
+            "geometry": {"radius": plan.geometry_radius, "height": plan.geometry_height},
+            "channels": dict(channels),
+        },
+        geometry={"radius": plan.geometry_radius, "height": plan.geometry_height},
+    )
+
+
+def _flatten_channel_names(payload: Mapping[str, Any], *, prefix: str = "") -> tuple[str, ...]:
+    names: list[str] = []
+    for raw_name, value in payload.items():
+        if not isinstance(raw_name, str):
+            continue
+        name = f"{prefix}_{raw_name}" if prefix else raw_name
+        if isinstance(value, Mapping):
+            names.extend(_flatten_channel_names(value, prefix=name))
+        else:
+            names.append(name)
+    return tuple(names)
+
+
+def _canonical_channel_name(raw_name: str) -> str:
+    normalized = raw_name.strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "anchor_min_forces": "constrained_vertex_forces_min",
+        "anchor_min_force": "constrained_vertex_forces_min",
+        "bottom_anchor_forces": "constrained_vertex_forces_min",
+        "bottom_anchor_force": "constrained_vertex_forces_min",
+        "anchor_max_forces": "constrained_vertex_forces_max",
+        "anchor_max_force": "constrained_vertex_forces_max",
+        "top_anchor_forces": "constrained_vertex_forces_max",
+        "top_anchor_force": "constrained_vertex_forces_max",
+        "vertices": "mesh_vertices",
+    }
+    return aliases.get(normalized, normalized)
+
+
 def run_torsion_paper_replay_lane(
     plan: TorsionPaperReplayPlan,
     *,
     sampling_callable: Callable[..., object] = sample_gv,
 ) -> TorsionPaperReplayResult:
-    sample_result = sampling_callable(**plan.sampling_kwargs())
+    if plan.paper_exact and sampling_callable is sample_gv:
+        sample_result = _run_torsion_paper_exact_forward_sweep(plan)
+    else:
+        sample_result = sampling_callable(**plan.sampling_kwargs())
     result = postprocess_torsion_paper_replay_lane(sample_result, plan=plan)
     if not plan.include_plot:
         return result
     return plot_torsion_paper_replay_lane(result)
+
+
+def _run_torsion_paper_exact_forward_sweep(plan: TorsionPaperReplayPlan) -> dict[str, Any]:
+    theta_values = tuple(float(value) for value in _coerce_control_value(plan.controls["theta"], name="theta"))  # type: ignore[arg-type]
+    geometry = build_geometry(
+        radius=plan.geometry_radius,
+        height=plan.geometry_height,
+        source="meso_uq.structures.gv.paper_replay_lanes.torsion.forward_sweep",
+    )
+    runtime = plan_runtime(
+        "torsion",
+        output_root=plan.output_root,
+        geometry=geometry.id,
+        controls=None,
+        material_parameter_overrides=dict(plan.material_parameters),
+        include_experimental=True,
+    )
+    sampling_plan = build_sampling_plan(
+        runtime,
+        control_axis="theta",
+        values=theta_values,
+        timeout_seconds=GVRuntimeOptions().timeout_seconds,
+    )
+    started = time.perf_counter()
+    execution = execute_sampling_plan(
+        sampling_plan,
+        timeout_seconds=GVRuntimeOptions().timeout_seconds,
+        env={
+            "MESOUQ_GV_MATERIAL_OVERRIDES_JSON": json.dumps(
+                dict(plan.material_parameters),
+                sort_keys=True,
+            ),
+        },
+    )
+    runtime_seconds = time.perf_counter() - started
+    channels = extract_sampling_channels(
+        experiment="torsion",
+        work_dir=runtime.work_dir,
+        controls={"theta": theta_values[0]},
+        sweep=GVSweep("theta", theta_values),
+        geometry=GVMaterialGeometry(radGV=plan.geometry_radius, height=plan.geometry_height),
+    )
+    return {
+        "experiment": "torsion",
+        "geometry": {"radGV": plan.geometry_radius, "height": plan.geometry_height},
+        "material_parameters": dict(plan.material_parameters),
+        "controls": {"theta": theta_values},
+        "channels": channels,
+        "manifest": None,
+        "runtime_manifests": (runtime.to_manifest(),),
+        "plan_manifests": (sampling_plan.to_manifest(),),
+        "execution_manifests": (
+            {
+                "executed_commands": list(execution.executed_commands),
+                "return_codes": list(execution.return_codes),
+            },
+        ),
+        "work_dirs": (Path(runtime.work_dir),),
+        "runtime_seconds": runtime_seconds,
+        "status": "completed",
+    }
 
 
 __all__ = [

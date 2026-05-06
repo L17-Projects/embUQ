@@ -4,6 +4,12 @@
 #   CAMPAIGN_ID=<unique replay campaign id>
 # Optional variables:
 #   LANES="stretching buckling torsion eigenmodes"
+#   PAPER_EXACT=1
+#   STRETCHING_POINT_START=<inclusive index>
+#   STRETCHING_POINT_STOP=<exclusive index>
+#
+# For lane-aware walltime defaults, prefer:
+#   scripts/platforms/vega/submit_gv_paper_figure_replay.sh
 
 #SBATCH --job-name=mesouq-gv-paper-replay
 #SBATCH --partition=gpu
@@ -30,8 +36,11 @@ if [[ -z "${CAMPAIGN_ID}" ]]; then
 fi
 
 LANES="${LANES:-}"
+PAPER_EXACT="${PAPER_EXACT:-0}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/gv/figure_replay/${CAMPAIGN_ID}}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
+STRETCHING_POINT_START="${STRETCHING_POINT_START:-}"
+STRETCHING_POINT_STOP="${STRETCHING_POINT_STOP:-}"
 
 module purge
 module load \
@@ -51,7 +60,7 @@ fi
 
 source "${REPO_ROOT}/_vega/gv_venv/env.sh"
 export MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"
-export MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-1}"
+export MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"
 
 cd "${REPO_ROOT}"
 
@@ -65,5 +74,17 @@ command=(
 for lane in ${LANES}; do
   command+=(--lane "${lane}")
 done
+
+if [[ "${PAPER_EXACT}" == "1" || "${PAPER_EXACT}" == "true" || "${PAPER_EXACT}" == "TRUE" ]]; then
+  command+=(--paper-exact)
+fi
+
+if [[ -n "${STRETCHING_POINT_START}" ]]; then
+  command+=(--stretching-point-start "${STRETCHING_POINT_START}")
+fi
+
+if [[ -n "${STRETCHING_POINT_STOP}" ]]; then
+  command+=(--stretching-point-stop "${STRETCHING_POINT_STOP}")
+fi
 
 "${command[@]}"

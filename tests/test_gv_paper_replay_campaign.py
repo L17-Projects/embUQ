@@ -312,6 +312,69 @@ def test_campaign_manifest_validation_reports_duplicate_and_finite_failures(tmp_
     assert validation["missing_source_pdfs"] == [str(missing_pdf.resolve())]
 
 
+def test_lane_record_and_campaign_validation_cover_remaining_guard_paths(tmp_path: Path) -> None:
+    source_pdf = _source_pdf(tmp_path)
+    common_kwargs = dict(
+        source_pdfs=(source_pdf,),
+        runtime_commands=(("python", "run.py"),),
+        material_parameters={
+            "ka": 1.0,
+            "kb": 0.2,
+            "mu": 0.5,
+            "b1": 0.0,
+            "b2": 0.0,
+            "a3": 0.0,
+            "a4": 0.0,
+            "mu_l": 0.4,
+            "c": 0.1,
+        },
+        geometry={"radGV": 2.0, "height": 14.28},
+        controls={"tot_force": 1.0, "bpress": -91.0},
+        output_paths={"summary": _campaign_root(tmp_path) / "lanes" / "stretching" / "summary.json"},
+        plot_paths=(_campaign_root(tmp_path) / "lanes" / "stretching" / "plots" / "preview.pdf",),
+        validation_status="passed",
+        data_ranges=(GVPaperReplayDataRange(name="response_x", minimum=0.0, maximum=1.0),),
+        finite_checks=(GVPaperReplayFiniteCheck(name="response_channels", passed=True, finite_ratio=1.0, nonfinite_count=0),),
+    )
+
+    with pytest.raises(ValueError, match="lane must match experiment"):
+        GVPaperReplayLaneRecord(lane="stretching", experiment="torsion", mode="fixture", **common_kwargs)
+    with pytest.raises(ValueError, match="Unknown GV experiment"):
+        GVPaperReplayLaneRecord(lane="unknown", experiment="unknown", mode="fixture", **common_kwargs)
+    with pytest.raises(ValueError, match="at least one command"):
+        GVPaperReplayLaneRecord(
+            lane="stretching",
+            experiment="stretching",
+            mode="fixture",
+            runtime_commands=(),
+            **{key: value for key, value in common_kwargs.items() if key != "runtime_commands"},
+        )
+    with pytest.raises(ValueError, match="must not be empty"):
+        GVPaperReplayLaneRecord(
+            lane="stretching",
+            experiment="stretching",
+            mode="fixture",
+            runtime_commands=((),),
+            **{key: value for key, value in common_kwargs.items() if key != "runtime_commands"},
+        )
+
+    lane = _lane_record(tmp_path)
+    bad_manifest = GVPaperReplayCampaignManifest(
+        campaign_id="expected-id",
+        campaign_root=_campaign_root(tmp_path, "different-id"),
+        generated_at_utc="2026-05-05T12:00:00+00:00",
+        schema_version=MANIFEST_SCHEMA_VERSION,
+        git_head=GVPaperReplayGitHead(commit="deadbeef", branch="feature/test", dirty_worktree=False),
+        dry_run=False,
+        fixture_mode=True,
+        source_pdfs=lane.source_pdfs,
+        lanes=(lane,),
+        comparison_packets=(),
+    )
+    with pytest.raises(ValueError, match="leaf directory"):
+        validate_campaign_manifest(bad_manifest)
+
+
 def test_comparison_packet_skeleton_marks_qualitative_review_ready(tmp_path: Path) -> None:
     lane = _lane_record(tmp_path)
     packets = build_comparison_packet_skeletons((lane,))
@@ -408,6 +471,92 @@ def test_cli_fixture_mode_writes_manifest(tmp_path: Path, monkeypatch: pytest.Mo
     assert payload["comparison_packets"][0]["status"] == "ready_for_qualitative_review"
 
 
+def test_cli_fixture_lane_file_short_circuits_generated_lanes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_script_module("mesouq_test_gv_paper_replay_cli_fixture_file")
+    monkeypatch.setattr(module, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        module,
+        "collect_git_head",
+        lambda _repo_root: GVPaperReplayGitHead(commit="cafebabe", branch="feature/test", dirty_worktree=False),
+    )
+    fixture_path = tmp_path / "lane.json"
+    fixture_path.write_text(json.dumps(_lane_record(tmp_path).to_manifest()), encoding="utf-8")
+
+    rc = module.main(
+        [
+            "--campaign-id",
+            "fixture-file-cli",
+            "--fixture-lane",
+            str(fixture_path),
+        ]
+    )
+
+    manifest_path = tmp_path / "_runs" / "gv" / "figure_replay" / "fixture-file-cli" / "campaign_manifest.json"
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert rc == 0
+    assert payload["lanes"][0]["lane"] == "stretching"
+
+
+def test_cli_operational_mode_dispatches_each_lane(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = _load_script_module("mesouq_test_gv_paper_replay_cli_operational")
+    monkeypatch.setattr(module, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        module,
+        "collect_git_head",
+        lambda _repo_root: GVPaperReplayGitHead(commit="cafebabe", branch="feature/test", dirty_worktree=False),
+    )
+    source_pdf = _source_pdf(tmp_path)
+    si_pdf = tmp_path / "sources" / "si.pdf"
+    si_pdf.write_text("%PDF-1.4 fixture SI\n", encoding="utf-8")
+    profile = SimpleNamespace(
+        provenance=SimpleNamespace(
+            paper_pdf_path=str(source_pdf),
+            si_pdf_path=str(si_pdf),
+        )
+    )
+    monkeypatch.setattr(module, "load_gv_paper_replay_profile", lambda: profile)
+    dispatched: list[dict[str, object]] = []
+
+    def fake_operational_lane(**kwargs):
+        dispatched.append(dict(kwargs))
+        return build_fixture_lane_record(
+            repo_root=tmp_path,
+            campaign_root=kwargs["campaign_root"],
+            lane=kwargs["lane"],
+            source_pdfs=kwargs["source_pdfs"],
+            fixture_mode=False,
+        )
+
+    monkeypatch.setattr(module, "_run_operational_lane", fake_operational_lane)
+
+    rc = module.main(
+        [
+            "--campaign-id",
+            "operational-cli",
+            "--paper-exact",
+            "--stretching-point-start",
+            "0",
+            "--stretching-point-stop",
+            "15",
+            "--lane",
+            "stretching",
+            "--lane",
+            "torsion",
+        ]
+    )
+
+    manifest_path = tmp_path / "_runs" / "gv" / "figure_replay" / "operational-cli" / "campaign_manifest.json"
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert rc == 0
+    assert [lane["lane"] for lane in payload["lanes"]] == ["stretching", "torsion"]
+    assert [item["paper_exact"] for item in dispatched] == [True, True]
+    assert dispatched[0]["stretching_point_start"] == 0
+    assert dispatched[0]["stretching_point_stop"] == 15
+
+
 def test_cli_reports_invalid_campaign_root_and_lane(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     module = _load_script_module("mesouq_test_gv_paper_replay_cli_errors")
     monkeypatch.setattr(module, "REPO_ROOT", tmp_path)
@@ -433,6 +582,9 @@ def test_replay_cli_private_helpers_cover_error_and_fallback_paths(
         "array": {"shape": [1], "dtype": "float64"},
         "flag": True,
     }
+    jsonable_path = module._jsonable({"path": tmp_path / "artifact.json", "items": (1, 2)})
+    assert jsonable_path["path"].endswith("artifact.json")
+    assert jsonable_path["items"] == [1, 2]
     with pytest.raises(ValueError, match="empty"):
         module._channel_arrays({"bad": []})
     with pytest.raises(ValueError, match="no finite"):
@@ -463,10 +615,40 @@ def test_replay_cli_private_helpers_cover_error_and_fallback_paths(
     assert module._lane_work_dirs(provenance_result) == (str(tmp_path / "_runs" / "work"),)
     assert module._lane_runtime_ids(provenance_result) == ("theta_0_03",)
     assert module._manifest_without_full_channels(provenance_result)["channels"] == {"gamma": {"shape": [1]}}
+    assert module._lane_work_dirs(SimpleNamespace()) == ()
+    assert module._lane_work_dirs(SimpleNamespace(provenance={"work_dirs": [tmp_path / "_runs" / "fallback"]})) == (
+        str(tmp_path / "_runs" / "fallback"),
+    )
+    assert module._lane_runtime_ids(
+        SimpleNamespace(
+            provenance={"runtime_manifests": ["skip-me", {"dataset_id": "gv__fallback"}]},
+            raw_sample_result={"runtime_manifests": [{"dataset_id": "gv__fallback"}]},
+        )
+    ) == ("gv__fallback",)
+    assert module._manifest_without_full_channels(SimpleNamespace(manifest={"status": "passed"})) == {
+        "status": "passed",
+        "channels": {},
+    }
+    assert module._manifest_without_full_channels(
+        SimpleNamespace(
+            to_manifest=lambda: {"status": "manifest-method"},
+            channels={"gamma": np.array([0.0, 0.1])},
+        )
+    ) == {"status": "manifest-method", "channels": {"gamma": {"shape": [2]}}}
+    assert module._manifest_without_full_channels(object()) == {"channels": {}}
 
     monkeypatch.setenv("SLURM_JOB_ID", "123")
     monkeypatch.setenv("SLURM_ARRAY_JOB_ID", "123")
     assert module._slurm_job_ids() == ("123",)
+
+    module._validate_stretching_partition_policy(plan=SimpleNamespace(), paper_exact=True, lane="torsion")
+    monkeypatch.setenv("SLURM_JOB_PARTITION", "dev")
+    module._validate_stretching_partition_policy(plan=SimpleNamespace(controls=[]), paper_exact=True, lane="stretching")
+    module._validate_stretching_partition_policy(
+        plan=SimpleNamespace(controls={"tot_force": 500.0}),
+        paper_exact=True,
+        lane="stretching",
+    )
 
     for helper in (module._lane_controls, module._lane_geometry, module._lane_material_parameters):
         with pytest.raises(ValueError):
@@ -503,12 +685,16 @@ def test_operational_lane_record_writes_finite_summary(tmp_path: Path, monkeypat
     monkeypatch.setattr(module, "validate_gv_paper_replay_profile", lambda *_args, **_kwargs: None)
 
     def fake_plan(**kwargs):
+        assert kwargs["paper_exact"] is True
+        assert kwargs["point_start"] == 3
+        assert kwargs["point_stop"] == 8
         return SimpleNamespace(
             campaign_id=kwargs["campaign_id"],
             geometry_radius=kwargs["geometry_radius"],
             geometry_height=kwargs["geometry_height"],
             material_parameters=kwargs["material_parameters"],
             controls={"tot_force": (1.0, 2.0), "bpress": -91.0},
+            paper_exact=kwargs["paper_exact"],
         )
 
     def fake_run(plan):
@@ -517,8 +703,9 @@ def test_operational_lane_record_writes_finite_summary(tmp_path: Path, monkeypat
             plan=plan,
             manifest={"dataset_id": "fixture"},
             channels={
-                "displacement": np.array([0.0, 0.1]),
-                "force": np.array([0.0, 2.0]),
+                "epsilon_zz": np.array([0.0, 0.1]),
+                "minus_epsilon_phi": np.array([0.0, 0.05]),
+                "sigma_zz": np.array([0.0, 2.0]),
             },
             summary={"sample_count": 2},
             raw_sample_result={"work_dirs": [tmp_path / "_runs" / "work"]},
@@ -535,6 +722,9 @@ def test_operational_lane_record_writes_finite_summary(tmp_path: Path, monkeypat
         campaign_root=tmp_path / "_runs" / "gv" / "figure_replay" / "op",
         source_pdfs=(source_pdf, si_pdf),
         runtime_command=("python", "run_paper_figure_replay.py"),
+        paper_exact=True,
+        stretching_point_start=3,
+        stretching_point_stop=8,
     )
 
     assert Path.cwd() == start_cwd
@@ -545,8 +735,35 @@ def test_operational_lane_record_writes_finite_summary(tmp_path: Path, monkeypat
     assert record.finite_checks[0].passed is True
     assert record.output_paths["summary"].is_file()
     payload = json.loads(record.output_paths["summary"].read_text(encoding="utf-8"))
-    assert payload["data_ranges"][0]["name"] == "displacement"
+    assert payload["data_ranges"][0]["name"] == "epsilon_zz"
     assert payload["work_dirs"]
+
+
+def test_dev_partition_guard_rejects_oversized_paper_exact_stretching_shards(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_script_module("mesouq_test_gv_paper_replay_dev_guard")
+    monkeypatch.setenv("SLURM_JOB_PARTITION", "dev")
+
+    with pytest.raises(ValueError, match="15 control points"):
+        module._validate_stretching_partition_policy(
+            plan=SimpleNamespace(controls={"tot_force": tuple(float(i) for i in range(16))}),
+            paper_exact=True,
+            lane="stretching",
+        )
+
+    module._validate_stretching_partition_policy(
+        plan=SimpleNamespace(controls={"tot_force": tuple(float(i) for i in range(15))}),
+        paper_exact=True,
+        lane="stretching",
+    )
+    monkeypatch.setenv("SLURM_JOB_PARTITION", "gpu")
+    module._validate_stretching_partition_policy(
+        plan=SimpleNamespace(controls={"tot_force": tuple(float(i) for i in range(30))}),
+        paper_exact=True,
+        lane="stretching",
+    )
 
 
 @pytest.mark.parametrize(
@@ -564,15 +781,19 @@ def test_operational_lane_record_writes_finite_summary(tmp_path: Path, monkeypat
             "buckling",
             "plan_buckling_paper_replay_lane",
             "run_buckling_paper_replay_lane",
-            {"bpress": np.array([-91.0, -94.0]), "relative_volume": np.array([1.0, 0.95])},
-            {"buck": 0.75, "bpress": (-91.0, -94.0)},
+            {
+                "buck": np.array([0.0, 0.75]),
+                "pressure_difference": np.array([0.0, 68.175]),
+                "relative_volume": np.array([1.0, 0.95]),
+            },
+            {"buck": (0.0, 0.75), "bpress": -91.0, "pressure_difference": (0.0, 68.175)},
             None,
         ),
         (
             "eigenmodes",
             "plan_eigenmodes_paper_replay_lane",
             "run_eigenmodes_paper_replay_lane",
-            {"mode_index": np.array([0.0, 1.0]), "eigenvalues": np.array([1.0, 4.0])},
+            {"mode_index": np.array([0.0, 1.0]), "frequency": np.array([1.0, 2.0])},
             {"bpress": -91.0},
             None,
         ),
@@ -605,6 +826,17 @@ def test_operational_lane_dispatch_covers_all_non_stretching_lanes(
             "mu_l": 4.0,
             "c": 5.0,
         },
+        material_values_for_lane=lambda _lane: {
+            "ka": 9.0,
+            "kb": 8.0,
+            "mu": 7.0,
+            "b1": 0.0,
+            "b2": 0.0,
+            "a3": 0.0,
+            "a4": 0.0,
+            "mu_l": 6.0,
+            "c": 5.0,
+        },
         geometry=SimpleNamespace(values=lambda: {"radGV": 2.0, "height": 14.28}),
         provenance=SimpleNamespace(to_dict=lambda: {"source": "fixture"}),
     )
@@ -620,6 +852,7 @@ def test_operational_lane_dispatch_covers_all_non_stretching_lanes(
             geometry_height=kwargs.get("geometry_height", kwargs.get("height", 14.28)),
             material_parameters=kwargs["material_parameters"],
             controls=controls,
+            paper_exact=kwargs.get("paper_exact", False),
             mode_count=2,
             mapping_assumptions=("fixture mapping",),
             to_manifest=lambda: {"experiment": lane, "controls": controls},
@@ -659,9 +892,11 @@ def test_operational_lane_dispatch_covers_all_non_stretching_lanes(
         campaign_root=tmp_path / "_runs" / "gv" / "figure_replay" / "op",
         source_pdfs=(source_pdf, si_pdf),
         runtime_command=("python", "run_paper_figure_replay.py"),
+        paper_exact=True,
     )
 
     assert record.lane == lane
+    assert record.material_parameters["ka"] == 9.0
     assert record.runtime_ids == (f"gv__{lane}__fixture",)
     assert record.slurm_job_ids == ()
     assert all(check.passed for check in record.finite_checks)
