@@ -42,7 +42,7 @@ args = parser.parse_args()
 num_gpus = args.g
 num_nodes = args.N
 
-ntasks_per_node = num_gpus
+num_mpi_ranks = int(os.environ.get('MESOUQ_GV_MPI_RANKS', str(num_gpus + 1)))
 
 
 mem_per_gpu = 20  # Memory in GB per GPU, adjust as needed
@@ -181,7 +181,7 @@ def write_commands(filename, runscript, extra = ""):
 	file_commands.close()
 	return cnt_sim, cnt_par
 
-cnt_sim, cnt_par = write_commands('commands.txt', 'run.sh', f'{num_gpus}')
+cnt_sim, cnt_par = write_commands('commands.txt', 'run.sh', f'{num_mpi_ranks}')
 
 os.system(f'rm parameters-default.yaml')
 
@@ -196,7 +196,7 @@ file_vega.write(f'''#!/bin/bash
 #SBATCH --time=00:01:00
 #SBATCH --gres=gpu:{num_gpus}
 #SBATCH --nodes={num_nodes}
-#SBATCH --ntasks-per-node={ntasks_per_node}
+#SBATCH --ntasks-per-node={num_mpi_ranks}
 #SBATCH --partition=gpu
 #SBATCH --mem={total_mem}GB
 #SBATCH --output=output.out

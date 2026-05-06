@@ -254,8 +254,8 @@ class RuntimeDescriptor:
                 [
                     "-p",
                     sweep.name,
-                    _format_float(sweep.start),
-                    _format_float(sweep.stop),
+                    _format_float_literal(sweep.start),
+                    _format_float_literal(sweep.stop),
                     str(sweep.steps),
                 ]
             )
@@ -436,6 +436,10 @@ def _safe_output_root(output_root: str | Path) -> Path:
 def _format_float(value: float) -> str:
     text = f"{value:g}"
     return text.replace(".", "_")
+
+
+def _format_float_literal(value: float) -> str:
+    return f"{value:g}"
 
 
 def _find_repo_root() -> Path:

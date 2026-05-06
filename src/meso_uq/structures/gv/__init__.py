@@ -31,6 +31,12 @@ __all__ = [
     "build_geometry",
     "geometry_id",
     "GV_OBSERVABLE_SCHEMAS",
+    "GVSampleResult",
+    "GVMaterialGeometry",
+    "GVRuntimeOptions",
+    "GVSweep",
+    "GV_SAMPLING_EXPERIMENTS",
+    "sample_gv",
     "GVNumericalGenerationResult",
     "generate_gv_numerical_data",
 ]
@@ -45,8 +51,44 @@ def __getattr__(name: str):
         from .generator import generate_gv_numerical_data
 
         return generate_gv_numerical_data
+    if name == "sample_gv":
+        from .sampling import sample_gv
+
+        return sample_gv
+    if name == "GVSampleResult":
+        from .sampling import GVSampleResult
+
+        return GVSampleResult
+    if name == "GVMaterialGeometry":
+        from .sampling import GVMaterialGeometry
+
+        return GVMaterialGeometry
+    if name == "GVRuntimeOptions":
+        from .sampling import GVRuntimeOptions
+
+        return GVRuntimeOptions
+    if name == "GVSweep":
+        from .sampling import GVSweep
+
+        return GVSweep
+    if name == "GV_SAMPLING_EXPERIMENTS":
+        from .sampling import GV_SAMPLING_EXPERIMENTS
+
+        return GV_SAMPLING_EXPERIMENTS
     raise AttributeError(f"module 'meso_uq.structures.gv' has no attribute {name!r}")
 
 
 def __dir__() -> list[str]:
-    return sorted(list(globals()) + ["GVNumericalGenerationResult", "generate_gv_numerical_data"])
+    return sorted(
+        list(globals())
+        + [
+            "GVMaterialGeometry",
+            "GVRuntimeOptions",
+            "GVSweep",
+            "GVSampleResult",
+            "GV_SAMPLING_EXPERIMENTS",
+            "GVNumericalGenerationResult",
+            "generate_gv_numerical_data",
+            "sample_gv",
+        ]
+    )

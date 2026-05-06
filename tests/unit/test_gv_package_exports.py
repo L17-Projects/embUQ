@@ -16,3 +16,17 @@ def test_gv_package_lazy_numerical_generation_exports() -> None:
 def test_gv_package_rejects_unknown_lazy_export() -> None:
     with pytest.raises(AttributeError, match="has no attribute"):
         gv.__getattr__("not_an_export")
+
+
+def test_gv_package_exports_sampling_api() -> None:
+    exported = dir(gv)
+    assert gv.sample_gv.__name__ == "sample_gv"
+    assert gv.GVMaterialGeometry.__name__ == "GVMaterialGeometry"
+    assert gv.GVRuntimeOptions.__name__ == "GVRuntimeOptions"
+    assert gv.GVSweep.__name__ == "GVSweep"
+    assert gv.GVSampleResult.__name__ == "GVSampleResult"
+    assert gv.GV_SAMPLING_EXPERIMENTS == ("stretching", "buckling", "torsion", "eigenmodes")
+    assert "sample_gv" in exported
+    assert "GVMaterialGeometry" in exported
+    assert "GVRuntimeOptions" in exported
+    assert "GVSweep" in exported

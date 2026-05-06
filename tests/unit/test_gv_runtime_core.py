@@ -143,6 +143,34 @@ def test_runtime_descriptor_uses_control_overrides_in_generated_command(tmp_path
     ]
 
 
+def test_runtime_descriptor_keeps_decimal_literals_separate_from_file_safe_ids(tmp_path: Path) -> None:
+    descriptor = RuntimeDescriptor(
+        experiment="torsion",
+        provenance_root="gv/torsion/src",
+        source_files=("run_all.sh", "generate.py", "parameters.py", "equil.py"),
+        control_sweeps=(ControlSweep("theta", 0.01, 0.1, 10),),
+        sweep_mode="forward",
+        first_restart=False,
+    )
+
+    dry_run = descriptor.plan(output_root=tmp_path, controls={"theta": 0.03})
+    manifest = dry_run.to_manifest()
+
+    assert manifest["control_id"] == "theta_0_03"
+    assert manifest["commands"][0]["argv"] == [
+        "python3",
+        "generate.py",
+        "-p",
+        "theta",
+        "0.03",
+        "0.03",
+        "1",
+        "--object",
+        "gv",
+        "--forward",
+    ]
+
+
 def test_runtime_plan_records_material_parameter_overrides(tmp_path: Path) -> None:
     descriptor = RuntimeDescriptor(
         experiment="stretching",
@@ -330,8 +358,8 @@ def test_runtime_catalog_preserves_shear_flow_execution_contract(tmp_path: Path)
         "generate.py",
         "-p",
         "ptan",
-        "0_4",
-        "0_4",
+        "0.4",
+        "0.4",
         "1",
         "-p",
         "afsi",
