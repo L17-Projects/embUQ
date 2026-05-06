@@ -8,6 +8,11 @@ ignore:
   - "src/meso_uq/surrogate/bnn_training.py"
   - "compression/surrogate/scripts/emb_train_bnn.py"
   - "indentation/surrogate/scripts/emb_train_bnn.py"
+  # Mirheo executable experiment sources and scheduler wrappers are validated
+  # through platform-routing tests and GPU canaries, not Python line coverage.
+  - "gv/**/src/**"
+  - "scripts/platforms/vega/sbatch/**"
+  - "scripts/platforms/vega/submit_gv_paper_figure_replay.sh"
 
 coverage:
   status:
