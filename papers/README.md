@@ -24,7 +24,16 @@ python -m pip install pybind11 meson ninja h5py
 
 bash scripts/platforms/hpc/bootstrap_korali.sh --jobs 8
 source _vega/korali/env.sh
-bash scripts/platforms/hpc/bootstrap_mirheo.sh --jobs 8
+
+# Mirheo's CMake configure step writes generated files into the Mirheo source
+# tree. A fresh clone in another Vega account must therefore use a writable
+# account-local Mirheo copy instead of the default lock path under another user.
+export MESOUQ_MIRHEO_SRC="${MESOUQ_MIRHEO_SRC:-$HOME/software/Mirheo}"
+if [[ ! -f "$MESOUQ_MIRHEO_SRC/CMakeLists.txt" ]]; then
+  mkdir -p "$(dirname "$MESOUQ_MIRHEO_SRC")"
+  rsync -rlt --chmod=u+rwX,go+rX /ceph/hpc/home/eubrieucb/software/Mirheo/ "$MESOUQ_MIRHEO_SRC/"
+fi
+bash scripts/platforms/hpc/bootstrap_mirheo.sh --source "$MESOUQ_MIRHEO_SRC" --jobs 8 --reconfigure
 source _vega/mirheo/env.sh
 bash scripts/platforms/vega/bootstrap_tex.sh
 source _vega/tinytex/env.sh
