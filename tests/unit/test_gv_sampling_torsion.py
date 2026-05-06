@@ -195,6 +195,29 @@ def test_parse_torsion_lane_channels_accepts_observables_payload_scalar_force() 
     assert channels["sigma_phi_r"].tolist() == [1.0 / (2.0 * np.pi * 2.0 * 10.0)]
 
 
+def test_torsion_paper_anchor_helpers_cover_flattened_and_error_paths() -> None:
+    flattened = torsion._coerce_anchor_force_timeseries(
+        [[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]],
+        name="anchor_min_forces",
+        particle_count=2,
+    )
+    assert flattened.shape == (1, 2, 3)
+    assert torsion._has_force_source({"anchor_min_forces": [1.0]}) is True
+    assert torsion._has_force_source({"nested": {"other": [1.0]}}) is False
+
+    with pytest.raises(ValueError, match="numeric data"):
+        torsion._coerce_anchor_force_timeseries("bad", name="anchor_min_forces", particle_count=1)
+    with pytest.raises(ValueError, match="must contain data"):
+        torsion._coerce_anchor_force_timeseries([], name="anchor_min_forces", particle_count=1)
+    with pytest.raises(ValueError, match="at least one timestep"):
+        torsion._paper_torque_statistics(np.empty((0, 1, 3)), positions=np.zeros((1, 3)))
+    with pytest.raises(ValueError, match="non-finite"):
+        torsion._paper_torque_statistics(
+            np.array([[[np.nan, 0.0, 0.0]]]),
+            positions=np.ones((1, 3)),
+        )
+
+
 def test_compute_torsion_gamma_rejects_nonfinite_radius_or_height() -> None:
     with pytest.raises(ValueError, match="must be finite"):
         torsion.compute_torsion_gamma([0.1], radius=float("nan"), height=1.0)
