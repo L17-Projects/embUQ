@@ -130,6 +130,18 @@ def test_plan_eigenmodes_paper_replay_lane_records_mode_count() -> None:
     assert plan.runtime_options.output_root == "_runs/gv/paper_replay/eigenmodes"
 
 
+def test_plan_eigenmodes_paper_replay_lane_records_timeout() -> None:
+    plan = plan_eigenmodes_paper_replay_lane(
+        material_parameters=_BASE_MATERIAL_PARAMETERS,
+        radGV=2.0,
+        height=14.28,
+        timeout_seconds=36000,
+    )
+
+    assert plan.runtime_options.timeout_seconds == 36000
+    assert plan.to_manifest()["runtime_options"]["timeout_seconds"] == 36000
+
+
 def test_plan_eigenmodes_paper_replay_lane_exact_replay_forces_30_modes() -> None:
     plan = plan_eigenmodes_paper_replay_lane(
         material_parameters=_BASE_MATERIAL_PARAMETERS,
@@ -210,7 +222,7 @@ def test_run_eigenmodes_paper_replay_lane_uses_injected_sampler() -> None:
     assert np.array_equal(result.channels["eigenvalues"], np.array([1.0, 4.0, 9.0]))
     assert np.allclose(result.channels["frequency"], np.array([1.0, 1.5, 3.0]))
     assert np.array_equal(result.channels["eigenvectors"], np.array([[1.0], [0.0], [0.5]]))
-    assert result.selected_modes["surface_mode_indices"] == [0, 2, 6, 11, 14, 20]
+    assert result.selected_modes["surface_mode_indices"] == [0, 4, 6, 7, 18, 24]
     assert result.provenance["lane_plan"]["mode_count"] == 3
 
 
@@ -400,7 +412,7 @@ def test_eigenmodes_helpers_cover_aliases_fallbacks_and_error_paths(
             ),
         },
         selected_modes={
-            "surface_mode_indices": [0, 2, 6, 11, 14, 20],
+            "surface_mode_indices": [0, 4, 6, 7, 18, 24],
             "surface_mode_indices_available": [],
             "axial_mode_indices": [0, 6, 20],
             "axial_mode_indices_available": [0],
@@ -422,7 +434,7 @@ def test_eigenmodes_helpers_cover_aliases_fallbacks_and_error_paths(
         material_parameters=_BASE_MATERIAL_PARAMETERS,
         channels=manual_result.channels,
         selected_modes={
-            "surface_mode_indices": [0, 2, 6, 11, 14, 20],
+            "surface_mode_indices": [0, 4, 6, 7, 18, 24],
             "surface_mode_indices_available": [0],
             "axial_mode_indices": [0, 6, 20],
             "axial_mode_indices_available": [0],
@@ -757,7 +769,7 @@ def test_plot_eigenmodes_paper_replay_writes_selected_surface_modes_when_source_
     )
 
     assert output.is_file()
-    assert result.selected_modes["surface_mode_indices_available"] == [0, 2, 6, 11, 14, 20]
+    assert result.selected_modes["surface_mode_indices_available"] == [0, 4, 6, 7, 18, 24]
 
 
 def test_plot_eigenmodes_paper_replay_writes_paper_panels_with_mesh_faces(

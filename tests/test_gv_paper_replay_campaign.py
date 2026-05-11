@@ -541,6 +541,12 @@ def test_cli_operational_mode_dispatches_each_lane(tmp_path: Path, monkeypatch: 
             "0",
             "--stretching-point-stop",
             "15",
+            "--buckling-buck-max",
+            "1.1",
+            "--buckling-point-count",
+            "37",
+            "--buckling-timeout-seconds",
+            "28800",
             "--lane",
             "stretching",
             "--lane",
@@ -555,6 +561,9 @@ def test_cli_operational_mode_dispatches_each_lane(tmp_path: Path, monkeypatch: 
     assert [item["paper_exact"] for item in dispatched] == [True, True]
     assert dispatched[0]["stretching_point_start"] == 0
     assert dispatched[0]["stretching_point_stop"] == 15
+    assert dispatched[0]["buckling_buck_max"] == pytest.approx(1.1)
+    assert dispatched[0]["buckling_point_count"] == 37
+    assert dispatched[0]["buckling_timeout_seconds"] == 28800
 
 
 def test_cli_reports_invalid_campaign_root_and_lane(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -843,7 +852,10 @@ def test_operational_lane_dispatch_covers_all_non_stretching_lanes(
     monkeypatch.setattr(module, "load_gv_paper_replay_profile", lambda: profile)
     monkeypatch.setattr(module, "validate_gv_paper_replay_profile", lambda *_args, **_kwargs: None)
 
+    plan_kwargs: list[dict[str, object]] = []
+
     def fake_plan(**kwargs):
+        plan_kwargs.append(dict(kwargs))
         return SimpleNamespace(
             experiment=lane,
             figure_id=f"fixture-{lane}",
@@ -893,9 +905,12 @@ def test_operational_lane_dispatch_covers_all_non_stretching_lanes(
         source_pdfs=(source_pdf, si_pdf),
         runtime_command=("python", "run_paper_figure_replay.py"),
         paper_exact=True,
+        buckling_timeout_seconds=999,
     )
 
     assert record.lane == lane
+    if lane == "buckling":
+        assert plan_kwargs[0]["timeout_seconds"] == 999
     assert record.material_parameters["ka"] == 9.0
     assert record.runtime_ids == (f"gv__{lane}__fixture",)
     assert record.slurm_job_ids == ()

@@ -16,6 +16,7 @@ from meso_uq.structures.gv.paper_replay_lanes.buckling import (
     postprocess_buckling_paper_replay_lane,
     run_buckling_paper_replay_lane,
 )
+from meso_uq.structures.gv.runtime.base import DryRunCommand, RuntimeDryRun
 
 
 _BASE_MATERIAL_PARAMETERS = {
@@ -134,6 +135,39 @@ def test_plan_buckling_paper_replay_lane_uses_exact_paper_sweep_when_requested()
     assert plan.controls["pressure_difference"][-1] == pytest.approx(68.175)
 
 
+def test_plan_buckling_paper_replay_lane_accepts_extended_sweep_request() -> None:
+    plan = plan_buckling_paper_replay_lane(
+        material_parameters=_BASE_MATERIAL_PARAMETERS,
+        radGV=2.0,
+        height=14.28,
+        buck=1.1,
+        buck_point_count=37,
+        paper_exact=True,
+    )
+
+    assert len(plan.controls["buck"]) == 37
+    assert plan.controls["buck"][-1] == pytest.approx(1.1)
+    assert plan.controls["pressure_difference"][-1] == pytest.approx(99.99)
+
+    with pytest.raises(ValueError, match="at least 2"):
+        plan_buckling_paper_replay_lane(
+            material_parameters=_BASE_MATERIAL_PARAMETERS,
+            radGV=2.0,
+            height=14.28,
+            buck=1.1,
+            buck_point_count=1,
+        )
+
+    with pytest.raises(ValueError, match="only valid"):
+        plan_buckling_paper_replay_lane(
+            material_parameters=_BASE_MATERIAL_PARAMETERS,
+            radGV=2.0,
+            height=14.28,
+            buck=(0.0, 0.75),
+            buck_point_count=5,
+        )
+
+
 def test_plan_buckling_rejects_inconsistent_explicit_pressure_differences() -> None:
     with pytest.raises(ValueError, match="at least two pressure-difference"):
         plan_buckling_paper_replay_lane(
@@ -224,6 +258,28 @@ def test_postprocess_buckling_paper_replay_normalizes_mean_volume_to_first_contr
     assert np.allclose(result.channels["pressure_difference"], np.array([0.0, 34.0875, 68.175]))
     assert np.allclose(result.channels["relative_volume"], np.array([1.0, 0.98, 0.95]))
     assert np.allclose(result.channels["relative_volume_std"], np.array([0.01, 0.02, 0.03]))
+
+
+def test_postprocess_buckling_paper_replay_uses_measured_zero_pressure_volume_reference() -> None:
+    result = postprocess_buckling_paper_replay_lane(
+        {
+            "experiment": "buckling",
+            "geometry": {"radGV": 2.0, "height": 14.28},
+            "material_parameters": _BASE_MATERIAL_PARAMETERS,
+            "controls": {"bpress": -91.0},
+            "channels": {
+                "buck": [0.5, 0.0, 0.75],
+                "mean_volume": [99.0, 110.0, 88.0],
+                "std_volume": [1.0, 2.0, 3.0],
+                "initial_volume": [100.0, 100.0, 100.0],
+                "deformation_amplitude": [0.2, 0.0, 0.4],
+            },
+        }
+    )
+
+    assert np.allclose(result.channels["reference_volume"], np.array([110.0, 110.0, 110.0]))
+    assert np.allclose(result.channels["relative_volume"], np.array([0.9, 1.0, 0.8]))
+    assert np.allclose(result.channels["relative_volume_std"], np.array([1.0, 2.0, 3.0]) / 110.0)
 
 
 def test_run_buckling_paper_replay_lane_uses_injected_sampler() -> None:
@@ -537,7 +593,7 @@ def test_buckling_postprocess_plan_fallback_and_control_aliases() -> None:
                 },
             }
         )
-    with pytest.raises(ValueError, match="positive first mean_volume"):
+    with pytest.raises(ValueError, match="positive measured zero-pressure volume"):
         postprocess_buckling_paper_replay_lane(
             {
                 "experiment": "buckling",
@@ -588,18 +644,44 @@ def test_buckling_paper_exact_execution_sets_runtime_flag(
         lambda **_kwargs: SimpleNamespace(id="gv_geom", parameters={"radGV": 2.0, "height": 14.28}),
     )
 
-    class Runtime:
-        work_dir = tmp_path
+    runtime = RuntimeDryRun(
+        structure="gv",
+        experiment="buckling",
+        geometry="gv_geom",
+        controls={"buck": 0.0, "bpress": -91.0},
+        control_sweeps=(),
+        control_id="buck_0_0_75__bpress_-91",
+        dataset_id="gv__buckling__fixture",
+        provenance_root=str(tmp_path),
+        source_root=str(tmp_path),
+        legacy_import_root="",
+        output_root=str(tmp_path),
+        work_dir=str(tmp_path),
+        commands=(
+            DryRunCommand(
+                argv=("python3", "generate.py", "-p", "buck", "0", "0.75", "2", "--object", "gv", "--forward"),
+                cwd=str(tmp_path),
+                description="generate",
+            ),
+        ),
+        source_files=(),
+        source_manifest=str(tmp_path / "source_manifest.json"),
+        generated_subdirs=(),
+        runtime_package="mirheo",
+        sweep_mode="forward",
+    )
 
-        def to_manifest(self) -> dict[str, object]:
-            return {"work_dir": str(self.work_dir)}
-
-    monkeypatch.setattr(buckling_module, "plan_runtime", lambda *args, **kwargs: Runtime())
+    monkeypatch.setattr(buckling_module, "plan_runtime", lambda *args, **kwargs: runtime)
     class SamplingPlan:
         def to_manifest(self) -> dict[str, object]:
             return {"control_axis": "buck"}
 
-    monkeypatch.setattr(buckling_module, "build_sampling_plan", lambda *args, **kwargs: SamplingPlan())
+    def fake_build_sampling_plan(runtime_arg: RuntimeDryRun, *args: object, **kwargs: object) -> SamplingPlan:
+        captured["generate_argv"] = runtime_arg.commands[0].argv
+        captured["first_restart"] = runtime_arg.first_restart
+        return SamplingPlan()
+
+    monkeypatch.setattr(buckling_module, "build_sampling_plan", fake_build_sampling_plan)
 
     def fake_execute(*_args: object, **kwargs: object) -> SimpleNamespace:
         captured["env"] = kwargs["env"]
@@ -620,5 +702,7 @@ def test_buckling_paper_exact_execution_sets_runtime_flag(
     result = run_buckling_paper_replay_lane(plan)
 
     assert captured["env"]["MESOUQ_GV_PAPER_EXACT"] == "1"
+    assert "--first" not in captured["generate_argv"]
+    assert captured["first_restart"] is False
     assert result.provenance["status"] == "completed"
     assert result.controls["bpress"] == pytest.approx(-91.0)

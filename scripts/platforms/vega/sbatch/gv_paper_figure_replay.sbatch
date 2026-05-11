@@ -7,6 +7,9 @@
 #   PAPER_EXACT=1
 #   STRETCHING_POINT_START=<inclusive index>
 #   STRETCHING_POINT_STOP=<exclusive index>
+#   BUCKLING_BUCK_MAX=<float>
+#   BUCKLING_POINT_COUNT=<int>
+#   BUCKLING_TIMEOUT_SECONDS=<int>
 #
 # For lane-aware walltime defaults, prefer:
 #   scripts/platforms/vega/submit_gv_paper_figure_replay.sh
@@ -41,6 +44,9 @@ OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/gv/figure_replay/${CAMPAIGN_ID}}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 STRETCHING_POINT_START="${STRETCHING_POINT_START:-}"
 STRETCHING_POINT_STOP="${STRETCHING_POINT_STOP:-}"
+BUCKLING_BUCK_MAX="${BUCKLING_BUCK_MAX:-}"
+BUCKLING_POINT_COUNT="${BUCKLING_POINT_COUNT:-}"
+BUCKLING_TIMEOUT_SECONDS="${BUCKLING_TIMEOUT_SECONDS:-}"
 
 module purge
 module load \
@@ -85,6 +91,18 @@ fi
 
 if [[ -n "${STRETCHING_POINT_STOP}" ]]; then
   command+=(--stretching-point-stop "${STRETCHING_POINT_STOP}")
+fi
+
+if [[ -n "${BUCKLING_BUCK_MAX}" ]]; then
+  command+=(--buckling-buck-max "${BUCKLING_BUCK_MAX}")
+fi
+
+if [[ -n "${BUCKLING_POINT_COUNT}" ]]; then
+  command+=(--buckling-point-count "${BUCKLING_POINT_COUNT}")
+fi
+
+if [[ -n "${BUCKLING_TIMEOUT_SECONDS}" ]]; then
+  command+=(--buckling-timeout-seconds "${BUCKLING_TIMEOUT_SECONDS}")
 fi
 
 "${command[@]}"

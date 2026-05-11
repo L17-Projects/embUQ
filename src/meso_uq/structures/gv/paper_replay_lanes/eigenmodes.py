@@ -39,15 +39,15 @@ _MATERIAL_ALIASES = {"muL": "mu_l"}
 _REFERENCE_POSITION_KEYS = ("reference_positions", "mesh_vertices", "vertices", "positions", "ref_positions")
 _MESH_FACE_KEYS = ("mesh_faces", "faces", "triangles")
 _KBT_KEYS = ("kBT", "kbt")
-_SELECTED_SURFACE_MODE_INDICES = (0, 2, 6, 11, 14, 20)
+_SELECTED_SURFACE_MODE_INDICES = (0, 4, 6, 7, 18, 24)
 _SELECTED_AXIAL_MODE_INDICES = (0, 6, 20)
 _SELECTED_SURFACE_MODE_TITLES = (
-    "$(m, n) = (1, 2)$",
-    "$(m, n) = (1, 3)$",
-    "$(m, n) = (2, 3)$",
-    "$(m, n) = (2, 2)$",
-    "$(m, n) = (1, 1)$",
-    "$(m, n) = (3, 4)$",
+    "Mode 0",
+    "Mode 4",
+    "Mode 6",
+    "Mode 7",
+    "Mode 18",
+    "Mode 24",
 )
 _SELECTED_AXIAL_MODE_LABELS = (
     "$(m, n) = (1, 2)$",

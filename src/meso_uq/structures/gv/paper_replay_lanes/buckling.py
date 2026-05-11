@@ -32,6 +32,7 @@ _OPTIONAL_CHANNELS = (
     "shape_amplitude",
     "deformation_amplitude",
     "initial_volume",
+    "reference_volume",
     "mean_volume",
     "std_volume",
     "relative_volume_std",
@@ -125,6 +126,7 @@ def plan_buckling_paper_replay_lane(
     height: float | None = None,
     pressure_differences: tuple[float, ...] | list[float] | None = None,
     buck: float | tuple[float, ...] | list[float] = _DEFAULT_BUCK_MAX,
+    buck_point_count: int | None = None,
     bpress: float = _DEFAULT_BPRESS,
     paper_exact: bool = False,
     output_root: str | Path = _DEFAULT_OUTPUT_ROOT,
@@ -132,7 +134,7 @@ def plan_buckling_paper_replay_lane(
 ) -> BucklingPaperReplayPlan:
     validated_geometry = validate_geometry(geometry, radGV=radGV, height=height)
     validated_materials = _validate_paper_replay_material_parameters(material_parameters)
-    buck_sweep = _resolve_buck_sweep(buck, paper_exact=paper_exact)
+    buck_sweep = _resolve_buck_sweep(buck, paper_exact=paper_exact, point_count=buck_point_count)
     if pressure_differences is None:
         pressures = _derive_pressure_difference(buck_sweep)
     else:
@@ -284,6 +286,11 @@ def _run_buckling_paper_exact_forward_sweep(plan: BucklingPaperReplayPlan) -> di
                 dict(plan.material_parameters),
                 sort_keys=True,
             ),
+            **_optional_environment("MESOUQ_GV_BUCKLING_MEMBRANE_BPRESS_MODE"),
+            **_optional_environment("MESOUQ_GV_BUCKLING_FLUID_MODE"),
+            **_optional_environment("MESOUQ_GV_BUCKLING_FLUID_STABILIZATION"),
+            **_optional_environment("MESOUQ_GV_BUCKLING_PIN_OBJECT"),
+            **_optional_environment("MESOUQ_GV_BUCKLING_ODPD_AMP_SCALE"),
         },
     )
     runtime_seconds = time.perf_counter() - started
@@ -452,14 +459,17 @@ def _normalize_buckling_channels(channels_like: object) -> dict[str, np.ndarray]
         parsed["buck"] = _derive_buck_from_pressure_difference(parsed["pressure_difference"])
     if "mean_volume" in parsed:
         mean_volume = _coerce_finite_1d(parsed["mean_volume"], name="mean_volume")
-        if mean_volume[0] <= 0.0:
-            raise ValueError("Buckling paper replay requires positive first mean_volume for normalization.")
-        parsed["relative_volume"] = mean_volume / mean_volume[0]
+        reference_volume = _measured_zero_pressure_reference_volume(
+            mean_volume,
+            buck_values=parsed.get("buck"),
+        )
+        parsed["reference_volume"] = np.full(mean_volume.shape, reference_volume, dtype=float)
+        parsed["relative_volume"] = mean_volume / reference_volume
         if "std_volume" in parsed:
             std_volume = _coerce_finite_1d(parsed["std_volume"], name="std_volume")
             if std_volume.shape != mean_volume.shape:
                 raise ValueError("Buckling paper replay requires std_volume and mean_volume to share a shape.")
-            parsed["relative_volume_std"] = std_volume / mean_volume[0]
+            parsed["relative_volume_std"] = std_volume / reference_volume
     normalized: dict[str, np.ndarray] = {}
     for channel_name in (*_REQUIRED_CHANNELS, *_OPTIONAL_CHANNELS):
         if channel_name in parsed:
@@ -471,17 +481,48 @@ def _resolve_buck_sweep(
     buck: object,
     *,
     paper_exact: bool,
+    point_count: int | None,
 ) -> np.ndarray:
     array = np.asarray(buck, dtype=float)
     if array.ndim == 0 or array.size == 1:
         upper = _coerce_scalar(array, name="buck")
-        points = _EXACT_PAPER_SWEEP_POINTS if paper_exact else _DEFAULT_PAPER_SWEEP_POINTS
+        points = _resolve_buck_point_count(point_count, paper_exact=paper_exact)
         sweep = np.linspace(0.0, upper, points, dtype=float)
     else:
+        if point_count is not None:
+            raise ValueError("Buckling paper replay buck_point_count is only valid when buck is a scalar upper bound.")
         sweep = _coerce_finite_1d(buck, name="buck")
     if sweep.size < 2:
         raise ValueError("Buckling paper replay requires at least two buck samples.")
     return sweep
+
+
+def _resolve_buck_point_count(point_count: int | None, *, paper_exact: bool) -> int:
+    if point_count is None:
+        return _EXACT_PAPER_SWEEP_POINTS if paper_exact else _DEFAULT_PAPER_SWEEP_POINTS
+    points = int(point_count)
+    if points < 2:
+        raise ValueError("Buckling paper replay buck_point_count must be at least 2.")
+    return points
+
+
+def _measured_zero_pressure_reference_volume(
+    mean_volume: np.ndarray,
+    *,
+    buck_values: object | None,
+) -> float:
+    if buck_values is None:
+        reference_index = 0
+    else:
+        buck = _coerce_finite_1d(buck_values, name="buck")
+        if buck.shape != mean_volume.shape:
+            raise ValueError("Buckling paper replay requires buck and mean_volume to share a shape.")
+        zero_indices = np.flatnonzero(np.isclose(buck, 0.0, rtol=0.0, atol=1.0e-12))
+        reference_index = int(zero_indices[0]) if zero_indices.size else 0
+    reference_volume = float(mean_volume[reference_index])
+    if reference_volume <= 0.0:
+        raise ValueError("Buckling paper replay requires positive measured zero-pressure volume for normalization.")
+    return reference_volume
 
 
 def _derive_pressure_difference(buck_values: object) -> np.ndarray:
@@ -490,6 +531,13 @@ def _derive_pressure_difference(buck_values: object) -> np.ndarray:
 
 def _derive_buck_from_pressure_difference(pressure_differences: object) -> np.ndarray:
     return _coerce_finite_1d(pressure_differences, name="pressure_difference") / _BUCK_TO_PRESSURE_SCALE
+
+
+def _optional_environment(name: str) -> dict[str, str]:
+    import os
+
+    value = os.environ.get(name)
+    return {name: value} if value else {}
 
 
 def _coerce_mapping(payload: object, *, context: str) -> Mapping[str, Any]:

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 from pathlib import Path
+import sys
 
+import numpy as np
 import pytest
 
 from meso_uq.structures import get_structure
@@ -94,3 +97,43 @@ def test_gv_default_geometry_rejects_unknown_id() -> None:
     gv = get_structure("gv")
     with pytest.raises(KeyError, match="Unknown geometry"):
         gv.get_geometry("missing_geometry")
+
+
+def test_buckling_geometry_faces_are_oriented_like_paper_archive(monkeypatch: pytest.MonkeyPatch) -> None:
+    script = Path("gv/buckling/src/gas_vesicle/add_to_off.py")
+    monkeypatch.syspath_prepend(str(script.parent.resolve()))
+    spec = importlib.util.spec_from_file_location("buckling_add_to_off_under_test", script)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    points = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ]
+    )
+    positive_faces = np.array(
+        [
+            [0, 2, 1],
+            [0, 1, 3],
+            [1, 2, 3],
+            [2, 0, 3],
+        ]
+    )
+
+    oriented = module.orient_faces_to_paper_winding(positive_faces, points)
+
+    assert module.signed_mesh_volume(points, positive_faces) > 0.0
+    assert module.signed_mesh_volume(points, oriented) < 0.0
+
+
+def test_buckling_create_gv_enforces_paper_mesh_winding() -> None:
+    text = Path("gv/buckling/src/gas_vesicle/create_gv.py").read_text(encoding="utf-8")
+
+    assert "_orient_off_to_paper_winding(\"out.off\")" in text
+    assert "archived paper meshes use negative signed volume" in text

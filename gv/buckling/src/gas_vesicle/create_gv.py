@@ -154,6 +154,51 @@ def _find_scale_space_tool() -> Path:
     )
 
 
+def _read_off_file(path: str | Path) -> tuple[np.ndarray, np.ndarray]:
+    with Path(path).open("r", encoding="utf-8") as handle:
+        header = handle.readline().strip()
+        if header != "OFF":
+            raise RuntimeError(f"{path} is not an OFF mesh.")
+        counts = handle.readline().split()
+        n_vertices = int(counts[0])
+        n_faces = int(counts[1])
+        vertices = [list(map(float, handle.readline().split()[:3])) for _ in range(n_vertices)]
+        faces = []
+        for _ in range(n_faces):
+            values = handle.readline().split()
+            if int(values[0]) != 3:
+                raise RuntimeError(f"{path} contains a non-triangular face.")
+            faces.append(list(map(int, values[1:4])))
+    return np.asarray(vertices, dtype=float), np.asarray(faces, dtype=int)
+
+
+def _signed_mesh_volume(vertices: np.ndarray, faces: np.ndarray) -> float:
+    if len(faces) == 0:
+        return 0.0
+    triangle = vertices[faces]
+    return float(np.einsum("ij,ij->", triangle[:, 0], np.cross(triangle[:, 1], triangle[:, 2])) / 6.0)
+
+
+def _write_off_file(path: str | Path, vertices: np.ndarray, faces: np.ndarray) -> None:
+    with Path(path).open("w", encoding="utf-8") as handle:
+        handle.write("OFF\n")
+        handle.write(f"{len(vertices)} {len(faces)} 0\n")
+        for vertex in vertices:
+            handle.write(f"{vertex[0]} {vertex[1]} {vertex[2]}\n")
+        for face in faces:
+            handle.write(f"3 {int(face[0])} {int(face[1])} {int(face[2])}\n")
+
+
+def _orient_off_to_paper_winding(path: str | Path) -> None:
+    vertices, faces = _read_off_file(path)
+    # The archived paper meshes use negative signed volume. Keep that winding
+    # independent of the local CGAL/scale_space build used to triangulate.
+    if _signed_mesh_volume(vertices, faces) > 0.0:
+        faces = np.array(faces, copy=True)
+        faces[:, [1, 2]] = faces[:, [2, 1]]
+        _write_off_file(path, vertices, faces)
+
+
 scale_space_exe = _find_scale_space_tool()
 
 print('Running scale_space')
@@ -164,4 +209,5 @@ if result.returncode != 0:
         f"scale_space exited with status {result.returncode} when processing {af1}."
     )
 
+_orient_off_to_paper_winding("out.off")
 Path("test.off").unlink(missing_ok=True)

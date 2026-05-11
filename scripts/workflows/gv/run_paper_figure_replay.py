@@ -95,6 +95,24 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional exclusive stop index for paper-exact stretching control points.",
     )
+    parser.add_argument(
+        "--buckling-buck-max",
+        type=float,
+        default=None,
+        help="Optional buckling sweep upper bound. Values above 0.75 extend beyond the paper Figure 7 maximum.",
+    )
+    parser.add_argument(
+        "--buckling-point-count",
+        type=int,
+        default=None,
+        help="Optional number of buckling sweep points when --buckling-buck-max is used.",
+    )
+    parser.add_argument(
+        "--buckling-timeout-seconds",
+        type=int,
+        default=None,
+        help="Optional executor timeout for long buckling paper sweeps.",
+    )
     return parser
 
 
@@ -391,6 +409,9 @@ def _run_operational_lane(
     paper_exact: bool = False,
     stretching_point_start: int | None = None,
     stretching_point_stop: int | None = None,
+    buckling_buck_max: float | None = None,
+    buckling_point_count: int | None = None,
+    buckling_timeout_seconds: int | None = None,
 ) -> GVPaperReplayLaneRecord:
     try:
         previous_cwd = Path.cwd()
@@ -444,8 +465,15 @@ def _run_operational_lane(
                 material_parameters=material_parameters,
                 radGV=geometry["radGV"],
                 height=geometry["height"],
+                buck=0.75 if buckling_buck_max is None else float(buckling_buck_max),
+                buck_point_count=buckling_point_count,
                 paper_exact=paper_exact,
                 output_root=lane_root_relative,
+                timeout_seconds=int(
+                    buckling_timeout_seconds
+                    if buckling_timeout_seconds is not None
+                    else os.environ.get("MESOUQ_GV_BUCKLING_TIMEOUT_SECONDS", "7200")
+                ),
             )
             result = run_buckling_paper_replay_lane(plan)
             plot_path = plot_buckling_paper_replay(
@@ -462,6 +490,7 @@ def _run_operational_lane(
                 mode_count=30,
                 paper_exact=paper_exact,
                 output_root=lane_root_relative,
+                timeout_seconds=int(os.environ.get("MESOUQ_GV_EIGENMODES_TIMEOUT_SECONDS", "7200")),
             )
             result = run_eigenmodes_paper_replay_lane(plan)
             plot_path = plot_eigenmodes_paper_replay(
@@ -536,6 +565,9 @@ def main(argv: list[str] | None = None) -> int:
                         paper_exact=bool(args.paper_exact),
                         stretching_point_start=args.stretching_point_start,
                         stretching_point_stop=args.stretching_point_stop,
+                        buckling_buck_max=args.buckling_buck_max,
+                        buckling_point_count=args.buckling_point_count,
+                        buckling_timeout_seconds=args.buckling_timeout_seconds,
                     )
                 )
 

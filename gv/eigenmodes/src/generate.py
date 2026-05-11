@@ -60,6 +60,12 @@ _PAPER_EXACT_DEFAULT_OVERRIDES = {
     'stslik': 20000,
     'stslik_eq': 100,
 }
+_PAPER_EXACT_ENV_OVERRIDES = {
+    'numsteps': 'MESOUQ_GV_EIGENMODES_NUMSTEPS',
+    'numsteps_eq': 'MESOUQ_GV_EIGENMODES_NUMSTEPS_EQ',
+    'stslik': 'MESOUQ_GV_EIGENMODES_STSLIK',
+    'stslik_eq': 'MESOUQ_GV_EIGENMODES_STSLIK_EQ',
+}
 
 
 def _paper_exact_enabled():
@@ -71,6 +77,14 @@ def _apply_paper_exact_defaults(parameters_default):
         return parameters_default
     resolved = dict(parameters_default)
     resolved.update(_PAPER_EXACT_DEFAULT_OVERRIDES)
+    for key, env_name in _PAPER_EXACT_ENV_OVERRIDES.items():
+        raw_value = os.environ.get(env_name)
+        if raw_value is None:
+            continue
+        value = int(raw_value)
+        if value <= 0:
+            raise ValueError(f'{env_name} must be a positive integer.')
+        resolved[key] = value
     return resolved
 
 
@@ -123,6 +137,10 @@ def _write_runtime_preamble(file_commands):
             'export MESOUQ_GV_PAPER_EXACT='
             f'{shlex.quote(paper_exact)}\n'
         )
+    for env_name in _PAPER_EXACT_ENV_OVERRIDES.values():
+        raw_value = os.environ.get(env_name, '')
+        if raw_value:
+            file_commands.write(f'export {env_name}={shlex.quote(raw_value)}\n')
     file_commands.write('\n')
 
 if(args.par == None):

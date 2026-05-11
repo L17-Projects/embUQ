@@ -250,20 +250,43 @@ def _extract_buckling_forward_sweep(root: Path) -> dict[str, np.ndarray] | None:
         radial = np.linalg.norm(final_centered[:, :2], axis=1)
         shape.append(float(np.std(radial)))
 
+    buck_array = np.asarray(buck, dtype=float)
     mean_array = np.asarray(mean_volume, dtype=float)
     std_array = np.asarray(std_volume, dtype=float)
+    reference_volume = _buckling_measured_reference_volume(mean_array, buck_values=buck_array)
     return {
-        "buck": np.asarray(buck, dtype=float),
+        "buck": buck_array,
         "bpress": np.asarray(bpress, dtype=float),
         "deformation_amplitude": np.asarray(deformation, dtype=float),
         "shape_amplitude": np.asarray(shape, dtype=float),
         "initial_volume": np.full(mean_array.shape, initial_volume, dtype=float),
+        "reference_volume": np.full(mean_array.shape, reference_volume, dtype=float),
         "mean_volume": mean_array,
         "std_volume": std_array,
         "analyzed_volume_frame_count": np.asarray(analyzed_count, dtype=float),
-        "relative_volume": mean_array / initial_volume,
-        "relative_volume_std": std_array / initial_volume,
+        "relative_volume": mean_array / reference_volume,
+        "relative_volume_std": std_array / reference_volume,
     }
+
+
+def _buckling_measured_reference_volume(
+    mean_volume: np.ndarray,
+    *,
+    buck_values: np.ndarray | None = None,
+) -> float:
+    if mean_volume.ndim != 1 or mean_volume.size == 0:
+        raise GVSamplingExtractionError("Buckling measured volume reference requires a non-empty 1D mean_volume array.")
+    if buck_values is not None:
+        if buck_values.shape != mean_volume.shape:
+            raise GVSamplingExtractionError("Buckling buck and mean_volume arrays must share a shape.")
+        zero_indices = np.flatnonzero(np.isclose(buck_values, 0.0, rtol=0.0, atol=1.0e-12))
+        reference_index = int(zero_indices[0]) if zero_indices.size else 0
+    else:
+        reference_index = 0
+    reference_volume = float(mean_volume[reference_index])
+    if reference_volume <= 0.0:
+        raise GVSamplingExtractionError("Buckling measured reference volume must be positive.")
+    return reference_volume
 
 
 def _extract_torsion(

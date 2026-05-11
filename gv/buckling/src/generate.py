@@ -96,6 +96,36 @@ def _write_runtime_preamble(file_commands):
             'export MESOUQ_GV_PAPER_EXACT='
             f'{shlex.quote(paper_exact)}\n'
         )
+    membrane_bpress_mode = os.environ.get('MESOUQ_GV_BUCKLING_MEMBRANE_BPRESS_MODE', '')
+    if membrane_bpress_mode:
+        file_commands.write(
+            'export MESOUQ_GV_BUCKLING_MEMBRANE_BPRESS_MODE='
+            f'{shlex.quote(membrane_bpress_mode)}\n'
+        )
+    fluid_mode = os.environ.get('MESOUQ_GV_BUCKLING_FLUID_MODE', '')
+    if fluid_mode:
+        file_commands.write(
+            'export MESOUQ_GV_BUCKLING_FLUID_MODE='
+            f'{shlex.quote(fluid_mode)}\n'
+        )
+    fluid_stabilization = os.environ.get('MESOUQ_GV_BUCKLING_FLUID_STABILIZATION', '')
+    if fluid_stabilization:
+        file_commands.write(
+            'export MESOUQ_GV_BUCKLING_FLUID_STABILIZATION='
+            f'{shlex.quote(fluid_stabilization)}\n'
+        )
+    pin_object = os.environ.get('MESOUQ_GV_BUCKLING_PIN_OBJECT', '')
+    if pin_object:
+        file_commands.write(
+            'export MESOUQ_GV_BUCKLING_PIN_OBJECT='
+            f'{shlex.quote(pin_object)}\n'
+        )
+    odpd_amp_scale = os.environ.get('MESOUQ_GV_BUCKLING_ODPD_AMP_SCALE', '')
+    if odpd_amp_scale:
+        file_commands.write(
+            'export MESOUQ_GV_BUCKLING_ODPD_AMP_SCALE='
+            f'{shlex.quote(odpd_amp_scale)}\n'
+        )
     file_commands.write('\n')
 
 if(args.par == None):

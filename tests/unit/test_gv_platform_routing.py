@@ -251,6 +251,11 @@ def test_gv_generated_mirheo_jobs_source_runtime_environment_and_preserve_materi
     assert "source {shlex.quote(env_script)}" in contents
     assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in contents
     assert "MESOUQ_GV_MIRHEO_MODULE" in contents
+    if experiment_name == "buckling":
+        assert "MESOUQ_GV_BUCKLING_FLUID_MODE" in contents
+        assert "MESOUQ_GV_BUCKLING_FLUID_STABILIZATION" in contents
+        assert "MESOUQ_GV_BUCKLING_PIN_OBJECT" in contents
+        assert "MESOUQ_GV_BUCKLING_ODPD_AMP_SCALE" in contents
     assert "bash commands.txt" in contents
     assert "num_mpi_ranks = int(os.environ.get('MESOUQ_GV_MPI_RANKS', str(num_gpus + 1)))" in contents
     assert "#SBATCH --ntasks-per-node={num_mpi_ranks}" in contents
@@ -272,6 +277,8 @@ def test_gv_eigenmodes_runtime_allocates_postprocess_rank_by_default() -> None:
     assert "MESOUQ_GV_PAPER_EXACT" in generate_contents
     assert "'numsteps': 4000000" in generate_contents
     assert "'stslik': 20000" in generate_contents
+    assert "MESOUQ_GV_EIGENMODES_NUMSTEPS" in generate_contents
+    assert "MESOUQ_GV_EIGENMODES_STSLIK" in generate_contents
     assert "'gamma_dpd_gas': 3.0" in generate_contents
     assert "MESOUQ_GV_MPI_RANKS" not in generate_contents
     assert "nranks=${3:-${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}}" in run_contents
@@ -284,7 +291,13 @@ def test_gv_mirheo_launchers_disable_openmpi_binding_on_vega(experiment_name: st
     contents = run_script.read_text(encoding="utf-8")
 
     assert "nranks=${3:-${MESOUQ_GV_MPI_RANKS:-2}}" in contents
-    assert "mpirun --bind-to none -np ${nranks}" in contents
+    assert "mpirun --bind-to none" in contents
+    assert "-np ${nranks}" in contents
+    if experiment_name == "buckling":
+        assert "MESOUQ_OPENMPI_LIB_DIR" in contents
+        assert "export LD_LIBRARY_PATH=" in contents
+        assert "-x LD_LIBRARY_PATH" in contents
+        assert "-x MESOUQ_GV_BUCKLING_FLUID_STABILIZATION" in contents
 
 
 def test_gv_eigenmodes_analysis_accepts_restart_backed_trajectory() -> None:
@@ -302,6 +315,7 @@ def test_gv_eigenmodes_analysis_accepts_restart_backed_trajectory() -> None:
 
     all_analysis_contents = (analysis_root / "all_analysis.py").read_text(encoding="utf-8")
     assert "np.linalg.svd(trj_np, full_matrices=False)" in all_analysis_contents
+    assert "reference_positions = av" in all_analysis_contents
 
 
 def test_gv_dry_run_plan_receives_material_overrides_only_when_provided() -> None:

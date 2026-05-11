@@ -11,6 +11,9 @@
 #   GV_PAPER_REPLAY_TIME_LIMIT=HH:MM:SS   # explicit override
 #   STRETCHING_POINT_START=<int>
 #   STRETCHING_POINT_STOP=<int>
+#   BUCKLING_BUCK_MAX=<float>
+#   BUCKLING_POINT_COUNT=<int>
+#   BUCKLING_TIMEOUT_SECONDS=<int>
 
 set -euo pipefail
 
@@ -93,6 +96,15 @@ if [[ -n "${STRETCHING_POINT_START:-}" ]]; then
 fi
 if [[ -n "${STRETCHING_POINT_STOP:-}" ]]; then
   exports+=("STRETCHING_POINT_STOP=${STRETCHING_POINT_STOP}")
+fi
+if [[ -n "${BUCKLING_BUCK_MAX:-}" ]]; then
+  exports+=("BUCKLING_BUCK_MAX=${BUCKLING_BUCK_MAX}")
+fi
+if [[ -n "${BUCKLING_POINT_COUNT:-}" ]]; then
+  exports+=("BUCKLING_POINT_COUNT=${BUCKLING_POINT_COUNT}")
+fi
+if [[ -n "${BUCKLING_TIMEOUT_SECONDS:-}" ]]; then
+  exports+=("BUCKLING_TIMEOUT_SECONDS=${BUCKLING_TIMEOUT_SECONDS}")
 fi
 
 IFS=,

@@ -330,6 +330,37 @@ def test_extract_buckling_forward_sweep_channels_from_sim_folders(tmp_path: Path
     assert channels["deformation_amplitude"][1] > channels["deformation_amplitude"][0]
 
 
+def test_extract_buckling_forward_sweep_uses_measured_zero_pressure_volume_reference(tmp_path: Path) -> None:
+    work = tmp_path / "buckling-forward-measured-reference"
+    initial = [(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)]
+    faces = [(0, 2, 1), (0, 1, 3), (0, 3, 2), (1, 2, 3)]
+    _write_off(work / "mesh" / "gv00001.off", initial, faces=faces)
+    (work / "parameter").mkdir(parents=True)
+    for sim, buck, scale in (("00001", 0.0, 1.2), ("00002", 0.75, 1.5)):
+        (work / "parameter" / f"parameters-default{sim}.yaml").write_text(
+            f"buck: {buck}\nbpress: -91.0\n",
+            encoding="utf-8",
+        )
+        for frame_index in range(3):
+            frame = [
+                (10.0 + scale * x, 10.0 + scale * y, 10.0 + scale * z)
+                for x, y, z in initial
+            ]
+            _write_xyz(work / "trj_eq" / f"sim{sim}" / f"emb_{frame_index:07d}.xyz", frame)
+
+    channels = extract_sampling_channels(
+        experiment="buckling",
+        work_dir=work,
+        controls={"buck": 0.0, "bpress": -91.0},
+        sweep=GVSweep("buck", (0.0, 0.75)),
+        geometry=_geometry(),
+    )
+
+    assert channels["relative_volume"].tolist() == pytest.approx([1.0, (1.5 / 1.2) ** 3])
+    assert channels["reference_volume"].tolist() == pytest.approx([channels["mean_volume"][0]] * 2)
+    assert channels["initial_volume"][0] != pytest.approx(channels["reference_volume"][0])
+
+
 def test_extract_torsion_forward_sweep_channels_from_anchor_folders(tmp_path: Path) -> None:
     work = tmp_path / "torsion-forward"
     vertices = [

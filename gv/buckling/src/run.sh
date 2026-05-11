@@ -18,4 +18,22 @@ if [[ -n "${MESOUQ_GV_MATERIAL_OVERRIDES_JSON:-}" ]]; then
         "parameter/parameters.prms${simnum}.yaml" \
         --overrides-json "${MESOUQ_GV_MATERIAL_OVERRIDES_JSON}"
 fi
-mpirun --bind-to none -np ${nranks} python3 equil.py $mode --simnum ${simnum}
+
+if [[ -n "${MESOUQ_OPENMPI_LIB_DIR:-}" && -d "${MESOUQ_OPENMPI_LIB_DIR}" ]]; then
+    export LD_LIBRARY_PATH="${MESOUQ_OPENMPI_LIB_DIR}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+elif [[ -d /cvmfs/sling.si/modules/el7/software/OpenMPI/4.1.4-GCC-12.2.0/lib ]]; then
+    export LD_LIBRARY_PATH="/cvmfs/sling.si/modules/el7/software/OpenMPI/4.1.4-GCC-12.2.0/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+fi
+
+mpirun --bind-to none \
+    -x PATH \
+    -x PYTHONPATH \
+    -x LD_LIBRARY_PATH \
+    -x MESOUQ_GV_MIRHEO_MODULE \
+    -x MESOUQ_GV_PAPER_EXACT \
+    -x MESOUQ_GV_BUCKLING_MEMBRANE_BPRESS_MODE \
+    -x MESOUQ_GV_BUCKLING_FLUID_MODE \
+    -x MESOUQ_GV_BUCKLING_FLUID_STABILIZATION \
+    -x MESOUQ_GV_BUCKLING_PIN_OBJECT \
+    -x MESOUQ_GV_BUCKLING_ODPD_AMP_SCALE \
+    -np ${nranks} python3 equil.py $mode --simnum ${simnum}

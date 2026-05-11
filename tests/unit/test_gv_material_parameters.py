@@ -298,11 +298,14 @@ def test_gv_equil_scripts_support_standard_mirheo_and_mirheo_obmd(experiment: st
     assert "_create_particle_vector('sol2', mass = mg, obmd = 0)" in text
 
 
-def test_gv_buckling_keeps_bpress_out_of_membrane_load_for_paper_replay() -> None:
+def test_gv_buckling_can_route_bpress_membrane_load_modes() -> None:
     text = Path("gv/buckling/src/equil.py").read_text(encoding="utf-8")
 
+    assert 'MESOUQ_GV_BUCKLING_MEMBRANE_BPRESS_MODE' in text
+    assert '_DEFAULT_MEMBRANE_BPRESS_MODE = "runtime"' in text
+    assert 'prms_emb["bpress"] = bpress' in text
     assert 'prms_emb["bpress"] = 0.0' in text
-    assert 'prms_emb["bpress"] = bpress' not in text
+    assert 'must be \'runtime\' or \'zero\'' in text
     assert "ODPD" in text
 
 
@@ -311,8 +314,17 @@ def test_gv_eigenmodes_generator_allocates_postprocess_rank() -> None:
     text = generate_script.read_text(encoding="utf-8")
 
     assert "MESOUQ_GV_EIGENMODES_MPI_RANKS" in text
+    assert "MESOUQ_GV_EIGENMODES_NUMSTEPS" in text
+    assert "MESOUQ_GV_EIGENMODES_NUMSTEPS_EQ" in text
     assert "MESOUQ_GV_MIRHEO_MODULE" in text
     assert "MESOUQ_GV_MPI_RANKS" not in text
     assert "str(num_gpus + 1)" in text
     assert "write_commands('commands.txt', 'run.sh', f'{num_mpi_ranks}')" in text
     assert "#SBATCH --ntasks-per-node={num_mpi_ranks}" in text
+
+
+def test_gv_eigenmodes_parameters_match_paper_gas_fsi_formula() -> None:
+    text = Path("gv/eigenmodes/src/parameters.py").read_text(encoding="utf-8")
+
+    gamma_line = next(line for line in text.splitlines() if line.startswith("gamma_fsi_gas = "))
+    assert "1.23" not in gamma_line
