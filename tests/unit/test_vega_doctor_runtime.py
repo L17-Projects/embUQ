@@ -171,6 +171,19 @@ def test_doctor_collect_diagnostics_can_target_karolina_site(tmp_path, monkeypat
     assert report["paths"]["scale_space_binary"].endswith("_karolina/gv_cgal_tools/bin/scale_space")
 
 
+def test_doctor_uses_env_site_and_karolina_module_profiles(monkeypatch):
+    module = _load_doctor_module()
+    monkeypatch.setenv("MESOUQ_SITE", "karolina")
+
+    assert module._default_runtime_site() == "karolina"
+    assert module._recommended_modules("karolina", with_mirheo=False, with_gv_runtime=False) == list(
+        module.DEFAULT_KAROLINA_MODULES
+    )
+    assert module._recommended_modules("karolina", with_mirheo=True, with_gv_runtime=False) == list(
+        module.DEFAULT_KAROLINA_MIRHEO_MODULES
+    )
+
+
 def test_karolina_doctor_propagates_site_env(monkeypatch):
     module = _load_karolina_doctor_module()
     captured = {}
