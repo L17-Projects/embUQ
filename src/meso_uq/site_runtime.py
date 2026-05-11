@@ -30,6 +30,10 @@ class RuntimePaths:
     gv_venv_root: Path
     gv_venv_site_packages: Path
     gv_venv_env_script: Path
+    gv_cgal_tools_root: Path
+    gv_cgal_tools_bin_dir: Path
+    gv_cgal_tools_env_script: Path
+    scale_space_binary: Path
     venv_root: Path
     venv_site_packages: Path
     tinytex_root: Path
@@ -97,6 +101,7 @@ def get_site_runtime_paths(
     site_root = _resolve_site_root(root, site=resolved_site, runtime_root=runtime_root, env=source_env)
     korali_root = site_root / "korali"
     mirheo_root = site_root / "mirheo"
+    gv_cgal_tools_root = site_root / "gv_cgal_tools"
     venv_root = site_root / "venv"
     tinytex_root = site_root / "tinytex"
     py_tag = f"python{sys.version_info.major}.{sys.version_info.minor}"
@@ -115,6 +120,10 @@ def get_site_runtime_paths(
         gv_venv_root=site_root / "gv_venv",
         gv_venv_site_packages=site_root / "gv_venv" / "lib" / py_tag / "site-packages",
         gv_venv_env_script=site_root / "gv_venv" / "env.sh",
+        gv_cgal_tools_root=gv_cgal_tools_root,
+        gv_cgal_tools_bin_dir=gv_cgal_tools_root / "bin",
+        gv_cgal_tools_env_script=gv_cgal_tools_root / "env.sh",
+        scale_space_binary=gv_cgal_tools_root / "bin" / "scale_space",
         venv_root=venv_root,
         venv_site_packages=venv_root / "lib" / py_tag / "site-packages",
         tinytex_root=tinytex_root,
@@ -128,4 +137,3 @@ def get_site_runtime_paths(
         mirheo_env_script=mirheo_root / "env.sh",
         mirheo_snapshot_path=mirheo_root / "source_snapshot.json",
     )
-

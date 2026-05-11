@@ -17,11 +17,14 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from meso_uq.vega import (
+    DEFAULT_KAROLINA_MIRHEO_MODULES,
+    DEFAULT_KAROLINA_MODULES,
+    DEFAULT_KAROLINA_RUNTIME_MODULES,
     DEFAULT_VEGA_MIRHEO_MODULES,
     DEFAULT_VEGA_MODULES,
     DEFAULT_VEGA_RUNTIME_MODULES,
     find_external_korali_entries,
-    get_vega_paths,
+    get_runtime_paths,
     load_mirheo_source_lock,
     resolve_mirheo_source,
 )
@@ -103,6 +106,29 @@ def _check(name: str, status: str, details: str) -> dict[str, str]:
     return {"name": name, "status": status, "details": details}
 
 
+def _default_runtime_site() -> str:
+    for name in ("MESOUQ_SITE", "HPC_SITE"):
+        value = os.environ.get(name, "").strip().lower()
+        if value in {"vega", "karolina"}:
+            return value
+    parent = Path(__file__).resolve().parent.name
+    return parent if parent in {"vega", "karolina"} else "vega"
+
+
+def _recommended_modules(site: str, *, with_mirheo: bool, with_gv_runtime: bool) -> list[str]:
+    if site == "karolina":
+        if with_gv_runtime:
+            return list(DEFAULT_KAROLINA_MIRHEO_MODULES + DEFAULT_KAROLINA_RUNTIME_MODULES[len(DEFAULT_KAROLINA_MODULES) :])
+        if with_mirheo:
+            return list(DEFAULT_KAROLINA_MIRHEO_MODULES)
+        return list(DEFAULT_KAROLINA_MODULES)
+    if with_gv_runtime:
+        return list(DEFAULT_VEGA_MIRHEO_MODULES + DEFAULT_VEGA_RUNTIME_MODULES[len(DEFAULT_VEGA_MODULES) :])
+    if with_mirheo:
+        return list(DEFAULT_VEGA_MIRHEO_MODULES)
+    return list(DEFAULT_VEGA_MODULES)
+
+
 def _kpsewhich(name: str) -> str:
     resolved = _command_path("kpsewhich")
     if not resolved:
@@ -121,22 +147,19 @@ def _kpsewhich(name: str) -> str:
 def collect_diagnostics(
     python_bin: str,
     *,
+    site: str | None = None,
     with_mirheo: bool = False,
     with_gv_runtime: bool = False,
     with_tex: bool = False,
 ) -> dict[str, object]:
-    paths = get_vega_paths(REPO_ROOT)
+    paths = get_runtime_paths(REPO_ROOT, site=site or _default_runtime_site())
     checks: list[dict[str, str]] = []
     include_mirheo_checks = with_mirheo or with_gv_runtime
-    if with_gv_runtime:
-        recommended_modules = list(
-            DEFAULT_VEGA_MIRHEO_MODULES
-            + DEFAULT_VEGA_RUNTIME_MODULES[len(DEFAULT_VEGA_MODULES) :]
-        )
-    elif with_mirheo:
-        recommended_modules = list(DEFAULT_VEGA_MIRHEO_MODULES)
-    else:
-        recommended_modules = list(DEFAULT_VEGA_MODULES)
+    recommended_modules = _recommended_modules(
+        paths.site,
+        with_mirheo=with_mirheo,
+        with_gv_runtime=with_gv_runtime,
+    )
 
     loaded_modules = os.environ.get("LOADEDMODULES", "")
     checks.append(
@@ -233,7 +256,7 @@ def collect_diagnostics(
         )
 
     if include_mirheo_checks:
-        mirheo_lock = load_mirheo_source_lock(REPO_ROOT)
+        mirheo_lock = load_mirheo_source_lock(REPO_ROOT, site=paths.site)
         checks.append(
             _check(
                 "mirheo_lock",
@@ -242,7 +265,7 @@ def collect_diagnostics(
             )
         )
         try:
-            mirheo_source = resolve_mirheo_source(REPO_ROOT)
+            mirheo_source = resolve_mirheo_source(REPO_ROOT, site=paths.site)
             source_status = "ok" if mirheo_source.is_dir() else "warn"
             source_details = str(mirheo_source)
         except Exception as exc:  # pragma: no cover - defensive path
@@ -332,11 +355,13 @@ def collect_diagnostics(
 
     return {
         "repo_root": str(paths.repo_root),
+        "site": paths.site,
         "python_bin": python_bin,
         "python_version": platform.python_version(),
         "hostname": platform.node(),
         "recommended_modules": recommended_modules,
         "paths": {
+            "site_root": str(paths.site_root),
             "vega_root": str(paths.vega_root),
             "korali_source": str(paths.korali_source),
             "korali_prefix": str(paths.korali_prefix),
@@ -353,6 +378,9 @@ def collect_diagnostics(
             "gv_venv_root": str(paths.gv_venv_root),
             "gv_venv_site_packages": str(paths.gv_venv_site_packages),
             "gv_venv_env_script": str(paths.gv_venv_env_script),
+            "gv_cgal_tools_root": str(paths.gv_cgal_tools_root),
+            "gv_cgal_tools_env_script": str(paths.gv_cgal_tools_env_script),
+            "scale_space_binary": str(paths.scale_space_binary),
         },
         "checks": checks,
         "with_mirheo": with_mirheo,

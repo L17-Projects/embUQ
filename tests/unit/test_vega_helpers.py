@@ -8,6 +8,7 @@ from meso_uq.vega import (
     get_runtime_paths,
     get_vega_paths,
     load_mirheo_source_lock,
+    render_gv_cgal_tools_env_script,
     render_gv_venv_env_script,
     render_mirheo_env_script,
     render_korali_env_script,
@@ -50,6 +51,8 @@ def test_runtime_paths_support_karolina_repo_local_root(tmp_path):
     assert paths.korali_prefix == repo_root / "_karolina" / "korali" / "install"
     assert paths.mirheo_prefix == repo_root / "_karolina" / "mirheo" / "install"
     assert paths.gv_venv_env_script == repo_root / "_karolina" / "gv_venv" / "env.sh"
+    assert paths.gv_cgal_tools_env_script == repo_root / "_karolina" / "gv_cgal_tools" / "env.sh"
+    assert paths.scale_space_binary == repo_root / "_karolina" / "gv_cgal_tools" / "bin" / "scale_space"
 
 
 def test_runtime_paths_honor_site_runtime_root_override(tmp_path):
@@ -185,6 +188,14 @@ def test_load_mirheo_source_lock_defaults_when_lock_missing(tmp_path):
     assert "source_path" in lock
 
 
+def test_load_mirheo_source_lock_uses_karolina_default_when_lock_missing(tmp_path):
+    repo_root = _make_repo(tmp_path)
+
+    lock = load_mirheo_source_lock(repo_root, site="karolina")
+
+    assert lock["source_path"] == "/home/it4i-bbenvegnen/software/Mirheo"
+
+
 def test_load_mirheo_source_lock_rejects_non_mapping_payload(tmp_path):
     repo_root = _make_repo(tmp_path)
     (repo_root / "extern" / "mirheo.lock.json").write_text('["bad"]', encoding="utf-8")
@@ -254,8 +265,24 @@ def test_render_gv_venv_env_script_exports_openmpi_and_scale_space_paths(tmp_pat
     assert "GV_SCALE_SPACE_BINARY" in env_script
     assert "_vega/gv_cgal_tools/bin/scale_space" in env_script
     assert "GV_CGAL_TOOLS_ROOT" in env_script
+    assert "_vega/gv_cgal_tools/env.sh" in env_script
     assert "MESOUQ_OPENMPI_LIB_DIR" in env_script
     assert str(paths.mirheo_snapshot_path) in env_script
+
+
+def test_render_gv_cgal_tools_env_script_exports_karolina_library_paths(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    paths = get_runtime_paths(repo_root, site="karolina", env={})
+
+    env_script = render_gv_cgal_tools_env_script(paths)
+
+    assert "MESOUQ_SITE=karolina" in env_script
+    assert "MESOUQ_KAROLINA_ROOT" in env_script
+    assert str(paths.scale_space_binary) in env_script
+    assert str(paths.gv_cgal_tools_bin_dir) in env_script
+    assert "MPFR/4.2.0-GCCcore-12.2.0/lib" in env_script
+    assert "GMP/6.2.1-GCCcore-12.2.0/lib" in env_script
+    assert "LD_LIBRARY_PATH" in env_script
 
 
 def test_render_gv_venv_env_script_omits_snapshot_when_not_provided(tmp_path):
