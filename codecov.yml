@@ -11,6 +11,9 @@ ignore:
   # Mirheo executable experiment sources and scheduler wrappers are validated
   # through platform-routing tests and GPU canaries, not Python line coverage.
   - "gv/**/src/**"
+  - "docs/**"
+  - "scripts/platforms/karolina/*.sh"
+  - "scripts/platforms/vega/*.sh"
   - "scripts/platforms/vega/sbatch/**"
   - "scripts/platforms/vega/submit_gv_paper_figure_replay.sh"
 

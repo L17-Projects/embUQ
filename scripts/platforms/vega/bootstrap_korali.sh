@@ -8,7 +8,7 @@ usage() {
   cat <<'EOF'
 Usage: bootstrap_korali.sh [--python-bin PYTHON] [--jobs N] [--reconfigure] [--native-cuda-batch] [--skip-python-build-deps]
 
-Build and install the vendored extern/korali tree into the repo-local _vega/ area.
+Build and install the vendored extern/korali tree into the site runtime area.
 
 Expected environment:
   - Vega module stack loaded
@@ -66,10 +66,11 @@ import sys
 
 repo_root = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(repo_root / "src"))
-from meso_uq.vega import get_vega_paths  # noqa: E402
+from meso_uq.vega import get_runtime_paths  # noqa: E402
 
-paths = get_vega_paths(repo_root)
-print(f"VEGA_ROOT={paths.vega_root}")
+paths = get_runtime_paths(repo_root)
+print(f"SITE={paths.site}")
+print(f"SITE_ROOT={paths.site_root}")
 print(f"LOGS_DIR={paths.logs_dir}")
 print(f"KORALI_SOURCE={paths.korali_source}")
 print(f"KORALI_BUILD_DIR={paths.korali_build_dir}")
@@ -84,6 +85,7 @@ log_file="$LOGS_DIR/bootstrap_korali.log"
 exec > >(tee "$log_file") 2>&1
 
 echo "Repo root: $repo_root"
+echo "Site:      $SITE"
 echo "Log file:  $log_file"
 echo "Install to: $KORALI_PREFIX"
 
@@ -133,9 +135,9 @@ import sys
 
 repo_root = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(repo_root / "src"))
-from meso_uq.vega import build_runtime_pythonpath, get_vega_paths  # noqa: E402
+from meso_uq.vega import build_runtime_pythonpath, get_runtime_paths  # noqa: E402
 
-paths = get_vega_paths(repo_root)
+paths = get_runtime_paths(repo_root)
 print(build_runtime_pythonpath(repo_root, paths.korali_site_packages, os.environ.get("PYTHONPATH", ""), include_existing=True))
 PY
 )"
@@ -185,9 +187,9 @@ import sys
 repo_root = Path(sys.argv[1]).resolve()
 env_script = Path(sys.argv[2]).resolve()
 sys.path.insert(0, str(repo_root / "src"))
-from meso_uq.vega import get_vega_paths, render_korali_env_script  # noqa: E402
+from meso_uq.vega import get_runtime_paths, render_korali_env_script  # noqa: E402
 
-paths = get_vega_paths(repo_root)
+paths = get_runtime_paths(repo_root)
 env_script.write_text(render_korali_env_script(paths), encoding="utf-8")
 PY
 
@@ -198,4 +200,4 @@ echo "Korali bootstrap completed."
 echo "Source the repo-local runtime before running workflows:"
 echo "  source $KORALI_ENV_SCRIPT"
 echo "Then re-run the doctor in strict mode:"
-echo "  $python_bin $repo_root/scripts/platforms/vega/doctor_vega.py --strict"
+echo "  $python_bin $repo_root/scripts/platforms/hpc/doctor_hpc.py --strict"

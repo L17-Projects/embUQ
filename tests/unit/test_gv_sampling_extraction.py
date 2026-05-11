@@ -690,9 +690,10 @@ def test_extract_eigenmodes_uses_vector_1d_path(tmp_path: Path) -> None:
     assert np.allclose(channels["eigenvectors"], [1.0, 2.0])
 
 
-def test_read_hdf5_dataset_requires_optional_dependency(tmp_path: Path) -> None:
+def test_read_hdf5_dataset_requires_optional_dependency(monkeypatch, tmp_path: Path) -> None:
     path = tmp_path / "unsupported.h5"
     path.write_text("", encoding="utf-8")
+    monkeypatch.setitem(sys.modules, "h5py", None)
     with pytest.raises(GVSamplingExtractionError, match="h5py is required"):
         _read_hdf5_dataset(path, "position")
 

@@ -33,7 +33,21 @@ def _load_smoke_module(name: str):
     return module
 
 
+def _runtime_module_names() -> set[str]:
+    return {
+        name.lower()
+        for name in sys.modules
+        if name.lower() in {"mirheo", "mirheoobmd"}
+        or name.lower().startswith(("mirheo.", "mirheoobmd."))
+    }
+
+
+def _assert_no_new_mirheo_modules(previous_modules: set[str]) -> None:
+    assert not (_runtime_module_names() - previous_modules)
+
+
 def test_help_does_not_load_runtime_or_mirheo(monkeypatch: pytest.MonkeyPatch) -> None:
+    previous_modules = _runtime_module_names()
     module = _load_module("mesouq_test_gv_runtime_help")
     calls: list[str] = []
 
@@ -48,7 +62,7 @@ def test_help_does_not_load_runtime_or_mirheo(monkeypatch: pytest.MonkeyPatch) -
 
     assert excinfo.value.code == 0
     assert calls == []
-    assert "mirheo" not in {name.lower() for name in sys.modules}
+    _assert_no_new_mirheo_modules(previous_modules)
 
 
 def test_non_shear_experiment_does_not_require_experimental_flag(
@@ -118,6 +132,7 @@ def test_non_shear_experiment_does_not_require_experimental_flag(
 
 
 def test_real_stretching_cli_writes_manifest_without_mirheo(tmp_path: Path) -> None:
+    previous_modules = _runtime_module_names()
     module = _load_module("mesouq_test_gv_runtime_real_stretching")
     output_root = tmp_path / "real-stretching"
 
@@ -139,7 +154,7 @@ def test_real_stretching_cli_writes_manifest_without_mirheo(tmp_path: Path) -> N
     assert manifest["controls"]["tot_force"] == 750.0
     assert manifest["dataset_id"].startswith("gv:stretching:")
     assert manifest["selection"] == "gv:stretching"
-    assert "mirheo" not in {name.lower() for name in sys.modules}
+    _assert_no_new_mirheo_modules(previous_modules)
 
 
 @pytest.mark.parametrize(
@@ -381,6 +396,7 @@ def test_offline_smoke_selection_supports_all_gv_experiments_without_mirheo(
     expected_control_key: str,
     include_experimental: bool,
 ) -> None:
+    previous_modules = _runtime_module_names()
     module = _load_smoke_module(f"mesouq_test_gv_smoke_selection_{selection.replace(':', '_')}")
     argv = [
         "--selection",
@@ -412,7 +428,7 @@ def test_offline_smoke_selection_supports_all_gv_experiments_without_mirheo(
     assert report["structure"] == "gv"
     assert report["selection"] == selection
     assert report["execution_mode"] in {"dry_run_manifest_only", "train_load_evaluate"}
-    assert "mirheo" not in {name.lower() for name in sys.modules}
+    _assert_no_new_mirheo_modules(previous_modules)
 
 
 def test_offline_smoke_runtime_manifest_preserves_selection(tmp_path: Path) -> None:

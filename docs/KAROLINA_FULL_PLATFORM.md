@@ -20,6 +20,7 @@ The site-neutral runtime helper resolves Karolina bootstrap state under `MESOUQ_
 - `_karolina/korali`
 - `_karolina/mirheo`
 - `_karolina/gv_venv`
+- `_karolina/gv_cgal_tools`
 
 ## Slurm policy
 
@@ -51,6 +52,16 @@ _karolina/gv_venv/env.sh
 
 Vega compatibility is preserved through `get_vega_paths()` and clone-local `_vega/` defaults.
 
+GV geometry tooling is staged under:
+
+```bash
+"${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools/bin/scale_space"
+```
+
+When present, `${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools/env.sh` exports `GV_SCALE_SPACE_BINARY`, `GV_CGAL_TOOLS_ROOT`, updates `PATH`, and adds the Karolina MPFR/GMP runtime library paths needed by the CGAL `scale_space` binary.
+
+Standard Mirheo and mirheoOBMD follow the Vega runtime policy: they are separate lane/process imports, not same-interpreter imports. Non-shear GV lanes use `mirheo` by default; `shear_flow` uses `mirheoOBMD`. Validation should import each module in a separate subprocess.
+
 ## Initial evidence target
 
 Karolina acceptance evidence must be machine-readable and include:
@@ -61,4 +72,3 @@ Karolina acceptance evidence must be machine-readable and include:
 - EMB validation matrix and production-sanity report paths;
 - GV non-shear canary report paths for stretching, buckling, torsion, and eigenmodes;
 - explicit blockers, especially missing Vega provenance or unresolved eigenmodes paper-replay mismatch.
-
