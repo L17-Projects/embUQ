@@ -19,19 +19,72 @@ module load Python/3.10.8-GCCcore-12.2.0 openmpi/4.1.2.1 CUDA/12.2.2 GSL/2.7-GCC
 python -m venv _vega/venv
 source _vega/venv/bin/activate
 python -m pip install --upgrade pip
+# Vega's driver stack cannot run the default PyPI CUDA 13 PyTorch wheel.
+# Install a CUDA 12.6 wheel first so the editable install keeps this build.
+python -m pip install --index-url https://download.pytorch.org/whl/cu126 "torch==2.11.0+cu126"
 python -m pip install -e ".[test,mpi]"
 python -m pip install pybind11 meson ninja h5py
 
-bash scripts/platforms/hpc/bootstrap_korali.sh --jobs 8
+bash scripts/platforms/hpc/bootstrap_korali.sh --jobs 8 --native-cuda-batch
 source _vega/korali/env.sh
-bash scripts/platforms/hpc/bootstrap_mirheo.sh --jobs 8
+python - <<'PY'
+import json
+from pathlib import Path
+
+build_options = Path("_vega/korali/build/meson-info/intro-buildoptions.json")
+options = {item["name"]: item["value"] for item in json.loads(build_options.read_text())}
+if options.get("native_cuda_batch") is not True:
+    raise SystemExit("ERROR: Korali was not built with native_cuda_batch=true")
+PY
+
+# Mirheo's CMake configure step writes generated files into the Mirheo source
+# tree. A fresh clone in another Vega account must therefore use a writable
+# account-local Mirheo copy instead of the default lock path under another user.
+export MESOUQ_MIRHEO_SRC="${MESOUQ_MIRHEO_SRC:-$HOME/software/Mirheo}"
+if [[ ! -f "$MESOUQ_MIRHEO_SRC/CMakeLists.txt" ]]; then
+  mkdir -p "$(dirname "$MESOUQ_MIRHEO_SRC")"
+  rsync -rlt --chmod=u+rwX,go+rX /ceph/hpc/home/eubrieucb/software/Mirheo/ "$MESOUQ_MIRHEO_SRC/"
+fi
+bash scripts/platforms/hpc/bootstrap_mirheo.sh --source "$MESOUQ_MIRHEO_SRC" --jobs 8 --reconfigure
 source _vega/mirheo/env.sh
 bash scripts/platforms/vega/bootstrap_tex.sh
 source _vega/tinytex/env.sh
 
 python scripts/platforms/hpc/doctor_hpc.py --strict --with-mirheo --with-tex
 python -m pytest tests/test_vega_50k_campaign.py tests/test_huq_emb_campaign_orchestrator.py tests/test_run_exact_uqdpd_asset_port.py
+
+mkdir -p _vega/logs
+sbatch --wait \
+  --partition=dev \
+  --gres=gpu:1 \
+  --time=00:05:00 \
+  --job-name=mesouq-torch-cuda-probe \
+  --output="$REPO/_vega/logs/torch_cuda_probe_%j.out" \
+  --error="$REPO/_vega/logs/torch_cuda_probe_%j.err" \
+  --export=ALL,REPO="$REPO" <<'SBATCH'
+#!/bin/bash
+set -euo pipefail
+cd "$REPO"
+module purge
+module load Python/3.10.8-GCCcore-12.2.0 CUDA/12.2.2
+source _vega/venv/bin/activate
+python - <<'PY'
+import torch
+
+print(f"torch={torch.__version__}")
+print(f"torch_cuda={torch.version.cuda}")
+if torch.version.cuda != "12.6":
+    raise SystemExit("ERROR: expected the CUDA 12.6 PyTorch wheel")
+if not torch.cuda.is_available():
+    raise SystemExit("ERROR: PyTorch cannot initialize CUDA on this Vega GPU node")
+print(f"gpu={torch.cuda.get_device_name(0)}")
+PY
+SBATCH
 ```
+
+If Korali was already bootstrapped without `native_cuda_batch`, rerun the Korali
+bootstrap with `--reconfigure --native-cuda-batch`. If PyTorch reports a CUDA 13
+wheel, reinstall the CUDA 12.6 wheel above before running the paper campaign.
 
 ## 2. Run the four 50k campaigns
 
@@ -78,7 +131,7 @@ cat "$PAPER_DATA_ROOT/logs/$CAMPAIGN_ID/vega_50k_campaign_report.json"
 
 ## 3. Build the paper figures
 
-Run this only after step 2 finished.
+Run this only after step 2 finished and the campaign report passed.
 
 ```bash
 set -euo pipefail
@@ -88,6 +141,21 @@ export HPC_SITE=vega
 export PAPER_DATA_ROOT="${PAPER_DATA_ROOT:-$HOME/mesouq_paper_data}"
 export CAMPAIGN_ID="${CAMPAIGN_ID:-$(cat "$PAPER_DATA_ROOT/LAST_CAMPAIGN_ID.txt")}"
 mkdir -p "$PAPER_DATA_ROOT/logs/$CAMPAIGN_ID"
+
+python - <<'PY'
+import json
+import os
+from pathlib import Path
+
+report_path = Path(os.environ["PAPER_DATA_ROOT"]) / "logs" / os.environ["CAMPAIGN_ID"] / "vega_50k_campaign_report.json"
+report = json.loads(report_path.read_text())
+failed_steps = [
+    step for step in report.get("steps", [])
+    if step.get("job_state") and step.get("job_state") != "COMPLETED"
+]
+if report.get("status") != "passed" or failed_steps:
+    raise SystemExit(f"ERROR: 50k campaign has not passed: {report_path}")
+PY
 
 sbatch --wait \
   --partition=gpu \
