@@ -20,6 +20,7 @@ export MESOUQ_RUNS_ROOT="${MESOUQ_RUNS_ROOT:-${MESOUQ_SCRATCH_ROOT}/runs}"
 
 export PARTITION="${PARTITION:-qgpu}"
 export NGPUS="${NGPUS:-1}"
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
 
 for _mesouq_env_script in \
   "${MESOUQ_SITE_RUNTIME_ROOT}/mirheo/env.sh" \

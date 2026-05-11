@@ -1,3 +1,6 @@
+import os
+import shlex
+import subprocess
 from pathlib import Path
 
 from meso_uq.vega import (
@@ -267,7 +270,39 @@ def test_render_gv_venv_env_script_exports_openmpi_and_scale_space_paths(tmp_pat
     assert "GV_CGAL_TOOLS_ROOT" in env_script
     assert "_vega/gv_cgal_tools/env.sh" in env_script
     assert "MESOUQ_OPENMPI_LIB_DIR" in env_script
+    assert 'case ":${LD_LIBRARY_PATH:-}:" in' in env_script
     assert str(paths.mirheo_snapshot_path) in env_script
+
+
+def test_render_gv_venv_env_script_sources_under_nounset_without_ld_library_path(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    paths = get_vega_paths(repo_root)
+    source_root = tmp_path / "Mirheo"
+    source_root.mkdir()
+    mpi_root = tmp_path / "mpi"
+    mpi_bin = mpi_root / "bin"
+    mpi_lib = mpi_root / "lib"
+    mpi_bin.mkdir(parents=True)
+    mpi_lib.mkdir()
+    (mpi_bin / "mpicxx").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    (mpi_bin / "mpicxx").chmod(0o755)
+    env_path = tmp_path / "gv_env.sh"
+    env_path.write_text(render_gv_venv_env_script(paths, source_root=source_root), encoding="utf-8")
+
+    subprocess.run(
+        [
+            "bash",
+            "-u",
+            "-c",
+            (
+                "unset LD_LIBRARY_PATH; "
+                f"source {shlex.quote(str(env_path))}; "
+                f'case ":${{LD_LIBRARY_PATH:-}}:" in *":{shlex.quote(str(mpi_lib))}:"*) ;; *) exit 7 ;; esac'
+            ),
+        ],
+        check=True,
+        env={**os.environ, "PATH": f"{mpi_bin}:{os.environ['PATH']}"},
+    )
 
 
 def test_render_gv_cgal_tools_env_script_exports_karolina_library_paths(tmp_path):

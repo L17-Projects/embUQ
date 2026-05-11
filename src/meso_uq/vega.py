@@ -222,7 +222,7 @@ def render_gv_venv_env_script(
             'if command -v mpicxx >/dev/null 2>&1; then',
             '  export MESOUQ_OPENMPI_LIB_DIR="$(dirname "$(dirname "$(command -v mpicxx)")")/lib"',
             '  if [[ -d "$MESOUQ_OPENMPI_LIB_DIR" ]]; then',
-            '    case ":${LD_LIBRARY_PATH}:" in',
+            '    case ":${LD_LIBRARY_PATH:-}:" in',
             '      *":${MESOUQ_OPENMPI_LIB_DIR}:"*) ;;',
             '      *) export LD_LIBRARY_PATH="${MESOUQ_OPENMPI_LIB_DIR}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" ;;',
             "    esac",
