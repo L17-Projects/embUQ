@@ -218,6 +218,33 @@ def test_gv_runtime_rendering_targets_staged_work_dir_and_generates_scheduler(tm
     assert "Missing required GV runtime environment" in scheduler_contents
 
 
+def test_gv_runtime_resolves_karolina_env_script_from_site_runtime_root(tmp_path, monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_runtime.py"),
+        "gv_runtime_karolina_env_resolution_test",
+    )
+    runtime_root = tmp_path / "runtime"
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(runtime_root))
+
+    env_script = module._resolve_gv_env_script("karolina")
+
+    assert env_script == (runtime_root / "gv_venv" / "env.sh").resolve()
+
+
+def test_gv_runtime_karolina_default_output_root_uses_scratch_runs_root(tmp_path, monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_runtime.py"),
+        "gv_runtime_karolina_output_root_test",
+    )
+    runs_root = tmp_path / "runs"
+    monkeypatch.setenv("MESOUQ_RUNS_ROOT", str(runs_root))
+    args = Namespace(output_root=None, platform="karolina", run_tag="tag1")
+
+    output_root = module._resolve_output_root(args)
+
+    assert output_root == (runs_root / "gv" / "runtime" / "tag1").resolve()
+
+
 def test_gv_dry_run_material_parser_validates_overrides() -> None:
     module = _load_module(
         Path("scripts/workflows/gv/run_gv_dry_run.py"),
@@ -247,7 +274,9 @@ def test_gv_generated_mirheo_jobs_source_runtime_environment_and_preserve_materi
     contents = generate_script.read_text(encoding="utf-8")
 
     assert "MESOUQ_GV_ENV_SCRIPT" in contents
-    assert "_vega' / 'gv_venv' / 'env.sh" in contents
+    assert "MESOUQ_SITE_RUNTIME_ROOT" in contents
+    assert "f'_{site}'" in contents
+    assert "_vega' / 'gv_venv' / 'env.sh" not in contents
     assert "source {shlex.quote(env_script)}" in contents
     assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in contents
     assert "MESOUQ_GV_MIRHEO_MODULE" in contents
@@ -663,6 +692,7 @@ def test_gv_runtime_render_manifest_records_classified_known_issues(tmp_path, mo
         ],
         manifest={"work_dir": str(work_dir)},
         platform="vega",
+        gv_env_script=Path("/tmp/gv_venv/env.sh"),
     )
     assert scheduled == []
 
@@ -673,6 +703,7 @@ def test_gv_runtime_render_manifest_records_classified_known_issues(tmp_path, mo
         command_list=[(("sbatch", "existing.sbatch"), work_dir)],
         manifest={"work_dir": str(work_dir)},
         platform="vega",
+        gv_env_script=Path("/tmp/gv_venv/env.sh"),
     ) == []
 
     module._ensure_generated_directories(work_dir, {"generated_subdirs": ["logs", 3]})

@@ -5,6 +5,7 @@ from meso_uq.vega import (
     build_runtime_pythonpath,
     find_external_korali_entries,
     gather_mirheo_source_snapshot,
+    get_runtime_paths,
     get_vega_paths,
     load_mirheo_source_lock,
     render_gv_venv_env_script,
@@ -38,6 +39,32 @@ def test_vega_paths_use_repo_local_visible_state(tmp_path):
     assert paths.mirheo_env_script == repo_root / "_vega" / "mirheo" / "env.sh"
     assert paths.gv_venv_root == repo_root / "_vega" / "gv_venv"
     assert paths.gv_venv_env_script == repo_root / "_vega" / "gv_venv" / "env.sh"
+
+
+def test_runtime_paths_support_karolina_repo_local_root(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    paths = get_runtime_paths(repo_root, site="karolina", env={})
+
+    assert paths.site == "karolina"
+    assert paths.site_root == repo_root / "_karolina"
+    assert paths.korali_prefix == repo_root / "_karolina" / "korali" / "install"
+    assert paths.mirheo_prefix == repo_root / "_karolina" / "mirheo" / "install"
+    assert paths.gv_venv_env_script == repo_root / "_karolina" / "gv_venv" / "env.sh"
+
+
+def test_runtime_paths_honor_site_runtime_root_override(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    runtime_root = tmp_path / "scratch" / "runtime"
+    paths = get_runtime_paths(
+        repo_root,
+        site="karolina",
+        env={"MESOUQ_SITE_RUNTIME_ROOT": str(runtime_root)},
+    )
+
+    assert paths.site_root == runtime_root.resolve()
+    assert paths.venv_root == runtime_root.resolve() / "venv"
+    assert paths.korali_env_script == runtime_root.resolve() / "korali" / "env.sh"
+    assert paths.gv_venv_env_script == runtime_root.resolve() / "gv_venv" / "env.sh"
 
 
 def test_resolve_repo_root_finds_root_from_nested_file(tmp_path):
@@ -108,6 +135,19 @@ def test_render_korali_env_script_uses_deterministic_pythonpath(tmp_path):
     assert str(paths.korali_site_packages) in env_script
     assert f"{repo_root / 'src'}:{repo_root}" in env_script
     assert "replaces inherited PYTHONPATH" in env_script
+
+
+def test_render_korali_env_script_exports_karolina_runtime_root(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    paths = get_runtime_paths(repo_root, site="karolina", env={})
+
+    env_script = render_korali_env_script(paths)
+
+    assert "MESOUQ_SITE=karolina" in env_script
+    assert "MESOUQ_SITE_RUNTIME_ROOT" in env_script
+    assert "MESOUQ_KAROLINA_ROOT" in env_script
+    assert str(repo_root / "_karolina" / "korali" / "install") in env_script
+    assert "MESOUQ_VEGA_ROOT" not in env_script
 
 
 def test_render_tinytex_env_script_exports_repo_local_bin(tmp_path):

@@ -35,10 +35,15 @@ def default_runs_root(
     *,
     site: str | None = None,
     run_tag: str | None = None,
+    env: dict[str, str] | None = None,
 ) -> Path:
+    source_env = env if env is not None else os.environ
     root = Path(repo_root).resolve()
     resolved_site = site if site is not None else detect_hpc_site()
     if resolved_site not in _VALID_SITES:
         raise ValueError(f"Unsupported site '{resolved_site}'. Expected one of: {sorted(_VALID_SITES)}")
     resolved_tag = run_tag if run_tag is not None else make_run_tag()
+    runs_root = source_env.get("MESOUQ_RUNS_ROOT", "").strip()
+    if runs_root:
+        return Path(runs_root).expanduser().resolve() / workflow_name / resolved_tag
     return root / "_runs" / resolved_site / workflow_name / resolved_tag
