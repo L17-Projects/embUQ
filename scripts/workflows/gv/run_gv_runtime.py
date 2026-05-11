@@ -321,6 +321,7 @@ def _run_commands(
     *,
     dry_run: bool,
     material_overrides_json: str = "",
+    env_overrides: dict[str, str] | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     records: list[dict[str, Any]] = []
     if dry_run:
@@ -337,10 +338,13 @@ def _run_commands(
             )
         return records, 0
     for command, cwd in commands:
-        env = None
+        command_env = dict(env_overrides or {})
         if material_overrides_json:
+            command_env["MESOUQ_GV_MATERIAL_OVERRIDES_JSON"] = material_overrides_json
+        env = None
+        if command_env:
             env = dict(os.environ)
-            env["MESOUQ_GV_MATERIAL_OVERRIDES_JSON"] = material_overrides_json
+            env.update(command_env)
         run_kwargs: dict[str, Any] = {
             "cwd": str(cwd),
             "capture_output": True,
@@ -363,6 +367,14 @@ def _run_commands(
         if proc.returncode != 0:
             return records, proc.returncode
     return records, 0
+
+
+def _runtime_env_overrides(platform: str, gv_env_script: Path) -> dict[str, str]:
+    overrides = {"MESOUQ_GV_ENV_SCRIPT": str(gv_env_script)}
+    if platform in {"karolina", "vega"}:
+        overrides["MESOUQ_SITE"] = platform
+        overrides["HPC_SITE"] = platform
+    return overrides
 
 
 def _to_render_manifest(
@@ -462,6 +474,7 @@ def main(argv: list[str] | None = None) -> int:
         commands=command_list,
         dry_run=args.dry_run,
         material_overrides_json=material_overrides_json,
+        env_overrides=_runtime_env_overrides(platform, gv_env_script),
     )
 
     render_manifest_path = runtime_output_root / GV_RUNTIME_RENDER_MANIFEST

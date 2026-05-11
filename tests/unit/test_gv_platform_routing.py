@@ -561,6 +561,38 @@ def test_gv_runtime_command_execution_exports_material_overrides(tmp_path, monke
         module._load_runtime_manifest(bad_controls_json)
 
 
+def test_gv_runtime_command_execution_propagates_runtime_env_overrides(tmp_path, monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_runtime.py"),
+        "gv_runtime_site_env_override_test",
+    )
+    captured_env: list[dict[str, str]] = []
+
+    def _fake_run(command, cwd, env, capture_output, text, check):
+        captured_env.append(dict(env))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", _fake_run)
+
+    records, returncode = module._run_commands(
+        commands=[(("python3", "generate.py"), tmp_path)],
+        dry_run=False,
+        material_overrides_json='{"ka": 1.1}',
+        env_overrides={
+            "MESOUQ_SITE": "karolina",
+            "HPC_SITE": "karolina",
+            "MESOUQ_GV_ENV_SCRIPT": "/scratch/mesouq/runtime/gv_venv/env.sh",
+        },
+    )
+
+    assert returncode == 0
+    assert records[0]["status"] == "completed"
+    assert captured_env[0]["MESOUQ_SITE"] == "karolina"
+    assert captured_env[0]["HPC_SITE"] == "karolina"
+    assert captured_env[0]["MESOUQ_GV_ENV_SCRIPT"] == "/scratch/mesouq/runtime/gv_venv/env.sh"
+    assert captured_env[0]["MESOUQ_GV_MATERIAL_OVERRIDES_JSON"] == '{"ka": 1.1}'
+
+
 def test_gv_runtime_command_execution_without_material_overrides_does_not_pass_env(tmp_path, monkeypatch) -> None:
     module = _load_module(
         Path("scripts/workflows/gv/run_gv_runtime.py"),
@@ -582,6 +614,53 @@ def test_gv_runtime_command_execution_without_material_overrides_does_not_pass_e
     assert returncode == 0
     assert records[0]["status"] == "completed"
     assert "env" not in captured_kwargs[0]
+
+
+def test_gv_runtime_workflow_passes_karolina_env_to_subprocesses(tmp_path, monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_runtime.py"),
+        "gv_runtime_karolina_subprocess_env_test",
+    )
+    output_root = tmp_path / "runtime"
+    work_dir = output_root / "torsion" / "gv_rad2_height14_28" / "theta_0_03" / "work"
+    manifest = {
+        "structure": "gv",
+        "experiment": "torsion",
+        "geometry": "gv_rad2_height14_28",
+        "controls": {"theta": 0.03},
+        "control_id": "theta_0_03",
+        "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0_03",
+        "output_root": str(output_root),
+        "work_dir": str(work_dir),
+        "commands": [{"argv": ["python3", "generate.py"], "cwd": "{work_dir}"}],
+    }
+
+    def _fake_dry_run(argv: list[str]) -> int:
+        output_root.mkdir(parents=True, exist_ok=True)
+        work_dir.mkdir(parents=True, exist_ok=True)
+        (output_root / module.GV_RUNTIME_MANIFEST).write_text(json.dumps(manifest), encoding="utf-8")
+        return 0
+
+    captured_env: list[dict[str, str]] = []
+
+    def _fake_run(command, *, cwd, env, capture_output, text, check):
+        captured_env.append(dict(env))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(module, "RUN_GV_DRY_RUN_MAIN", _fake_dry_run)
+    monkeypatch.setattr(module.subprocess, "run", _fake_run)
+    monkeypatch.delenv("MESOUQ_SITE", raising=False)
+    monkeypatch.delenv("HPC_SITE", raising=False)
+    monkeypatch.delenv("MESOUQ_GV_ENV_SCRIPT", raising=False)
+
+    rc = module.main(["--selection", "gv:torsion", "--platform", "karolina", "--output-root", str(output_root)])
+
+    assert rc == 0
+    assert len(captured_env) == 1
+    expected_env_script = str(module._resolve_gv_env_script("karolina"))
+    assert captured_env[0]["MESOUQ_SITE"] == "karolina"
+    assert captured_env[0]["HPC_SITE"] == "karolina"
+    assert captured_env[0]["MESOUQ_GV_ENV_SCRIPT"] == expected_env_script
 
 
 def test_gv_runtime_render_manifest_records_classified_known_issues(tmp_path, monkeypatch) -> None:
