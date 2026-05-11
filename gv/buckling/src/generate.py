@@ -63,15 +63,19 @@ def _find_repo_root():
 
 
 def _gv_env_script():
-    env_script = os.environ.get('MESOUQ_GV_ENV_SCRIPT')
+    env_script = os.environ.get('MESOUQ_GV_ENV_SCRIPT', '').strip()
     if env_script:
         return str(Path(env_script).expanduser().resolve())
+    runtime_root = os.environ.get('MESOUQ_SITE_RUNTIME_ROOT', '').strip()
+    if runtime_root:
+        return str((Path(runtime_root).expanduser() / 'gv_venv' / 'env.sh').resolve())
     repo_root = _find_repo_root()
     if repo_root is None:
         return ''
-    return str((repo_root / '_vega' / 'gv_venv' / 'env.sh').resolve())
-
-
+    site = (os.environ.get('MESOUQ_SITE', '') or os.environ.get('HPC_SITE', '') or 'vega').strip().lower()
+    if site not in {'vega', 'karolina'}:
+        site = 'vega'
+    return str((repo_root / f'_{site}' / 'gv_venv' / 'env.sh').resolve())
 def _write_runtime_preamble(file_commands):
     env_script = _gv_env_script()
     if env_script:
@@ -83,6 +87,48 @@ def _write_runtime_preamble(file_commands):
         file_commands.write(
             'export MESOUQ_GV_MATERIAL_OVERRIDES_JSON='
             f'{shlex.quote(material_overrides)}\n'
+        )
+    mirheo_module = os.environ.get('MESOUQ_GV_MIRHEO_MODULE', '')
+    if mirheo_module:
+        file_commands.write(
+            'export MESOUQ_GV_MIRHEO_MODULE='
+            f'{shlex.quote(mirheo_module)}\n'
+        )
+    paper_exact = os.environ.get('MESOUQ_GV_PAPER_EXACT', '')
+    if paper_exact:
+        file_commands.write(
+            'export MESOUQ_GV_PAPER_EXACT='
+            f'{shlex.quote(paper_exact)}\n'
+        )
+    membrane_bpress_mode = os.environ.get('MESOUQ_GV_BUCKLING_MEMBRANE_BPRESS_MODE', '')
+    if membrane_bpress_mode:
+        file_commands.write(
+            'export MESOUQ_GV_BUCKLING_MEMBRANE_BPRESS_MODE='
+            f'{shlex.quote(membrane_bpress_mode)}\n'
+        )
+    fluid_mode = os.environ.get('MESOUQ_GV_BUCKLING_FLUID_MODE', '')
+    if fluid_mode:
+        file_commands.write(
+            'export MESOUQ_GV_BUCKLING_FLUID_MODE='
+            f'{shlex.quote(fluid_mode)}\n'
+        )
+    fluid_stabilization = os.environ.get('MESOUQ_GV_BUCKLING_FLUID_STABILIZATION', '')
+    if fluid_stabilization:
+        file_commands.write(
+            'export MESOUQ_GV_BUCKLING_FLUID_STABILIZATION='
+            f'{shlex.quote(fluid_stabilization)}\n'
+        )
+    pin_object = os.environ.get('MESOUQ_GV_BUCKLING_PIN_OBJECT', '')
+    if pin_object:
+        file_commands.write(
+            'export MESOUQ_GV_BUCKLING_PIN_OBJECT='
+            f'{shlex.quote(pin_object)}\n'
+        )
+    odpd_amp_scale = os.environ.get('MESOUQ_GV_BUCKLING_ODPD_AMP_SCALE', '')
+    if odpd_amp_scale:
+        file_commands.write(
+            'export MESOUQ_GV_BUCKLING_ODPD_AMP_SCALE='
+            f'{shlex.quote(odpd_amp_scale)}\n'
         )
     file_commands.write('\n')
 

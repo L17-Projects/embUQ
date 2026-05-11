@@ -68,10 +68,10 @@ f.close()
 print('Step:::::Subtracting average/reference structure from trajectory')
 trj_np = np.zeros((trajs, 3 * num_vertices))
 
-av = np.loadtxt('emb_0000000.xyz', skiprows=2)[:,1:]
+reference_positions = av
 
 for i in range(trajs):
-    trj_np[i] = trj.trajectory[i].positions.reshape(1,-1) - av.reshape(1,-1)
+    trj_np[i] = trj.trajectory[i].positions.reshape(1,-1) - reference_positions.reshape(1,-1)
 
 ###########################################################
 
@@ -79,11 +79,15 @@ print(f'Step:::::Preparing mass-weighted trajectory matrix of size {trj_np.shape
 trj_np *= np.sqrt(parameters["mvert"])
 ###########################################################
 
-method = 'svd' # 'eig', 'svd', 'mdanalysis'
+method = os.environ.get('MESOUQ_GV_EIGENMODES_ANALYSIS_METHOD', 'covariance').strip().lower()
 print(f'Step:::::Calculating eigenvalues and eigenvectors using np.{method} method.')
-if(method == 'eigh'):
-    a = np.cov(trj_np.T)
-    eigvalues, eigvectors = np.linalg.eigh(a)
+if(method in ('covariance', 'cov', 'eigh')):
+    denominator = max(trajs - 1, 1)
+    covariance = trj_np.T @ trj_np / denominator
+    eigvalues, eigvectors = np.linalg.eigh(covariance)
+    idx = eigvalues.argsort()[::-1]
+    eigvalues = eigvalues[idx]
+    U = eigvectors[:, idx]
 elif(method == 'eig'):
     a = np.cov(trj_np.T)
     eigvalues, eigvectors = np.linalg.eig(a)
@@ -94,6 +98,8 @@ elif(method == 'svd'):
     U = Vh.T
 elif(method == 'mdanalysis'):
     pc = pca.PCA(trj, select='all', mean=None, n_components=None).run()
+else:
+    raise ValueError(f'Unknown eigenmode analysis method: {method}')
 
 ###########################################################
 
@@ -101,10 +107,7 @@ nlim = -1
 nlimt = ('all' if nlim == -1 else nlim)
 print(f'Step:::::Storing {nlimt} eigenvalues and eigenvectors.')
 
-if(method == 'eigh'):
-    np.savetxt('output/eigvalues.txt', eigvalues[0:nlim].real)
-    np.savetxt('output/eigvectors.txt', eigvectors.T.real[0:nlim])
-if(method == 'svd'):
+if(method in ('covariance', 'cov', 'eigh', 'svd')):
     np.savetxt('output/eigvalues.txt', eigvalues[0:nlim].real)
     np.savetxt('output/eigvectors.txt', U.T.real[0:nlim])
 if(method == 'eig'):
@@ -145,4 +148,3 @@ f.close()'''
 #160 s for 2562 and eigh
 #274 s for 2562 and eig
 #262 s for 2562 and svd
-

@@ -121,7 +121,7 @@ k_fsi = parameters_default["k_fsi"]
 
 rho_surf = nverts / tot_area
 gamma_fsi = fscale * 2.0 * visw_dpd * (2 * k_fsi + 1) * (2 * k_fsi + 2) * (2 * k_fsi + 3) * (2 * k_fsi + 4) / (3 * np.pi * rc **4 * rhow * rho_surf)
-gamma_fsi_gas = 1.23 * fscale * 2.0 * visg_dpd * (2 * k_fsi + 1) * (2 * k_fsi + 2) * (2 * k_fsi + 3) * (2 * k_fsi + 4) / (3 * np.pi * rc **4 * rhog * rho_surf)
+gamma_fsi_gas = fscale * 2.0 * visg_dpd * (2 * k_fsi + 1) * (2 * k_fsi + 2) * (2 * k_fsi + 3) * (2 * k_fsi + 4) / (3 * np.pi * rc **4 * rhog * rho_surf)
 
 # Lim Isotropic
 ka = fscale * Yt * shell_th / (2 * (1 - nu)) / (ue / ul**2)

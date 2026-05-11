@@ -1,11 +1,54 @@
 #!/usr/bin/env python3
 
-import mirheo as mir
+import importlib
+import os
+
+_MIRHEO_MODULE = os.environ.get("MESOUQ_GV_MIRHEO_MODULE", "mirheo")
+mir = importlib.import_module(_MIRHEO_MODULE)
+_PAPER_EXACT = os.environ.get("MESOUQ_GV_PAPER_EXACT", "").lower() in {"1", "true", "yes"}
+_DEFAULT_MEMBRANE_BPRESS_MODE = "runtime"
+_MEMBRANE_BPRESS_MODE = os.environ.get(
+    "MESOUQ_GV_BUCKLING_MEMBRANE_BPRESS_MODE",
+    _DEFAULT_MEMBRANE_BPRESS_MODE,
+).lower()
+_FLUID_MODE = os.environ.get("MESOUQ_GV_BUCKLING_FLUID_MODE", "dropped").lower()
+_FLUID_STABILIZATION_OVERRIDE = os.environ.get("MESOUQ_GV_BUCKLING_FLUID_STABILIZATION")
+_PIN_OBJECT_MODE = os.environ.get("MESOUQ_GV_BUCKLING_PIN_OBJECT", "1").lower()
+_ODPD_AMP_SCALE = float(os.environ.get("MESOUQ_GV_BUCKLING_ODPD_AMP_SCALE", "1.0"))
+
+
+def _pin_object_enabled():
+    return _PIN_OBJECT_MODE not in {"0", "false", "no", "off"}
+
+
+def _legacy_stabilized_fluid_mode():
+    return _FLUID_MODE in {"legacy", "legacy_stabilized", "paper_legacy"}
+
+
+def _fluid_stabilization():
+    if _FLUID_STABILIZATION_OVERRIDE is None:
+        return 1.0 if _legacy_stabilized_fluid_mode() else 0.0
+    value = float(_FLUID_STABILIZATION_OVERRIDE)
+    if value < 0.0 or value > 1.0:
+        raise ValueError("MESOUQ_GV_BUCKLING_FLUID_STABILIZATION must be in [0, 1].")
+    return value
+
+
+def _create_mirheo(ranks, domain, **kwargs):
+    if _MIRHEO_MODULE.startswith("mirheoOBMD"):
+        return mir.Mirheo(ranks, domain, {}, "open", **kwargs)
+    return mir.Mirheo(ranks, domain, **kwargs)
+
+
+def _create_particle_vector(name, *, mass, obmd):
+    if _MIRHEO_MODULE.startswith("mirheoOBMD"):
+        return mir.ParticleVectors.ParticleVector(name, mass=mass, obmd=obmd)
+    return mir.ParticleVectors.ParticleVector(name, mass=mass)
+
 import numpy as np
 import trimesh
 import yaml
 import argparse
-import os
 
 ######################################################
 # set-up simulation type: equilibration or restart
@@ -85,7 +128,7 @@ domain = (Lx, Ly, Lz)
 ######################################################
 checkpoint_step = numsteps - 1
 
-u = mir.Mirheo(ranks, domain, debug_level = 3, log_filename = 'logs/log', checkpoint_folder = "restart/", checkpoint_every = checkpoint_step) #, MPI._addressof(comm))
+u = _create_mirheo(ranks, domain, debug_level = 3, log_filename = 'logs/log', checkpoint_folder = "restart/", checkpoint_every = checkpoint_step) #, MPI._addressof(comm))
 
 
 #loads the off script
@@ -95,12 +138,14 @@ mesh = trimesh.load_mesh(objFile)
 triangle = mesh.vertices[mesh.faces]
 edge1 = triangle[:,1] - triangle[:,0]
 edges = np.linalg.norm(edge1, axis=1)
-lj_fac = 0.8 * np.min(edges)
+mesh_lj_fac = 0.8 * np.min(edges)
+lj_fac = 0.7 * np.min(edges) if _legacy_stabilized_fluid_mode() else mesh_lj_fac
 
 #reads vertices, faces
 mesh_emb = mir.ParticleVectors.MembraneMesh(mesh.vertices.tolist(), mesh.faces.tolist())
 
-emb = mir.ParticleVectors.MembraneVector("emb", mass = 100 * mvert, mesh = mesh_emb)
+emb_mass = mvert if _legacy_stabilized_fluid_mode() else 100 * mvert
+emb = mir.ParticleVectors.MembraneVector("emb", mass = emb_mass, mesh = mesh_emb)
 
 #initial condition for EMB
 ic_emb  = mir.InitialConditions.Membrane(pos_q)
@@ -109,12 +154,12 @@ ic_emb  = mir.InitialConditions.Membrane(pos_q)
 u.registerParticleVector(emb, ic_emb)
 
 #water
-water = mir.ParticleVectors.ParticleVector('water', mass = mw)#, obmd = obmd_flag) # ne smes imeti istega imena "water" za več "pv"-jev, "water" je ime "pv"-ja znotraj mirhea
+water = _create_particle_vector('water', mass = mw, obmd = obmd_flag)
 ic_water = mir.InitialConditions.Uniform(number_density = rhow)
 u.registerParticleVector(water, ic_water)
 
 #solvent
-sol2 = mir.ParticleVectors.ParticleVector('sol2', mass = mg)#, obmd = obmd_flag)
+sol2 = _create_particle_vector('sol2', mass = mg, obmd = 0)
 ic_outer2 = mir.InitialConditions.Uniform(number_density = rhog)
 u.registerParticleVector(sol2, ic_outer2)
 
@@ -135,13 +180,23 @@ radGV = parameters_default["radGV"]
 #buck = buck / radGV
 
 #interactions
-afsi = 2.0 * aii #buck * aii #prej 0.5 *
-lj_fac = parameters_default["lj_fac"]
+fluid_stabilization = _fluid_stabilization()
+legacy_afsi_factor = 10.0 * (2.0 / radGV)**2
+afsi = (2.0 + fluid_stabilization * (legacy_afsi_factor - 2.0)) * aii #buck * aii #prej 0.5 *
+if fluid_stabilization <= 0.0:
+    lj_fac = parameters_default["lj_fac"]
 facg = parameters_default["facg"]
 bpress = parameters_default["bpress"]
 
 if(objType == 'gv'):
-    prms_emb["bpress"] = bpress #-29.0
+    if _legacy_stabilized_fluid_mode():
+        buck = buck * (2.0 / radGV)**2
+    if _MEMBRANE_BPRESS_MODE == "runtime":
+        prms_emb["bpress"] = bpress #-29.0
+    elif _MEMBRANE_BPRESS_MODE == "zero":
+        prms_emb["bpress"] = 0.0
+    else:
+        raise ValueError("MESOUQ_GV_BUCKLING_MEMBRANE_BPRESS_MODE must be 'runtime' or 'zero'.")
     int_emb = mir.Interactions.MembraneForces("int_emb", "LimUniaxial", "KantorStressFree", **prms_emb, stress_free = True)
 else:
     int_emb = mir.Interactions.MembraneForces("int_emb", "Lim", "KantorStressFree", **prms_emb, stress_free = True)
@@ -156,13 +211,20 @@ print(f'time = {t0}')
 #timestart = t0
 #timeend = (t0 + numsteps * dt if args.restart else t0 + numsteps_eq * dt_eq)
 
-dpd = mir.Interactions.Pairwise('dpd', rc, kind = "DPD", a = 0*aii, gamma = 0*gamma_dpd, kBT = kbt, power = s)
-dpd_gas = mir.Interactions.Pairwise('dpd_gas', rc, kind = "DPD", a = 0*aii, gamma = gamma_dpd_gas, kBT = kbt, power = s_g)
+water_gas_a = fluid_stabilization * aii
+water_gas_gamma = fluid_stabilization * gamma_dpd
+gas_a = fluid_stabilization * facg * aii
+gas_fsi_a = fluid_stabilization * afsi
+dpd = mir.Interactions.Pairwise('dpd', rc, kind = "DPD", a = water_gas_a, gamma = water_gas_gamma, kBT = kbt, power = s)
+dpd_gas = mir.Interactions.Pairwise('dpd_gas', rc, kind = "DPD", a = gas_a, gamma = gamma_dpd_gas, kBT = kbt, power = s_g)
 dpd_fsi = mir.Interactions.Pairwise('dpd_fsi', rc, kind = "DPD", a = afsi, gamma = gamma_fsi, kBT = kbt, power = k_fsi)
-dpd_fsi_gas = mir.Interactions.Pairwise('dpd_fsi_gas', rc, kind = "DPD", a = 0*aii, gamma = gamma_fsi_gas, kBT = kbt, power = k_fsi)
+dpd_fsi_gas = mir.Interactions.Pairwise('dpd_fsi_gas', rc, kind = "DPD", a = gas_fsi_a, gamma = gamma_fsi_gas, kBT = kbt, power = k_fsi)
 lj = mir.Interactions.Pairwise('lj', rc, kind = "RepulsiveLJ", epsilon = 0.1, sigma = rc / (2**(1/6)), max_force = 10.0, aware_mode = 'Object')
 #lj_int = mir.Interactions.Pairwise('lj_int', lj_fac * rc, kind = "RepulsiveLJ", epsilon = 0.1, sigma = lj_fac * rc / (2**(1/6)), max_force = 10.0)
-lj_int = mir.Interactions.Pairwise('lj_int', lj_fac, kind = "RepulsiveLJ", epsilon = 10000.0, sigma = lj_fac / (2**(1/6)), max_force = 10000.0)
+lj_epsilon = 1000.0 if _legacy_stabilized_fluid_mode() else 10000.0
+lj_sigma = (0.99 * lj_fac if _legacy_stabilized_fluid_mode() else lj_fac) / (2**(1/6))
+lj_max_force = 1000.0 if _legacy_stabilized_fluid_mode() else 10000.0
+lj_int = mir.Interactions.Pairwise('lj_int', lj_fac, kind = "RepulsiveLJ", epsilon = lj_epsilon, sigma = lj_sigma, max_force = lj_max_force)
 #dpd_int = mir.Interactions.Pairwise('dpd_int', lj_fac , kind = "DPD", a = 10*aii, gamma = 0*gamma_dpd, kBT = kbt, power = s)
 
 #niter = 10
@@ -183,8 +245,10 @@ timeend = (numsteps_eq * dt_eq + numsteps * dt if args.restart else numsteps_eq 
 
 #odpd = mir.Interactions.Pairwise('odpd', rc, kind = "ODPD", a = a0, gamma = gamma_dpd, kBT = kbt, power = s, timestart = timestart, timeend = timeend, amp = buck * aii, mode = 2, stress=True, stress_period = tdump) # 1 = 'hysteresis', 0 - 'forward', 2 - 'forward + equil'
 
-if(args.restart):
-    odpd = mir.Interactions.Pairwise('odpd', rc, kind = "ODPD", a = a0, gamma = gamma_dpd, kBT = kbt, power = s, timestart = timestart, timeend = timeend, amp = buck * aii, mode = 2, stress=True, stress_period = tdump) # 1 = 'hysteresis', 0 - 'forward', 2 - 'forward + equil'
+if _legacy_stabilized_fluid_mode():
+    odpd = mir.Interactions.Pairwise('odpd', rc, kind = "ODPD", a = aii, gamma = gamma_dpd, kBT = kbt, power = s, timestart = timestart, timeend = timeend, amp = _ODPD_AMP_SCALE * buck * aii, mode = 2, stress=True, stress_period = tdump) # 1 = 'hysteresis', 0 - 'forward', 2 - 'forward + equil'
+elif(args.restart):
+    odpd = mir.Interactions.Pairwise('odpd', rc, kind = "ODPD", a = a0, gamma = gamma_dpd, kBT = kbt, power = s, timestart = timestart, timeend = timeend, amp = _ODPD_AMP_SCALE * buck * aii, mode = 2, stress=True, stress_period = tdump) # 1 = 'hysteresis', 0 - 'forward', 2 - 'forward + equil'
 else:
     odpd = mir.Interactions.Pairwise('odpd', rc, kind = "ODPD", a = aii, gamma = gamma_dpd, kBT = kbt, power = s, timestart = timestart, timeend = timeend, amp = 0 * aii, mode = 2, stress=True, stress_period = tdump) # 1 = 'hysteresis', 0 - 'forward', 2 - 'forward + equil'
 
@@ -205,7 +269,7 @@ vv = mir.Integrators.VelocityVerlet('vv')
 u.registerIntegrator(vv)
 
 #set integrator for various parts
-if args.restart:
+if _legacy_stabilized_fluid_mode() or args.restart:
     u.setIntegrator(vv, emb)
 
 #u.setIntegrator(vv, emb)
@@ -280,10 +344,11 @@ if args.equil:
     pids = [np.argmin(mesh.vertices[:,2]), np.argmax(mesh.vertices[:,2])]
     #print(f'utime eq = {u.getState().current_time}')
     #set_interactions(u)
-    unr = mir.Plugins.PinObject.Unrestricted
-    omega = [unr, unr, unr]
-    velocity = [0.0, 0.0, 0.0]
-    u.registerPlugins(mir.Plugins.createPinObject('pin', emb, nevery, 'force/', velocity, omega))
+    if _pin_object_enabled():
+        unr = mir.Plugins.PinObject.Unrestricted
+        omega = [unr, unr, unr]
+        velocity = [0.0, 0.0, 0.0]
+        u.registerPlugins(mir.Plugins.createPinObject('pin', emb, nevery, 'force/', velocity, omega))
     u.registerPlugins(mir.Plugins.createStats('stats', every = nevery))
     u.registerPlugins(mir.Plugins.createDumpXYZ('xyz_dump', emb, nevery, f"trj_eq/sim{args.simnum}"))
     u.registerPlugins(mir.Plugins.createDumpMesh('ply_dump', emb, nevery, f"ply_eq/sim{args.simnum}"))
@@ -300,10 +365,11 @@ if args.restart:
     u.restart("restart/")
     #set_interactions(u)
     #print(f'utime res = {u.getState().current_time}')
-    unr = mir.Plugins.PinObject.Unrestricted
-    omega = [unr, unr, unr]
-    velocity = [0.0, 0.0, 0.0]
-    u.registerPlugins(mir.Plugins.createPinObject('pin', emb, nevery, 'force/', velocity, omega))
+    if _pin_object_enabled():
+        unr = mir.Plugins.PinObject.Unrestricted
+        omega = [unr, unr, unr]
+        velocity = [0.0, 0.0, 0.0]
+        u.registerPlugins(mir.Plugins.createPinObject('pin', emb, nevery, 'force/', velocity, omega))
     u.registerPlugins(mir.Plugins.createStats('stats', every = nevery))
     u.registerPlugins(mir.Plugins.createDumpXYZ('xyz_dump', emb, nevery, f"trj_eq/sim{args.simnum}"))
     u.registerPlugins(mir.Plugins.createDumpMesh('ply_dump', emb, nevery, f"ply_eq/sim{args.simnum}"))

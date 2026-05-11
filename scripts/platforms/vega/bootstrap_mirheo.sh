@@ -8,7 +8,7 @@ usage() {
   cat <<'EOF'
 Usage: bootstrap_mirheo.sh [--python-bin PYTHON] [--source PATH] [--jobs N] [--reconfigure] [--skip-python-deps]
 
-Build Mirheo from an external pinned source path into the repo-local _vega/ area
+Build Mirheo from an external pinned source path into the site runtime area
 and install the Python package into the active repo-local venv.
 
 Expected environment:
@@ -69,11 +69,12 @@ import sys
 repo_root = Path(sys.argv[1]).resolve()
 override = sys.argv[2] or None
 sys.path.insert(0, str(repo_root / "src"))
-from meso_uq.vega import get_vega_paths, resolve_mirheo_source  # noqa: E402
+from meso_uq.vega import get_runtime_paths, resolve_mirheo_source  # noqa: E402
 
-paths = get_vega_paths(repo_root)
-source_root = resolve_mirheo_source(repo_root, override=override)
-print(f"VEGA_ROOT={paths.vega_root}")
+paths = get_runtime_paths(repo_root)
+source_root = resolve_mirheo_source(repo_root, override=override, site=paths.site)
+print(f"SITE={paths.site}")
+print(f"SITE_ROOT={paths.site_root}")
 print(f"LOGS_DIR={paths.logs_dir}")
 print(f"MIRHEO_SOURCE={source_root}")
 print(f"MIRHEO_BUILD_DIR={paths.mirheo_build_dir}")
@@ -91,6 +92,7 @@ log_file="$LOGS_DIR/bootstrap_mirheo.log"
 exec > >(tee "$log_file") 2>&1
 
 echo "Repo root:      $repo_root"
+echo "Site:           $SITE"
 echo "Log file:       $log_file"
 echo "Mirheo source:  $MIRHEO_SOURCE"
 echo "Build dir:      $MIRHEO_BUILD_DIR"
@@ -198,12 +200,13 @@ gv_env_script = Path(sys.argv[5]).resolve()
 sys.path.insert(0, str(repo_root / "src"))
 from meso_uq.vega import (
     gather_mirheo_source_snapshot,
-    get_vega_paths,
+    get_runtime_paths,
+    render_gv_cgal_tools_env_script,
     render_gv_venv_env_script,
     render_mirheo_env_script,  # noqa: E402
 )
 
-paths = get_vega_paths(repo_root)
+paths = get_runtime_paths(repo_root)
 snapshot = gather_mirheo_source_snapshot(source_root)
 snapshot["build_dir"] = str(paths.mirheo_build_dir)
 snapshot["install_prefix"] = str(paths.mirheo_prefix)
@@ -222,9 +225,15 @@ gv_env_script.write_text(
     ),
     encoding="utf-8",
 )
+paths.gv_cgal_tools_env_script.parent.mkdir(parents=True, exist_ok=True)
+paths.gv_cgal_tools_env_script.write_text(
+    render_gv_cgal_tools_env_script(paths),
+    encoding="utf-8",
+)
 PY
 
 chmod +x "$MIRHEO_ENV_SCRIPT" "$GV_VENV_ENV_SCRIPT"
+chmod +x "$(dirname "$GV_VENV_ENV_SCRIPT")/../gv_cgal_tools/env.sh"
 
 echo "Verifying Mirheo and h5py imports"
 "$runtime_python" - <<'PY'
@@ -244,4 +253,4 @@ echo "Source the repo-local runtime before running MAP Mirheo workflows:"
 echo "  source $MIRHEO_ENV_SCRIPT"
 echo "  source $GV_VENV_ENV_SCRIPT"
 echo "Then re-run the doctor in strict mode:"
-echo "  $runtime_python $repo_root/scripts/platforms/vega/doctor_vega.py --strict --with-gv-runtime"
+echo "  $runtime_python $repo_root/scripts/platforms/hpc/doctor_hpc.py --strict --with-gv-runtime"

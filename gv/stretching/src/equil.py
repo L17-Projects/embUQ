@@ -1,11 +1,28 @@
 #!/usr/bin/env python3
 
-import mirheo as mir
+import importlib
+import os
+
+_MIRHEO_MODULE = os.environ.get("MESOUQ_GV_MIRHEO_MODULE", "mirheo")
+mir = importlib.import_module(_MIRHEO_MODULE)
+_PAPER_EXACT = os.environ.get("MESOUQ_GV_PAPER_EXACT", "").lower() in {"1", "true", "yes"}
+
+
+def _create_mirheo(ranks, domain, **kwargs):
+    if _MIRHEO_MODULE.startswith("mirheoOBMD"):
+        return mir.Mirheo(ranks, domain, {}, "open", **kwargs)
+    return mir.Mirheo(ranks, domain, **kwargs)
+
+
+def _create_particle_vector(name, *, mass, obmd):
+    if _MIRHEO_MODULE.startswith("mirheoOBMD"):
+        return mir.ParticleVectors.ParticleVector(name, mass=mass, obmd=obmd)
+    return mir.ParticleVectors.ParticleVector(name, mass=mass)
+
 import numpy as np
 import trimesh
 import yaml
 import argparse
-import os
 
 ######################################################
 # set-up simulation type: equilibration or restart
@@ -159,7 +176,7 @@ force = parameters_default["force"]
 checkpoint_step = numsteps - 1
 
 #mirheo coordinator
-u = mir.Mirheo(ranks, domain, debug_level = 3, log_filename = 'logs/log', checkpoint_folder = "restart/", checkpoint_every = checkpoint_step)
+u = _create_mirheo(ranks, domain, debug_level = 3, log_filename = 'logs/log', checkpoint_folder = "restart/", checkpoint_every = checkpoint_step)
 
 #loads the off script
 mesh = trimesh.load_mesh(objFile)
@@ -170,13 +187,14 @@ mesh = trimesh.load_mesh(objFile)
 triangle = mesh.vertices[mesh.faces]
 edge1 = triangle[:,1] - triangle[:,0]
 edges = np.linalg.norm(edge1, axis=1)
-mesh_lj_fac = 0.8 * np.min(edges)
-lj_fac = parameters_default.get("lj_fac", mesh_lj_fac)
+mesh_lj_fac = 0.7 * np.min(edges) if _PAPER_EXACT else 0.8 * np.min(edges)
+lj_fac = mesh_lj_fac if _PAPER_EXACT else parameters_default.get("lj_fac", mesh_lj_fac)
 
 #reads vertices, faces
 mesh_emb = mir.ParticleVectors.MembraneMesh(vertices = mesh.vertices.tolist(), stress_free_vertices = mesh.vertices.tolist(), faces = mesh.faces.tolist())
 
-emb = mir.ParticleVectors.MembraneVector("emb", mass = 50*mvert, mesh = mesh_emb)
+emb_mass = 10 * mvert if _PAPER_EXACT else 50 * mvert
+emb = mir.ParticleVectors.MembraneVector("emb", mass = emb_mass, mesh = mesh_emb)
 
 #initial condition for GV
 ic_emb = mir.InitialConditions.Membrane(pos_q)
@@ -186,12 +204,12 @@ u.registerParticleVector(emb, ic_emb)
 
 if(not args.vacuum):
     #water
-    water = mir.ParticleVectors.ParticleVector('water', mass = mw)
+    water = _create_particle_vector('water', mass = mw, obmd = obmd_flag)
     ic_water = mir.InitialConditions.Uniform(number_density = rhow)
     u.registerParticleVector(water, ic_water)
 
     #solvent
-    sol2 = mir.ParticleVectors.ParticleVector('sol2', mass = mg)
+    sol2 = _create_particle_vector('sol2', mass = mg, obmd = 0)
     ic_outer2 = mir.InitialConditions.Uniform(number_density = rhog)
     u.registerParticleVector(sol2, ic_outer2)
 
@@ -213,25 +231,30 @@ if(not args.vacuum):
 #dpd = mir.Interactions.Pairwise('dpd', rc, kind = "DPD", a = aii, gamma = gamma_dpd, kBT = kbt, power = s)
 #lj = mir.Interactions.Pairwise('lj', rc, kind = "RepulsiveLJ", epsilon = 0.1, sigma = rc / (2**(1/6)), max_force = 10.0, aware_mode = 'Object')
 
-afsi = 0.4 * aii
+afsi = 0.0 if _PAPER_EXACT else 0.4 * aii
 bpress = parameters_default["bpress"]
 #if(args.vacuum):
 #    prms_emb["gammaC"] = gamma_dpd
 if(objType == 'gv'):
-    prms_emb["bpress"] = bpress #-29.0
+    if _PAPER_EXACT:
+        prms_emb["bpress"] = 0.0
+    else:
+        prms_emb["bpress"] = bpress #-29.0
     int_emb = mir.Interactions.MembraneForces("int_emb", "LimUniaxial", "KantorStressFree", **prms_emb, stress_free = True)
 else:
     int_emb = mir.Interactions.MembraneForces("int_emb", "Lim", "KantorStressFree", **prms_emb, stress_free = True)
 
 if(args.vacuum):
     dpd0 = mir.Interactions.Pairwise('dpd0', rc, kind = "DPD", a = 0.0, gamma = 3 * gamma_dpd, kBT = 0.015 * kbt, power = s)
-dpd = mir.Interactions.Pairwise('dpd', rc, kind = "DPD", a = 0*aii, gamma = 0*gamma_dpd, kBT = kbt, power = s)
+dpd = mir.Interactions.Pairwise('dpd', rc, kind = "DPD", a = aii if _PAPER_EXACT else 0*aii, gamma = gamma_dpd if _PAPER_EXACT else 0*gamma_dpd, kBT = kbt, power = s)
 dpd_wat = mir.Interactions.Pairwise('dpd_wat', rc, kind = "DPD", a = aii, gamma = gamma_dpd, kBT = kbt, power = s)
-dpd_gas = mir.Interactions.Pairwise('dpd_gas', rc, kind = "DPD", a = 0.0 * aii, gamma = gamma_dpd_gas, kBT = kbt, power = s_g)
+dpd_gas = mir.Interactions.Pairwise('dpd_gas', rc, kind = "DPD", a = aii if _PAPER_EXACT else 0.0 * aii, gamma = gamma_dpd_gas, kBT = kbt, power = s_g)
 dpd_fsi = mir.Interactions.Pairwise('dpd_fsi', rc, kind = "DPD", a = afsi, gamma = 1*gamma_fsi, kBT = kbt, power = k_fsi)
-dpd_fsi_gas = mir.Interactions.Pairwise('dpd_fsi_gas', rc, kind = "DPD", a = 0.0 * afsi, gamma = gamma_fsi_gas, kBT = kbt, power = k_fsi)
+dpd_fsi_gas = mir.Interactions.Pairwise('dpd_fsi_gas', rc, kind = "DPD", a = afsi if _PAPER_EXACT else 0.0 * afsi, gamma = gamma_fsi_gas, kBT = kbt, power = k_fsi)
 #lj = mir.Interactions.Pairwise('lj', rc, kind = "RepulsiveLJ", epsilon = 0.1, sigma = rc / (2**(1/6)), max_force = 10.0, aware_mode = 'Object')
-lj_int = mir.Interactions.Pairwise('lj_int', lj_fac, kind = "RepulsiveLJ", epsilon = 10000.0, sigma = lj_fac / (2**(1/6)), max_force = 100000.0)
+lj_epsilon = 1000.0 if _PAPER_EXACT else 10000.0
+lj_max_force = 10000.0 if _PAPER_EXACT else 100000.0
+lj_int = mir.Interactions.Pairwise('lj_int', lj_fac, kind = "RepulsiveLJ", epsilon = lj_epsilon, sigma = lj_fac / (2**(1/6)), max_force = lj_max_force)
 #lj_int = mir.Interactions.Pairwise('lj_int', lj_fac * rc, kind = "DPD", a = 100.0, gamma = 0.0, kBT = 0.0, power = s)
 
 ######################################## INTEGRATOR ########################################
@@ -280,7 +303,10 @@ if(args.vacuum):
 #reflection boundaries of gas vesicle shells
 
 if(not args.vacuum):
-    bouncer = mir.Bouncers.Mesh("membrane_bounce", 150, 150, "bounce_maxwell", kBT = kbt)
+    if _PAPER_EXACT:
+        bouncer = mir.Bouncers.Mesh("membrane_bounce", 1000, 150, "bounce_maxwell", kBT = kbt)
+    else:
+        bouncer = mir.Bouncers.Mesh("membrane_bounce", 150, 150, "bounce_maxwell", kBT = kbt)
     u.registerBouncer(bouncer)
     u.setBouncer(bouncer, emb, water)
     u.setBouncer(bouncer, emb, gas)
@@ -292,12 +318,25 @@ fraction = parameters_default["fraction"]
 tolerance = 0.2
 z0 = 0.15 * parameters_default["height"]
 #ind_min, ind_max = computeIndices(mesh.vertices, z0, tolerance)
-ind_min, ind_max = computeIndices(mesh.vertices, z0)
+if _PAPER_EXACT:
+    anchor_count = int(0.5 * fraction * len(mesh.vertices))
+    if anchor_count <= 0:
+        raise ValueError("Paper-exact stretching requires at least one anchor vertex per pole.")
+    ind_max = np.argpartition(+mesh.vertices[:,2], -anchor_count)[-anchor_count:]
+    ind_min = np.argpartition(-mesh.vertices[:,2], -anchor_count)[-anchor_count:]
+else:
+    ind_min, ind_max = computeIndices(mesh.vertices, z0)
 
 force = parameters_default["tot_force"] / len(ind_min)
 
-#forces = computeForces(mesh.vertices, force, z0, tolerance).tolist()
-forces = computeForces(mesh.vertices, force, z0).tolist()
+if _PAPER_EXACT:
+    forces = np.zeros((len(mesh.vertices), 3))
+    forces[ind_max, 2] = +force
+    forces[ind_min, 2] = -force
+    forces = forces.tolist()
+else:
+    #forces = computeForces(mesh.vertices, force, z0, tolerance).tolist()
+    forces = computeForces(mesh.vertices, force, z0).tolist()
 
 
 cen = np.array([0.5 * Lx, 0.5 * Ly, 0.5 * Lz])
@@ -315,8 +354,6 @@ if args.equil:
     velocity = [0.0, 0.0, 0.0]
     pids = [np.argmin(mesh.vertices[:,2]), np.argmax(mesh.vertices[:,2])]
     u.registerPlugins(mir.Plugins.createPinObject('pin', emb, nevery, 'force/', velocity, omega))
-    #forces = computeForces(mesh.vertices, force, z0, tolerance).tolist()
-    forces = computeForces(mesh.vertices, force, z0).tolist()
     u.registerPlugins(mir.Plugins.createStats('stats', every = nevery))
     u.registerPlugins(mir.Plugins.createDumpXYZ('xyz_dump', emb, nevery, f"trj_eq/sim{args.simnum}"))
     #u.registerPlugins(mir.Plugins.createDumpXYZ('xyz_dump_gas', gas, nevery, f"trj_eq/sim{args.simnum}"))
@@ -332,8 +369,6 @@ if args.restart:
     omega = [unr, unr, unr]
     velocity = [0.0, 0.0, 0.0]
     u.registerPlugins(mir.Plugins.createPinObject('pin', emb, nevery, 'force/', velocity, omega))
-    #forces = computeForces(mesh.vertices, force, z0, tolerance).tolist()
-    forces = computeForces(mesh.vertices, force, z0).tolist()
     u.registerPlugins(mir.Plugins.createStats('stats', every = nevery))
     u.registerPlugins(mir.Plugins.createDumpXYZ('xyz_dump', emb, nevery, f"trj_eq/sim{args.simnum}"))
     #u.registerPlugins(mir.Plugins.createDumpXYZ('xyz_dump_gas', gas, nevery, f"trj_eq/sim{args.simnum}"))

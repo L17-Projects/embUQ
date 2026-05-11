@@ -22,12 +22,13 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
+from meso_uq.site_runtime import get_site_runtime_paths  # noqa: E402
+
 DRY_RUN_WORKFLOW = REPO_ROOT / "scripts" / "workflows" / "gv" / "run_gv_dry_run.py"
 DEFAULT_OUTPUT_ROOT = REPO_ROOT / "_runs" / "gv" / "runtime"
 GV_RUNTIME_MANIFEST = "gv_runtime_dry_run_manifest.json"
 GV_RUNTIME_RENDER_MANIFEST = "gv_runtime_render_manifest.json"
 _KNOWN_ISSUE_BLOCKED_SEVERITIES = {"error", "blocking", "blocked", "critical"}
-_GV_VENV_ENV_SCRIPT = str((REPO_ROOT / "_vega" / "gv_venv" / "env.sh").resolve())
 
 
 def _normalize_known_issues(raw_known_issues: object) -> list[dict[str, Any]]:
@@ -112,10 +113,28 @@ def build_parser() -> argparse.ArgumentParser:
 def _resolve_output_root(args: argparse.Namespace) -> Path:
     if args.output_root is not None:
         return Path(args.output_root).expanduser().resolve()
+    if args.platform == "karolina":
+        runs_root = os.environ.get("MESOUQ_RUNS_ROOT", "").strip()
+        if runs_root:
+            resolved = Path(runs_root).expanduser().resolve() / "gv" / "runtime"
+        else:
+            resolved = REPO_ROOT / "_runs" / "karolina" / "gv" / "runtime"
+        if args.run_tag is not None:
+            resolved = resolved / args.run_tag
+        return resolved
     resolved = DEFAULT_OUTPUT_ROOT
     if args.run_tag is not None:
         resolved = resolved / args.run_tag
     return resolved
+
+
+def _resolve_gv_env_script(platform: str) -> Path:
+    env_script = os.environ.get("MESOUQ_GV_ENV_SCRIPT", "").strip()
+    if env_script:
+        return Path(env_script).expanduser().resolve()
+    if platform == "karolina":
+        return get_site_runtime_paths(REPO_ROOT, site="karolina").gv_venv_env_script
+    return get_site_runtime_paths(REPO_ROOT, site="vega").gv_venv_env_script
 
 
 def _load_runtime_manifest(path: Path) -> dict[str, Any]:
@@ -194,17 +213,18 @@ def _write_commands_txt(
     commands: list[tuple[tuple[str, ...], Path]],
     commands_path: Path,
     *,
+    gv_env_script: Path,
     material_overrides_json: str = "",
 ) -> None:
     commands_path.parent.mkdir(parents=True, exist_ok=True)
     with commands_path.open("w", encoding="utf-8") as handle:
         handle.write("#!/usr/bin/env bash\n")
         handle.write("set -euo pipefail\n")
-        handle.write(f"if [[ ! -f {_GV_VENV_ENV_SCRIPT!r} ]]; then\n")
-        handle.write("  echo 'Missing required GV runtime environment: _vega/gv_venv/env.sh' >&2\n")
+        handle.write(f"if [[ ! -f {str(gv_env_script)!r} ]]; then\n")
+        handle.write(f"  echo 'Missing required GV runtime environment: {str(gv_env_script)}' >&2\n")
         handle.write("  exit 1\n")
         handle.write("fi\n")
-        handle.write(f"source {_GV_VENV_ENV_SCRIPT!r}\n\n")
+        handle.write(f"source {str(gv_env_script)!r}\n\n")
         if material_overrides_json:
             handle.write(
                 "export MESOUQ_GV_MATERIAL_OVERRIDES_JSON="
@@ -223,6 +243,7 @@ def _default_sbatch_script(
     control_id: str,
     platform: str,
     work_dir: Path,
+    gv_env_script: Path,
 ) -> str:
     script = "#!/usr/bin/env bash\n"
     script += "#SBATCH --job-name=gv-runtime\n"
@@ -230,11 +251,11 @@ def _default_sbatch_script(
     script += "#SBATCH --error=gv-runtime-%j.err\n"
     script += "set -euo pipefail\n"
     script += "cd \"$(dirname \"$0\")\"\n\n"
-    script += f'if [[ ! -f {_GV_VENV_ENV_SCRIPT!r} ]]; then\n'
-    script += "  echo 'Missing required GV runtime environment: _vega/gv_venv/env.sh' >&2\n"
+    script += f'if [[ ! -f {str(gv_env_script)!r} ]]; then\n'
+    script += f"  echo 'Missing required GV runtime environment: {str(gv_env_script)}' >&2\n"
     script += "  exit 1\n"
     script += "fi\n"
-    script += f'source {_GV_VENV_ENV_SCRIPT!r}\n\n'
+    script += f'source {str(gv_env_script)!r}\n\n'
     script += "if [ -x ./run_all_HPC.sh ]; then\n"
     script += "  bash ./run_all_HPC.sh\n"
     script += "elif [ -x ./run.sh ]; then\n"
@@ -256,6 +277,7 @@ def _ensure_scheduler_scripts(
     command_list: list[tuple[tuple[str, ...], Path]],
     manifest: dict[str, Any],
     platform: str,
+    gv_env_script: Path,
 ) -> list[str]:
     work_dir = Path(manifest["work_dir"]).resolve()
     generated: list[str] = []
@@ -278,6 +300,7 @@ def _ensure_scheduler_scripts(
                 control_id=str(manifest.get("control_id", "default")),
                 platform=platform,
                 work_dir=work_dir,
+                gv_env_script=gv_env_script,
             ),
             encoding="utf-8",
         )
@@ -298,6 +321,7 @@ def _run_commands(
     *,
     dry_run: bool,
     material_overrides_json: str = "",
+    env_overrides: dict[str, str] | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     records: list[dict[str, Any]] = []
     if dry_run:
@@ -314,10 +338,13 @@ def _run_commands(
             )
         return records, 0
     for command, cwd in commands:
-        env = None
+        command_env = dict(env_overrides or {})
         if material_overrides_json:
+            command_env["MESOUQ_GV_MATERIAL_OVERRIDES_JSON"] = material_overrides_json
+        env = None
+        if command_env:
             env = dict(os.environ)
-            env["MESOUQ_GV_MATERIAL_OVERRIDES_JSON"] = material_overrides_json
+            env.update(command_env)
         run_kwargs: dict[str, Any] = {
             "cwd": str(cwd),
             "capture_output": True,
@@ -342,6 +369,14 @@ def _run_commands(
     return records, 0
 
 
+def _runtime_env_overrides(platform: str, gv_env_script: Path) -> dict[str, str]:
+    overrides = {"MESOUQ_GV_ENV_SCRIPT": str(gv_env_script)}
+    if platform in {"karolina", "vega"}:
+        overrides["MESOUQ_SITE"] = platform
+        overrides["HPC_SITE"] = platform
+    return overrides
+
+
 def _to_render_manifest(
     *,
     args: argparse.Namespace,
@@ -352,6 +387,7 @@ def _to_render_manifest(
     scheduled_scripts: list[str],
     returncode: int,
     dry_run: bool,
+    gv_env_script: Path,
 ) -> dict[str, Any]:
     return {
         "workflow": "gv_runtime",
@@ -365,6 +401,7 @@ def _to_render_manifest(
         "output_root": runtime_manifest["output_root"],
         "runtime_manifest": str(manifest_path),
         "commands_txt": str(commands_path),
+        "gv_env_script": str(gv_env_script),
         "generated_scheduler_scripts": scheduled_scripts,
         "commands": command_records,
         "include_experimental": args.include_experimental,
@@ -416,24 +453,28 @@ def main(argv: list[str] | None = None) -> int:
     work_dir = Path(runtime_manifest["work_dir"]).resolve()
     _ensure_generated_directories(work_dir=work_dir, manifest=runtime_manifest)
     platform = args.platform
+    gv_env_script = _resolve_gv_env_script(platform)
     material_overrides_json = _material_overrides_json(runtime_manifest)
 
     commands_path = work_dir / "commands.txt"
     _write_commands_txt(
         commands=command_list,
         commands_path=commands_path,
+        gv_env_script=gv_env_script,
         material_overrides_json=material_overrides_json,
     )
     generated_scripts = _ensure_scheduler_scripts(
         command_list=command_list,
         manifest=runtime_manifest,
         platform=platform,
+        gv_env_script=gv_env_script,
     )
 
     command_records, returncode = _run_commands(
         commands=command_list,
         dry_run=args.dry_run,
         material_overrides_json=material_overrides_json,
+        env_overrides=_runtime_env_overrides(platform, gv_env_script),
     )
 
     render_manifest_path = runtime_output_root / GV_RUNTIME_RENDER_MANIFEST
@@ -446,6 +487,7 @@ def main(argv: list[str] | None = None) -> int:
         scheduled_scripts=generated_scripts,
         returncode=returncode,
         dry_run=args.dry_run,
+        gv_env_script=gv_env_script,
     )
     render_manifest_path.write_text(json.dumps(render_manifest, indent=2, sort_keys=True), encoding="utf-8")
 

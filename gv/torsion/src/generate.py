@@ -63,15 +63,19 @@ def _find_repo_root():
 
 
 def _gv_env_script():
-    env_script = os.environ.get('MESOUQ_GV_ENV_SCRIPT')
+    env_script = os.environ.get('MESOUQ_GV_ENV_SCRIPT', '').strip()
     if env_script:
         return str(Path(env_script).expanduser().resolve())
+    runtime_root = os.environ.get('MESOUQ_SITE_RUNTIME_ROOT', '').strip()
+    if runtime_root:
+        return str((Path(runtime_root).expanduser() / 'gv_venv' / 'env.sh').resolve())
     repo_root = _find_repo_root()
     if repo_root is None:
         return ''
-    return str((repo_root / '_vega' / 'gv_venv' / 'env.sh').resolve())
-
-
+    site = (os.environ.get('MESOUQ_SITE', '') or os.environ.get('HPC_SITE', '') or 'vega').strip().lower()
+    if site not in {'vega', 'karolina'}:
+        site = 'vega'
+    return str((repo_root / f'_{site}' / 'gv_venv' / 'env.sh').resolve())
 def _write_runtime_preamble(file_commands):
     env_script = _gv_env_script()
     if env_script:
@@ -83,6 +87,12 @@ def _write_runtime_preamble(file_commands):
         file_commands.write(
             'export MESOUQ_GV_MATERIAL_OVERRIDES_JSON='
             f'{shlex.quote(material_overrides)}\n'
+        )
+    mirheo_module = os.environ.get('MESOUQ_GV_MIRHEO_MODULE', '')
+    if mirheo_module:
+        file_commands.write(
+            'export MESOUQ_GV_MIRHEO_MODULE='
+            f'{shlex.quote(mirheo_module)}\n'
         )
     file_commands.write('\n')
 

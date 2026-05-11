@@ -8,6 +8,9 @@ import numpy as np
 _TORSION_AXIS = "gamma"
 _REQUIRED_CONTROLS = ("theta",)
 _FORCE_TO_STRESS_AREA_SCALE = 2.0 * np.pi
+_PAPER_ANCHOR_FRACTION = 0.35
+_PAPER_STEADY_STATE_FRACTION = 0.25
+_PAPER_GAMMA_RADIUS_FACTOR = 2.0
 
 _CHANNEL_ALIASES = {
     "theta": "theta",
@@ -18,6 +21,11 @@ _CHANNEL_ALIASES = {
     "gamma": "gamma",
     "shear_strain": "gamma",
     "sigma_phi_r": "sigma_phi_r",
+    "sigma_std": "sigma_std",
+    "mesh_vertices": "mesh_vertices",
+    "vertices": "mesh_vertices",
+    "vertex_positions": "mesh_vertices",
+    "positions": "mesh_vertices",
     "constrained_vertex_force": "constrained_vertex_forces",
     "constrained_vertex_forces": "constrained_vertex_forces",
     "constrained_forces": "constrained_vertex_forces",
@@ -28,8 +36,12 @@ _CHANNEL_ALIASES = {
     "anchor_reaction_forces": "constrained_vertex_forces",
     "anchor_min_force": "constrained_vertex_forces_min",
     "anchor_min_forces": "constrained_vertex_forces_min",
+    "bottom_anchor_force": "constrained_vertex_forces_min",
+    "bottom_anchor_forces": "constrained_vertex_forces_min",
     "anchor_max_force": "constrained_vertex_forces_max",
     "anchor_max_forces": "constrained_vertex_forces_max",
+    "top_anchor_force": "constrained_vertex_forces_max",
+    "top_anchor_forces": "constrained_vertex_forces_max",
 }
 _GEOMETRY_ALIASES = {
     "radius": "radius",
@@ -166,6 +178,22 @@ def compute_torsion_gamma(
     return (float(radius) * theta_array) / float(height)
 
 
+def compute_torsion_paper_gamma(
+    theta: object,
+    *,
+    radius: float,
+    dz: float,
+) -> np.ndarray:
+    """Compute paper-replay torsion strain gamma = 2 * theta * radGV / dz."""
+
+    if not np.isfinite(radius) or not np.isfinite(dz):
+        raise ValueError("Torsion paper replay requires finite radius and anchor dz.")
+    if radius <= 0.0 or dz <= 0.0:
+        raise ValueError("Torsion paper replay requires positive radius and anchor dz.")
+    theta_array = _coerce_numeric_array(theta, name="theta")
+    return (_PAPER_GAMMA_RADIUS_FACTOR * float(radius) * theta_array) / float(dz)
+
+
 def _reduce_force_payload(payload: object, *, name: str) -> np.ndarray:
     array = _coerce_numeric_array(payload, name=name)
     if array.ndim == 0:
@@ -205,6 +233,191 @@ def compute_torsion_sigma_phi_r(
         name="constrained_vertex_forces",
     )
     return reduced_force / (_FORCE_TO_STRESS_AREA_SCALE * float(radius) * float(height))
+
+
+def _extract_canonical_channels(channel_payload: Mapping[str, Any]) -> dict[str, np.ndarray]:
+    canonical: dict[str, np.ndarray] = {}
+    for raw_name, value in _flatten_mapping(channel_payload).items():
+        name = _CHANNEL_ALIASES.get(_canonical_name(raw_name), _canonical_name(raw_name))
+        if name in ("theta", "gamma", "sigma_phi_r", "sigma_std") and name not in canonical:
+            canonical[name] = _coerce_numeric_array(value, name=name)
+    return canonical
+
+
+def _extract_mesh_vertices(
+    fixture_like: Mapping[str, Any],
+    channel_payload: Mapping[str, Any],
+) -> np.ndarray | None:
+    for payload in (channel_payload, fixture_like):
+        flattened = _flatten_mapping(payload)
+        for raw_name, value in flattened.items():
+            name = _CHANNEL_ALIASES.get(_canonical_name(raw_name), _canonical_name(raw_name))
+            if name != "mesh_vertices":
+                continue
+            vertices = _coerce_numeric_array(value, name="mesh_vertices")
+            if vertices.ndim != 2 or vertices.shape[1] != 3:
+                raise ValueError("Torsion paper replay mesh_vertices must have shape (n, 3).")
+            return vertices
+    return None
+
+
+def _looks_like_paper_raw_payload(
+    fixture_like: Mapping[str, Any],
+    channel_payload: Mapping[str, Any],
+) -> bool:
+    return _extract_mesh_vertices(fixture_like, channel_payload) is not None
+
+
+def _find_anchor_indices(vertices: np.ndarray, *, height: float) -> tuple[np.ndarray, np.ndarray]:
+    threshold = _PAPER_ANCHOR_FRACTION * float(height)
+    top_indices = np.flatnonzero(vertices[:, 2] > threshold)
+    bottom_indices = np.flatnonzero(vertices[:, 2] < -threshold)
+    if top_indices.size == 0 or bottom_indices.size == 0:
+        raise ValueError(
+            "Torsion paper replay could not reconstruct anchor regions from mesh_vertices and height."
+        )
+    return top_indices, bottom_indices
+
+
+def _rotate_points_around_z(vertices: np.ndarray, indices: np.ndarray, theta: float) -> np.ndarray:
+    points = vertices[np.asarray(indices, dtype=int), :].copy()
+    rotation = np.array(
+        [
+            [np.cos(theta), -np.sin(theta)],
+            [np.sin(theta), np.cos(theta)],
+        ],
+        dtype=float,
+    )
+    points[:, :2] = points[:, :2] @ rotation.T
+    return points
+
+
+def reconstruct_torsion_anchor_geometry(
+    fixture_like: Mapping[str, Any],
+    *,
+    geometry: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Reconstruct paper-replay anchor regions and dz from mesh vertices."""
+
+    if not isinstance(fixture_like, Mapping):
+        raise ValueError("fixture_like must be a mapping.")
+    resolved_geometry = parse_torsion_lane_geometry(fixture_like, geometry=geometry)
+    channel_payload = _extract_channel_payload(fixture_like)
+    vertices = _extract_mesh_vertices(fixture_like, channel_payload)
+    if vertices is None:
+        raise ValueError("Torsion paper replay requires mesh_vertices to reconstruct anchor geometry.")
+    top_indices, bottom_indices = _find_anchor_indices(vertices, height=resolved_geometry["height"])
+    dz = float(np.min(vertices[top_indices, 2]) - np.max(vertices[bottom_indices, 2]))
+    if not np.isfinite(dz) or dz <= 0.0:
+        raise ValueError("Torsion paper replay requires positive anchor dz from mesh_vertices.")
+    return {
+        "mesh_vertices": vertices,
+        "top_indices": top_indices,
+        "bottom_indices": bottom_indices,
+        "dz": dz,
+    }
+
+
+def _coerce_anchor_force_timeseries(
+    payload: object,
+    *,
+    name: str,
+    particle_count: int,
+) -> np.ndarray:
+    try:
+        array = np.asarray(payload, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Torsion paper replay {name!r} must be numeric data.") from exc
+    if array.size == 0:
+        raise ValueError(f"Torsion paper replay {name!r} must contain data.")
+    if array.ndim == 3 and array.shape[1:] == (particle_count, 3):
+        return array
+    if array.ndim == 2 and array.shape[1] == particle_count * 3:
+        return array.reshape(array.shape[0], particle_count, 3)
+    raise ValueError(
+        f"Torsion paper replay {name!r} must have shape (timesteps, particles, 3) "
+        "or flattened shape (timesteps, particles*3)."
+    )
+
+
+def _paper_torque_statistics(forces: np.ndarray, *, positions: np.ndarray) -> tuple[float, float]:
+    torque_per_timestep = np.cross(positions[None, :, :], forces, axis=2).sum(axis=1)
+    start = int((1.0 - _PAPER_STEADY_STATE_FRACTION) * torque_per_timestep.shape[0])
+    steady_state = torque_per_timestep[start:]
+    if steady_state.shape[0] == 0:
+        raise ValueError("Torsion paper replay requires at least one timestep for anchor torque averaging.")
+    if not np.all(np.isfinite(steady_state)):
+        raise ValueError("Torsion paper replay steady-state anchor torque contains non-finite values.")
+    tau_z = steady_state[:, 2]
+    return float(np.mean(tau_z)), float(np.std(tau_z))
+
+
+def reconstruct_torsion_paper_channels(
+    fixture_like: Mapping[str, Any],
+    *,
+    geometry: Mapping[str, Any] | None = None,
+    controls: Mapping[str, Any] | None = None,
+) -> dict[str, np.ndarray]:
+    """Reconstruct canonical torsion channels from paper-style anchor-force payloads."""
+
+    if not isinstance(fixture_like, Mapping):
+        raise ValueError("fixture_like must be a mapping.")
+
+    resolved_geometry = parse_torsion_lane_geometry(fixture_like, geometry=geometry)
+    resolved_controls = parse_torsion_lane_controls(fixture_like, controls=controls)
+    anchor_geometry = reconstruct_torsion_anchor_geometry(fixture_like, geometry=geometry)
+    channel_payload = _extract_channel_payload(fixture_like)
+    flattened = _flatten_mapping(channel_payload)
+
+    force_sources: dict[str, Any] = {}
+    for raw_name, value in flattened.items():
+        name = _CHANNEL_ALIASES.get(_canonical_name(raw_name), _canonical_name(raw_name))
+        if name in ("constrained_vertex_forces_min", "constrained_vertex_forces_max"):
+            force_sources[name] = value
+
+    missing = [name for name in ("constrained_vertex_forces_min", "constrained_vertex_forces_max") if name not in force_sources]
+    if missing:
+        raise ValueError(
+            "Torsion paper replay requires both anchor_min/anchor_max force payloads for raw reconstruction."
+        )
+
+    theta = resolved_controls["theta"]
+    top_positions = _rotate_points_around_z(
+        anchor_geometry["mesh_vertices"],
+        anchor_geometry["top_indices"],
+        theta,
+    )
+    bottom_positions = _rotate_points_around_z(
+        anchor_geometry["mesh_vertices"],
+        anchor_geometry["bottom_indices"],
+        -theta,
+    )
+    bottom_forces = _coerce_anchor_force_timeseries(
+        force_sources["constrained_vertex_forces_min"],
+        name="anchor_min_forces",
+        particle_count=bottom_positions.shape[0],
+    )
+    top_forces = _coerce_anchor_force_timeseries(
+        force_sources["constrained_vertex_forces_max"],
+        name="anchor_max_forces",
+        particle_count=top_positions.shape[0],
+    )
+
+    bottom_tau_z, bottom_std = _paper_torque_statistics(bottom_forces, positions=bottom_positions)
+    top_tau_z, top_std = _paper_torque_statistics(top_forces, positions=top_positions)
+    area = _FORCE_TO_STRESS_AREA_SCALE * float(resolved_geometry["radius"]) ** 2
+    sigma_phi_r = 0.5 * (abs(bottom_tau_z / area) + abs(top_tau_z / area))
+    sigma_std = 0.5 * (abs(bottom_std / area) + abs(top_std / area))
+
+    return {
+        "gamma": compute_torsion_paper_gamma(
+            np.array([theta], dtype=float),
+            radius=resolved_geometry["radius"],
+            dz=float(anchor_geometry["dz"]),
+        ),
+        "sigma_phi_r": np.array([sigma_phi_r], dtype=float),
+        "sigma_std": np.array([sigma_std], dtype=float),
+    }
 
 
 def _flatten_mapping(payload: Mapping[str, Any], *, prefix: str = "") -> dict[str, Any]:
@@ -254,6 +467,7 @@ def parse_torsion_lane_channels(
     fixture_like: Mapping[str, Any],
     *,
     geometry: Mapping[str, Any] | None = None,
+    controls: Mapping[str, Any] | None = None,
 ) -> dict[str, np.ndarray]:
     """Extract canonical torsion channels `gamma` and `sigma_phi_r`."""
 
@@ -262,40 +476,89 @@ def parse_torsion_lane_channels(
 
     resolved_geometry = parse_torsion_lane_geometry(fixture_like, geometry=geometry)
     channel_payload = _extract_channel_payload(fixture_like)
-    flattened = _flatten_mapping(channel_payload)
-
-    theta = None
-    gamma = None
-    for raw_name, value in flattened.items():
-        canonical = _CHANNEL_ALIASES.get(_canonical_name(raw_name), _canonical_name(raw_name))
-        if canonical == "theta" and theta is None:
-            theta = _coerce_numeric_array(value, name="theta")
-        elif canonical == "gamma" and gamma is None:
-            gamma = _coerce_numeric_array(value, name="gamma")
+    paper_raw_payload = _looks_like_paper_raw_payload(fixture_like, channel_payload)
+    canonical_channels = _extract_canonical_channels(channel_payload)
+    theta = canonical_channels.get("theta")
+    gamma = canonical_channels.get("gamma")
+    sigma_phi_r = canonical_channels.get("sigma_phi_r")
+    sigma_std = canonical_channels.get("sigma_std")
 
     if gamma is None:
         if theta is None:
-            raise ValueError("Torsion lane requires a theta/torsion_coord channel or canonical gamma.")
-        gamma = compute_torsion_gamma(
-            theta,
-            radius=resolved_geometry["radius"],
-            height=resolved_geometry["height"],
-        )
+            if not paper_raw_payload and _has_force_source(channel_payload):
+                raise ValueError("Torsion lane requires a theta channel or control to compute gamma.")
+            try:
+                reconstructed = reconstruct_torsion_paper_channels(
+                    fixture_like,
+                    geometry=geometry,
+                    controls=controls,
+                )
+            except ValueError as exc:
+                if paper_raw_payload:
+                    raise
+                raise ValueError(
+                    "Torsion lane requires canonical gamma/sigma_phi_r or reconstructable paper raw anchors."
+                ) from exc
+            return reconstructed
+        try:
+            anchor_geometry = reconstruct_torsion_anchor_geometry(fixture_like, geometry=geometry)
+        except ValueError:
+            gamma = compute_torsion_gamma(
+                theta,
+                radius=resolved_geometry["radius"],
+                height=resolved_geometry["height"],
+            )
+        else:
+            gamma = compute_torsion_paper_gamma(
+                theta,
+                radius=resolved_geometry["radius"],
+                dz=float(anchor_geometry["dz"]),
+            )
 
-    constrained_force = _resolve_force_source(channel_payload)
-    sigma_phi_r = compute_torsion_sigma_phi_r(
-        constrained_force,
-        radius=resolved_geometry["radius"],
-        height=resolved_geometry["height"],
-    )
+    if sigma_phi_r is None:
+        try:
+            reconstructed = reconstruct_torsion_paper_channels(
+                fixture_like,
+                geometry=geometry,
+                controls=controls,
+            )
+        except ValueError:
+            if paper_raw_payload:
+                raise
+            constrained_force = _resolve_force_source(channel_payload)
+            sigma_phi_r = compute_torsion_sigma_phi_r(
+                constrained_force,
+                radius=resolved_geometry["radius"],
+                height=resolved_geometry["height"],
+            )
+        else:
+            sigma_phi_r = reconstructed["sigma_phi_r"]
+            sigma_std = reconstructed.get("sigma_std")
 
     if gamma.shape != sigma_phi_r.shape:
         raise ValueError("Torsion canonical gamma and sigma_phi_r must have matching shapes.")
 
-    return {
+    channels = {
         "gamma": gamma,
         "sigma_phi_r": sigma_phi_r,
     }
+    if sigma_std is not None:
+        if sigma_std.shape != sigma_phi_r.shape:
+            raise ValueError("Torsion canonical sigma_std and sigma_phi_r must have matching shapes.")
+        channels["sigma_std"] = sigma_std
+    return channels
+
+
+def _has_force_source(channel_payload: Mapping[str, Any]) -> bool:
+    for raw_name in _flatten_mapping(channel_payload):
+        name = _CHANNEL_ALIASES.get(_canonical_name(raw_name), _canonical_name(raw_name))
+        if name in (
+            "constrained_vertex_forces",
+            "constrained_vertex_forces_min",
+            "constrained_vertex_forces_max",
+        ):
+            return True
+    return False
 
 
 def parse_torsion_lane_controls(
@@ -333,7 +596,11 @@ def extract_torsion_lane(
         "axis": _TORSION_AXIS,
         "geometry": parse_torsion_lane_geometry(fixture_like, geometry=geometry),
         "controls": parse_torsion_lane_controls(fixture_like, controls=controls),
-        "channels": parse_torsion_lane_channels(fixture_like, geometry=geometry),
+        "channels": parse_torsion_lane_channels(
+            fixture_like,
+            geometry=geometry,
+            controls=controls,
+        ),
     }
 
 
@@ -354,13 +621,19 @@ def parse_torsion_sampling_lane(
 
 __all__ = [
     "_FORCE_TO_STRESS_AREA_SCALE",
+    "_PAPER_ANCHOR_FRACTION",
+    "_PAPER_GAMMA_RADIUS_FACTOR",
+    "_PAPER_STEADY_STATE_FRACTION",
     "_REQUIRED_CONTROLS",
     "_TORSION_AXIS",
     "compute_torsion_gamma",
+    "compute_torsion_paper_gamma",
     "compute_torsion_sigma_phi_r",
     "extract_torsion_lane",
     "parse_torsion_lane_channels",
     "parse_torsion_lane_controls",
     "parse_torsion_lane_geometry",
     "parse_torsion_sampling_lane",
+    "reconstruct_torsion_anchor_geometry",
+    "reconstruct_torsion_paper_channels",
 ]

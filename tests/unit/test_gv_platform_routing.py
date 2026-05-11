@@ -218,6 +218,59 @@ def test_gv_runtime_rendering_targets_staged_work_dir_and_generates_scheduler(tm
     assert "Missing required GV runtime environment" in scheduler_contents
 
 
+def test_gv_runtime_resolves_karolina_env_script_from_site_runtime_root(tmp_path, monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_runtime.py"),
+        "gv_runtime_karolina_env_resolution_test",
+    )
+    runtime_root = tmp_path / "runtime"
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(runtime_root))
+
+    env_script = module._resolve_gv_env_script("karolina")
+
+    assert env_script == (runtime_root / "gv_venv" / "env.sh").resolve()
+
+
+def test_gv_runtime_resolves_explicit_env_script_override(tmp_path, monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_runtime.py"),
+        "gv_runtime_explicit_env_resolution_test",
+    )
+    override = tmp_path / "custom" / "gv-env.sh"
+    monkeypatch.setenv("MESOUQ_GV_ENV_SCRIPT", str(override))
+
+    env_script = module._resolve_gv_env_script("karolina")
+
+    assert env_script == override.resolve()
+
+
+def test_gv_runtime_karolina_default_output_root_uses_scratch_runs_root(tmp_path, monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_runtime.py"),
+        "gv_runtime_karolina_output_root_test",
+    )
+    runs_root = tmp_path / "runs"
+    monkeypatch.setenv("MESOUQ_RUNS_ROOT", str(runs_root))
+    args = Namespace(output_root=None, platform="karolina", run_tag="tag1")
+
+    output_root = module._resolve_output_root(args)
+
+    assert output_root == (runs_root / "gv" / "runtime" / "tag1").resolve()
+
+
+def test_gv_runtime_karolina_default_output_root_falls_back_to_repo_runs(monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_runtime.py"),
+        "gv_runtime_karolina_repo_output_root_test",
+    )
+    monkeypatch.delenv("MESOUQ_RUNS_ROOT", raising=False)
+    args = Namespace(output_root=None, platform="karolina", run_tag=None)
+
+    output_root = module._resolve_output_root(args)
+
+    assert output_root == module.REPO_ROOT / "_runs" / "karolina" / "gv" / "runtime"
+
+
 def test_gv_dry_run_material_parser_validates_overrides() -> None:
     module = _load_module(
         Path("scripts/workflows/gv/run_gv_dry_run.py"),
@@ -247,9 +300,17 @@ def test_gv_generated_mirheo_jobs_source_runtime_environment_and_preserve_materi
     contents = generate_script.read_text(encoding="utf-8")
 
     assert "MESOUQ_GV_ENV_SCRIPT" in contents
-    assert "_vega' / 'gv_venv' / 'env.sh" in contents
+    assert "MESOUQ_SITE_RUNTIME_ROOT" in contents
+    assert "f'_{site}'" in contents
+    assert "_vega' / 'gv_venv' / 'env.sh" not in contents
     assert "source {shlex.quote(env_script)}" in contents
     assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in contents
+    assert "MESOUQ_GV_MIRHEO_MODULE" in contents
+    if experiment_name == "buckling":
+        assert "MESOUQ_GV_BUCKLING_FLUID_MODE" in contents
+        assert "MESOUQ_GV_BUCKLING_FLUID_STABILIZATION" in contents
+        assert "MESOUQ_GV_BUCKLING_PIN_OBJECT" in contents
+        assert "MESOUQ_GV_BUCKLING_ODPD_AMP_SCALE" in contents
     assert "bash commands.txt" in contents
     assert "num_mpi_ranks = int(os.environ.get('MESOUQ_GV_MPI_RANKS', str(num_gpus + 1)))" in contents
     assert "#SBATCH --ntasks-per-node={num_mpi_ranks}" in contents
@@ -259,16 +320,23 @@ def test_gv_generated_mirheo_jobs_source_runtime_environment_and_preserve_materi
     assert "module load CUDA/12.2.2" in contents
 
 
-def test_gv_eigenmodes_runtime_uses_single_physical_rank_by_default() -> None:
+def test_gv_eigenmodes_runtime_allocates_postprocess_rank_by_default() -> None:
     generate_contents = Path("gv/eigenmodes/src/generate.py").read_text(encoding="utf-8")
     run_contents = Path("gv/eigenmodes/src/run.sh").read_text(encoding="utf-8")
 
     assert "MESOUQ_GV_ENV_SCRIPT" in generate_contents
     assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in generate_contents
+    assert "MESOUQ_GV_MIRHEO_MODULE" in generate_contents
     assert "MESOUQ_GV_EIGENMODES_MPI_RANKS" in generate_contents
-    assert "num_mpi_ranks = int(os.environ.get('MESOUQ_GV_EIGENMODES_MPI_RANKS', str(num_gpus)))" in generate_contents
+    assert "num_mpi_ranks = int(os.environ.get('MESOUQ_GV_EIGENMODES_MPI_RANKS', str(num_gpus + 1)))" in generate_contents
+    assert "MESOUQ_GV_PAPER_EXACT" in generate_contents
+    assert "'numsteps': 4000000" in generate_contents
+    assert "'stslik': 20000" in generate_contents
+    assert "MESOUQ_GV_EIGENMODES_NUMSTEPS" in generate_contents
+    assert "MESOUQ_GV_EIGENMODES_STSLIK" in generate_contents
+    assert "'gamma_dpd_gas': 3.0" in generate_contents
     assert "MESOUQ_GV_MPI_RANKS" not in generate_contents
-    assert "nranks=${3:-${MESOUQ_GV_EIGENMODES_MPI_RANKS:-1}}" in run_contents
+    assert "nranks=${3:-${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}}" in run_contents
     assert "mpirun --bind-to none -np ${nranks}" in run_contents
 
 
@@ -278,7 +346,13 @@ def test_gv_mirheo_launchers_disable_openmpi_binding_on_vega(experiment_name: st
     contents = run_script.read_text(encoding="utf-8")
 
     assert "nranks=${3:-${MESOUQ_GV_MPI_RANKS:-2}}" in contents
-    assert "mpirun --bind-to none -np ${nranks}" in contents
+    assert "mpirun --bind-to none" in contents
+    assert "-np ${nranks}" in contents
+    if experiment_name == "buckling":
+        assert "MESOUQ_OPENMPI_LIB_DIR" in contents
+        assert "export LD_LIBRARY_PATH=" in contents
+        assert "-x LD_LIBRARY_PATH" in contents
+        assert "-x MESOUQ_GV_BUCKLING_FLUID_STABILIZATION" in contents
 
 
 def test_gv_eigenmodes_analysis_accepts_restart_backed_trajectory() -> None:
@@ -291,9 +365,12 @@ def test_gv_eigenmodes_analysis_accepts_restart_backed_trajectory() -> None:
 
     initial_contents = (analysis_root / "initial.py").read_text(encoding="utf-8")
     assert "emb_0000000.xyz" in initial_contents
+    assert "sim{simnum}eq" in initial_contents
+    assert "Using equilibrated eigenmode reference frame" in initial_contents
 
     all_analysis_contents = (analysis_root / "all_analysis.py").read_text(encoding="utf-8")
     assert "np.linalg.svd(trj_np, full_matrices=False)" in all_analysis_contents
+    assert "reference_positions = av" in all_analysis_contents
 
 
 def test_gv_dry_run_plan_receives_material_overrides_only_when_provided() -> None:
@@ -510,6 +587,38 @@ def test_gv_runtime_command_execution_exports_material_overrides(tmp_path, monke
         module._load_runtime_manifest(bad_controls_json)
 
 
+def test_gv_runtime_command_execution_propagates_runtime_env_overrides(tmp_path, monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_runtime.py"),
+        "gv_runtime_site_env_override_test",
+    )
+    captured_env: list[dict[str, str]] = []
+
+    def _fake_run(command, cwd, env, capture_output, text, check):
+        captured_env.append(dict(env))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", _fake_run)
+
+    records, returncode = module._run_commands(
+        commands=[(("python3", "generate.py"), tmp_path)],
+        dry_run=False,
+        material_overrides_json='{"ka": 1.1}',
+        env_overrides={
+            "MESOUQ_SITE": "karolina",
+            "HPC_SITE": "karolina",
+            "MESOUQ_GV_ENV_SCRIPT": "/scratch/mesouq/runtime/gv_venv/env.sh",
+        },
+    )
+
+    assert returncode == 0
+    assert records[0]["status"] == "completed"
+    assert captured_env[0]["MESOUQ_SITE"] == "karolina"
+    assert captured_env[0]["HPC_SITE"] == "karolina"
+    assert captured_env[0]["MESOUQ_GV_ENV_SCRIPT"] == "/scratch/mesouq/runtime/gv_venv/env.sh"
+    assert captured_env[0]["MESOUQ_GV_MATERIAL_OVERRIDES_JSON"] == '{"ka": 1.1}'
+
+
 def test_gv_runtime_command_execution_without_material_overrides_does_not_pass_env(tmp_path, monkeypatch) -> None:
     module = _load_module(
         Path("scripts/workflows/gv/run_gv_runtime.py"),
@@ -531,6 +640,53 @@ def test_gv_runtime_command_execution_without_material_overrides_does_not_pass_e
     assert returncode == 0
     assert records[0]["status"] == "completed"
     assert "env" not in captured_kwargs[0]
+
+
+def test_gv_runtime_workflow_passes_karolina_env_to_subprocesses(tmp_path, monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_runtime.py"),
+        "gv_runtime_karolina_subprocess_env_test",
+    )
+    output_root = tmp_path / "runtime"
+    work_dir = output_root / "torsion" / "gv_rad2_height14_28" / "theta_0_03" / "work"
+    manifest = {
+        "structure": "gv",
+        "experiment": "torsion",
+        "geometry": "gv_rad2_height14_28",
+        "controls": {"theta": 0.03},
+        "control_id": "theta_0_03",
+        "dataset_id": "gv:torsion:gv_rad2_height14_28:theta_0_03",
+        "output_root": str(output_root),
+        "work_dir": str(work_dir),
+        "commands": [{"argv": ["python3", "generate.py"], "cwd": "{work_dir}"}],
+    }
+
+    def _fake_dry_run(argv: list[str]) -> int:
+        output_root.mkdir(parents=True, exist_ok=True)
+        work_dir.mkdir(parents=True, exist_ok=True)
+        (output_root / module.GV_RUNTIME_MANIFEST).write_text(json.dumps(manifest), encoding="utf-8")
+        return 0
+
+    captured_env: list[dict[str, str]] = []
+
+    def _fake_run(command, *, cwd, env, capture_output, text, check):
+        captured_env.append(dict(env))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(module, "RUN_GV_DRY_RUN_MAIN", _fake_dry_run)
+    monkeypatch.setattr(module.subprocess, "run", _fake_run)
+    monkeypatch.delenv("MESOUQ_SITE", raising=False)
+    monkeypatch.delenv("HPC_SITE", raising=False)
+    monkeypatch.delenv("MESOUQ_GV_ENV_SCRIPT", raising=False)
+
+    rc = module.main(["--selection", "gv:torsion", "--platform", "karolina", "--output-root", str(output_root)])
+
+    assert rc == 0
+    assert len(captured_env) == 1
+    expected_env_script = str(module._resolve_gv_env_script("karolina"))
+    assert captured_env[0]["MESOUQ_SITE"] == "karolina"
+    assert captured_env[0]["HPC_SITE"] == "karolina"
+    assert captured_env[0]["MESOUQ_GV_ENV_SCRIPT"] == expected_env_script
 
 
 def test_gv_runtime_render_manifest_records_classified_known_issues(tmp_path, monkeypatch) -> None:
@@ -641,6 +797,7 @@ def test_gv_runtime_render_manifest_records_classified_known_issues(tmp_path, mo
         ],
         manifest={"work_dir": str(work_dir)},
         platform="vega",
+        gv_env_script=Path("/tmp/gv_venv/env.sh"),
     )
     assert scheduled == []
 
@@ -651,6 +808,7 @@ def test_gv_runtime_render_manifest_records_classified_known_issues(tmp_path, mo
         command_list=[(("sbatch", "existing.sbatch"), work_dir)],
         manifest={"work_dir": str(work_dir)},
         platform="vega",
+        gv_env_script=Path("/tmp/gv_venv/env.sh"),
     ) == []
 
     module._ensure_generated_directories(work_dir, {"generated_subdirs": ["logs", 3]})

@@ -2,6 +2,20 @@ from .controls import ALL_GV_CONTROLS, EXPERIMENT_CONTROLS
 from .experiments import GV_EXPERIMENTS
 from .geometries import DEFAULT_GV_GEOMETRY, build_geometry, geometry_id
 from .observables import GV_OBSERVABLE_SCHEMAS
+from .paper_replay_constants import (
+    GV_PAPER_REPLAY_FIGURE_TARGETS,
+    GV_PAPER_REPLAY_PAPER_PDF,
+    GV_PAPER_REPLAY_PROFILE_ID,
+    GV_PAPER_REPLAY_SCHEMA_VERSION,
+    GV_PAPER_REPLAY_SI_PDF,
+    GVPaperReplayGeometry,
+    GVPaperReplayProfile,
+    GVPaperReplayProvenance,
+    GVPaperReplayValue,
+    canonical_runtime_source_path,
+    load_gv_paper_replay_profile,
+    validate_gv_paper_replay_profile,
+)
 from .parameters import GV_NOISE_MODEL, GV_PARAMETER_CONTRACT
 from ..registry import StructureSpec
 
@@ -31,6 +45,18 @@ __all__ = [
     "build_geometry",
     "geometry_id",
     "GV_OBSERVABLE_SCHEMAS",
+    "GV_PAPER_REPLAY_FIGURE_TARGETS",
+    "GV_PAPER_REPLAY_PAPER_PDF",
+    "GV_PAPER_REPLAY_PROFILE_ID",
+    "GV_PAPER_REPLAY_SCHEMA_VERSION",
+    "GV_PAPER_REPLAY_SI_PDF",
+    "GVPaperReplayGeometry",
+    "GVPaperReplayProfile",
+    "GVPaperReplayProvenance",
+    "GVPaperReplayValue",
+    "canonical_runtime_source_path",
+    "load_gv_paper_replay_profile",
+    "validate_gv_paper_replay_profile",
     "GVSampleResult",
     "GVMaterialGeometry",
     "GVRuntimeOptions",

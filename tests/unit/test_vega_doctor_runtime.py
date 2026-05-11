@@ -16,6 +16,18 @@ def _load_doctor_module():
     return module
 
 
+def _load_karolina_doctor_module():
+    spec = importlib.util.spec_from_file_location(
+        "mesouq_test_karolina_doctor_runtime",
+        Path("scripts/platforms/karolina/doctor_karolina.py"),
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec is not None
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_doctor_gv_runtime_diagnostics_includes_scale_space_and_mirheo_checks(tmp_path, monkeypatch):
     module = _load_doctor_module()
     repo_root = tmp_path / "repo"
@@ -126,6 +138,7 @@ def test_doctor_core_and_tex_diagnostics_cover_warning_paths(tmp_path, monkeypat
     monkeypatch.setattr(module, "_pkg_config_version", lambda _name: "")
     monkeypatch.setattr(module, "_python_module_spec", lambda _name: "")
     monkeypatch.setattr(module, "_kpsewhich", lambda _name: "")
+    monkeypatch.delenv("PYTHONPATH", raising=False)
 
     report = module.collect_diagnostics("python", with_tex=True)
     checks = {entry["name"]: entry for entry in report["checks"]}
@@ -140,6 +153,56 @@ def test_doctor_core_and_tex_diagnostics_cover_warning_paths(tmp_path, monkeypat
     assert checks["tex:helvet.sty"]["status"] == "warn"
 
 
+def test_doctor_collect_diagnostics_can_target_karolina_site(tmp_path, monkeypatch):
+    module = _load_doctor_module()
+    repo_root = tmp_path / "repo"
+    (repo_root / "extern" / "korali").mkdir(parents=True)
+    (repo_root / "pyproject.toml").write_text("[project]\nname='mesouq'\n", encoding="utf-8")
+    monkeypatch.setattr(module, "REPO_ROOT", repo_root)
+    monkeypatch.setattr(module, "_command_path", lambda _name: "")
+    monkeypatch.setattr(module, "_pkg_config_version", lambda _name: "")
+    monkeypatch.setattr(module, "_python_module_spec", lambda _name: "")
+
+    report = module.collect_diagnostics("python", site="karolina", with_gv_runtime=True)
+
+    assert report["site"] == "karolina"
+    assert "CUDA/12.4.0" in report["recommended_modules"]
+    assert report["paths"]["site_root"].endswith("_karolina")
+    assert report["paths"]["scale_space_binary"].endswith("_karolina/gv_cgal_tools/bin/scale_space")
+
+
+def test_doctor_uses_env_site_and_karolina_module_profiles(monkeypatch):
+    module = _load_doctor_module()
+    monkeypatch.setenv("MESOUQ_SITE", "karolina")
+
+    assert module._default_runtime_site() == "karolina"
+    assert module._recommended_modules("karolina", with_mirheo=False, with_gv_runtime=False) == list(
+        module.DEFAULT_KAROLINA_MODULES
+    )
+    assert module._recommended_modules("karolina", with_mirheo=True, with_gv_runtime=False) == list(
+        module.DEFAULT_KAROLINA_MIRHEO_MODULES
+    )
+
+
+def test_karolina_doctor_propagates_site_env(monkeypatch):
+    module = _load_karolina_doctor_module()
+    captured = {}
+
+    def fake_call(args, env):
+        captured["args"] = args
+        captured["env"] = env
+        return 0
+
+    monkeypatch.setattr(module.subprocess, "call", fake_call)
+
+    assert module.main(["--strict", "--with-gv-runtime"]) == 0
+
+    assert captured["env"]["HPC_SITE"] == "karolina"
+    assert captured["env"]["MESOUQ_SITE"] == "karolina"
+    assert captured["args"][-2:] == ["--strict", "--with-gv-runtime"]
+    assert captured["args"][1].endswith("scripts/platforms/vega/doctor_vega.py")
+
+
 def test_doctor_mirheo_diagnostics_cover_source_and_scale_space_warnings(tmp_path, monkeypatch):
     module = _load_doctor_module()
     repo_root = tmp_path / "repo"
@@ -151,9 +214,14 @@ def test_doctor_mirheo_diagnostics_cover_source_and_scale_space_warnings(tmp_pat
     monkeypatch.setattr(module, "_command_path", lambda name: "/bin/mpicxx" if name == "mpicxx" else "")
     monkeypatch.setattr(module, "_pkg_config_version", lambda _name: "")
     monkeypatch.setattr(module, "_python_module_spec", lambda _name: "")
-    monkeypatch.setattr(module, "load_mirheo_source_lock", lambda _root: {"source_path": "/missing/mirheo"})
-    monkeypatch.setattr(module, "resolve_mirheo_source", lambda _root: (_ for _ in ()).throw(RuntimeError("no source")))
+    monkeypatch.setattr(module, "load_mirheo_source_lock", lambda _root, **_kwargs: {"source_path": "/missing/mirheo"})
+    monkeypatch.setattr(
+        module,
+        "resolve_mirheo_source",
+        lambda _root, **_kwargs: (_ for _ in ()).throw(RuntimeError("no source")),
+    )
     monkeypatch.setattr(module, "_resolve_scale_space_binary", lambda: ("", ""))
+    monkeypatch.delenv("MESOUQ_OPENMPI_LIB_DIR", raising=False)
 
     report = module.collect_diagnostics("python", with_mirheo=True)
     checks = {entry["name"]: entry for entry in report["checks"]}

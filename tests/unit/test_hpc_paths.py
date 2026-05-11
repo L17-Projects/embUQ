@@ -38,6 +38,18 @@ def test_default_runs_root_layout() -> None:
     assert root == Path("/tmp/repo/_runs/karolina/validation_matrix/20260421_123456")
 
 
+def test_default_runs_root_honors_runs_root_override(tmp_path) -> None:
+    root = default_runs_root(
+        Path("/tmp/repo"),
+        "validation_matrix",
+        site="karolina",
+        run_tag="20260421_123456",
+        env={"MESOUQ_RUNS_ROOT": str(tmp_path / "runs")},
+    )
+
+    assert root == (tmp_path / "runs" / "validation_matrix" / "20260421_123456").resolve()
+
+
 def test_default_runs_root_rejects_unknown_site() -> None:
     with pytest.raises(ValueError, match="Unsupported site"):
         default_runs_root("/tmp/repo", "validation_matrix", site="other")
