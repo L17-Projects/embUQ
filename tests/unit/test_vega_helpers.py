@@ -3,6 +3,7 @@ import shlex
 import subprocess
 from pathlib import Path
 
+from meso_uq.site_runtime import normalize_runtime_site
 from meso_uq.vega import (
     build_gv_runtime_pythonpath,
     build_runtime_pythonpath,
@@ -51,6 +52,7 @@ def test_runtime_paths_support_karolina_repo_local_root(tmp_path):
 
     assert paths.site == "karolina"
     assert paths.site_root == repo_root / "_karolina"
+    assert paths.karolina_root == repo_root / "_karolina"
     assert paths.korali_prefix == repo_root / "_karolina" / "korali" / "install"
     assert paths.mirheo_prefix == repo_root / "_karolina" / "mirheo" / "install"
     assert paths.gv_venv_env_script == repo_root / "_karolina" / "gv_venv" / "env.sh"
@@ -72,6 +74,24 @@ def test_runtime_paths_honor_site_runtime_root_override(tmp_path):
     assert paths.korali_env_script == runtime_root.resolve() / "korali" / "env.sh"
     assert paths.gv_venv_env_script == runtime_root.resolve() / "gv_venv" / "env.sh"
 
+    explicit_paths = get_runtime_paths(
+        repo_root,
+        site="karolina",
+        runtime_root=runtime_root,
+        env={},
+    )
+
+    assert explicit_paths.site_root == runtime_root.resolve()
+
+
+def test_normalize_runtime_site_rejects_unknown_site():
+    try:
+        normalize_runtime_site("unknown")
+    except ValueError as exc:
+        assert "Unsupported runtime site" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("Expected ValueError for an unsupported runtime site.")
+
 
 def test_resolve_repo_root_finds_root_from_nested_file(tmp_path):
     repo_root = _make_repo(tmp_path)
@@ -80,6 +100,18 @@ def test_resolve_repo_root_finds_root_from_nested_file(tmp_path):
     nested_file.write_text("# test\n", encoding="utf-8")
 
     assert resolve_repo_root(nested_file) == repo_root
+
+
+def test_resolve_repo_root_raises_when_no_repo_marker_exists(tmp_path):
+    orphan = tmp_path / "not-a-repo" / "nested"
+    orphan.mkdir(parents=True)
+
+    try:
+        resolve_repo_root(orphan)
+    except FileNotFoundError as exc:
+        assert "Could not locate the MesoUQ repo root" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("Expected FileNotFoundError outside a MesoUQ checkout.")
 
 
 def test_build_runtime_pythonpath_prefers_repo_local_korali(tmp_path):
@@ -237,6 +269,19 @@ def test_render_mirheo_env_script_exports_local_paths(tmp_path):
     assert str(paths.mirheo_snapshot_path) in env_script
 
 
+def test_render_mirheo_env_script_exports_karolina_root(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    paths = get_runtime_paths(repo_root, site="karolina", env={})
+    source_root = tmp_path / "Mirheo"
+    source_root.mkdir()
+
+    env_script = render_mirheo_env_script(paths, source_root=source_root)
+
+    assert "MESOUQ_SITE=karolina" in env_script
+    assert "MESOUQ_KAROLINA_ROOT" in env_script
+    assert "MESOUQ_VEGA_ROOT" not in env_script
+
+
 def test_render_mirheo_env_script_omits_snapshot_when_not_provided(tmp_path):
     repo_root = _make_repo(tmp_path)
     paths = get_vega_paths(repo_root)
@@ -272,6 +317,19 @@ def test_render_gv_venv_env_script_exports_openmpi_and_scale_space_paths(tmp_pat
     assert "MESOUQ_OPENMPI_LIB_DIR" in env_script
     assert 'case ":${LD_LIBRARY_PATH:-}:" in' in env_script
     assert str(paths.mirheo_snapshot_path) in env_script
+
+
+def test_render_gv_venv_env_script_exports_karolina_root(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    paths = get_runtime_paths(repo_root, site="karolina", env={})
+    source_root = tmp_path / "Mirheo"
+    source_root.mkdir()
+
+    env_script = render_gv_venv_env_script(paths, source_root=source_root)
+
+    assert "MESOUQ_SITE=karolina" in env_script
+    assert "MESOUQ_KAROLINA_ROOT" in env_script
+    assert "MESOUQ_VEGA_ROOT" not in env_script
 
 
 def test_render_gv_venv_env_script_sources_under_nounset_without_ld_library_path(tmp_path):
@@ -341,6 +399,17 @@ def test_render_gv_venv_env_script_omits_snapshot_when_not_provided(tmp_path):
     env_script = render_gv_venv_env_script(paths, source_root=source_root)
 
     assert "MIRHEO_SOURCE_SNAPSHOT" not in env_script
+
+
+def test_render_tinytex_env_script_exports_karolina_root(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    paths = get_runtime_paths(repo_root, site="karolina", env={})
+
+    env_script = render_tinytex_env_script(paths)
+
+    assert "MESOUQ_SITE=karolina" in env_script
+    assert "MESOUQ_KAROLINA_ROOT" in env_script
+    assert "MESOUQ_VEGA_ROOT" not in env_script
 
 
 def test_gather_mirheo_source_snapshot_ignores_build_artifacts(tmp_path):

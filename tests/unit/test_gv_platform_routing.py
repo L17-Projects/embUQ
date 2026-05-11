@@ -231,6 +231,19 @@ def test_gv_runtime_resolves_karolina_env_script_from_site_runtime_root(tmp_path
     assert env_script == (runtime_root / "gv_venv" / "env.sh").resolve()
 
 
+def test_gv_runtime_resolves_explicit_env_script_override(tmp_path, monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_runtime.py"),
+        "gv_runtime_explicit_env_resolution_test",
+    )
+    override = tmp_path / "custom" / "gv-env.sh"
+    monkeypatch.setenv("MESOUQ_GV_ENV_SCRIPT", str(override))
+
+    env_script = module._resolve_gv_env_script("karolina")
+
+    assert env_script == override.resolve()
+
+
 def test_gv_runtime_karolina_default_output_root_uses_scratch_runs_root(tmp_path, monkeypatch) -> None:
     module = _load_module(
         Path("scripts/workflows/gv/run_gv_runtime.py"),
@@ -243,6 +256,19 @@ def test_gv_runtime_karolina_default_output_root_uses_scratch_runs_root(tmp_path
     output_root = module._resolve_output_root(args)
 
     assert output_root == (runs_root / "gv" / "runtime" / "tag1").resolve()
+
+
+def test_gv_runtime_karolina_default_output_root_falls_back_to_repo_runs(monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/workflows/gv/run_gv_runtime.py"),
+        "gv_runtime_karolina_repo_output_root_test",
+    )
+    monkeypatch.delenv("MESOUQ_RUNS_ROOT", raising=False)
+    args = Namespace(output_root=None, platform="karolina", run_tag=None)
+
+    output_root = module._resolve_output_root(args)
+
+    assert output_root == module.REPO_ROOT / "_runs" / "karolina" / "gv" / "runtime"
 
 
 def test_gv_dry_run_material_parser_validates_overrides() -> None:
