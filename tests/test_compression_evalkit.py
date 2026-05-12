@@ -105,6 +105,31 @@ def test_prepare_compression_rejects_unknown_diameter():
         tools.prepareCompression(9.9)
 
 
+def test_prepare_compression_rejects_missing_explicit_csv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    project_root = tmp_path / "project"
+    source_dir = project_root / "compression" / "src"
+    data_dir = project_root / "compression" / "evalkit" / "data"
+    source_dir.mkdir(parents=True)
+    data_dir.mkdir(parents=True)
+    (data_dir / "data_1.csv").write_text(
+        "# h1\n# h2\n# h3\n0.1,1.0\n0.2,2.0\n0.3,3.0\n0.4,4.0\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(project_root)
+
+    with pytest.raises(FileNotFoundError, match="missing.csv"):
+        tools.prepareCompression(
+            2.1,
+            data_dir=str(data_dir),
+            data_prefix="compression_data_",
+            data_file=str(data_dir / "missing.csv"),
+            init_path=str(tmp_path / "lane" / "_init_compression_2.1um"),
+        )
+
+
 def test_prepare_compression_with_mocked_pipeline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     project_root = tmp_path / "project"
     source_dir = project_root / "compression" / "src"

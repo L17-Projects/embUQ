@@ -65,12 +65,11 @@ def _resolve_compression_paths(
         if not resolved_data_file.is_absolute():
             resolved_data_file = Path(project_root) / resolved_data_file
 
-    raw_data_file = (
-        resolved_data_file
-        if resolved_data_file.suffix.lower() == ".csv"
-        else data_root / RAW_DATA_BY_DIAMETER[diameter_um]
-    )
-    if not raw_data_file.exists():
+    explicit_csv = data_file is not None and resolved_data_file.suffix.lower() == ".csv"
+    raw_data_file = resolved_data_file if explicit_csv else data_root / RAW_DATA_BY_DIAMETER[diameter_um]
+    if explicit_csv and not raw_data_file.exists():
+        raise FileNotFoundError(f"Compression raw reference data not found: {raw_data_file}")
+    if not explicit_csv and not raw_data_file.exists():
         fallback = Path(project_root) / "compression" / "evalkit" / "data" / RAW_DATA_BY_DIAMETER[diameter_um]
         raw_data_file = fallback
     if not raw_data_file.exists():
