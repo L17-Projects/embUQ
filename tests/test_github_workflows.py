@@ -8,12 +8,25 @@ RUN_COVERAGE_SCOPE_IF = (
     "success() && github.event_name == 'pull_request' && "
     "steps.coverage-scope.outputs.run_coverage_gate == 'true'"
 )
+FULL_CI_PR_IF = (
+    "github.event_name == 'pull_request' && "
+    "contains(github.event.pull_request.labels.*.name, 'full-ci')"
+)
+FULL_CI_JOB_IF = (
+    "github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || "
+    "(github.event_name == 'pull_request' && "
+    "contains(github.event.pull_request.labels.*.name, 'full-ci'))"
+)
 
 
 def _load_workflow(name: str):
     repo_root = Path(__file__).resolve().parents[1]
     workflow_path = repo_root / ".github" / "workflows" / name
     return yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+
+
+def _workflow_triggers(workflow):
+    return workflow.get("on", workflow.get(True))
 
 
 def _uses_by_step(workflow):
@@ -31,8 +44,11 @@ def _step_by_name(steps, step_name: str):
 
 def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     workflow = _load_workflow("ci.yml")
+    triggers = _workflow_triggers(workflow)
 
     assert workflow["permissions"] == {"contents": "read"}
+    assert triggers["pull_request"]["types"] == ["opened", "synchronize", "reopened", "labeled"]
+    assert "workflow_dispatch" in triggers
     assert workflow["concurrency"]["cancel-in-progress"] is True
     assert "github.workflow" in workflow["concurrency"]["group"]
     assert workflow["jobs"]["package-and-tests"]["permissions"] == {
@@ -59,11 +75,12 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     coverage_scope = _step_by_name(package_steps, "Detect coverage-sensitive changes")
     assert preserve_head["if"] == "always()"
     assert "test -f coverage.json" in preserve_head["run"]
-    assert compute_base["if"] == "success() && github.event_name == 'pull_request'"
+    assert compute_base["if"] == f"success() && {FULL_CI_PR_IF}"
     assert "${{ github.event.pull_request.base.sha }}" in compute_base["run"]
     assert "${{ github.base_ref }}" not in compute_base["run"]
-    assert coverage_scope["if"] == "github.event_name == 'pull_request'"
+    assert coverage_scope["if"] == FULL_CI_PR_IF
     assert coverage_scope["id"] == "coverage-scope"
+    assert _step_by_name(package_steps, "Restore base coverage cache")["if"] == FULL_CI_PR_IF
     assert coverage_upload["if"] == "always()"
     assert coverage_upload["uses"] == UPLOAD_ARTIFACT_SHA
     assert coverage_upload["with"]["name"] == "coverage-report"
@@ -83,6 +100,11 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     assert codecov_upload["with"]["disable_search"] is True
     assert codecov_upload["with"]["codecov_yml_path"] == "codecov.yml"
     assert codecov_upload["with"]["fail_ci_if_error"] is False
+
+    assert workflow["jobs"]["bnn-backend-canary"]["if"] == FULL_CI_JOB_IF
+    assert workflow["jobs"]["mpi-smoke"]["if"] == FULL_CI_JOB_IF
+    assert workflow["jobs"]["retraining-canary"]["if"] == FULL_CI_JOB_IF
+    assert workflow["jobs"]["workflow-canary"]["if"] == FULL_CI_JOB_IF
 
     workflow_steps = workflow["jobs"]["workflow-canary"]["steps"]
     mpi_steps = workflow["jobs"]["mpi-smoke"]["steps"]
@@ -119,11 +141,15 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
 
 def test_release_smoke_workflow_has_concurrency_timeouts_and_dist_artifact():
     workflow = _load_workflow("release-smoke.yml")
+    triggers = _workflow_triggers(workflow)
 
     assert workflow["permissions"] == {"contents": "read"}
+    assert triggers["pull_request"]["types"] == ["opened", "synchronize", "reopened", "labeled"]
+    assert "workflow_dispatch" in triggers
     assert workflow["concurrency"]["cancel-in-progress"] is True
     assert "github.workflow" in workflow["concurrency"]["group"]
     assert workflow["jobs"]["release-smoke"]["timeout-minutes"] == 15
+    assert workflow["jobs"]["release-smoke"]["if"] == FULL_CI_JOB_IF
     assert workflow["jobs"]["docs-link-check"]["timeout-minutes"] == 5
 
     release_steps = workflow["jobs"]["release-smoke"]["steps"]
@@ -153,3 +179,11 @@ def test_release_smoke_workflow_has_concurrency_timeouts_and_dist_artifact():
         "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
         UPLOAD_ARTIFACT_SHA,
     }
+
+
+def test_codecov_patch_status_is_informational():
+    repo_root = Path(__file__).resolve().parents[1]
+    config = yaml.safe_load((repo_root / "codecov.yml").read_text(encoding="utf-8"))
+
+    assert config["codecov"]["require_ci_to_pass"] is False
+    assert config["coverage"]["status"]["patch"]["default"]["informational"] is True
