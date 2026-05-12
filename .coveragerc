@@ -1,13 +1,14 @@
 [run]
 branch = True
-source =
-    src/meso_uq
-    compression
-    indentation
-    inference
-    propagation
-    reduced
-    scripts
+relative_files = True
+include =
+    src/meso_uq/*
+    compression/*
+    indentation/*
+    inference/*
+    propagation/*
+    reduced/*
+    scripts/*
 omit =
     */__pycache__/*
     tests/*

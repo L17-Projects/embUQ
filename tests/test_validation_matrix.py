@@ -526,6 +526,10 @@ def test_validation_matrix_wrapper_delegates_to_workflow_matrix_with_validation_
             "4",
             "--python-bin",
             "python",
+            "--run-map-mirheo",
+            "--map-mirheo-n-displacements",
+            "1",
+            "--skip-release-manifest",
         ]
     )
 
@@ -537,6 +541,9 @@ def test_validation_matrix_wrapper_delegates_to_workflow_matrix_with_validation_
     )
     assert "--profiles" in captured["command"]
     assert captured["command"][captured["command"].index("--profiles") + 1] == "validation"
+    assert "--run-map-mirheo" in captured["command"]
+    assert captured["command"][captured["command"].index("--map-mirheo-n-displacements") + 1] == "1"
+    assert "--skip-release-manifest" in captured["command"]
     assert str(tmp_path / "validation") in captured["command"]
 
 

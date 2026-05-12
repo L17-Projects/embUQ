@@ -13,7 +13,9 @@ ignore:
   - "gv/**/src/**"
   - "docs/**"
   - "scripts/platforms/karolina/*.sh"
+  - "scripts/platforms/karolina/sbatch/**"
   - "scripts/platforms/vega/*.sh"
+  - "scripts/platforms/vega/run_validation_matrix.py"
   - "scripts/platforms/vega/sbatch/**"
   - "scripts/platforms/vega/submit_gv_paper_figure_replay.sh"
   # Test modules are validation assets. Patch coverage should measure product
