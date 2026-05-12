@@ -605,6 +605,264 @@ def test_phase1_prepare_environment_and_dry_run(
     assert any("parameter template not found" in message for message in warnings)
 
 
+def test_phase1_non_surrogate_compression_model_uses_lane_local_init_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase1_runtime,
+) -> None:
+    mod, fake_korali, _fake_comm = phase1_runtime
+    config_path = tmp_path / "compression_phase1_mirheo.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "pop_size": 4,
+                "max_gen": 1,
+                "target_cov": 0.7,
+                "covariance_scaling": 0.03,
+                "phase1_burn_in": 0,
+                "use_surrogate": False,
+                "prior_Yt": [1.0, 2.0],
+                "prior_kb": [3.0, 4.0],
+                "prior_d0": [0.0, 0.5],
+                "prior_sigma": [0.01, 0.2],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class _CompressionStudy:
+        name = "compression"
+        enabled = True
+        diameters = [2.1]
+        prior_d0 = None
+        prior_sigma = None
+        data_dir = tmp_path
+        data_prefix = "compression_data_"
+
+        @staticmethod
+        def dataset_name(diameter_um: float) -> str:
+            return f"compression_{diameter_um}um"
+
+        @staticmethod
+        def get_reference_points(_diameter_um: float) -> list[float]:
+            return [0.0, 1.0]
+
+        @staticmethod
+        def get_reference_data(_diameter_um: float) -> list[float]:
+            return [0.0, 1.0]
+
+        @staticmethod
+        def data_file(diameter_um: float) -> Path:
+            return tmp_path / f"compression_data_{diameter_um}um.dat"
+
+    captured = {}
+    comp_mod = sys.modules["compression.evalkit.posterior_compression"]
+
+    def _compute_compression(sample_data, reference_points, diameter_um, **kwargs):
+        captured["sample_data"] = sample_data
+        captured["reference_points"] = reference_points
+        captured["diameter_um"] = diameter_um
+        captured.update(kwargs)
+
+    comp_mod.compute_compression = _compute_compression
+    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(mod, "load_experiments", lambda config, root: [_CompressionStudy()])
+    monkeypatch.setattr(mod, "configure_device_conduit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(mod, "to_korali_path", lambda path, *, base_dir: path)
+    monkeypatch.setattr(
+        mod,
+        "phase1_prior_specs",
+        lambda config, prior_d0, prior_sigma: [
+            ("Yt", config["prior_Yt"]),
+            ("kb", config["prior_kb"]),
+            ("d0", prior_d0),
+            ("sigma", prior_sigma),
+        ],
+    )
+
+    output_dir = tmp_path / "phase1_out"
+    mod.run_inference(
+        config_path=str(config_path),
+        output_dir=str(output_dir),
+        device="cpu",
+    )
+
+    experiment = fake_korali.created_experiments[0]
+    experiment["Problem"]["Computational Model"]({"Samples": []})
+
+    assert captured["reference_points"] == [0.0, 1.0]
+    assert captured["diameter_um"] == 2.1
+    assert captured["init_compression_path"] == str(
+        output_dir / "_runtime" / "compression" / "_init_compression_2.1um"
+    )
+
+
+def test_phase1_restart_non_surrogate_compression_model_uses_lane_local_init_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase1_runtime,
+) -> None:
+    mod, fake_korali, _fake_comm = phase1_runtime
+    config_path = tmp_path / "compression_phase1_restart_mirheo.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "pop_size": 4,
+                "max_gen": 1,
+                "target_cov": 0.7,
+                "covariance_scaling": 0.03,
+                "phase1_burn_in": 0,
+                "use_surrogate": False,
+                "prior_Yt": [1.0, 2.0],
+                "prior_kb": [3.0, 4.0],
+                "prior_d0": [0.0, 0.5],
+                "prior_sigma": [0.01, 0.2],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class _RestartExperiment(_FakeExperiment):
+        def loadState(self, _path: str) -> bool:
+            self["Problem"]["Reference Data"] = [10.0, 11.0]
+            return True
+
+    def _experiment_factory() -> _RestartExperiment:
+        experiment = _RestartExperiment()
+        fake_korali.created_experiments.append(experiment)
+        return experiment
+
+    class _CompressionStudy:
+        name = "compression"
+        enabled = True
+        diameters = [2.1]
+        prior_d0 = None
+        prior_sigma = None
+
+        @staticmethod
+        def dataset_name(diameter_um: float) -> str:
+            return f"compression_{diameter_um}um"
+
+        @staticmethod
+        def get_reference_points(_diameter_um: float) -> list[float]:
+            return [0.0, 1.0, 2.0]
+
+    captured = {}
+    comp_mod = sys.modules["compression.evalkit.posterior_compression"]
+
+    def _compute_compression(sample_data, reference_points, diameter_um, **kwargs):
+        captured["sample_data"] = sample_data
+        captured["reference_points"] = reference_points
+        captured["diameter_um"] = diameter_um
+        captured.update(kwargs)
+
+    comp_mod.compute_compression = _compute_compression
+    monkeypatch.setattr(fake_korali, "Experiment", _experiment_factory)
+    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(mod, "load_experiments", lambda config, root: [_CompressionStudy()])
+    monkeypatch.setattr(mod, "configure_device_conduit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(mod, "to_korali_path", lambda path, *, base_dir: path)
+
+    output_dir = tmp_path / "phase1_out"
+    mod.run_inference(
+        restart=True,
+        config_path=str(config_path),
+        output_dir=str(output_dir),
+        device="cpu",
+    )
+
+    experiment = fake_korali.created_experiments[0]
+    experiment["Problem"]["Computational Model"]({"Samples": []})
+
+    assert experiment["Problem"]["Reference Data"] == [10.0, 11.0]
+    assert captured["reference_points"] == [0.0, 1.0]
+    assert captured["diameter_um"] == 2.1
+    assert captured["init_compression_path"] == str(
+        output_dir / "_runtime" / "compression" / "_init_compression_2.1um"
+    )
+
+
+def test_phase1_restart_cpu_surrogate_uses_standard_model_assignment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase1_runtime,
+) -> None:
+    mod, fake_korali, _fake_comm = phase1_runtime
+    config_path = tmp_path / "compression_phase1_restart_surrogate.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "pop_size": 4,
+                "max_gen": 1,
+                "target_cov": 0.7,
+                "covariance_scaling": 0.03,
+                "phase1_burn_in": 0,
+                "use_surrogate": True,
+                "surrogate": {"backend": "dnn"},
+                "prior_Yt": [1.0, 2.0],
+                "prior_kb": [3.0, 4.0],
+                "prior_d0": [0.0, 0.5],
+                "prior_sigma": [0.01, 0.2],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class _RestartExperiment(_FakeExperiment):
+        def loadState(self, _path: str) -> bool:
+            self["Problem"]["Reference Data"] = [10.0, 11.0]
+            return True
+
+    def _experiment_factory() -> _RestartExperiment:
+        experiment = _RestartExperiment()
+        fake_korali.created_experiments.append(experiment)
+        return experiment
+
+    class _CompressionStudy:
+        name = "compression"
+        enabled = True
+        diameters = [2.1]
+        prior_d0 = None
+        prior_sigma = None
+
+        @staticmethod
+        def dataset_name(diameter_um: float) -> str:
+            return f"compression_{diameter_um}um"
+
+        @staticmethod
+        def get_reference_points(_diameter_um: float) -> list[float]:
+            return [0.0, 1.0, 2.0]
+
+    captured = {}
+    comp_mod = sys.modules["compression.evalkit.posterior_compression"]
+
+    def _compute_surrogate(sample_data, reference_points, diameter_um):
+        captured["sample_data"] = sample_data
+        captured["reference_points"] = reference_points
+        captured["diameter_um"] = diameter_um
+
+    comp_mod.compute_compression_surrogate = _compute_surrogate
+    monkeypatch.setattr(fake_korali, "Experiment", _experiment_factory)
+    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(mod, "load_experiments", lambda config, root: [_CompressionStudy()])
+    monkeypatch.setattr(mod, "configure_device_conduit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(mod, "to_korali_path", lambda path, *, base_dir: path)
+
+    mod.run_inference(
+        restart=True,
+        config_path=str(config_path),
+        output_dir=str(tmp_path / "phase1_out"),
+        device="cpu",
+    )
+
+    experiment = fake_korali.created_experiments[0]
+    experiment["Problem"]["Computational Model"]({"Samples": []})
+
+    assert captured["reference_points"] == [0.0, 1.0]
+    assert captured["diameter_um"] == 2.1
+    assert "init_compression_path" not in captured
+
+
 def test_phase1_main_forwards_cli_arguments(monkeypatch: pytest.MonkeyPatch, phase1_runtime) -> None:
     mod, _fake_korali, _fake_comm = phase1_runtime
     captured = {}

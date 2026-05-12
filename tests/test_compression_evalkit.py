@@ -130,6 +130,152 @@ def test_prepare_compression_rejects_missing_explicit_csv(
         )
 
 
+def test_find_project_root_falls_back_to_module_location(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    project_root = tmp_path / "project"
+    source_dir = project_root / "compression" / "src"
+    evalkit_dir = project_root / "compression" / "evalkit"
+    source_dir.mkdir(parents=True)
+    evalkit_dir.mkdir(parents=True)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+
+    monkeypatch.chdir(outside)
+    monkeypatch.setattr(tools, "__file__", str(evalkit_dir / "tools.py"))
+
+    assert tools._find_project_root() == str(project_root)
+
+
+def test_resolve_compression_paths_handles_relative_defaults_and_init(tmp_path: Path):
+    project_root = tmp_path / "project"
+    data_root = project_root / "lane-data"
+    data_root.mkdir(parents=True)
+    raw_csv = data_root / "data_1.csv"
+    raw_csv.write_text("# h1\n# h2\n# h3\n0.1,1.0\n", encoding="utf-8")
+
+    raw, target, init_root = tools._resolve_compression_paths(
+        2.1,
+        str(project_root),
+        data_dir="lane-data",
+        data_prefix="compression_data_",
+        data_file=None,
+        init_path="runtime/_init_compression_2.1um",
+    )
+
+    assert raw == str(raw_csv)
+    assert target == str(data_root / "compression_data_2.1um.dat")
+    assert init_root == str((project_root / "runtime" / "_init_compression_2.1um").resolve()) + "/"
+
+
+def test_resolve_compression_paths_uses_fallback_raw_data_only_for_generated_dpd(
+    tmp_path: Path,
+):
+    project_root = tmp_path / "project"
+    fallback_root = project_root / "compression" / "evalkit" / "data"
+    fallback_root.mkdir(parents=True)
+    fallback_csv = fallback_root / "data_1.csv"
+    fallback_csv.write_text("# h1\n# h2\n# h3\n0.1,1.0\n", encoding="utf-8")
+
+    external_root = tmp_path / "lane-data"
+    external_root.mkdir()
+    output_file = external_root / "compression_data_2.1um.dat"
+
+    raw, target, init_root = tools._resolve_compression_paths(
+        2.1,
+        str(project_root),
+        data_dir=str(external_root),
+        data_prefix="compression_data_",
+        data_file=str(output_file),
+        init_path=None,
+    )
+
+    assert raw == str(fallback_csv)
+    assert target == str(output_file)
+    assert init_root == str((project_root / "_init_compression_2.1um").resolve()) + "/"
+
+
+def test_resolve_compression_paths_raises_when_raw_data_is_missing(tmp_path: Path):
+    project_root = tmp_path / "project"
+    (project_root / "compression" / "evalkit" / "data").mkdir(parents=True)
+    external_root = tmp_path / "lane-data"
+    external_root.mkdir()
+
+    with pytest.raises(FileNotFoundError, match="data_1.csv"):
+        tools._resolve_compression_paths(
+            2.1,
+            str(project_root),
+            data_dir=str(external_root),
+            data_prefix="compression_data_",
+            data_file=str(external_root / "compression_data_2.1um.dat"),
+            init_path=None,
+        )
+
+
+def test_resolve_compression_paths_handles_relative_explicit_data_file(tmp_path: Path):
+    project_root = tmp_path / "project"
+    data_root = project_root / "data"
+    data_root.mkdir(parents=True)
+    raw_csv = data_root / "raw.csv"
+    raw_csv.write_text("# h1\n# h2\n# h3\n0.1,1.0\n", encoding="utf-8")
+
+    raw, target, _init_root = tools._resolve_compression_paths(
+        2.1,
+        str(project_root),
+        data_dir="data",
+        data_prefix="compression_data_",
+        data_file="data/raw.csv",
+        init_path=None,
+    )
+
+    assert raw == str(raw_csv)
+    assert target == str(data_root / "compression_data_2.1um.dat")
+
+
+def test_load_source_module_raises_when_spec_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(tools.importlib.util, "spec_from_file_location", lambda *args, **kwargs: None)
+
+    with pytest.raises(RuntimeError, match="Could not load compression source module"):
+        tools._load_source_module("generate", str(tmp_path))
+
+
+def test_prepare_compression_rejects_empty_parameter_template(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    project_root = tmp_path / "project"
+    source_dir = project_root / "compression" / "src"
+    data_dir = project_root / "compression" / "evalkit" / "data"
+    source_dir.mkdir(parents=True)
+    data_dir.mkdir(parents=True)
+    (data_dir / "data_1.csv").write_text(
+        "# h1\n# h2\n# h3\n0.1,1.0\n0.2,2.0\n0.3,3.0\n0.4,4.0\n",
+        encoding="utf-8",
+    )
+    (source_dir / "generate.py").write_text("def generate_sim(**kwargs):\n    return None\n", encoding="utf-8")
+    (source_dir / "parameters.py").write_text(
+        "from pathlib import Path\n"
+        "def write_parameters(source_path, simu_path, simnum):\n"
+        "    path = Path(simu_path) / 'parameter' / f'parameters-default{simnum}.yaml'\n"
+        "    path.parent.mkdir(parents=True, exist_ok=True)\n"
+        "    path.write_text('', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(project_root)
+    monkeypatch.setattr(tools.os, "system", lambda cmd: 0)
+
+    with pytest.raises(ValueError, match="parameter template is empty"):
+        tools.prepareCompression(
+            2.1,
+            data_dir=str(data_dir),
+            data_prefix="compression_data_",
+            data_file=str(data_dir / "compression_data_2.1um.dat"),
+            init_path=str(tmp_path / "lane" / "_init_compression_2.1um"),
+        )
+
+
 def test_prepare_compression_with_mocked_pipeline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     project_root = tmp_path / "project"
     source_dir = project_root / "compression" / "src"
@@ -237,3 +383,15 @@ def test_prepare_compression_raises_when_project_root_missing(
     monkeypatch.setattr(tools, "__file__", str(tmp_path / "compression" / "evalkit" / "tools.py"))
     with pytest.raises(RuntimeError, match="Could not find project root"):
         tools.prepareCompression(2.1)
+
+
+def test_convert_to_dpd_units_rejects_empty_parameter_template(tmp_path: Path):
+    init_root = tmp_path / "_init_compression_2.1um"
+    param_file = init_root / "parameter" / "parameters-default00001.yaml"
+    param_file.parent.mkdir(parents=True)
+    param_file.write_text("", encoding="utf-8")
+    input_file = tmp_path / "compression_interp.dat"
+    input_file.write_text("Force [nN]  Displacement [nm]\n2.0 3.0\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="parameter template is empty"):
+        tools.convertToDPDUnits(str(input_file), str(init_root) + "/", 2.1)
