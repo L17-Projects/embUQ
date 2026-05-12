@@ -5,6 +5,7 @@ on:
     branches: [main, bootstrap/**, release-hardening/**]
   pull_request:
     branches: [main, bootstrap/**, release-hardening/**]
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
 permissions:

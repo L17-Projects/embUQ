@@ -25,6 +25,10 @@ def _load_workflow(name: str):
     return yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
 
 
+def _workflow_triggers(workflow):
+    return workflow.get("on", workflow.get(True))
+
+
 def _uses_by_step(workflow):
     mapping = {}
     for job in workflow["jobs"].values():
@@ -40,8 +44,11 @@ def _step_by_name(steps, step_name: str):
 
 def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     workflow = _load_workflow("ci.yml")
+    triggers = _workflow_triggers(workflow)
 
     assert workflow["permissions"] == {"contents": "read"}
+    assert triggers["pull_request"]["types"] == ["opened", "synchronize", "reopened", "labeled"]
+    assert "workflow_dispatch" in triggers
     assert workflow["concurrency"]["cancel-in-progress"] is True
     assert "github.workflow" in workflow["concurrency"]["group"]
     assert workflow["jobs"]["package-and-tests"]["permissions"] == {
@@ -134,8 +141,11 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
 
 def test_release_smoke_workflow_has_concurrency_timeouts_and_dist_artifact():
     workflow = _load_workflow("release-smoke.yml")
+    triggers = _workflow_triggers(workflow)
 
     assert workflow["permissions"] == {"contents": "read"}
+    assert triggers["pull_request"]["types"] == ["opened", "synchronize", "reopened", "labeled"]
+    assert "workflow_dispatch" in triggers
     assert workflow["concurrency"]["cancel-in-progress"] is True
     assert "github.workflow" in workflow["concurrency"]["group"]
     assert workflow["jobs"]["release-smoke"]["timeout-minutes"] == 15
