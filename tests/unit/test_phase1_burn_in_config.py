@@ -526,7 +526,13 @@ def test_phase1_prepare_environment_and_dry_run(
     mod, _fake_korali, _fake_comm = phase1_runtime
 
     prepare_calls = []
-    monkeypatch.setattr(mod, "prepareCompression", lambda diameter_um: prepare_calls.append(("compression", diameter_um)))
+    monkeypatch.setattr(
+        mod,
+        "prepareCompression",
+        lambda diameter_um, data_dir, data_prefix, data_file, init_path: prepare_calls.append(
+            ("compression", diameter_um, data_dir, data_prefix, data_file, init_path)
+        ),
+    )
     monkeypatch.setattr(
         mod,
         "prepareIndentation",
@@ -535,7 +541,14 @@ def test_phase1_prepare_environment_and_dry_run(
         ),
     )
 
-    compression_exp = types.SimpleNamespace(name="compression", diameters=[2.1], data_dir=tmp_path)
+    output_root = tmp_path / "phase1-output"
+    compression_exp = types.SimpleNamespace(
+        name="compression",
+        diameters=[2.1],
+        data_dir=tmp_path,
+        data_prefix="compression_data_",
+        data_file=lambda diameter_um: tmp_path / f"compression_data_{diameter_um}um.dat",
+    )
     indentation_exp = types.SimpleNamespace(
         name="indentation",
         diameters=[3.2],
@@ -545,22 +558,29 @@ def test_phase1_prepare_environment_and_dry_run(
     )
     unknown_exp = types.SimpleNamespace(name="mystery", diameters=[1.0], data_dir=tmp_path)
 
-    mod._prepare_experiment_environment([compression_exp, indentation_exp], rank=1)
+    mod._prepare_experiment_environment([compression_exp, indentation_exp], rank=1, output_root=output_root)
     assert prepare_calls == []
 
-    mod._prepare_experiment_environment([compression_exp, indentation_exp], rank=0)
+    mod._prepare_experiment_environment([compression_exp, indentation_exp], rank=0, output_root=output_root)
     assert prepare_calls == [
-        ("compression", 2.1),
+        (
+            "compression",
+            2.1,
+            str(tmp_path),
+            "compression_data_",
+            str(tmp_path / "compression_data_2.1um.dat"),
+            str(output_root / "_runtime" / "compression" / "_init_compression_2.1um"),
+        ),
         ("indentation", 3.2, str(tmp_path), "indentation_data_", str(tmp_path / "3.2.csv")),
     ]
 
     with pytest.raises(ValueError, match="Unsupported experiment type 'mystery'"):
-        mod._prepare_experiment_environment([unknown_exp], rank=0)
+        mod._prepare_experiment_environment([unknown_exp], rank=0, output_root=output_root)
 
     monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path)
     warnings = []
     monkeypatch.setattr(mod, "datedPrint", lambda message: warnings.append(message))
-    parameter_dir = tmp_path / "_init_compression_2.1um" / "parameter"
+    parameter_dir = output_root / "_runtime" / "compression" / "_init_compression_2.1um" / "parameter"
     parameter_dir.mkdir(parents=True)
     base_payload = {"numsteps": 1, "numsteps_eq": 2, "keep": 3}
     for filename in ["parameters-default00001.yaml", "parameters-default00001eq.yaml"]:
@@ -569,10 +589,12 @@ def test_phase1_prepare_environment_and_dry_run(
     mod._apply_compression_dry_run(
         [types.SimpleNamespace(name="compression", diameters=[2.1, 2.9])],
         rank=1,
+        output_root=output_root,
     )
     mod._apply_compression_dry_run(
         [types.SimpleNamespace(name="compression", diameters=[2.1, 2.9])],
         rank=0,
+        output_root=output_root,
     )
 
     for filename in ["parameters-default00001.yaml", "parameters-default00001eq.yaml"]:

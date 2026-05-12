@@ -77,6 +77,21 @@ def test_convert_to_dpd_units_writes_expected_reference_file(
     assert np.allclose(converted[0], [3e-09, 2e-09])
 
 
+def test_convert_to_dpd_units_accepts_explicit_output_file(tmp_path: Path):
+    init_root = tmp_path / "_init_compression_2.1um"
+    param_file = init_root / "parameter" / "parameters-default00001.yaml"
+    _write_compression_params(param_file)
+
+    input_file = tmp_path / "compression_interp.dat"
+    output_file = tmp_path / "lane" / "compression_data_2.1um.dat"
+    input_file.write_text("Force [nN]  Displacement [nm]\n2.0 3.0\n", encoding="utf-8")
+
+    tools.convertToDPDUnits(str(input_file), str(init_root) + "/", 2.1, output_file=str(output_file))
+
+    converted = np.loadtxt(output_file, skiprows=1, ndmin=2)
+    assert np.allclose(converted[0], [3e-09, 2e-09])
+
+
 def test_convert_to_force_from_dpd_units_uses_explicit_template(tmp_path: Path):
     param_file = tmp_path / "_init_compression_2.1um" / "parameter" / "parameters-default00001.yaml"
     _write_compression_params(param_file)
@@ -100,6 +115,8 @@ def test_prepare_compression_with_mocked_pipeline(tmp_path: Path, monkeypatch: p
         "# h1\n# h2\n# h3\n0.1,1.0\n0.2,2.0\n0.3,3.0\n0.4,4.0\n",
         encoding="utf-8",
     )
+    target_data = data_dir / "compression_data_2.1um.dat"
+    target_data.write_text("Displacement [DPD units]  Force [DPD units]\n1.0 2.0\n", encoding="utf-8")
 
     (source_dir / "generate.py").write_text(
         "def generate_sim(**kwargs):\n    return None\n",
@@ -115,31 +132,77 @@ def test_prepare_compression_with_mocked_pipeline(tmp_path: Path, monkeypatch: p
         encoding="utf-8",
     )
 
-    called = {"interp": False, "convert": False}
     monkeypatch.chdir(project_root)
     monkeypatch.setattr(tools.os, "system", lambda cmd: 0)
-    monkeypatch.setattr(
-        tools,
-        "generateCompressionData",
-        lambda data_file, init_path: called.__setitem__("interp", True),
-    )
-    monkeypatch.setattr(
-        tools,
-        "convertToDPDUnits",
-        lambda data_file, init_path, diameter: called.__setitem__("convert", True),
-    )
 
-    tools.prepareCompression(2.1)
+    lane_init = tmp_path / "lane" / "_init_compression_2.1um"
+    tools.prepareCompression(
+        2.1,
+        data_dir=str(data_dir),
+        data_prefix="compression_data_",
+        data_file=str(target_data),
+        init_path=str(lane_init),
+    )
 
     params = yaml.safe_load(
         (
-            project_root / "_init_compression_2.1um" / "parameter" / "parameters-default00001.yaml"
+            lane_init / "parameter" / "parameters-default00001.yaml"
         ).read_text(encoding="utf-8")
     )
     assert params["radp"] == pytest.approx(10.5)
     assert params["Lx"] == pytest.approx(26.0)
-    assert called["interp"] is True
-    assert called["convert"] is True
+    assert not (project_root / "_init_compression_2.1um").exists()
+
+
+def test_prepare_compression_generates_missing_reference_data_in_target_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    project_root = tmp_path / "project"
+    source_dir = project_root / "compression" / "src"
+    data_dir = project_root / "compression" / "evalkit" / "data"
+    source_dir.mkdir(parents=True)
+    data_dir.mkdir(parents=True)
+    raw_csv = data_dir / "data_1.csv"
+    raw_csv.write_text(
+        "# h1\n# h2\n# h3\n0.1,1.0\n0.2,2.0\n0.3,3.0\n0.4,4.0\n0.5,5.0\n",
+        encoding="utf-8",
+    )
+
+    (source_dir / "generate.py").write_text(
+        "def generate_sim(**kwargs):\n"
+        "    from pathlib import Path\n"
+        "    Path(kwargs['simu_path'], 'parameter').mkdir(parents=True, exist_ok=True)\n",
+        encoding="utf-8",
+    )
+    (source_dir / "parameters.py").write_text(
+        "from pathlib import Path\n"
+        "import yaml\n"
+        "def write_parameters(source_path, simu_path, simnum):\n"
+        "    path = Path(simu_path) / 'parameter' / f'parameters-default{simnum}.yaml'\n"
+        "    path.parent.mkdir(parents=True, exist_ok=True)\n"
+        "    path.write_text(yaml.dump({"
+        "'ul': 1.0e-7, 'rho_water': 1.0, 'rhow': 1.0, 'energyFactor': 1.0, "
+        "'kbol': 1.0, 't0': 1.0, 'fscale': 1.0"
+        "}), encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(project_root)
+    monkeypatch.setattr(tools.os, "system", lambda cmd: 0)
+
+    lane_init = tmp_path / "lane" / "_init_compression_2.1um"
+    output_data = tmp_path / "lane-data" / "compression_data_2.1um.dat"
+    tools.prepareCompression(
+        2.1,
+        data_dir=str(data_dir),
+        data_prefix="compression_data_",
+        data_file=str(output_data),
+        init_path=str(lane_init),
+    )
+
+    assert output_data.exists()
+    assert (lane_init / "reference_data" / "data_1_interp.dat").exists()
+    assert not (project_root / "_init_compression_2.1um").exists()
 
 
 def test_prepare_compression_raises_when_project_root_missing(

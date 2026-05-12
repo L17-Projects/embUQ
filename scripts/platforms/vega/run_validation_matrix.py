@@ -40,6 +40,18 @@ def main(argv: list[str] | None = None) -> int:
                         help="Run the phase1 MAP extraction step (skipped by default).")
     parser.add_argument("--skip-phase3b-map", action="store_true", default=False)
     parser.add_argument("--skip-phase3b-propagation", action="store_true", default=False)
+    parser.add_argument(
+        "--run-map-mirheo", action="store_true", default=False,
+        help="Run MAP Mirheo DPD evaluation after map_phase3b.",
+    )
+    parser.add_argument(
+        "--map-mirheo-n-displacements", type=int, default=15,
+        help="Number of displacement points for MAP Mirheo evaluation.",
+    )
+    parser.add_argument(
+        "--skip-release-manifest", action="store_true", default=False,
+        help="Skip paper-release asset gating and emit workflow-only validation evidence.",
+    )
     args = parser.parse_args(argv)
 
     resolved_site = args.site if args.site is not None else detect_hpc_site()
@@ -89,6 +101,11 @@ def main(argv: list[str] | None = None) -> int:
         command.append("--skip-phase3b-map")
     if args.skip_phase3b_propagation:
         command.append("--skip-phase3b-propagation")
+    if args.run_map_mirheo:
+        command.append("--run-map-mirheo")
+        command.extend(["--map-mirheo-n-displacements", str(args.map_mirheo_n_displacements)])
+    if args.skip_release_manifest:
+        command.append("--skip-release-manifest")
 
     print("Validation profile: validation")
     print(f"Output root:         {output_root}")

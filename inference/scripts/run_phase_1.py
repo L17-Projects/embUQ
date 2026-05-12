@@ -85,6 +85,24 @@ def _resolve_output_dir(output_dir: str | Path) -> Path:
     return output_path.resolve()
 
 
+def _compression_init_path(output_root: Path, diameter_um: float) -> Path:
+    return output_root / "_runtime" / "compression" / f"_init_compression_{diameter_um}um"
+
+
+def _experiment_data_dir(exp) -> Path:
+    return Path(getattr(exp, "data_dir", PROJECT_ROOT / exp.name / "evalkit" / "data"))
+
+
+def _experiment_data_prefix(exp) -> str:
+    return str(getattr(exp, "data_prefix", f"{exp.name}_data_"))
+
+
+def _experiment_data_file(exp, diameter_um: float) -> Path:
+    if hasattr(exp, "data_file"):
+        return Path(exp.data_file(diameter_um))
+    return _experiment_data_dir(exp) / f"{_experiment_data_prefix(exp)}{diameter_um}um.dat"
+
+
 def _load_korali_runtime():
     import korali
     from mpi4py import MPI
@@ -102,42 +120,45 @@ def _working_directory(path: Path):
         os.chdir(previous)
 
 
-def _prepare_experiment_environment(experiments, rank: int) -> None:
+def _prepare_experiment_environment(experiments, rank: int, output_root: Path | None = None) -> None:
     if rank != 0:
         return
+    setup_root = _resolve_output_dir(output_root or "_setup")
     for exp in experiments:
         for diameter_um in exp.diameters:
             datedPrint(f"[Setup] Preparing {exp.name} environment for {diameter_um} μm")
             if exp.name == "compression":
-                prepareCompression(diameter_um)
+                prepareCompression(
+                    diameter_um,
+                    data_dir=str(_experiment_data_dir(exp)),
+                    data_prefix=_experiment_data_prefix(exp),
+                    data_file=str(_experiment_data_file(exp, diameter_um)),
+                    init_path=str(_compression_init_path(setup_root, diameter_um)),
+                )
             elif exp.name == "indentation":
                 prepareIndentation(
                     diameter_um,
-                    data_dir=str(exp.data_dir),
-                    data_prefix=exp.data_prefix,
-                    data_file=str(exp.data_file(diameter_um)),
+                    data_dir=str(_experiment_data_dir(exp)),
+                    data_prefix=_experiment_data_prefix(exp),
+                    data_file=str(_experiment_data_file(exp, diameter_um)),
                 )
             else:
                 raise ValueError(f"Unsupported experiment type '{exp.name}'")
 
 
-def _apply_compression_dry_run(experiments, rank: int) -> None:
+def _apply_compression_dry_run(experiments, rank: int, output_root: Path | None = None) -> None:
     if rank != 0:
         return
+    setup_root = _resolve_output_dir(output_root or "_setup")
     sample_param = {"numsteps": 100, "numsteps_eq": 100}
     for exp in experiments:
         if exp.name != "compression":
             continue
         for diameter_um in exp.diameters:
+            init_root = _compression_init_path(setup_root, diameter_um)
             filenames = [
-                PROJECT_ROOT
-                / f"_init_compression_{diameter_um}um"
-                / "parameter"
-                / "parameters-default00001.yaml",
-                PROJECT_ROOT
-                / f"_init_compression_{diameter_um}um"
-                / "parameter"
-                / "parameters-default00001eq.yaml",
+                init_root / "parameter" / "parameters-default00001.yaml",
+                init_root / "parameter" / "parameters-default00001eq.yaml",
             ]
             for filename in filenames:
                 if not filename.exists():
@@ -323,11 +344,19 @@ def run_inference(
                         )
                     )
                 else:
-                    e["Problem"]["Computational Model"] = (
-                        lambda sampleData, d=diameter_um, model=compute_model, pts=reference_points: model(
-                            sampleData, pts, d
+                    if not use_surrogate and exp.name == "compression":
+                        init_path = str(_compression_init_path(output_root, diameter_um))
+                        e["Problem"]["Computational Model"] = (
+                            lambda sampleData, d=diameter_um, model=compute_model, pts=reference_points, init=init_path: model(
+                                sampleData, pts, d, init_compression_path=init
+                            )
                         )
-                    )
+                    else:
+                        e["Problem"]["Computational Model"] = (
+                            lambda sampleData, d=diameter_um, model=compute_model, pts=reference_points: model(
+                                sampleData, pts, d
+                            )
+                        )
                 e_list.append(e)
                 if rank == 0:
                     model_label = "surrogate" if use_surrogate else "Mirheo"
@@ -336,10 +365,10 @@ def run_inference(
                     )
     else:
         with _working_directory(PROJECT_ROOT):
-            _prepare_experiment_environment(experiments, rank)
+            _prepare_experiment_environment(experiments, rank, output_root)
             comm.Barrier()
             if dry_run:
-                _apply_compression_dry_run(experiments, rank)
+                _apply_compression_dry_run(experiments, rank, output_root)
 
         if rank == 0:
             datedPrint(f"[Korali] Number of ranks: {comm.Get_size()}")
@@ -387,11 +416,19 @@ def run_inference(
                         )
                     )
                 else:
-                    e["Problem"]["Computational Model"] = (
-                        lambda sampleData, d=diameter_um, model=compute_model, pts=reference_points: model(
-                            sampleData, pts, d
+                    if not use_surrogate and exp.name == "compression":
+                        init_path = str(_compression_init_path(output_root, diameter_um))
+                        e["Problem"]["Computational Model"] = (
+                            lambda sampleData, d=diameter_um, model=compute_model, pts=reference_points, init=init_path: model(
+                                sampleData, pts, d, init_compression_path=init
+                            )
                         )
-                    )
+                    else:
+                        e["Problem"]["Computational Model"] = (
+                            lambda sampleData, d=diameter_um, model=compute_model, pts=reference_points: model(
+                                sampleData, pts, d
+                            )
+                        )
                 e["Problem"]["Type"] = "Bayesian/Reference"
                 e["Problem"]["Likelihood Model"] = "Normal"
                 e["Problem"]["Reference Data"] = reference_data

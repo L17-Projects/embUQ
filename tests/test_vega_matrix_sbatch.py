@@ -8,6 +8,7 @@ import pytest
 
 
 SBATCH_DIR = Path(__file__).resolve().parents[1] / "scripts" / "platforms" / "vega" / "sbatch"
+KAROLINA_SBATCH_DIR = Path(__file__).resolve().parents[1] / "scripts" / "platforms" / "karolina" / "sbatch"
 
 MATRIX_TEMPLATES = (
     "dnn_rebaseline_matrix.sbatch",
@@ -34,6 +35,23 @@ def _load_module(path: Path, name: str):
 @pytest.mark.parametrize("template", ALL_TEMPLATES)
 def test_matrix_template_exists(template: str) -> None:
     assert (SBATCH_DIR / template).exists(), f"Missing template: {template}"
+
+
+def test_karolina_validation_matrix_template_uses_only_karolina_runtime_paths() -> None:
+    text = (KAROLINA_SBATCH_DIR / "validation_matrix.sbatch").read_text(encoding="utf-8")
+
+    assert "#SBATCH --account=eu-26-17" in text
+    assert "#SBATCH --partition=qgpu" in text
+    assert "#SBATCH --gpus=1" in text
+    assert 'source "${REPO_ROOT}/scripts/platforms/karolina/env_karolina.sh"' in text
+    assert 'OUTPUT_ROOT="${OUTPUT_ROOT:-${MESOUQ_RUNS_ROOT}/validation_matrix/${RUN_TAG}}"' in text
+    assert 'PYTHON_BIN="${PYTHON_BIN:-$(command -v python)}"' in text
+    assert 'RUN_MAP_MIRHEO="${RUN_MAP_MIRHEO:-false}"' in text
+    assert 'MAP_MIRHEO_N_DISPLACEMENTS="${MAP_MIRHEO_N_DISPLACEMENTS:-1}"' in text
+    assert 'SKIP_RELEASE_MANIFEST="${SKIP_RELEASE_MANIFEST:-true}"' in text
+    assert "--run-map-mirheo" in text
+    assert "--skip-release-manifest" in text
+    assert "_vega/" not in text
 
 
 @pytest.mark.parametrize("template", ALL_TEMPLATES)
