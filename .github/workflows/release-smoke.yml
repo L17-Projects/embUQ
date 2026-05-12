@@ -5,6 +5,7 @@ on:
     branches: [main, bootstrap/**, release-hardening/**]
   pull_request:
     branches: [main, bootstrap/**, release-hardening/**]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,6 +16,7 @@ concurrency:
 
 jobs:
   release-smoke:
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

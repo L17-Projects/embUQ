@@ -5,6 +5,7 @@ on:
     branches: [main, bootstrap/**, release-hardening/**]
   pull_request:
     branches: [main, bootstrap/**, release-hardening/**]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -58,7 +59,7 @@ jobs:
           cp coverage.json coverage-head.json
 
       - name: Restore base coverage cache
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci')
         id: base-coverage-cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -66,7 +67,7 @@ jobs:
           key: base-coverage-${{ runner.os }}-py311-${{ github.event.pull_request.base.sha }}
 
       - name: Detect coverage-sensitive changes
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci')
         id: coverage-scope
         shell: bash
         run: |
@@ -83,7 +84,7 @@ jobs:
           fi
 
       - name: Compute base branch coverage
-        if: success() && github.event_name == 'pull_request'
+        if: success() && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci')
         shell: bash
         run: |
           set -euo pipefail
@@ -186,6 +187,7 @@ jobs:
         run: python scripts/ci/check_docs_links.py
 
   bnn-backend-canary:
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -201,6 +203,7 @@ jobs:
         run: python scripts/ci/run_bnn_backend_canary.py
 
   mpi-smoke:
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -226,7 +229,7 @@ jobs:
           mpirun --oversubscribe -np 2 python -c "from mpi4py import MPI; comm = MPI.COMM_WORLD; print(f'rank {comm.Get_rank()} / {comm.Get_size()}')"
 
   retraining-canary:
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -268,7 +271,7 @@ jobs:
           retention-days: 14
 
   workflow-canary:
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

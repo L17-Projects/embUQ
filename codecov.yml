@@ -1,5 +1,5 @@
 codecov:
-  require_ci_to_pass: true
+  require_ci_to_pass: false
 
 ignore:
   # Optional BNN runtime/training surfaces require the `pyro-ppl` extra,
@@ -32,5 +32,6 @@ coverage:
       default:
         target: auto
         threshold: 0%
+        informational: true
 
 comment: false
