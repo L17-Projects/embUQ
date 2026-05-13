@@ -1,0 +1,59 @@
+{
+  "release": "MES-125",
+  "status": "draft",
+  "platform": {
+    "site": "karolina",
+    "never_mount_paths": [
+      "/ceph/hpc/home/eubrieucb"
+    ]
+  },
+  "paper_replay": {
+    "paper_data_available_on_karolina": false,
+    "paper_data_note": "Exact HUQ-EMB paper_data is not present on Karolina; this is an unavailable input for replay evidence, not a platform blocker.",
+    "local_pdfs": [
+      "/home/it4i-bbenvegnen/workspace/EMB_GV_DPD.pdf",
+      "/home/it4i-bbenvegnen/workspace/an5c02783_si_001.pdf"
+    ],
+    "scratch_provenance_pdfs": [
+      "/scratch/project/eu-26-17/eubrieucb/mesouq/provenance/gv_paper/EMB_GV_DPD.pdf",
+      "/scratch/project/eu-26-17/eubrieucb/mesouq/provenance/gv_paper/an5c02783_si_001.pdf"
+    ]
+  },
+  "placeholders": {
+    "doctor": {
+      "status": "pending",
+      "path": ""
+    },
+    "emb_evidence": {
+      "status": "pending",
+      "path": "",
+      "notes": ""
+    },
+    "gv_evidence": {
+      "status": "pending",
+      "path": "",
+      "notes": ""
+    },
+    "tests": {
+      "status": "pending",
+      "summary": "",
+      "paths": []
+    },
+    "linear_issue_closure": {
+      "status": "pending",
+      "issue": "",
+      "closure_reference": ""
+    },
+    "pr_ci_codecov_review_sweep": {
+      "status": "pending",
+      "pr_url": "",
+      "ci_url": "",
+      "codecov_url": "",
+      "review_sweep_reference": ""
+    }
+  },
+  "notes": [
+    "Fill this skeleton with the final acceptance evidence bundle.",
+    "Treat missing paper_data as an unavailable input, not a Karolina platform blocker."
+  ]
+}

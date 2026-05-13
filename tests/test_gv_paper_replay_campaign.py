@@ -310,6 +310,29 @@ def test_campaign_manifest_validation_reports_duplicate_and_finite_failures(tmp_
     assert validation["status"] == "failed"
     assert validation["finite_failure_count"] == 1
     assert validation["missing_source_pdfs"] == [str(missing_pdf.resolve())]
+    assert validation["unavailable_input_artifacts"] == [str(missing_pdf.resolve())]
+
+
+def test_campaign_manifest_marks_missing_source_pdfs_as_unavailable_inputs(tmp_path: Path) -> None:
+    lane = _lane_record(tmp_path)
+    missing_pdf = tmp_path / "sources" / "missing.pdf"
+    missing_pdf.parent.mkdir(parents=True, exist_ok=True)
+    fixture = GVPaperReplayCampaignManifest(
+        campaign_id="paper-fixture",
+        campaign_root=_campaign_root(tmp_path),
+        generated_at_utc="2026-05-05T12:00:00+00:00",
+        schema_version=MANIFEST_SCHEMA_VERSION,
+        git_head=GVPaperReplayGitHead(commit="deadbeef", branch="feature/test", dirty_worktree=False),
+        dry_run=False,
+        fixture_mode=True,
+        source_pdfs=(missing_pdf,),
+        lanes=(lane,),
+        comparison_packets=(),
+    )
+    payload = validate_campaign_manifest(fixture)
+    assert payload["status"] == "failed"
+    assert payload["missing_source_pdfs"] == [str(missing_pdf.resolve())]
+    assert payload["unavailable_input_artifacts"] == [str(missing_pdf.resolve())]
 
 
 def test_lane_record_and_campaign_validation_cover_remaining_guard_paths(tmp_path: Path) -> None:
@@ -564,6 +587,25 @@ def test_cli_operational_mode_dispatches_each_lane(tmp_path: Path, monkeypatch: 
     assert dispatched[0]["buckling_buck_max"] == pytest.approx(1.1)
     assert dispatched[0]["buckling_point_count"] == 37
     assert dispatched[0]["buckling_timeout_seconds"] == 28800
+
+
+def test_cli_fixture_mode_records_default_profile_source_pdfs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = _load_script_module("mesouq_test_gv_paper_replay_cli_source_pdfs")
+    monkeypatch.setattr(module, "REPO_ROOT", tmp_path)
+    source_pdf = tmp_path / "EMB_GV_DPD.pdf"
+    si_pdf = tmp_path / "an5c02783_si_001.pdf"
+    source_pdf.write_text("%PDF-1.4 fixture PAPER\n", encoding="utf-8")
+    si_pdf.write_text("%PDF-1.4 fixture SI\n", encoding="utf-8")
+    profile = SimpleNamespace(provenance=SimpleNamespace(paper_pdf_path=str(source_pdf), si_pdf_path=str(si_pdf)))
+    monkeypatch.setattr(module, "load_gv_paper_replay_profile", lambda: profile)
+
+    module.main(["--campaign-id", "fixture-source-paths", "--fixture-mode"])
+
+    manifest_path = tmp_path / "_runs" / "gv" / "figure_replay" / "fixture-source-paths" / "campaign_manifest.json"
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert payload["source_pdfs"] == sorted([str(source_pdf.resolve()), str(si_pdf.resolve())])
+    assert payload["validation"]["status"] == "passed"
+    assert payload["validation"]["unavailable_input_artifacts"] == []
 
 
 def test_cli_reports_invalid_campaign_root_and_lane(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

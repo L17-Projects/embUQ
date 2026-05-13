@@ -397,6 +397,7 @@ def validate_campaign_manifest(
             if not check.passed:
                 finite_failures += 1
     missing_source_pdfs = [str(path) for path in source_pdfs if not path.exists()]
+    unavailable_input_artifacts = sorted({*missing_source_pdfs})
     validation_status = "passed" if finite_failures == 0 and not missing_source_pdfs else "failed"
     return {
         "status": validation_status,
@@ -405,6 +406,7 @@ def validate_campaign_manifest(
         "comparison_packet_count": len(manifest.comparison_packets),
         "finite_failure_count": finite_failures,
         "missing_source_pdfs": missing_source_pdfs,
+        "unavailable_input_artifacts": unavailable_input_artifacts,
         "write_safe": write_safe,
     }
 
