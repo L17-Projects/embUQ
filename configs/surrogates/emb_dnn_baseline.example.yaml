@@ -1,0 +1,10 @@
+schema_version: "1.0"
+kind: surrogate
+metadata:
+  id: emb_dnn_baseline
+  name: EMB DNN Baseline
+spec:
+  modality: emb_compression
+  model_family: dnn
+  registry_key: emb_compression_dnn_baseline
+  artifact_manifest: configs/artifacts/artifact_manifest.example.json

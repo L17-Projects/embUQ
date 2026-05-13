@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0",
+  "manifest_id": "artifact-policy-example",
+  "generated_at": "2026-05-13T00:00:00Z",
+  "cleanup_policy": {
+    "generated_roots": [
+      "${MESOUQ_RUNS_ROOT}",
+      "paper_data/${CAMPAIGN_ID}"
+    ],
+    "protected_roots": [
+      "extern/korali"
+    ]
+  },
+  "artifacts": [
+    {
+      "artifact_id": "raw-indent-reference",
+      "artifact_class": "raw",
+      "path": "data/raw/indentation/reference.csv",
+      "format": "text/csv"
+    },
+    {
+      "artifact_id": "reference-config",
+      "artifact_class": "reference",
+      "path": "configs/inference/hierarchical_tmcmc.example.yaml",
+      "format": "text/yaml"
+    },
+    {
+      "artifact_id": "processed-training-table",
+      "artifact_class": "processed",
+      "path": "paper_data/processed/training_table.parquet",
+      "format": "application/x-parquet"
+    },
+    {
+      "artifact_id": "generated-runtime-root",
+      "artifact_class": "generated",
+      "path": "${MESOUQ_RUNS_ROOT}/karolina/run_001",
+      "format": "inode/directory"
+    },
+    {
+      "artifact_id": "surrogate-checkpoint",
+      "artifact_class": "surrogate",
+      "path": "paper_data/surrogates/emb_dnn_baseline.pt",
+      "format": "application/octet-stream"
+    },
+    {
+      "artifact_id": "posterior-sample-table",
+      "artifact_class": "posterior",
+      "path": "paper_data/posteriors/compression_phase1_samples.csv",
+      "format": "text/csv"
+    },
+    {
+      "artifact_id": "validation-figure",
+      "artifact_class": "figure",
+      "path": "paper_data/figures/validation_overlay.png",
+      "format": "image/png"
+    },
+    {
+      "artifact_id": "acceptance-report",
+      "artifact_class": "report",
+      "path": "paper_data/reports/workstation_acceptance_report.json",
+      "format": "application/json"
+    },
+    {
+      "artifact_id": "matrix-log",
+      "artifact_class": "log",
+      "path": "${MESOUQ_RUNS_ROOT}/karolina/run_001/logs/driver.log",
+      "format": "text/plain"
+    }
+  ]
+}

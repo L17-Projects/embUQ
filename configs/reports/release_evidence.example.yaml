@@ -1,0 +1,10 @@
+schema_version: "1.0"
+kind: report
+metadata:
+  id: release_evidence
+  name: Release Evidence Report
+spec:
+  report_type: release_evidence
+  output_path_template: ${MESOUQ_RUNS_ROOT}/reports/${RUN_TAG}/release_evidence.json
+  artifact_manifest: configs/artifacts/artifact_manifest.example.json
+  retention: archive

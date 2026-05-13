@@ -1,0 +1,23 @@
+schema_version: "1.0"
+kind: platform
+metadata:
+  id: workstation
+  name: Workstation
+platform_key: workstation
+spec:
+  scheduler: local
+  submission:
+    launcher: python
+    concurrency_env: MESOUQ_LOCAL_WORKERS
+  paths:
+    runtime_root: ${MESOUQ_REPO_ROOT}/_workstation
+    runs_root: ${MESOUQ_RUNS_ROOT}/workstation
+    scratch_root: ${MESOUQ_SCRATCH_ROOT}
+    korali_vendor_root: extern/korali
+path_policy:
+  allow_absolute_paths: false
+  required_placeholders:
+    - ${MESOUQ_REPO_ROOT}
+    - ${MESOUQ_RUNS_ROOT}
+    - ${MESOUQ_SCRATCH_ROOT}
+  forbidden_literals: []

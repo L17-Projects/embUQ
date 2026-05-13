@@ -75,3 +75,8 @@ gv/**/force/
 !src/meso_uq/structures/**/__init__.py
 !src/meso_uq/references/**/__init__.py
 !src/meso_uq/inference/**/__init__.py
+!src/meso_uq/agents/**/__init__.py
+!src/meso_uq/artifacts/**/__init__.py
+!src/meso_uq/configs/**/__init__.py
+!src/meso_uq/core/**/__init__.py
+!src/meso_uq/modalities/**/__init__.py

@@ -1,0 +1,16 @@
+schema_version: "1.0"
+kind: agent
+metadata:
+  id: default_controller
+  name: Default Controller
+spec:
+  entrypoint: meso_uq.pipeline.controller
+  default_platform: workstation
+  compatible_modalities:
+    - emb_compression
+    - emb_indentation
+    - gv_buckling
+  config_roots:
+    - configs/modalities
+    - configs/datasets
+    - configs/inference
