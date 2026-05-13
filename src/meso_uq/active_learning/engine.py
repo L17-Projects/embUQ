@@ -82,7 +82,12 @@ class ActiveLearningDryRunEngine:
         scores, acquisition_failures = self._score_candidates(valid, state)
         state = self._append_failures(state, acquisition_failures)
 
-        selected = self._select_batch(scores, valid, set(state.evaluated_candidate_ids))
+        selected = self._select_batch(
+            scores,
+            valid,
+            set(state.evaluated_candidate_ids),
+            limit=self._remaining_batch_budget(state),
+        )
         requests = tuple(
             SimulationRequest(
                 request_id=f"{state.loop_id}-iter-{state.iteration}-cand-{idx+1}",
@@ -177,9 +182,15 @@ class ActiveLearningDryRunEngine:
         scores: tuple[AcquisitionScore, ...],
         candidates: tuple[Candidate, ...],
         already_evaluated: set[str],
+        *,
+        limit: int,
     ) -> tuple[Candidate, ...]:
+        if limit < 1:
+            return ()
         candidates_by_id = {
-            candidate.candidate_id: candidate for candidate in candidates if candidate.candidate_id not in already_evaluated
+            candidate.candidate_id: candidate
+            for candidate in candidates
+            if candidate.candidate_id not in already_evaluated
         }
         ordered = sorted(scores, key=lambda item: item.score, reverse=True)
         selected: list[Candidate] = []
@@ -192,9 +203,15 @@ class ActiveLearningDryRunEngine:
                 continue
             selected.append(candidate)
             seen.add(candidate.candidate_id)
-            if len(selected) >= self._batch_size:
+            if len(selected) >= limit:
                 break
         return tuple(selected)
+
+    def _remaining_batch_budget(self, state: LoopState) -> int:
+        if self._stopping_criteria.max_evaluations is None:
+            return self._batch_size
+        remaining = self._stopping_criteria.max_evaluations - state.evaluated_candidate_count
+        return max(0, min(self._batch_size, remaining))
 
     def _simulate(
         self, requests: tuple[SimulationRequest, ...], state: LoopState

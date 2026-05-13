@@ -57,6 +57,23 @@ def test_missing_template_raises_contract_error(tmp_path: Path) -> None:
         )
 
 
+def test_rejects_template_source_that_escapes_mirheo_source_root(tmp_path: Path) -> None:
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    (tmp_path / "outside.txt").write_text("outside\n", encoding="utf-8")
+
+    with pytest.raises(UnsafeOutputPathError, match="source escapes Mirheo source root"):
+        stage_gv_runtime(
+            modality="gv",
+            experiment="stretching",
+            output_root=tmp_path / "output",
+            mirheo_source_root=source_root,
+            templates=(TemplateSpec("../outside.txt", "runtime/outside.txt"),),
+            run_id="run-source-escape",
+            dry_run=True,
+        )
+
+
 def test_rejects_unsafe_output_path_in_repo_source_tree() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     source_root = repo_root / "docs"
