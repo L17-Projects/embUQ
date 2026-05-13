@@ -21,6 +21,8 @@ This directory hosts the public documentation set for the `v0.1.0` release line.
 - `VEGA_VALIDATION_MATRIX.md` for the public Vega validation matrix and report surface
 - `KAROLINA_FULL_PLATFORM.md` for the Karolina scratch, Slurm, runtime-root, and acceptance-evidence contract
 - `MES-125_KAROLINA_ACCEPTANCE_CLOSEOUT.md` for the MES-125 Karolina closeout evidence skeleton
+- `MES-59_MERGE_READINESS_CHECKLIST.md` for the delayed/thread-aware connector review sweep required before merge readiness
+- `MES-59_74_76_79_CLOSEOUT_EVIDENCE.md` for the MES-59/MES-74/MES-76/MES-79 closeout decisions and validation evidence
 - `GV_EXTENSION_CLOSEOUT.md` for provisional MES-78 release hardening scope and GV rollout gate
 - `VALIDATION_CONFIGS.md` for the tiny validation config bundle
 

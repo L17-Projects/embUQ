@@ -120,6 +120,7 @@ def _run_diameter(
         "dataset_name": dataset_name,
         "map_json": str(map_json),
         "result_json": str(result_json) if result_json.exists() else None,
+        "scratch_root": str(scratch_root),
         "command": command,
         "returncode": returncode,
         "timed_out": timed_out,
@@ -138,6 +139,21 @@ def _cleanup_retry_state(scratch_root: Path, result_json: Path) -> list[str]:
         result_json.unlink()
         actions.append(f"removed partial result: {result_json}")
     return actions
+
+
+def _init_directory_policy(map_mirheo_dir: Path) -> dict[str, object]:
+    scratch_root_base = map_mirheo_dir / "_scratch"
+    return {
+        "mode": "auto_prepared_per_dataset_scratch_root",
+        "preexisting_init_dirs_required": False,
+        "scratch_root_base": str(scratch_root_base),
+        "scratch_root_pattern": str(scratch_root_base / "<dataset_name>"),
+        "compression_template": "compression/src regenerated through generate_sim/write_parameters",
+        "indentation_template": "indentation/src copied into the scratch root",
+        "missing_template_behavior": (
+            "evaluator fails explicitly; MAP Mirheo smoke does not skip missing init inputs"
+        ),
+    }
 
 
 def _build_attempt_args(
@@ -306,6 +322,7 @@ def run_map_mirheo(
         "model_family": model_family,
         "manifest_path": str(manifest_path),
         "map_mirheo_dir": str(map_mirheo_dir),
+        "init_directory_policy": _init_directory_policy(map_mirheo_dir),
         "n_displacements": n_displacements,
         "mpi_ranks": mpi_ranks,
         "timeout_seconds": timeout_seconds,

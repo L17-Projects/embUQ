@@ -15,8 +15,15 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[2]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from meso_uq.production_sanity import resolve_production_sanity_selections  # noqa: E402
-from meso_uq.vega_workflows import VegaWorkflowSelection, selection_key, selection_slug  # noqa: E402
+from meso_uq.vega_workflows import (  # noqa: E402
+    VALID_EXPERIMENTS,
+    VALID_MODEL_FAMILIES,
+    VegaWorkflowSelection,
+    expand_selection_matrix,
+    parse_selection,
+    selection_key,
+    selection_slug,
+)
 
 DEFAULT_NUMSTEPS = 200
 DEFAULT_NUMSTEPS_EQ = 200
@@ -24,6 +31,57 @@ DEFAULT_N_DISPLACEMENTS = 1
 DEFAULT_TIME_LIMIT = "00:10:00"
 DEFAULT_CANARY_ROOT = REPO_ROOT / "_runtime_validation" / "gpu_canaries"
 SBATCH_TEMPLATE = REPO_ROOT / "scripts" / "vega" / "sbatch" / "workflow_map_mirheo.sbatch"
+DEFAULT_SANITY_SELECTION = VegaWorkflowSelection("compression", "full-model", "production")
+
+INIT_DIRECTORY_POLICY = {
+    "mode": "auto_prepared_per_dataset_scratch_root",
+    "preexisting_init_dirs_required": False,
+    "scratch_root_pattern": "<lane output>/map_mirheo/_scratch/<dataset_name>",
+    "compression_template": "compression/src regenerated through generate_sim/write_parameters",
+    "indentation_template": "indentation/src copied into the scratch root",
+    "missing_template_behavior": (
+        "job fails explicitly; MAP Mirheo sanity does not skip missing init inputs"
+    ),
+}
+
+SKIP_POLICY = {
+    "missing_phase3b_manifest": "fatal before sbatch submission",
+    "missing_init_inputs": "not skipped; evaluator preparation fails the lane",
+}
+
+
+def _deduplicate(selections: list[VegaWorkflowSelection]) -> list[VegaWorkflowSelection]:
+    ordered: list[VegaWorkflowSelection] = []
+    seen: set[str] = set()
+    for selection in selections:
+        key = selection_key(selection)
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(selection)
+    return ordered
+
+
+def resolve_map_mirheo_sanity_selections(
+    values: list[str],
+    *,
+    all_lanes: bool = False,
+) -> list[VegaWorkflowSelection]:
+    explicit = [parse_selection(value) for value in values]
+    if explicit:
+        selections = explicit
+    elif all_lanes:
+        selections = expand_selection_matrix(VALID_EXPERIMENTS, VALID_MODEL_FAMILIES, ("production",))
+    else:
+        selections = [DEFAULT_SANITY_SELECTION]
+
+    for selection in selections:
+        if selection.profile != "production":
+            raise ValueError(
+                "MAP Mirheo sanity only supports production selections. "
+                f"Got: {selection_key(selection)}"
+            )
+    return _deduplicate(selections)
 
 
 def _sbatch_export_arg(env: dict[str, str]) -> str:
@@ -165,7 +223,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--timeout-seconds", type=int, default=900)
     args = parser.parse_args(argv)
 
-    selections = resolve_production_sanity_selections(args.selection, all_lanes=args.all_lanes)
+    selections = resolve_map_mirheo_sanity_selections(args.selection, all_lanes=args.all_lanes)
     canary_root = _resolve_path(args.canary_root)
     report_root = (
         _resolve_path(args.report_root)
@@ -223,6 +281,12 @@ def main(argv: list[str] | None = None) -> int:
                 "job_exit_code": job_record["exit_code"],
                 "output_dir": str(output_dir),
                 "manifest": manifest,
+                "init_directory_policy": {
+                    **INIT_DIRECTORY_POLICY,
+                    "scratch_root_pattern": str(
+                        output_dir / "map_mirheo" / "_scratch" / "<dataset_name>"
+                    ),
+                },
                 "status": "passed" if lane_pass else "failed",
             }
         )
@@ -235,6 +299,8 @@ def main(argv: list[str] | None = None) -> int:
         "numsteps": args.numsteps,
         "numsteps_eq": args.numsteps_eq,
         "time_limit": args.time_limit,
+        "init_directory_policy": INIT_DIRECTORY_POLICY,
+        "skip_policy": SKIP_POLICY,
         "status": "passed" if overall_pass else "failed",
         "lanes": lane_reports,
     }
