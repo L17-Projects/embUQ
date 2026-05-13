@@ -1,0 +1,11 @@
+schema_version: "1.0"
+kind: dataset
+metadata:
+  id: emb_compression_reference
+  name: EMB Compression Reference Dataset
+spec:
+  modality: emb_compression
+  split: reference
+  source_type: curated_local
+  path_template: ${MESOUQ_REPO_ROOT}/data/reference/${DATASET_ID}
+  retention: refresh_or_archive

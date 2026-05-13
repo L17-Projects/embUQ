@@ -1,0 +1,13 @@
+schema_version: "1.0"
+kind: noise
+metadata:
+  id: gaussian_observation
+  name: Gaussian Observation Noise
+spec:
+  family: gaussian
+  parameters:
+    - sigma
+  bounds:
+    sigma:
+      - 0.0
+      - 1.0

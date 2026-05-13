@@ -1,0 +1,26 @@
+schema_version: "1.0"
+kind: platform
+metadata:
+  id: generic_slurm
+  name: Generic Slurm
+platform_key: generic_slurm
+spec:
+  scheduler: slurm
+  submission:
+    launcher: sbatch
+    account_env: MESOUQ_SLURM_ACCOUNT
+    partition_env: MESOUQ_SLURM_PARTITION
+    qos_env: MESOUQ_SLURM_QOS
+    time_limit: "08:00:00"
+  paths:
+    runtime_root: ${MESOUQ_REPO_ROOT}/_slurm
+    runs_root: ${MESOUQ_RUNS_ROOT}/slurm
+    scratch_root: ${MESOUQ_SCRATCH_ROOT}
+    korali_vendor_root: extern/korali
+path_policy:
+  allow_absolute_paths: false
+  required_placeholders:
+    - ${MESOUQ_REPO_ROOT}
+    - ${MESOUQ_RUNS_ROOT}
+    - ${MESOUQ_SCRATCH_ROOT}
+  forbidden_literals: []

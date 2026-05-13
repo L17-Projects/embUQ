@@ -1,0 +1,11 @@
+schema_version: "1.0"
+kind: inference
+metadata:
+  id: hierarchical_tmcmc
+  name: Hierarchical TMCMC
+spec:
+  modality: emb_compression
+  surrogate_ref: emb_dnn_baseline
+  algorithm: tmcmc
+  config_template: inference/configs/production/inference_config_compression.yaml
+  output_root_template: ${MESOUQ_RUNS_ROOT}/inference/${RUN_TAG}

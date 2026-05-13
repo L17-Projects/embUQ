@@ -1,0 +1,13 @@
+schema_version: "1.0"
+kind: modality
+metadata:
+  id: emb_compression
+  name: EMB Compression
+spec:
+  structure: emb
+  experiment: compression
+  model_family: reduced
+  supported_observables:
+    - force_displacement
+  default_dataset: emb_compression_reference
+  refresh_policy: refresh_or_archive

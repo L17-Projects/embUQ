@@ -100,4 +100,16 @@ include = ["meso_uq*"]
 
 [tool.pytest.ini_options]
 addopts = ["-ra", "--tb=short"]
+markers = [
+  "gpu: tests that exercise GPU-oriented contracts",
+  "hpc: tests that validate HPC-facing behavior contracts",
+  "slurm: tests that inspect Slurm configuration or runner behavior",
+  "cuda: tests tied to CUDA runtime guardrails",
+  "mpi: tests that touch MPI-sensitive orchestration",
+  "korali: tests that focus on Korali runtime behavior",
+  "pyro: tests that use optional Pyro inference paths",
+  "operational: tests related to production or workflow-ops contracts",
+  "slow: tests intentionally deferred for non-default local runs",
+  "integration: integration-surface behavioral tests",
+]
 testpaths = ["tests"]
