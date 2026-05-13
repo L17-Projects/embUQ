@@ -207,8 +207,7 @@ def _build_staged_entry(
     spec: TemplateSpec,
     allow_missing: bool,
 ) -> StagedTemplateFile:
-    source_path = (source_root / spec.source_relative_path).resolve()
-    _assert_source_path(parent=source_root, child=source_path)
+    source_path = _resolve_template_source(source_root=source_root, spec=spec)
     if not allow_missing and not source_path.is_file():
         raise MissingTemplateError(
             f"Missing runtime template '{spec.source_relative_path}' under Mirheo source root '{source_root}'."
@@ -231,6 +230,12 @@ def _materialize_staged_entry(*, source_root: Path, run_root: Path, spec: Templa
     entry.destination_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(entry.source_path, entry.destination_path)
     return entry
+
+
+def _resolve_template_source(*, source_root: Path, spec: TemplateSpec) -> Path:
+    source_path = (source_root / spec.source_relative_path).resolve()
+    _assert_source_path(parent=source_root, child=source_path)
+    return source_path
 
 
 def _sha256_path(path: Path) -> str:
