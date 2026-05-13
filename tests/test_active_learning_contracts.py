@@ -149,6 +149,50 @@ def test_acquisition_selects_top_scored_batch_for_simulation() -> None:
     assert len(retrain_calls) == 1
 
 
+def test_batch_selection_is_capped_by_remaining_evaluation_budget() -> None:
+    def candidates(_: LoopState) -> list[Candidate]:
+        return [
+            Candidate(candidate_id=f"budget-{idx}", parameters={"x": idx})
+            for idx in range(5)
+        ]
+
+    def score(candidates: tuple[Candidate, ...], _state: LoopState) -> list[AcquisitionScore]:
+        return [
+            AcquisitionScore(candidate_id=candidate.candidate_id, score=float(10 - idx))
+            for idx, candidate in enumerate(candidates)
+        ]
+
+    simulated_batches: list[list[str]] = []
+
+    def simulate(requests: tuple, _state):
+        simulated_batches.append([request.candidate.candidate_id for request in requests])
+        return [
+            SimulationResult(
+                request_id=request.request_id,
+                candidate_id=request.candidate.candidate_id,
+                status="success",
+                metrics={},
+            )
+            for request in requests
+        ]
+
+    retrain, _ = _build_fake_retrainer()
+    engine = ActiveLearningDryRunEngine(
+        candidate_generator=candidates,
+        acquisition_policy=score,
+        simulator=simulate,
+        retrainer=retrain,
+        stopping_criteria=StoppingCriteria(max_iterations=3, max_evaluations=2),
+        batch_size=5,
+    )
+
+    state = engine.run()
+
+    assert simulated_batches == [["budget-0", "budget-1"]]
+    assert len(state.simulation_requests) == 2
+    assert state.completion_reason == "max_evaluations_reached"
+
+
 def test_simulation_results_and_retraining_results_are_honored() -> None:
     def candidates(_: LoopState) -> list[Candidate]:
         return [Candidate(candidate_id="r-0", parameters={"x": 1}), Candidate(candidate_id="r-1", parameters={"x": 2})]

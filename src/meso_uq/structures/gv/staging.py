@@ -208,6 +208,7 @@ def _build_staged_entry(
     allow_missing: bool,
 ) -> StagedTemplateFile:
     source_path = (source_root / spec.source_relative_path).resolve()
+    _assert_source_path(parent=source_root, child=source_path)
     if not allow_missing and not source_path.is_file():
         raise MissingTemplateError(
             f"Missing runtime template '{spec.source_relative_path}' under Mirheo source root '{source_root}'."
@@ -250,6 +251,13 @@ def _assert_child_path(*, parent: Path, child: Path) -> None:
         child.relative_to(parent.resolve())
     except ValueError as exc:
         raise UnsafeOutputPathError(f"Staged destination escapes run root: {child}") from exc
+
+
+def _assert_source_path(*, parent: Path, child: Path) -> None:
+    try:
+        child.relative_to(parent.resolve())
+    except ValueError as exc:
+        raise UnsafeOutputPathError(f"Staged source escapes Mirheo source root: {child}") from exc
 
 
 def _find_repo_root() -> Path:
