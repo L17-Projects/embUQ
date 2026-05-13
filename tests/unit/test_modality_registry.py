@@ -13,6 +13,7 @@ def test_modality_registry_lists_metadata_descriptors():
     assert descriptor_ids == {
         "compression",
         "indentation",
+        "stretching",
         "buckling",
         "torsion",
         "eigenmodes",
@@ -27,6 +28,7 @@ def test_modality_registry_can_filter_by_family():
 
     assert tuple(descriptor.modality for descriptor in emb) == (Modality.COMPRESSION, Modality.INDENTATION)
     assert tuple(descriptor.modality.value for descriptor in gv) == (
+        "stretching",
         "buckling",
         "torsion",
         "eigenmodes",
@@ -41,6 +43,9 @@ def test_modality_descriptor_serialization_is_metadata_only():
 
     assert payload["family"] == "gv"
     assert payload["metadata"]["known_runtime_status"] == "staging_out_of_scope"
+    assert payload["runtime_requirements"][0]["name"] == "mirheoOBMD"
+    assert payload["input_controls"] == ["ptan", "afsi", "bpress"]
+    assert payload["observables"] == {"shear_flow_response": "curve"}
     assert restored == descriptor
 
 
