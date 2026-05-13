@@ -43,6 +43,12 @@ from meso_uq.workflow_acceleration import (
     expand_reduced_parameters,
     get_fixed_parameters,
 )
+from meso_uq.workflows.legacy import (
+    resolve_legacy_inference_config_path,
+    resolve_legacy_project_root,
+    resolve_legacy_surrogate_runtime,
+    resolve_legacy_surrogate_trained_dir,
+)
 
 _CONFIG_CACHE: Dict[str, Dict[str, Any]] = {}
 _SURROGATE_CACHE: Dict[Tuple[str, float, str, str], Any] = {}
@@ -60,29 +66,18 @@ def _get_worker_comm():
 
 @lru_cache(maxsize=1)
 def _resolve_project_root() -> str:
-    cwd = os.getcwd()
-    for possible_root in [cwd, os.path.dirname(cwd), os.path.dirname(os.path.dirname(cwd))]:
-        if os.path.exists(os.path.join(possible_root, "indentation", "src")):
-            return possible_root
-    raise RuntimeError(f"Could not find project root (indentation/src) from {cwd}")
+    return str(
+        resolve_legacy_project_root(
+            marker_parts=("indentation", "src"),
+            start_path=os.getcwd(),
+            anchor_file=__file__,
+            exists=os.path.exists,
+        )
+    )
 
 
 def _resolve_config_path(project_root: str) -> Path:
-    override = os.getenv("HUQ_INFERENCE_CONFIG") or os.getenv("CONFIG_PATH")
-    if override:
-        candidate = Path(override)
-        if not candidate.is_absolute() and not candidate.exists():
-            candidate = Path(project_root, override)
-        if candidate.exists():
-            return candidate
-    for path in [
-        Path(project_root, "inference/configs/production/inference_config_indentation.yaml"),
-        Path("../../inference/configs/production/inference_config_indentation.yaml"),
-        Path("inference/configs/production/inference_config_indentation.yaml"),
-    ]:
-        if path.exists():
-            return path
-    raise FileNotFoundError("Could not find inference_config_indentation.yaml")
+    return resolve_legacy_inference_config_path(project_root, "indentation")
 
 
 def _load_config(project_root: str) -> Dict[str, Any]:
@@ -95,28 +90,14 @@ def _load_config(project_root: str) -> Dict[str, Any]:
 
 
 def _resolve_surrogate_runtime(config: Dict[str, Any]) -> Tuple[str, int, int]:
-    surrogate_cfg = config.get("surrogate", {})
-    if surrogate_cfg is None:
-        surrogate_cfg = {}
-    if not isinstance(surrogate_cfg, dict):
-        raise ValueError("Expected 'surrogate' config section to be a mapping.")
-    backend = str(surrogate_cfg.get("backend", "dnn")).strip().lower()
-    if backend not in ("dnn", "bnn"):
-        raise ValueError(f"Unsupported surrogate backend '{backend}'. Expected 'dnn' or 'bnn'.")
-    predictive_mc_samples = int(surrogate_cfg.get("predictive_mc_samples", 32))
-    predictive_mc_chunk_size = int(surrogate_cfg.get("predictive_mc_chunk_size", 8))
-    if predictive_mc_samples < 1:
-        raise ValueError("surrogate.predictive_mc_samples must be >= 1.")
-    if predictive_mc_chunk_size < 1:
-        raise ValueError("surrogate.predictive_mc_chunk_size must be >= 1.")
-    return backend, predictive_mc_samples, predictive_mc_chunk_size
+    return resolve_legacy_surrogate_runtime(config).as_tuple()
 
 
 def _build_surrogate(
     project_root: str, diameter_um: float, device: str = "cpu", backend: str = "dnn"
 ) -> Any:
-    surrogate_path = os.path.join(
-        project_root, f"indentation/surrogate/diameters/{diameter_um}um/trained"
+    surrogate_path = os.fspath(
+        resolve_legacy_surrogate_trained_dir(project_root, "indentation", diameter_um)
     )
     if backend == "dnn":
         from indentation.surrogate.evaluate import Surrogate

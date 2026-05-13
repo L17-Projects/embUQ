@@ -24,6 +24,22 @@ available for one release cycle while the architecture migration settles.
 | Validation configs under `inference/configs/validation` and `reduced/configs/validation` | Keep the current validation-profile YAMLs intact | `docs/VALIDATION_CONFIGS.md`, `docs/VALIDATION_MATRIX.md` | `docs/WORKFLOWS.md`, `tests/test_validation_matrix.py` |
 | Production configs under `inference/configs/production` and `reduced/configs/production` | Keep the canonical production configs in place while launchers migrate | `docs/WORKFLOWS.md`, `docs/RELEASE_SCOPE.md` | `docs/VEGA_ACCEPTANCE_CHECKLIST.md`, `docs/VEGA_PHASE2_NATIVE_CUDA_CHECKLIST.md` |
 | `examples/configs` | Keep only while refresh/archive decisions are being made | `docs/RELEASE_SCOPE.md`, `docs/GETTING_STARTED.md` | `docs/README.md`, `docs/RELEASE_NOTES_v0.1.0.md` |
+| `compression/src/generate.py` and `indentation/src/generate.py` | Keep as EMB simulation-generation shims while callers migrate to package APIs | `src/meso_uq/simulation/emb_generation.py`, `tests/unit/test_compression_static_geometry.py`, `tests/unit/test_compute_indentation.py` | `meso_uq.simulation.generate_emb_simulation`, `docs/EMB_WORKFLOW_EXTRACTION_PLAN.md` |
+| `compression/evalkit/posterior_compression.py` and `indentation/evalkit/posterior_indentation.py` | Keep import and function names stable for Korali, notebooks, and serialized workflow references | `tests/unit/test_evalkit_surrogate_runtime.py`, `tests/unit/test_evalkit_surrogate_import_resolution.py`, `tests/unit/test_surrogate_backend_switch.py` | `src/meso_uq/workflows/legacy.py`, future inference/surrogate package APIs |
+| `inference/scripts/run_phase_1.py`, `run_phase_2.py`, and `run_phase_3b.py` | Keep phase launchers callable while runtime plumbing moves behind package contracts | `tests/unit/test_phase1_burn_in_config.py`, `tests/unit/test_inference_phase3b_driver.py`, `tests/unit/test_inference_phase3b_runtime.py` | `meso_uq.workflow_acceleration`, `meso_uq.experiments`, future orchestration package |
+| `reduced/scripts/run_phase_1.py`, `run_phase_2.py`, and `run_phase_3b.py` | Keep reduced-model launchers as thin delegates to inference phase launchers | `tests/test_reduced_phase_wrappers.py` | central config aliases and future orchestration package |
+| `propagation/scripts/run_phase1_propagation.py` and `run_phase3b_propagation.py` | Keep propagation launchers callable while shared path/config/backend mechanics move to package code | `tests/test_script_manifests.py`, `src/meso_uq/postprocess/propagation.py`, `src/meso_uq/workflows/legacy.py` | `meso_uq.postprocess.propagation`, future reporting/orchestration package |
+
+## Compatibility inventory source
+
+`src/meso_uq/workflows/legacy.py` is the machine-readable inventory for the legacy compression, indentation, inference, reduced, and propagation workflow surfaces. New compatibility shims must be added there with:
+
+- legacy path;
+- replacement API;
+- purpose;
+- workflow family.
+
+The same module owns compatibility-only project-root probing, inference-config fallback resolution, surrogate runtime parsing, evalkit path setup, surrogate trained-directory paths, and once-per-surface warning text. Scientific behavior should remain in the existing workflow modules until a dedicated migration issue moves it behind a replacement package API.
 
 ## Update triggers
 
@@ -33,6 +49,7 @@ Update this page when any of the following happen together:
 - the GV staging model changes from legacy roots to manifest-only delivery
 - the validation configs are renamed, archived, or regenerated
 - the paper replay flow stops using the compatibility shim
+- a legacy workflow path starts delegating to `src/meso_uq/workflows/legacy.py` or to a new package API
 
 ## Removal rule
 
