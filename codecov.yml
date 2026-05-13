@@ -8,19 +8,29 @@ ignore:
   - "src/meso_uq/surrogate/bnn_training.py"
   - "compression/surrogate/scripts/emb_train_bnn.py"
   - "indentation/surrogate/scripts/emb_train_bnn.py"
-  # Mirheo executable experiment sources and scheduler wrappers are validated
-  # through platform-routing tests and GPU canaries, not Python line coverage.
-  - "gv/**/src/**"
+  # Generated outputs, notebooks, vendored trees, and runtime artifacts are
+  # tracked by policy and docs, not by line coverage.
   - "docs/**"
+  - "extern/**"
+  - "papers/**"
+  - "runtime/**"
+  - "*/.ipynb_checkpoints/**"
+  - "*.ipynb"
+  - "_ci/**"
+  - "_out/**"
+  - "_runs/**"
+  - "logs/**"
+  # Test modules are validation assets. Patch coverage should measure product
+  # code exercised by tests, not line execution inside the tests themselves.
+  - "tests/**"
+  # Operational platform wrappers and generated replay helpers are validated
+  # by dedicated workflow tests instead of Codecov line deltas.
   - "scripts/platforms/karolina/*.sh"
   - "scripts/platforms/karolina/sbatch/**"
   - "scripts/platforms/vega/*.sh"
   - "scripts/platforms/vega/run_validation_matrix.py"
   - "scripts/platforms/vega/sbatch/**"
   - "scripts/platforms/vega/submit_gv_paper_figure_replay.sh"
-  # Test modules are validation assets. Patch coverage should measure product
-  # code exercised by tests, not line execution inside the tests themselves.
-  - "tests/**"
 
 coverage:
   status:

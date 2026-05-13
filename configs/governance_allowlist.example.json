@@ -1,0 +1,122 @@
+{
+  "schema_version": "1.0",
+  "manifest_id": "governance-allowlist-example",
+  "generated_at": "2026-05-13T00:00:00Z",
+  "entries": [
+    {
+      "check": "public_api_exports",
+      "owner": "core-contracts",
+      "reason": "The narrow meso_uq.public_api surface is intentionally curated so dependency-light contract imports stay stable.",
+      "review_condition": "Revise this entry when the public API contract is intentionally widened or narrowed.",
+      "expected_exports": [
+        "AgentDefinition",
+        "AgentFamily",
+        "ArtifactReference",
+        "ArtifactClass",
+        "DatasetSourceMetadata",
+        "InferenceBackend",
+        "ManifestMetadata",
+        "Modality",
+        "ModalityDescriptor",
+        "ModelBackend",
+        "NoiseModelKind",
+        "Platform",
+        "RequirementState",
+        "RuntimeCapability",
+        "RuntimeRequirement",
+        "RuntimeRequirementKind",
+        "RunMetadata",
+        "SURROGATE_SERIALIZATION_ALIASES",
+        "SerializedSurrogateAlias",
+        "SurrogateIdentifier",
+        "UnitSystem",
+        "classify_agent_modality_support",
+        "get_agent_definition",
+        "get_modality_descriptor",
+        "list_agent_definitions",
+        "list_agent_modalities",
+        "list_modality_descriptors",
+        "list_serialized_surrogate_aliases",
+        "missing_dependency_requirements_for_agent",
+        "resolve_agent_modality",
+        "resolve_agent_family_identifier",
+        "runtime_requirements_for_agent",
+        "supported_modalities_for_agent"
+      ]
+    },
+    {
+      "check": "ci_path_references",
+      "owner": "ci-governance",
+      "reason": "The CI workflow still stages generated evidence under repo-local _ci paths for retraining and workflow canary artifacts.",
+      "review_condition": "Update this entry when CI evidence moves out of the repository tree or the path names change.",
+      "files": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "fragments": [
+            "_ci/surrogate_retraining",
+            "_ci/workflow_canary"
+          ]
+        }
+      ]
+    },
+    {
+      "check": "docs_retired_markers",
+      "owner": "docs-governance",
+      "reason": "Migration docs intentionally keep deprecated and retired-command markers visible while the compatibility window remains open.",
+      "review_condition": "Trim these markers once the matching retired surfaces and compatibility language are removed from the docs.",
+      "files": [
+        {
+          "path": "docs/WORKFLOWS.md",
+          "fragments": [
+            "legacy command shapes alive",
+            "remove deprecated wrappers"
+          ]
+        },
+        {
+          "path": "docs/PACKAGE_CONTRACTS.md",
+          "fragments": [
+            "deprecated installed-package shim"
+          ]
+        },
+        {
+          "path": "docs/MESO_UQ_COMPATIBILITY_SURFACE.md",
+          "fragments": [
+            "deprecated installed-package shim"
+          ]
+        },
+        {
+          "path": "docs/MESO_UQ_MIGRATION_INVENTORY.md",
+          "fragments": [
+            "retired"
+          ]
+        },
+        {
+          "path": "docs/COVERAGE_POLICY.md",
+          "fragments": [
+            "wrappers are retired"
+          ]
+        }
+      ]
+    },
+    {
+      "check": "import_cycles",
+      "owner": "import-governance",
+      "reason": "A small set of cycle-sensitive metadata import orders is kept explicit so import-safety checks stay readable.",
+      "review_condition": "Refresh this entry if the supported import order sequences change.",
+      "sequences": [
+        [
+          "meso_uq.surrogate.catalogs",
+          "meso_uq.surrogate.gv_catalog"
+        ],
+        [
+          "meso_uq.surrogate.gv_catalog",
+          "meso_uq.surrogate.catalogs"
+        ],
+        [
+          "meso_uq.structures",
+          "meso_uq.structures.gv"
+        ]
+      ]
+    }
+  ]
+}

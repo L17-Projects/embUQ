@@ -106,6 +106,7 @@ markers = [
   "slurm: tests that inspect Slurm configuration or runner behavior",
   "cuda: tests tied to CUDA runtime guardrails",
   "mpi: tests that touch MPI-sensitive orchestration",
+  "mirheo: tests that exercise Mirheo runtime or bootstrap behavior",
   "korali: tests that focus on Korali runtime behavior",
   "pyro: tests that use optional Pyro inference paths",
   "operational: tests related to production or workflow-ops contracts",
