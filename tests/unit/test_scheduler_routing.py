@@ -77,3 +77,8 @@ def test_map_mirheo_template_keeps_production_defaults_unset() -> None:
 
     assert 'MAP_MIRHEO_NUMSTEPS="${MAP_MIRHEO_NUMSTEPS:-}"' in mirheo_text
     assert 'MAP_MIRHEO_NUMSTEPS_EQ="${MAP_MIRHEO_NUMSTEPS_EQ:-}"' in mirheo_text
+    assert 'MAP_MIRHEO_MAX_RETRIES="${MAP_MIRHEO_MAX_RETRIES:-1}"' in mirheo_text
+    assert 'MAP_MIRHEO_RETRY_DT_SCALE="${MAP_MIRHEO_RETRY_DT_SCALE:-0.5}"' in mirheo_text
+    assert "safe per-attempt budget" in mirheo_text
+    assert "parse_slurm_time_limit" in mirheo_text
+    assert "parse_hms_seconds" not in mirheo_text

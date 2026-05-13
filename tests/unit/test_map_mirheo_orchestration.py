@@ -201,6 +201,56 @@ def test_map_mirheo_timeout_recorded(tmp_path):
     assert summary["diameters"][0]["status"] == "timed_out"
 
 
+def test_map_mirheo_timeout_retries_with_cleanup(tmp_path):
+    import subprocess
+    from run_map_mirheo import run_map_mirheo
+
+    manifest_dir = tmp_path / "map_phase3b"
+    manifest_dir.mkdir()
+    dataset = {
+        "Yt": 1e7, "kb": 1e4, "d0": 0.1, "sigma": 0.03,
+        "logLikelihood": 10.0, "logPrior": -5.0, "logPosterior": 5.0,
+        "diameter_um": 3.2, "run_dir": "/tmp/r", "output_csv": "/tmp/o.csv",
+    }
+    (manifest_dir / "phase3b_map_manifest.json").write_text(
+        json.dumps({"datasets": {"indentation_3.2um": dataset}})
+    )
+
+    calls = {"count": 0}
+    mock_result = MagicMock(returncode=0, stdout="ok", stderr="")
+
+    def fake_run(command, **_kwargs):
+        calls["count"] += 1
+        scratch_root = Path(command[command.index("--scratch-root") + 1])
+        result_path = Path(command[command.index("--output") + 1])
+        if calls["count"] == 1:
+            scratch_root.mkdir(parents=True, exist_ok=True)
+            (scratch_root / "stale.lock").write_text("lock", encoding="utf-8")
+            result_path.parent.mkdir(parents=True, exist_ok=True)
+            result_path.write_text("partial", encoding="utf-8")
+            raise subprocess.TimeoutExpired(command, timeout=1, output="hang", stderr="deadlock")
+        assert not scratch_root.exists()
+        assert not result_path.exists()
+        return mock_result
+
+    with patch("subprocess.run", side_effect=fake_run):
+        summary = run_map_mirheo(
+            "indentation",
+            tmp_path,
+            sys.executable,
+            5,
+            timeout_seconds=1,
+            max_retries=1,
+        )
+
+    diameter = summary["diameters"][0]
+    assert summary["status"] == "passed"
+    assert diameter["status"] == "passed"
+    assert diameter["attempt_count"] == 2
+    assert diameter["attempts"][0]["timed_out"] is True
+    assert diameter["cleanup_actions"]
+
+
 def test_map_mirheo_dataset_filter_runs_only_selected_dataset(tmp_path):
     from run_map_mirheo import run_map_mirheo
 
@@ -336,6 +386,18 @@ def test_main_invalid_timeout_seconds_returns_one(tmp_path):
         "--profile", "production",
         "--output-dir", str(tmp_path),
         "--timeout-seconds", "0",
+    ])
+    assert rc == 1
+
+
+def test_main_negative_max_retries_returns_one(tmp_path):
+    from run_map_mirheo import main
+    rc = main([
+        "--experiment", "indentation",
+        "--model-family", "reduced-model",
+        "--profile", "production",
+        "--output-dir", str(tmp_path),
+        "--max-retries", "-1",
     ])
     assert rc == 1
 

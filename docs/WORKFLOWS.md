@@ -102,6 +102,12 @@ Plotting/postprocessing:
 
 Shared postprocessing helpers live under `src/meso_uq/postprocess/`.
 
+Phase 1 posterior-figure policy:
+- keep posterior figures based on the raw posterior sample database (no duplicate filtering)
+- compute and report duplicate-particle diagnostics (`unique_particle_count`, `top_duplicate_mass`, `top_10_duplicate_mass`)
+- compute and report chain-leader multiplicity diagnostics from Korali `Chain Leaders`
+- include per-lane comparison between chain-leader and posterior-sample duplication mass in machine-readable diagnostics outputs
+
 ## 7. Vega helper surface
 
 For Vega-first operation, the repo now also ships split helpers under `scripts/platforms/vega/`:
@@ -240,3 +246,25 @@ For one-command replay of the exact HUQ-EMB paper figures from a stored `paper_d
 
 This wrapper auto-stages the DNN holdout/Sobol inputs, renders the exact paper figures, copies them into `paper_data/figures/*` and `paper_data/tables/`, and writes a replay report under `runs/<campaign_id>/paper_exact_stage/`.
 If no TeX deps are configured, it falls back to non-TeX matplotlib rendering automatically. See `docs/HUQ_EMB_EXACT_FIGURE_REPLAY.md`.
+
+## 12. Compatibility wrapper retirement plan (Vega → Karolina parity)
+
+The compatibility wrappers under `scripts/platforms/vega/` for matrix and acceptance-style entrypoints keep
+legacy command shapes alive while delegating to the shared workflow-matrix runner or, for surrogate/BNN helpers,
+the equivalent `scripts/platforms/karolina/` operator runners.
+
+Current plan:
+
+- keep the delegation wrappers until the launcher migration is fully complete and the public release docs
+  point only to the parity `karolina` operators,
+- continue emitting behavior checks that these wrappers preserve the same CLI surface,
+- remove deprecated wrappers in a follow-up release only after:
+  - a deprecation period has passed,
+  - `HPC_SITE`-based launch paths are documented as the primary entrypoint,
+  - and this compatibility test matrix is green for at least one full release cycle.
+
+The following public surfaces are guarded by tests:
+
+- `scripts/platforms/vega/run_validation_matrix.py` still forwards to `run_workflow_matrix.py` with the `validation` profile.
+- `scripts/platforms/vega/run_dnn_rebaseline_matrix.py`, `run_bnn_sweep_matrix.py`, `run_bnn_roundtrip_check.py`,
+  `run_bnn_certification_matrix.py`, `promote_certified_bnn.py` still forward to the equivalent `karolina` runners.

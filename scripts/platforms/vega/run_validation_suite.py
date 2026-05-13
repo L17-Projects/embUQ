@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import shlex
 import subprocess
@@ -130,8 +131,36 @@ def _load_experiment_spec(config_path: Path, experiment_name: str):
     raise ValueError(f"Experiment '{experiment_name}' not found in {config_path}")
 
 
-def _postprocess_workflow(workflow_name: str, experiment_name: str, config_path: Path, workflow_dir: Path) -> None:
-    from meso_uq.postprocess.maps import extract_map_from_directory, load_posterior_samples
+def _strict_jsonable(value: Any) -> Any:
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    if isinstance(value, dict):
+        return {key: _strict_jsonable(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_strict_jsonable(item) for item in value]
+    if isinstance(value, tuple):
+        return [_strict_jsonable(item) for item in value]
+    return value
+
+
+def _postprocess_workflow(
+    workflow_name: str,
+    experiment_name: str,
+    config_path: Path,
+    workflow_dir: Path,
+) -> dict[str, str]:
+    from meso_uq.postprocess.diagnostics import (
+        PHASE1_POSTERIOR_FIGURE_POLICY,
+        duplicate_mass_comparison,
+        duplicate_particle_metrics,
+        mean_or_nan,
+        posterior_parameter_columns,
+    )
+    from meso_uq.postprocess.maps import (
+        extract_map_from_directory,
+        load_chain_leader_samples,
+        load_posterior_samples,
+    )
     from meso_uq.postprocess.plots import (
         plot_d0_correlations,
         plot_posterior_marginals,
@@ -140,23 +169,75 @@ def _postprocess_workflow(workflow_name: str, experiment_name: str, config_path:
 
     results_dir = workflow_dir / "results"
     map_dir = workflow_dir / "map_phase3b"
+    phase1_posterior_dir = workflow_dir / "posteriors_phase1"
     posterior_dir = workflow_dir / "posteriors_phase3b"
+    diagnostics_dir = workflow_dir / "diagnostics_phase1"
     overlay_dir = workflow_dir / "overlay_uq_ref"
+    phase1_samples_dir = workflow_dir / "samples_phase1"
     samples_dir = workflow_dir / "samples_phase3b"
     map_dir.mkdir(parents=True, exist_ok=True)
+    phase1_posterior_dir.mkdir(parents=True, exist_ok=True)
     posterior_dir.mkdir(parents=True, exist_ok=True)
+    diagnostics_dir.mkdir(parents=True, exist_ok=True)
     overlay_dir.mkdir(parents=True, exist_ok=True)
+    phase1_samples_dir.mkdir(parents=True, exist_ok=True)
     samples_dir.mkdir(parents=True, exist_ok=True)
 
     experiment = _load_experiment_spec(config_path, experiment_name)
     combined_map: Dict[str, Any] = {}
+    phase1_diagnostics: dict[str, Any] = {
+        "workflow": workflow_name,
+        "experiment": experiment_name,
+        "posterior_figure_policy": dict(PHASE1_POSTERIOR_FIGURE_POLICY),
+        "datasets": {},
+    }
 
     for diameter_um in experiment.diameters:
         exp_name = experiment.dataset_name(diameter_um)
+        phase1_dir = results_dir / "results_phase_1" / exp_name
         phase3b_dir = results_dir / "results_phase_3b" / exp_name
         map_csv = map_dir / f"{diameter_um}um_map.csv"
         map_df = extract_map_from_directory(phase3b_dir, output_csv=str(map_csv))
         combined_map[f"{diameter_um}um"] = map_df.iloc[0].to_dict()
+
+        phase1_samples_df = load_posterior_samples(phase1_dir)
+        phase1_samples_csv = phase1_samples_dir / f"{diameter_um}um_samples.csv"
+        phase1_samples_df.to_csv(phase1_samples_csv, index=False)
+        plot_posterior_marginals(
+            str(phase1_samples_csv),
+            str(phase1_posterior_dir / f"posterior_marginals_{diameter_um}um.png"),
+        )
+        if "d0" in phase1_samples_df.columns:
+            plot_d0_correlations(
+                str(phase1_samples_csv),
+                str(phase1_posterior_dir / f"d0_correlations_{diameter_um}um.png"),
+            )
+
+        posterior_metrics = duplicate_particle_metrics(
+            phase1_samples_df,
+            parameter_columns=posterior_parameter_columns(phase1_samples_df),
+        )
+        chain_leader_metrics: dict[str, float | int] | None
+        chain_leader_error: str | None = None
+        try:
+            chain_leader_df = load_chain_leader_samples(phase1_dir)
+            chain_leader_metrics = duplicate_particle_metrics(
+                chain_leader_df,
+                parameter_columns=posterior_parameter_columns(chain_leader_df),
+            )
+        except ValueError as exc:
+            chain_leader_metrics = None
+            chain_leader_error = str(exc)
+
+        phase1_diagnostics["datasets"][exp_name] = {
+            "diameter_um": diameter_um,
+            "posterior_sample_duplicates": posterior_metrics,
+            "chain_leader_duplicates": chain_leader_metrics,
+            "comparison_vs_posterior_samples": duplicate_mass_comparison(
+                posterior_metrics, chain_leader_metrics
+            ),
+            "chain_leader_error": chain_leader_error,
+        }
 
         samples_df = load_posterior_samples(phase3b_dir)
         samples_csv = samples_dir / f"{diameter_um}um_samples.csv"
@@ -188,7 +269,101 @@ def _postprocess_workflow(workflow_name: str, experiment_name: str, config_path:
     with (map_dir / "all_diameters_map.json").open("w") as handle:
         json.dump(combined_map, handle, indent=2)
 
+    per_dataset = list(phase1_diagnostics["datasets"].values())
+    chain_available = [
+        item for item in per_dataset if item.get("chain_leader_duplicates") is not None
+    ]
+    phase1_diagnostics["lane_summary"] = {
+        "dataset_count": len(per_dataset),
+        "chain_leader_dataset_count": len(chain_available),
+        "posterior_top_duplicate_mass_mean": mean_or_nan(
+            float(item["posterior_sample_duplicates"]["top_duplicate_mass"]) for item in per_dataset
+        ),
+        "posterior_top_10_duplicate_mass_mean": mean_or_nan(
+            float(item["posterior_sample_duplicates"]["top_10_duplicate_mass"]) for item in per_dataset
+        ),
+        "chain_leader_top_duplicate_mass_mean": mean_or_nan(
+            float(item["chain_leader_duplicates"]["top_duplicate_mass"]) for item in chain_available
+        ),
+        "chain_leader_top_10_duplicate_mass_mean": mean_or_nan(
+            float(item["chain_leader_duplicates"]["top_10_duplicate_mass"]) for item in chain_available
+        ),
+        "top_duplicate_mass_delta_mean": mean_or_nan(
+            float(item["comparison_vs_posterior_samples"]["top_duplicate_mass_delta"])
+            for item in chain_available
+        ),
+        "top_10_duplicate_mass_delta_mean": mean_or_nan(
+            float(item["comparison_vs_posterior_samples"]["top_10_duplicate_mass_delta"])
+            for item in chain_available
+        ),
+    }
+
+    diagnostics_json_path = diagnostics_dir / "phase1_duplicate_particle_metrics.json"
+    diagnostics_json_path.write_text(
+        json.dumps(_strict_jsonable(phase1_diagnostics), indent=2, allow_nan=False),
+        encoding="utf-8",
+    )
+
+    def _fmt_ratio(value: float | None) -> str:
+        if value is None:
+            return "n/a"
+        if isinstance(value, float) and math.isnan(value):
+            return "n/a"
+        return f"{100.0 * float(value):.2f}%"
+
+    report_lines = [
+        "# Phase 1 Duplicate-Particle Diagnostics",
+        "",
+        f"Workflow: `{workflow_name}`",
+        "",
+        "Posterior-figure policy: use raw Phase 1 posterior samples for plotting; do not filter duplicates.",
+        "",
+        "| Dataset | Unique particles (posterior) | Top duplicate mass (posterior) | Top-10 duplicate mass (posterior) | Top duplicate mass (chain leaders) | Top-10 duplicate mass (chain leaders) |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for dataset_name, payload in phase1_diagnostics["datasets"].items():
+        posterior = payload["posterior_sample_duplicates"]
+        chain = payload.get("chain_leader_duplicates") or {}
+        report_lines.append(
+            "| "
+            f"{dataset_name} | "
+            f"{int(posterior['unique_particle_count'])} | "
+            f"{_fmt_ratio(float(posterior['top_duplicate_mass']))} | "
+            f"{_fmt_ratio(float(posterior['top_10_duplicate_mass']))} | "
+            f"{_fmt_ratio(chain.get('top_duplicate_mass'))} | "
+            f"{_fmt_ratio(chain.get('top_10_duplicate_mass'))} |"
+        )
+        if payload.get("chain_leader_error"):
+            report_lines.append("")
+            report_lines.append(
+                f"> Chain leader diagnostics unavailable for `{dataset_name}`: {payload['chain_leader_error']}"
+            )
+
+    lane_summary = phase1_diagnostics["lane_summary"]
+    report_lines.extend(
+        [
+            "",
+            "## Lane Summary",
+            "",
+            f"- Datasets audited: {lane_summary['dataset_count']}",
+            f"- Datasets with chain leaders available: {lane_summary['chain_leader_dataset_count']}",
+            f"- Mean top duplicate mass delta (chain leaders - posterior): {_fmt_ratio(lane_summary['top_duplicate_mass_delta_mean'])}",
+            f"- Mean top-10 duplicate mass delta (chain leaders - posterior): {_fmt_ratio(lane_summary['top_10_duplicate_mass_delta_mean'])}",
+        ]
+    )
+    diagnostics_md_path = diagnostics_dir / "phase1_duplicate_particle_report.md"
+    diagnostics_md_path.write_text("\n".join(report_lines) + "\n", encoding="utf-8")
+
     print(f"Postprocessed workflow '{workflow_name}' into {workflow_dir}")
+    return {
+        "phase1_posterior_dir": str(phase1_posterior_dir),
+        "phase3b_posterior_dir": str(posterior_dir),
+        "phase1_samples_dir": str(phase1_samples_dir),
+        "phase3b_samples_dir": str(samples_dir),
+        "phase1_duplicate_metrics_json": str(diagnostics_json_path),
+        "phase1_duplicate_report_md": str(diagnostics_md_path),
+        "phase1_posterior_policy": PHASE1_POSTERIOR_FIGURE_POLICY["policy_id"],
+    }
 
 
 def _phase2_command(python_bin: str, cpu_ranks: int, script: Path, config_path: Path, results_dir: Path) -> list[str]:
@@ -268,7 +443,9 @@ def run_workflow(
         timings,
     )
 
-    _postprocess_workflow(workflow_name, workflow_spec["experiment"], config_path, workflow_dir)
+    postprocess_artifacts = _postprocess_workflow(
+        workflow_name, workflow_spec["experiment"], config_path, workflow_dir
+    )
 
     summary = {
         "workflow": workflow_output_name,
@@ -286,6 +463,7 @@ def run_workflow(
         "population_override": population_size,
         "step_timings": timings,
         "elapsed_seconds": sum(item["elapsed_seconds"] for item in timings),
+        "postprocess_artifacts": postprocess_artifacts,
     }
     with (workflow_dir / "summary.json").open("w") as handle:
         json.dump(summary, handle, indent=2)

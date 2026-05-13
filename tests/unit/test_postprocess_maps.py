@@ -12,7 +12,10 @@ import pytest
 from meso_uq.postprocess.maps import (
     _find_latest_state,
     _load_json,
+    _samples_to_dataframe,
     extract_map_from_directory,
+    load_chain_leader_samples,
+    load_korali_state,
     load_posterior_samples,
 )
 
@@ -53,6 +56,23 @@ def test_load_json_round_trips(tmp_path: Path) -> None:
     path = tmp_path / "data.json"
     path.write_text(json.dumps(data))
     assert _load_json(path) == data
+
+
+def test_load_korali_state_uses_latest_file(tmp_path: Path) -> None:
+    (tmp_path / "latest").write_text(
+        json.dumps(
+            {
+                "Variables": [{"Name": "Yt"}, {"Name": "kb"}],
+                "Results": {
+                    "Posterior Sample Database": [[1.0, 2.0]],
+                    "Posterior Sample LogLikelihood Database": [-1.0],
+                },
+            }
+        )
+    )
+    state_path, state = load_korali_state(tmp_path)
+    assert state_path == tmp_path / "latest"
+    assert "Results" in state
 
 
 # ---------------------------------------------------------------------------
@@ -140,6 +160,53 @@ def test_load_posterior_samples_unnamed_variable_fallback(tmp_path: Path) -> Non
     _write_state(tmp_path, state)
     df = load_posterior_samples(tmp_path)
     assert "var_0" in df.columns
+
+
+def test_samples_to_dataframe_handles_empty_scalar_and_wide_samples() -> None:
+    assert _samples_to_dataframe([], {"Variables": [{"Name": "Yt"}]}).empty
+
+    scalar_df = _samples_to_dataframe([1.0, 2.0], {"Variables": [{"Name": "Yt"}]})
+    assert list(scalar_df.columns) == ["Yt"]
+    assert scalar_df["Yt"].tolist() == [1.0, 2.0]
+
+    wide_df = _samples_to_dataframe([[1.0, 2.0, 3.0]], {"Variables": [{"Name": "Yt"}]})
+    assert list(wide_df.columns) == ["Yt", "var_1", "var_2"]
+
+    with pytest.raises(ValueError, match="sample database"):
+        _samples_to_dataframe(None, {})
+
+
+def test_load_chain_leader_samples_basic(tmp_path: Path) -> None:
+    state = _minimal_state([[1.0, 2.0]], [-5.0], var_names=["Yt", "[Sigma]"])
+    state["Solver"] = {
+        "Chain Leaders": [[1.0, 0.2], [2.0, 0.3]],
+        "Chain Leaders LogLikelihoods": [-7.0, -6.5],
+        "Chain Leaders LogPriors": [-0.5, -0.4],
+    }
+    _write_state(tmp_path, state)
+
+    df = load_chain_leader_samples(tmp_path)
+    assert list(df.columns) == ["Yt", "sigma", "logLikelihood", "logPrior", "logPosterior"]
+    assert len(df) == 2
+    assert df["logPosterior"].iloc[0] == pytest.approx(-7.5)
+
+
+def test_load_chain_leader_samples_falls_back_to_results_loglikelihood(tmp_path: Path) -> None:
+    state = _minimal_state([[1.0, 2.0]], [-5.0], var_names=["Yt", "kb"])
+    state["Results"]["Chain Leaders"] = [[1.0, 2.0], [2.0, 3.0]]
+    state["Results"]["Chain Leaders LogLikelihood Database"] = [-7.0, -6.5]
+    _write_state(tmp_path, state)
+
+    df = load_chain_leader_samples(tmp_path)
+
+    assert list(df.columns) == ["Yt", "kb", "logLikelihood", "logPosterior"]
+    assert df["logPosterior"].tolist() == [-7.0, -6.5]
+
+
+def test_load_chain_leader_samples_raises_when_missing(tmp_path: Path) -> None:
+    _write_state(tmp_path, _minimal_state([[1.0, 2.0]], [-5.0]))
+    with pytest.raises(ValueError, match="does not contain chain leader"):
+        load_chain_leader_samples(tmp_path)
 
 
 # ---------------------------------------------------------------------------

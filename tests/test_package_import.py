@@ -4,6 +4,7 @@ import importlib
 def test_public_package_imports_smoke():
     modules = [
         "meso_uq",
+        "meso_uq.postprocess.diagnostics",
         "meso_uq.postprocess.maps",
         "meso_uq.postprocess.plots",
         "meso_uq.postprocess.propagation",

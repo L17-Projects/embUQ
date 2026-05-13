@@ -40,7 +40,7 @@ def test_karolina_validation_matrix_wrapper_calls_workflow_matrix_with_validatio
             "--model-families",
             "full-model",
             "--output-root",
-            str(tmp_path / "validation"),
+            str(tmp_path / "_runs" / "validation"),
             "--phase2-cpu-ranks",
             "4",
             "--python-bin",
@@ -66,7 +66,7 @@ def test_karolina_validation_matrix_wrapper_calls_workflow_matrix_with_validatio
     assert "--run-map-mirheo" in captured["command"]
     assert _arg_value(captured["command"], "--map-mirheo-n-displacements") == "1"
     assert "--skip-release-manifest" in captured["command"]
-    assert str(tmp_path / "validation") in captured["command"]
+    assert str(tmp_path / "_runs" / "validation") in captured["command"]
 
 
 def test_karolina_validation_matrix_wrapper_uses_default_runs_root_for_relative_output(
@@ -107,3 +107,10 @@ def test_karolina_validation_matrix_wrapper_uses_default_runs_root_for_relative_
     }
     assert captured["cwd"] == str(repo_root)
     assert _arg_value(captured["command"], "--output-root").endswith("/_runs/karolina/validation_matrix/tag1")
+
+
+def test_karolina_validation_matrix_template_requests_explicit_memory() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    template = repo_root / "scripts" / "platforms" / "karolina" / "sbatch" / "validation_matrix.sbatch"
+    text = template.read_text(encoding="utf-8")
+    assert "#SBATCH --mem=64000" in text

@@ -26,6 +26,12 @@ DEFAULT_CANARY_ROOT = REPO_ROOT / "_runtime_validation" / "gpu_canaries"
 SBATCH_TEMPLATE = REPO_ROOT / "scripts" / "vega" / "sbatch" / "workflow_map_mirheo.sbatch"
 
 
+def _sbatch_export_arg(env: dict[str, str]) -> str:
+    explicit = sorted(key for key, value in env.items() if os.environ.get(key) != value)
+    parts = ["ALL", *(f"{key}={env[key]}" for key in explicit)]
+    return ",".join(parts)
+
+
 def _resolve_path(value: str | Path) -> Path:
     candidate = Path(value).expanduser()
     if not candidate.is_absolute():
@@ -76,6 +82,8 @@ def _submit_job(
         "--parsable",
         "--partition=dev",
         f"--time={time_limit}",
+        "--export",
+        _sbatch_export_arg(env),
         str(SBATCH_TEMPLATE),
     ]
     proc = subprocess.run(

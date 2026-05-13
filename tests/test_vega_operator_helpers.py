@@ -478,6 +478,7 @@ def test_validation_matrix_template_uses_public_command() -> None:
     assert "run_validation_matrix.py" in text
     assert "MODEL_FAMILIES" in text
     assert "EXPERIMENTS" in text
+    assert "#SBATCH --mem=64000" in text
     assert "_vega/korali/env.sh" in text
 
 

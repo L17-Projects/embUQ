@@ -68,6 +68,12 @@ SPECS = [
 ]
 
 
+def _sbatch_export_arg(env: dict[str, str]) -> str:
+    explicit = sorted(key for key, value in env.items() if os.environ.get(key) != value)
+    parts = ["ALL", *(f"{key}={env[key]}" for key in explicit)]
+    return ",".join(parts)
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -323,6 +329,8 @@ def _submit_array_job(*, spec: dict[str, Path | str], output_root: Path, args: a
             "sbatch",
             "--parsable",
             f"--array=0-{ARRAY_SIZE - 1}",
+            "--export",
+            _sbatch_export_arg(env),
             "--output",
             str(array_stdout),
             "--error",

@@ -49,7 +49,8 @@ The public CI layer is intentionally smaller than the full release contract beca
 
 That split is deliberate:
 
-- GitHub CI is the fast merge gate with one real workflow lane and one real retraining lane.
+- GitHub CI is the fast feedback gate: one real workflow lane and one real retraining lane are always run on PRs.
+- Before a PR is claimed merge-ready, a strict local/manual coverage gate is required to confirm the head branch improves total coverage against `origin/main` before final merge.
 - Vega remains the authoritative surface for the wider validation matrix, acceptance, production sanity, and hardware-specific backend proof.
 
 Those hardware-specific checks must still be recorded in-repo so the release does not depend on undocumented tribal knowledge.

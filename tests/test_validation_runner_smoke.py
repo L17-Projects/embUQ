@@ -39,6 +39,40 @@ def _write_phase3b_latest(latest_path: Path):
     )
 
 
+def _write_phase1_latest(latest_path: Path):
+    latest_path.parent.mkdir(parents=True, exist_ok=True)
+    latest_path.write_text(
+        json.dumps(
+            {
+                "Variables": [
+                    {"Name": "Yt"},
+                    {"Name": "kb"},
+                    {"Name": "d0"},
+                    {"Name": "[Sigma]"},
+                ],
+                "Solver": {
+                    "Chain Leaders": [
+                        [1.0, 2.0, 0.1, 0.01],
+                        [1.0, 2.0, 0.1, 0.01],
+                        [1.2, 2.3, 0.15, 0.02],
+                    ]
+                },
+                "Results": {
+                    "Posterior Sample Database": [
+                        [1.0, 2.0, 0.1, 0.01],
+                        [1.0, 2.0, 0.1, 0.01],
+                        [1.2, 2.3, 0.15, 0.02],
+                        [1.2, 2.3, 0.15, 0.02],
+                    ],
+                    "Posterior Sample LogLikelihood Database": [-10.0, -10.2, -8.0, -8.1],
+                    "Posterior Sample LogPrior Database": [-1.0, -1.1, -0.5, -0.6],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def _write_propagation_summary(summary_csv: Path):
     summary_csv.parent.mkdir(parents=True, exist_ok=True)
     summary_csv.write_text("x,mean\n0.0,0.0\n1.0,1.0\n2.0,2.0\n", encoding="utf-8")
@@ -74,6 +108,11 @@ def test_validation_runner_smoke_creates_summary_and_artifacts(tmp_path, monkeyp
 
     def fake_run(command, cwd=None, env=None, check=False):
         command_str = " ".join(str(part) for part in command)
+        if "run_phase_1.py" in command_str:
+            out_idx = command.index("--output-dir") + 1
+            results_dir = Path(command[out_idx])
+            for d in [2.1, 2.9, 3.0]:
+                _write_phase1_latest(results_dir / "results_phase_1" / f"compression_{d}um" / "latest")
         if "run_phase_3b.py" in command_str:
             out_idx = command.index("--output-dir") + 1
             results_dir = Path(command[out_idx])
@@ -106,10 +145,31 @@ def test_validation_runner_smoke_creates_summary_and_artifacts(tmp_path, monkeyp
     assert summary["model_family"] == "reduced-model"
     assert summary["profile"] == "validation"
     assert summary["selection"] == "compression:reduced-model:validation"
+    assert "postprocess_artifacts" in summary
     assert (workflow_dir / "summary.json").exists()
     assert (workflow_dir / "map_phase3b" / "all_diameters_map.json").exists()
     assert (workflow_dir / "overlay_uq_ref" / "uq_overlay_2.1um.png").exists()
     assert (workflow_dir / "posteriors_phase3b" / "posterior_marginals_2.1um.png").exists()
+    assert (workflow_dir / "posteriors_phase1" / "posterior_marginals_2.1um.png").exists()
+    assert (workflow_dir / "diagnostics_phase1" / "phase1_duplicate_particle_metrics.json").exists()
+    assert (workflow_dir / "diagnostics_phase1" / "phase1_duplicate_particle_report.md").exists()
+
+
+def test_validation_runner_strict_json_payload_replaces_nan() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "vega" / "run_validation_suite.py",
+        "run_gpu_validation_suite_json_payload_test",
+    )
+
+    payload = {
+        "summary": {"missing_mean": float("nan")},
+        "datasets": [{"delta": float("nan")}],
+    }
+    rendered = json.dumps(module._strict_jsonable(payload), allow_nan=False)
+
+    assert '"missing_mean": null' in rendered
+    assert '"delta": null' in rendered
 
 
 def test_validation_runner_defaults_to_validation_configs_and_preserves_population(tmp_path):

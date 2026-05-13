@@ -122,7 +122,7 @@ jobs:
           cp "$cache_file" coverage-base.json
           git worktree remove "$worktree_dir" --force
 
-      - name: Enforce strict coverage increase
+      - name: Enforce feedback coverage increase
         if: success() && github.event_name == 'pull_request' && steps.coverage-scope.outputs.run_coverage_gate == 'true'
         shell: bash
         run: |
