@@ -16,6 +16,7 @@ available for one release cycle while the architecture migration settles.
 | Surface | Preserve for one release cycle | Evidence now | Later update source |
 |---|---|---|---|
 | `import meso_uq` | Package import remains the public API | `tests/test_bootstrap.py`, `tests/test_package_import.py`, `docs/RELEASE_SCOPE.md` | `docs/GETTING_STARTED.md`, `docs/RELEASE_NOTES_v0.1.0.md` |
+| `learning.model` | Keep as a deprecated installed-package shim for legacy deterministic surrogate pickles and historical imports | `src/learning/model.py`, `src/meso_uq/surrogate/compat.py`, `tests/unit/test_surrogate_pickle_compat.py`, `tests/test_release_assets_smoke.py` | `meso_uq.surrogate.model`, Phase 6 artifact migration/regeneration issue |
 | `scripts/platforms/hpc/run_validation_matrix.py` and site wrappers | Keep a site-neutral dispatcher plus Karolina/Vega shims | `tests/test_validation_matrix.py`, `tests/test_karolina_validation_matrix.py`, `tests/test_vega_operator_helpers.py` | `docs/VALIDATION_MATRIX.md`, `docs/VEGA_VALIDATION_MATRIX.md`, `docs/KAROLINA_FULL_PLATFORM.md` |
 | `scripts/platforms/vega/run_validation_matrix.py` | Keep the Vega-facing command shape while it forwards to the shared workflow matrix runner | `tests/test_validation_matrix.py`, `docs/VEGA_VALIDATION_MATRIX.md` | `docs/WORKFLOWS.md`, `scripts/platforms/hpc/run_validation_matrix.py` |
 | `scripts/run_vega_acceptance.py` and `scripts/platforms/vega/run_validation_suite.py` | Keep the Vega acceptance entrypoint and its richer runner | `tests/test_vega_acceptance_smoke.py`, `docs/VEGA_ACCEPTANCE_COMMAND.md`, `docs/VEGA_ACCEPTANCE_CHECKLIST.md` | `docs/VEGA_BOOTSTRAP.md`, `docs/VEGA_WORKFLOW_HELPERS.md` |
@@ -40,6 +41,8 @@ available for one release cycle while the architecture migration settles.
 - workflow family.
 
 The same module owns compatibility-only project-root probing, inference-config fallback resolution, surrogate runtime parsing, evalkit path setup, surrogate trained-directory paths, and once-per-surface warning text. Scientific behavior should remain in the existing workflow modules until a dedicated migration issue moves it behind a replacement package API.
+
+Serialized surrogate artifact compatibility is tracked separately in `src/meso_uq/surrogate/compat.py`. That manifest is intentionally import-light and is exposed through `meso_uq.public_api` so restructuring work can check legacy pickle class paths without importing Torch. The only installed top-level compatibility package is `learning`, and it should remain a warning-emitting shim rather than a place for new implementation.
 
 ## Update triggers
 

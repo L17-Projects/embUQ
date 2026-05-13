@@ -96,7 +96,7 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["meso_uq*"]
+include = ["meso_uq*", "learning*"]
 
 [tool.pytest.ini_options]
 addopts = ["-ra", "--tb=short"]

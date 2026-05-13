@@ -3,6 +3,8 @@ import sys
 
 import torch
 
+from .compat import install_legacy_surrogate_pickle_aliases
+
 
 class MLP(torch.nn.Module):
     def __init__(self, input_dims, output_dims, hl_dims):
@@ -35,9 +37,7 @@ def save_model_states(model, *, xshift, xscale, yshift, yscale, path):
 def _install_legacy_pickle_aliases() -> None:
     package = sys.modules.get(__package__)
     current_module = sys.modules[__name__]
-    if package is not None:
-        sys.modules.setdefault("learning", package)
-    sys.modules.setdefault("learning.model", current_module)
+    install_legacy_surrogate_pickle_aliases(surrogate_package=package, model_module=current_module)
 
 
 def load_model_states(path):
