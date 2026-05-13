@@ -32,6 +32,9 @@ def test_gv_paper_figure_replay_karolina_template_uses_public_command_and_karoli
     assert "_vega/gv_venv/env.sh" not in text
     assert "#SBATCH --partition=qgpu" in text
     assert "#SBATCH --account=eu-26-17" in text
+    assert "#SBATCH --ntasks=2" in text
+    assert 'MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"' in text
+    assert 'MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"' in text
 
 
 def test_gv_paper_figure_replay_karolina_submitter_sets_lane_aware_walltime() -> None:

@@ -18,7 +18,7 @@
 #SBATCH --partition=qgpu
 #SBATCH --time=24:00:00
 #SBATCH --nodes=1
-#SBATCH --ntasks=1
+#SBATCH --ntasks=2
 #SBATCH --cpus-per-task=8
 #SBATCH --gpus=1
 #SBATCH --output=%x-%j.out
