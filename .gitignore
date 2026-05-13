@@ -82,3 +82,4 @@ gv/**/force/
 !src/meso_uq/modalities/**/__init__.py
 !src/meso_uq/workflows/**/__init__.py
 !src/learning/**/__init__.py
+!src/meso_uq/platforms/**/__init__.py
