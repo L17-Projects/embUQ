@@ -8,7 +8,9 @@ It defines where new metadata belongs while the legacy workflow entry points rem
 - `src/meso_uq/core/contracts.py`: dependency-light identities, run metadata, artifact references, surrogate identifiers, dataset source metadata, runtime requirements, and manifest records.
 - `src/meso_uq/agents/registry.py`: agent-family registry, aliases, default legacy behavior, supported modalities, supported backends, inference backends, runtime requirements, and unsupported-combination errors.
 - `src/meso_uq/agents/emb/` and `src/meso_uq/agents/gv/`: metadata-only family boundaries for EMB and GV constants.
+- `src/meso_uq/agents/emb/workflows.py`: EMB compression/indentation generation contracts, legacy script identities, config-resolution candidates, parameter-file names, and modality-specific runtime-prep constants.
 - `src/meso_uq/modalities/registry.py`: modality descriptors for EMB compression, EMB indentation, GV stretching, GV buckling, GV torsion, GV eigenmodes, and experimental GV shear flow.
+- `src/meso_uq/simulation/emb_generation.py`: shared EMB parameter-sweep, command-file, and legacy Sbatch generation logic consumed by the compatibility `compression/src/generate.py` and `indentation/src/generate.py` entry points.
 - `src/meso_uq/public_api.py`: narrow dependency-light public API for contracts, registries, and descriptor lookup.
 
 These modules must remain importable without Torch, Pyro, Matplotlib, MPI, Mirheo, Korali, Slurm helpers, checkpoints, generated data, or HPC runtime directories.
@@ -33,6 +35,7 @@ Modality descriptors:
 Workflow code:
 - remains under the existing compatibility paths until wrapper retirement is explicitly scheduled;
 - should consume contracts rather than redefine identities, path labels, or support matrices.
+- legacy EMB generation wrappers may delegate shared parameter-sweep and command-file behavior to `src/meso_uq/simulation/emb_generation.py`, but they must keep the existing CLI flags, default object names, generated file names, and Sbatch text unless a dedicated compatibility issue changes them.
 
 ## Compatibility rules
 

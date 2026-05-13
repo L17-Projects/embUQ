@@ -35,8 +35,10 @@ def _run_import_probe(code: str) -> subprocess.CompletedProcess[str]:
         "meso_uq.surrogate.gv_catalog",
         "meso_uq.surrogate.emb_catalog",
         "meso_uq.agents",
+        "meso_uq.agents.emb",
         "meso_uq.modalities",
         "meso_uq.public_api",
+        "meso_uq.simulation",
     ),
 )
 def test_metadata_imports_do_not_load_heavy_optional_dependencies(module_name: str) -> None:
