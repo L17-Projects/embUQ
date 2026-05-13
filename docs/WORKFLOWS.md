@@ -183,6 +183,10 @@ Scratch/runtime rule:
 - MAP Mirheo must use lane-local scratch under the lane output tree
 - do not reuse repo-root `_init_*_map` scratch directories across concurrent full/reduced lanes
 - the orchestration path now passes a unique scratch root per dataset under `map_mirheo/_scratch/`
+- operators do not pre-create MAP smoke-test init directories; `run_map_mirheo.py` passes `--scratch-root <lane output>/map_mirheo/_scratch/<dataset_name>` to the evaluator
+- compression smoke init directories are regenerated from `compression/src` through `generate_sim` and `write_parameters`
+- indentation smoke init directories are copied from `indentation/src`, then their `parameter/parameters-default*.yaml` files are rewritten for the selected diameter and retry settings
+- missing Phase 3b MAP manifests fail before Slurm submission; missing init templates or Mirheo bootstrap inputs fail the MAP Mirheo lane explicitly and are not skip conditions
 
 Production walltime rule:
 - indentation MAP Mirheo currently fits the `00:45:00` production wrapper budget

@@ -158,3 +158,92 @@ def test_compression_map_init_uses_fresh_src_template(tmp_path, monkeypatch):
     assert params["Lx"] == pytest.approx(17.0)
     assert params["Ly"] == pytest.approx(17.0)
     assert params["Lz"] == pytest.approx(22.0)
+
+
+def test_indentation_map_init_copies_template_to_scratch(tmp_path, monkeypatch):
+    import yaml
+
+    fake_mpi = types.SimpleNamespace(COMM_WORLD=types.SimpleNamespace(Barrier=lambda: None))
+    monkeypatch.setitem(sys.modules, "mpi4py", types.SimpleNamespace(MPI=fake_mpi))
+    fake_posterior = types.SimpleNamespace(compute_indentation=lambda *args, **kwargs: None)
+    fake_tools = types.SimpleNamespace(
+        datedPrint=lambda *args, **kwargs: None,
+        getReferencePoints=lambda diameter_um: [0.0, 1.0],
+    )
+    monkeypatch.setitem(sys.modules, "indentation.evalkit.posterior_indentation", fake_posterior)
+    monkeypatch.setitem(sys.modules, "indentation.evalkit.tools", fake_tools)
+    monkeypatch.delitem(
+        sys.modules,
+        "propagation.scripts.evaluate_map_mirheo_optimized_indentation",
+        raising=False,
+    )
+    mod = importlib.import_module("propagation.scripts.evaluate_map_mirheo_optimized_indentation")
+
+    project_root = tmp_path / "repo"
+    template_dir = project_root / "indentation" / "src"
+    parameter_dir = template_dir / "parameter"
+    parameter_dir.mkdir(parents=True)
+    defaults = {
+        "fscale": 0.0074,
+        "shell_th": 5.0e-9,
+        "numsteps": 5000,
+        "numsteps_eq": 10000,
+        "dt": 1.0e-4,
+        "dt_eq": 1.0e-4,
+        "radp": 1.0,
+        "Lx": 20.0,
+        "Ly": 20.0,
+        "Lz": 20.0,
+    }
+    (template_dir / "parameters-default.emb.yaml").write_text(yaml.dump(defaults), encoding="utf-8")
+    (parameter_dir / "parameters-default00001.yaml").write_text(yaml.dump(defaults), encoding="utf-8")
+    (template_dir / "template_marker.txt").write_text("copied\n", encoding="utf-8")
+
+    monkeypatch.setattr(mod, "PROJECT_ROOT", project_root)
+
+    scratch_root = tmp_path / "scratch" / "indentation_3.2um"
+    out = mod.setup_map_specific_init_dir(
+        diameter_um=3.2,
+        retry_attempt=0,
+        dt_scale_factor=0.5,
+        rank=0,
+        scratch_root=str(scratch_root),
+    )
+
+    assert out == str(scratch_root.resolve()) + "/"
+    assert (scratch_root / "template_marker.txt").is_file()
+    assert not (project_root / "_init_indentation_3.2um_map").exists()
+    params = yaml.safe_load(
+        (scratch_root / "parameter" / "parameters-default00001.yaml").read_text(encoding="utf-8")
+    )
+    assert params["radp"] == pytest.approx(mod.infer_radp_for_diameter("indentation", 3.2))
+    assert params["numsteps"] == 5000
+    assert params["numsteps_eq"] == 10000
+
+
+def test_indentation_map_init_requires_template_dir(tmp_path, monkeypatch):
+    fake_mpi = types.SimpleNamespace(COMM_WORLD=types.SimpleNamespace(Barrier=lambda: None))
+    monkeypatch.setitem(sys.modules, "mpi4py", types.SimpleNamespace(MPI=fake_mpi))
+    fake_posterior = types.SimpleNamespace(compute_indentation=lambda *args, **kwargs: None)
+    fake_tools = types.SimpleNamespace(
+        datedPrint=lambda *args, **kwargs: None,
+        getReferencePoints=lambda diameter_um: [0.0, 1.0],
+    )
+    monkeypatch.setitem(sys.modules, "indentation.evalkit.posterior_indentation", fake_posterior)
+    monkeypatch.setitem(sys.modules, "indentation.evalkit.tools", fake_tools)
+    monkeypatch.delitem(
+        sys.modules,
+        "propagation.scripts.evaluate_map_mirheo_optimized_indentation",
+        raising=False,
+    )
+    mod = importlib.import_module("propagation.scripts.evaluate_map_mirheo_optimized_indentation")
+    monkeypatch.setattr(mod, "PROJECT_ROOT", tmp_path / "repo")
+
+    with pytest.raises(FileNotFoundError, match="Base template directory not found"):
+        mod.setup_map_specific_init_dir(
+            diameter_um=3.2,
+            retry_attempt=0,
+            dt_scale_factor=0.5,
+            rank=0,
+            scratch_root=str(tmp_path / "scratch"),
+        )

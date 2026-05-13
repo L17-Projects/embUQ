@@ -133,12 +133,22 @@ def test_map_mirheo_manifest_schema(tmp_path):
     assert "map_mirheo_dir" in summary
     assert "n_displacements" in summary
     assert summary["n_displacements"] == 5
+    assert summary["init_directory_policy"]["preexisting_init_dirs_required"] is False
+    assert summary["init_directory_policy"]["scratch_root_base"] == str(
+        tmp_path / "map_mirheo" / "_scratch"
+    )
+    assert summary["diameters"][0]["scratch_root"] == str(
+        tmp_path / "map_mirheo" / "_scratch" / "indentation_3.2um"
+    )
 
     # Manifest file must exist
     manifest_out = tmp_path / "map_mirheo" / "map_mirheo_manifest.json"
     assert manifest_out.exists()
     loaded = json.loads(manifest_out.read_text())
     assert loaded["experiment"] == "indentation"
+    assert loaded["init_directory_policy"]["missing_template_behavior"].startswith(
+        "evaluator fails explicitly"
+    )
     rendered = " ".join(str(a) for a in captured_cmds[0])
     assert "--scratch-root" in rendered
     assert str(tmp_path / "map_mirheo" / "_scratch" / "indentation_3.2um") in rendered

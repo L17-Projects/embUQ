@@ -126,6 +126,10 @@ Supported MAP Mirheo micro-canary floor on Vega:
 - `--numsteps-eq 200`
 
 Lower values are outside the supported sanity/canary contract and can trigger payload-level instability.
+The MAP Mirheo smoke path prepares init directories automatically per dataset under
+`<lane output>/map_mirheo/_scratch/<dataset_name>`; preexisting repo-root `_init_*_map`
+directories are not required. Missing Phase 3b MAP manifests, init templates, or Mirheo
+bootstrap inputs are hard failures, not skip conditions.
 
 Optional flags:
 

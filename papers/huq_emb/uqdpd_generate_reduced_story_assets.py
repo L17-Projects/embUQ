@@ -89,6 +89,13 @@ SUPTITLE_FONTSIZE = 9.75
 LEGEND_FONTSIZE = 7.5
 ANNOTATION_FONTSIZE = 7.0
 _MATPLOTLIB_CONFIGURED = False
+_PHASE1_TOP_ROW_XLIM_QUANTILES = (0.01, 0.05, 0.50, 0.95, 0.99)
+_PHASE1_TOP_ROW_INNER_SPAN_SCALE = 1.65
+_PHASE1_TOP_ROW_TAIL_SPAN_SCALE = 0.48
+# MES-74: keep the broader bottom-row preview ranges from the April 28 audit.
+_PHASE1_BOTTOM_ROW_XLIM_QUANTILES = (0.02, 0.10, 0.50, 0.90, 0.98)
+_PHASE1_BOTTOM_ROW_INNER_SPAN_SCALE = 1.25
+_PHASE1_BOTTOM_ROW_TAIL_SPAN_SCALE = 0.30
 
 
 def configure_matplotlib() -> None:
@@ -187,6 +194,36 @@ def add_panel_labels(
     labels = [f"({chr(ord('a') + i)})" for i in range(np.ravel(np.asarray(axes, dtype=object)).size)]
     for ax, label in zip(np.ravel(np.asarray(axes, dtype=object)), labels):
         add_panel_label(ax, label, x=x, y=y)
+
+
+def _phase1_representative_histogram_xlim(values: np.ndarray, row: int) -> tuple[float, float]:
+    vals = np.asarray(values, dtype=float)
+    if row == 1:
+        q02, q10, q50, q90, q98 = np.quantile(vals, _PHASE1_BOTTOM_ROW_XLIM_QUANTILES)
+        half_width = max(q90 - q50, q50 - q10)
+        half_width = max(
+            half_width * _PHASE1_BOTTOM_ROW_INNER_SPAN_SCALE,
+            (q98 - q02) * _PHASE1_BOTTOM_ROW_TAIL_SPAN_SCALE,
+        )
+    else:
+        q01, q05, q50, q95, q99 = np.quantile(vals, _PHASE1_TOP_ROW_XLIM_QUANTILES)
+        half_width = max(q95 - q50, q50 - q05)
+        half_width = max(
+            half_width * _PHASE1_TOP_ROW_INNER_SPAN_SCALE,
+            (q99 - q01) * _PHASE1_TOP_ROW_TAIL_SPAN_SCALE,
+        )
+
+    if half_width > 0.0:
+        xmin = q50 - half_width
+        xmax = q50 + half_width
+    else:
+        xmin = float(np.min(vals))
+        xmax = float(np.max(vals))
+    if not np.isfinite(xmin) or not np.isfinite(xmax) or xmax <= xmin:
+        span = max(abs(q50), 1.0) * 1.0e-6
+        xmin = float(q50 - span)
+        xmax = float(q50 + span)
+    return float(xmin), float(xmax)
 
 
 def percent_text() -> str:
@@ -1065,24 +1102,7 @@ def plot_phase1_representative() -> None:
         for col, label in enumerate(labels):
             ax = axes[row, col]
             vals = samples[:, col]
-            if row == 1:
-                q02, q10, q50, q90, q98 = np.quantile(vals, [0.02, 0.10, 0.50, 0.90, 0.98])
-                half_width = max(q90 - q50, q50 - q10)
-                half_width = max(half_width * 1.25, (q98 - q02) * 0.30)
-            else:
-                q01, q05, q50, q95, q99 = np.quantile(vals, [0.01, 0.05, 0.50, 0.95, 0.99])
-                half_width = max(q95 - q50, q50 - q05)
-                half_width = max(half_width * 1.65, (q99 - q01) * 0.48)
-            if half_width > 0.0:
-                xmin = q50 - half_width
-                xmax = q50 + half_width
-            else:
-                xmin = float(np.min(vals))
-                xmax = float(np.max(vals))
-            if not np.isfinite(xmin) or not np.isfinite(xmax) or xmax <= xmin:
-                span = max(abs(q50), 1.0) * 1.0e-6
-                xmin = float(q50 - span)
-                xmax = float(q50 + span)
+            xmin, xmax = _phase1_representative_histogram_xlim(vals, row)
 
             visible_vals = vals[(vals >= xmin) & (vals <= xmax)]
             if visible_vals.size == 0:
