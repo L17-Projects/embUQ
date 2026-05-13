@@ -58,6 +58,7 @@ def test_runtime_paths_support_karolina_repo_local_root(tmp_path):
     assert paths.gv_venv_env_script == repo_root / "_karolina" / "gv_venv" / "env.sh"
     assert paths.gv_cgal_tools_env_script == repo_root / "_karolina" / "gv_cgal_tools" / "env.sh"
     assert paths.scale_space_binary == repo_root / "_karolina" / "gv_cgal_tools" / "bin" / "scale_space"
+    assert paths.provenance_root == repo_root / "provenance"
 
 
 def test_runtime_paths_honor_site_runtime_root_override(tmp_path):
@@ -73,6 +74,7 @@ def test_runtime_paths_honor_site_runtime_root_override(tmp_path):
     assert paths.venv_root == runtime_root.resolve() / "venv"
     assert paths.korali_env_script == runtime_root.resolve() / "korali" / "env.sh"
     assert paths.gv_venv_env_script == runtime_root.resolve() / "gv_venv" / "env.sh"
+    assert paths.provenance_root == runtime_root.resolve().parent / "provenance"
 
     explicit_paths = get_runtime_paths(
         repo_root,
@@ -82,6 +84,18 @@ def test_runtime_paths_honor_site_runtime_root_override(tmp_path):
     )
 
     assert explicit_paths.site_root == runtime_root.resolve()
+
+
+def test_runtime_paths_honor_karolina_provenance_root_override(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    provenance_root = tmp_path / "scratch" / "provenance"
+    paths = get_runtime_paths(
+        repo_root,
+        site="karolina",
+        env={"MESOUQ_PROVENANCE_ROOT": str(provenance_root)},
+    )
+
+    assert paths.provenance_root == provenance_root.resolve()
 
 
 def test_normalize_runtime_site_rejects_unknown_site():
@@ -183,6 +197,7 @@ def test_render_korali_env_script_exports_karolina_runtime_root(tmp_path):
 
     assert "MESOUQ_SITE=karolina" in env_script
     assert "MESOUQ_SITE_RUNTIME_ROOT" in env_script
+    assert "MESOUQ_PROVENANCE_ROOT" in env_script
     assert "MESOUQ_KAROLINA_ROOT" in env_script
     assert str(repo_root / "_karolina" / "korali" / "install") in env_script
     assert "MESOUQ_VEGA_ROOT" not in env_script
@@ -278,6 +293,7 @@ def test_render_mirheo_env_script_exports_karolina_root(tmp_path):
     env_script = render_mirheo_env_script(paths, source_root=source_root)
 
     assert "MESOUQ_SITE=karolina" in env_script
+    assert "MESOUQ_PROVENANCE_ROOT" in env_script
     assert "MESOUQ_KAROLINA_ROOT" in env_script
     assert "MESOUQ_VEGA_ROOT" not in env_script
 
@@ -328,6 +344,7 @@ def test_render_gv_venv_env_script_exports_karolina_root(tmp_path):
     env_script = render_gv_venv_env_script(paths, source_root=source_root)
 
     assert "MESOUQ_SITE=karolina" in env_script
+    assert "MESOUQ_PROVENANCE_ROOT" in env_script
     assert "MESOUQ_KAROLINA_ROOT" in env_script
     assert "MESOUQ_VEGA_ROOT" not in env_script
 
@@ -370,6 +387,7 @@ def test_render_gv_cgal_tools_env_script_exports_karolina_library_paths(tmp_path
     env_script = render_gv_cgal_tools_env_script(paths)
 
     assert "MESOUQ_SITE=karolina" in env_script
+    assert "MESOUQ_PROVENANCE_ROOT" in env_script
     assert "MESOUQ_KAROLINA_ROOT" in env_script
     assert str(paths.scale_space_binary) in env_script
     assert str(paths.gv_cgal_tools_bin_dir) in env_script
@@ -408,6 +426,7 @@ def test_render_tinytex_env_script_exports_karolina_root(tmp_path):
     env_script = render_tinytex_env_script(paths)
 
     assert "MESOUQ_SITE=karolina" in env_script
+    assert "MESOUQ_PROVENANCE_ROOT" in env_script
     assert "MESOUQ_KAROLINA_ROOT" in env_script
     assert "MESOUQ_VEGA_ROOT" not in env_script
 

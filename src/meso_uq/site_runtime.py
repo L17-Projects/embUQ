@@ -20,6 +20,7 @@ class RuntimePaths:
     repo_root: Path
     src_root: Path
     site_root: Path
+    provenance_root: Path
     logs_dir: Path
     korali_source: Path
     korali_root: Path
@@ -88,6 +89,24 @@ def _resolve_site_root(
     return repo_root / DEFAULT_SITE_ROOT_NAMES[site]
 
 
+def _resolve_provenance_root(
+    repo_root: Path,
+    *,
+    site: str,
+    site_root: Path,
+    env: dict[str, str],
+) -> Path:
+    env_root = env.get("MESOUQ_PROVENANCE_ROOT", "").strip()
+    if env_root:
+        return Path(env_root).expanduser().resolve()
+    if site == "karolina":
+        scratch_root = env.get("MESOUQ_SCRATCH_ROOT", "").strip()
+        if scratch_root:
+            return (Path(scratch_root).expanduser().resolve() / "provenance").resolve()
+        return (site_root.parent / "provenance").resolve()
+    return (repo_root / "gv").resolve()
+
+
 def get_site_runtime_paths(
     repo_root: str | Path | None = None,
     *,
@@ -99,6 +118,12 @@ def get_site_runtime_paths(
     resolved_site = normalize_runtime_site(site or source_env.get("MESOUQ_SITE") or source_env.get("HPC_SITE") or "vega")
     root = resolve_repo_root(repo_root)
     site_root = _resolve_site_root(root, site=resolved_site, runtime_root=runtime_root, env=source_env)
+    provenance_root = _resolve_provenance_root(
+        root,
+        site=resolved_site,
+        site_root=site_root,
+        env=source_env,
+    )
     korali_root = site_root / "korali"
     mirheo_root = site_root / "mirheo"
     gv_cgal_tools_root = site_root / "gv_cgal_tools"
@@ -110,6 +135,7 @@ def get_site_runtime_paths(
         repo_root=root,
         src_root=root / "src",
         site_root=site_root,
+        provenance_root=provenance_root,
         logs_dir=site_root / "logs",
         korali_source=root / "extern" / "korali",
         korali_root=korali_root,

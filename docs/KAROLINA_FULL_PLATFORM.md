@@ -12,6 +12,7 @@ export MESOUQ_PROJECT_ID=eu-26-17
 export MESOUQ_SCRATCH_ROOT=/scratch/project/eu-26-17/eubrieucb/mesouq
 export MESOUQ_SITE_RUNTIME_ROOT="${MESOUQ_SCRATCH_ROOT}/runtime"
 export MESOUQ_RUNS_ROOT="${MESOUQ_SCRATCH_ROOT}/runs"
+export MESOUQ_PROVENANCE_ROOT="${MESOUQ_SCRATCH_ROOT}/provenance"
 ```
 
 The site-neutral runtime helper resolves Karolina bootstrap state under `MESOUQ_SITE_RUNTIME_ROOT` when set. Without that override it uses clone-local `_karolina/` paths:
@@ -21,6 +22,8 @@ The site-neutral runtime helper resolves Karolina bootstrap state under `MESOUQ_
 - `_karolina/mirheo`
 - `_karolina/gv_venv`
 - `_karolina/gv_cgal_tools`
+
+`MESOUQ_PROVENANCE_ROOT` is explicit and site-aware. On Karolina it should point to scratch-accessible provenance staging (default `${MESOUQ_SCRATCH_ROOT}/provenance` from `env_karolina.sh`), and generated runtime env scripts export the resolved value.
 
 ## Slurm policy
 
@@ -35,6 +38,8 @@ Use the project/account that has Karolina GPU allocation:
 One requested GPU on Karolina maps to one eighth of an accelerated node: 1 A100 GPU, 16 CPU cores, and the corresponding memory allocation. Use `qgpu_exp` for short tests, `qgpu` for standard GPU work, `qgpu_free` for free-resource GPU work, and `qgpu_preempt` only for re-runnable preemptible jobs. Use `qgpu_big` only for jobs above 16 GPU nodes.
 
 The `eu-26-17` account is currently GPU-only from this login context. CPU, fat-memory, and visualization partitions are visible but are not submit-accessible with this account.
+
+Do not expect `/ceph/hpc/home/eubrieucb` to be mounted on Karolina. That path is not part of the Karolina acceptance contract and should not be treated as a missing platform feature.
 
 ## Runtime env-script contract
 
