@@ -32,6 +32,7 @@ def _run_import_probe(code: str) -> subprocess.CompletedProcess[str]:
         "meso_uq.structures",
         "meso_uq.structures.gv",
         "meso_uq.surrogate.catalogs",
+        "meso_uq.surrogate.emb_workflows",
         "meso_uq.surrogate.gv_catalog",
         "meso_uq.surrogate.emb_catalog",
         "meso_uq.agents",
