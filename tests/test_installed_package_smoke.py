@@ -75,12 +75,35 @@ def test_repo_path_filtering_removes_repo_and_src_entries(tmp_path):
     assert kept == ["/opt/venv/lib/python3.11/site-packages"]
 
 
+def test_dependency_paths_preserve_repo_local_virtualenv_site_packages(monkeypatch, tmp_path):
+    module = _load_module()
+    repo_root = tmp_path / "repo"
+    src_root = repo_root / "src"
+    site_packages = repo_root / "runtime" / "venv" / "lib" / "python3.11" / "site-packages"
+    user_site = repo_root / ".local" / "lib" / "python3.11" / "site-packages"
+    external_site = tmp_path / "external" / "lib" / "python3.11" / "site-packages"
+    for path in (src_root, site_packages, user_site, external_site):
+        path.mkdir(parents=True)
+
+    monkeypatch.setattr(module.site, "getsitepackages", lambda: [str(repo_root), str(src_root), str(site_packages), str(external_site)])
+    monkeypatch.setattr(module.site, "getusersitepackages", lambda: str(user_site))
+
+    entries = module._dependency_path_entries(repo_root)
+
+    assert str(site_packages.resolve()) in entries
+    assert str(user_site.resolve()) in entries
+    assert str(external_site.resolve()) in entries
+    assert str(repo_root.resolve()) not in entries
+    assert str(src_root.resolve()) not in entries
+
+
 def test_rendered_probe_reports_repo_root_and_heavy_module_guards(tmp_path):
     module = _load_module()
     probe = module._render_smoke_probe(repo_root=tmp_path)
 
     assert "repository-root import leakage detected" in probe
     assert "lightweight smoke loaded optional heavy modules" in probe
+    assert "_is_site_packages_path" in probe
     assert "meso_uq.public_api" in probe
     assert "torch" in probe
 

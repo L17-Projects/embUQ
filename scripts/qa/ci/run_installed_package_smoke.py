@@ -87,6 +87,14 @@ def _looks_like_repo_path(entry: str, repo_root: Path, src_root: Path) -> bool:
     return resolved == repo_root or resolved == src_root or repo_root in resolved.parents or src_root in resolved.parents
 
 
+def _looks_like_site_packages_path(entry: str | Path) -> bool:
+    try:
+        resolved = Path(entry).expanduser().resolve()
+    except (OSError, RuntimeError, ValueError):
+        return False
+    return any(part in {"site-packages", "dist-packages"} for part in resolved.parts)
+
+
 def _filter_repo_paths(entries: Iterable[str], repo_root: Path, src_root: Path) -> tuple[list[str], list[str]]:
     kept: list[str] = []
     removed: list[str] = []
@@ -186,7 +194,11 @@ def _dependency_path_entries(repo_root: Path) -> tuple[str, ...]:
         site_paths.extend(site.getsitepackages())
     with contextlib.suppress(Exception):
         site_paths.append(site.getusersitepackages())
-    kept, _removed = _filter_repo_paths(site_paths, repo_root, src_root)
+    kept = [
+        entry
+        for entry in site_paths
+        if entry and (not _looks_like_repo_path(entry, repo_root, src_root) or _looks_like_site_packages_path(entry))
+    ]
     return tuple(
         str(Path(entry).expanduser().resolve())
         for entry in kept
@@ -230,6 +242,13 @@ def _render_smoke_probe(
                 return False
             return resolved == REPO_ROOT or resolved == SRC_ROOT or REPO_ROOT in resolved.parents or SRC_ROOT in resolved.parents
 
+        def _is_site_packages_path(entry: str) -> bool:
+            try:
+                resolved = pathlib.Path(entry).expanduser().resolve()
+            except (OSError, RuntimeError, ValueError):
+                return False
+            return any(part in {{"site-packages", "dist-packages"}} for part in resolved.parts)
+
         def _origin_path(module_name: str) -> pathlib.Path | None:
             module = sys.modules[module_name]
             origin = getattr(module, "__file__", None)
@@ -258,7 +277,9 @@ def _render_smoke_probe(
         sys.path[:] = venv_sys_path
         appended_dependency_paths = []
         for entry in DEPENDENCY_PATHS:
-            if not entry or _is_repo_path(entry) or entry in sys.path:
+            if not entry or entry in sys.path:
+                continue
+            if _is_repo_path(entry) and not _is_site_packages_path(entry):
                 continue
             sys.path.append(entry)
             appended_dependency_paths.append(entry)
