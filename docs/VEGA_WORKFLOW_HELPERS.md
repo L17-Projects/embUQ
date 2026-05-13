@@ -48,7 +48,7 @@ python scripts/platforms/vega/run_inference_stage.py \
 Default outputs land under:
 
 ```text
-_vega/runs/<experiment>/<model-family>/<profile>/
+_runs/<site>/runs/<run-tag>/<experiment>/<model-family>/<profile>/
 ```
 
 ## Propagation wrapper

@@ -204,6 +204,7 @@ def test_phase2_cpu_partition_is_cpu() -> None:
 def test_phase2_cpu_requests_64_tasks() -> None:
     text = _read("phase2_cpu.sbatch")
     assert "#SBATCH --ntasks=64" in text
+    assert "#SBATCH --mem=256000" in text
 
 
 def test_phase2_cpu_calls_run_inference_stage_with_phase2() -> None:
@@ -223,6 +224,7 @@ def test_phase2_native_cuda_partition_is_gpu() -> None:
     text = _read("phase2_native_cuda.sbatch")
     assert "#SBATCH --partition=gpu" in text
     assert "#SBATCH --ntasks=1" in text
+    assert "#SBATCH --mem=64000" in text
     assert "--gres=gpu:1" in text
 
 

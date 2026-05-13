@@ -67,6 +67,7 @@ def test_dnn_training_matrix_runner_writes_report_and_invokes_multi_arch(tmp_pat
     rc = module.main(["--output-root", str(tmp_path), "--only", "compression_2.1um"])
     assert rc == 0
     assert captured[0][0] == "sbatch"
+    assert "--export" in captured[0]
     assert Path(captured[0][-1]).name == "train_dnn_arch_array.sbatch"
     assert Path(captured[-1][1]).name == "train_multi_arch.py"
     report = json.loads((tmp_path / "dnn_training_matrix_report.json").read_text(encoding="utf-8"))

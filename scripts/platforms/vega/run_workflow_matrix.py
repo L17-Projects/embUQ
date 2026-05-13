@@ -16,7 +16,11 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[2]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from meso_uq.hpc_paths import default_runs_root, detect_hpc_site  # noqa: E402
+from meso_uq.hpc_paths import (  # noqa: E402
+    default_runs_root,
+    detect_hpc_site,
+    ensure_canonical_output_root,
+)
 from meso_uq.campaign_manifests import (  # noqa: E402
     MANDATORY_MAIN_FIGURES,
     MANDATORY_SUPPLEMENTARY_FIGURES,
@@ -449,7 +453,7 @@ def main(argv: list[str] | None = None) -> int:
 
     resolved_site = args.site if args.site is not None else detect_hpc_site()
     matrix_root = (
-        _resolve_path(args.output_root)
+        ensure_canonical_output_root(args.output_root, REPO_ROOT, field_name="--output-root")
         if args.output_root is not None
         else default_runs_root(REPO_ROOT, "workflow_matrix", site=resolved_site, run_tag=args.run_tag)
     )

@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -40,6 +41,8 @@ from convert_map_manifest import convert_manifest  # noqa: E402
 
 TIMEOUT_SECONDS = 1800  # default: 30 minutes per diameter
 MPI_RANKS = 2
+MAX_RETRIES = 1
+RETRY_DT_SCALE_FACTOR = 0.5
 MPI_ENV_EXPORTS = (
     "PATH",
     "PYTHONPATH",
@@ -126,6 +129,53 @@ def _run_diameter(
     }
 
 
+def _cleanup_retry_state(scratch_root: Path, result_json: Path) -> list[str]:
+    actions: list[str] = []
+    if scratch_root.exists():
+        shutil.rmtree(scratch_root, ignore_errors=True)
+        actions.append(f"removed scratch root: {scratch_root}")
+    if result_json.exists():
+        result_json.unlink()
+        actions.append(f"removed partial result: {result_json}")
+    return actions
+
+
+def _build_attempt_args(
+    *,
+    base_args: list[str],
+    attempt_index: int,
+    retry_dt_scale_factor: float,
+) -> list[str]:
+    attempt_args: list[str] = []
+    base_retry_attempt = 0
+    dt_scale = retry_dt_scale_factor
+    idx = 0
+    while idx < len(base_args):
+        token = base_args[idx]
+        if token == "--retry-attempt" and idx + 1 < len(base_args):
+            base_retry_attempt = int(base_args[idx + 1])
+            idx += 2
+            continue
+        if token == "--dt-scale-factor" and idx + 1 < len(base_args):
+            dt_scale = float(base_args[idx + 1])
+            idx += 2
+            continue
+        attempt_args.append(token)
+        idx += 1
+
+    resolved_retry_attempt = base_retry_attempt + attempt_index
+    if resolved_retry_attempt > 0:
+        attempt_args.extend(
+            [
+                "--retry-attempt",
+                str(resolved_retry_attempt),
+                "--dt-scale-factor",
+                str(dt_scale),
+            ]
+        )
+    return attempt_args
+
+
 def run_map_mirheo(
     experiment: str,
     output_dir: Path,
@@ -136,6 +186,8 @@ def run_map_mirheo(
     model_family: str = "unknown",
     timeout_seconds: int = TIMEOUT_SECONDS,
     dataset_names: list[str] | None = None,
+    max_retries: int = MAX_RETRIES,
+    retry_dt_scale_factor: float = RETRY_DT_SCALE_FACTOR,
 ) -> dict:
     """Run MAP Mirheo for all diameters.  Returns the summary manifest dict."""
     if extra_args is None:
@@ -182,6 +234,9 @@ def run_map_mirheo(
     else:
         selected = sorted(written)
 
+    if max_retries < 0:
+        raise ValueError("max_retries must be >= 0.")
+
     diameter_results: list[dict] = []
     for map_json in selected:
         # Derive dataset name from filename: e.g. indentation_3.2um_map.json → indentation_3.2um
@@ -191,24 +246,54 @@ def run_map_mirheo(
         scratch_root = map_mirheo_dir / "_scratch" / dataset_name
 
         print(f"[map_mirheo] Running {dataset_name} ...")
-        result = _run_diameter(
-            dataset_name=dataset_name,
-            map_json=map_json,
-            result_json=result_json,
-            scratch_root=scratch_root,
-            experiment=experiment,
-            python_bin=python_bin,
-            n_displacements=n_displacements,
-            mpi_ranks=mpi_ranks,
-            extra_args=extra_args,
-            timeout_seconds=timeout_seconds,
+        attempts: list[dict] = []
+        cleanup_actions: list[str] = []
+        final_result: dict | None = None
+
+        for attempt_index in range(max_retries + 1):
+            attempt_args = _build_attempt_args(
+                base_args=extra_args,
+                attempt_index=attempt_index,
+                retry_dt_scale_factor=retry_dt_scale_factor,
+            )
+            if attempt_index > 0:
+                cleanup_actions.extend(_cleanup_retry_state(scratch_root, result_json))
+
+            raw_result = _run_diameter(
+                dataset_name=dataset_name,
+                map_json=map_json,
+                result_json=result_json,
+                scratch_root=scratch_root,
+                experiment=experiment,
+                python_bin=python_bin,
+                n_displacements=n_displacements,
+                mpi_ranks=mpi_ranks,
+                extra_args=attempt_args,
+                timeout_seconds=timeout_seconds,
+            )
+            result = dict(raw_result)
+            result["attempt"] = attempt_index + 1
+            attempts.append(result)
+
+            if result["timed_out"] and attempt_index < max_retries:
+                print(
+                    f"[map_mirheo]   {dataset_name}: timed out on attempt {attempt_index + 1}; retrying ..."
+                )
+                continue
+
+            final_result = dict(result)
+            break
+
+        assert final_result is not None  # pragma: no cover
+        status = "timed_out" if final_result["timed_out"] else (
+            "passed" if final_result["returncode"] == 0 else "failed"
         )
-        status = "timed_out" if result["timed_out"] else (
-            "passed" if result["returncode"] == 0 else "failed"
-        )
-        result["status"] = status
-        diameter_results.append(result)
-        print(f"[map_mirheo]   {dataset_name}: {status} ({result['elapsed_seconds']:.1f}s)")
+        final_result["status"] = status
+        final_result["attempts"] = attempts
+        final_result["attempt_count"] = len(attempts)
+        final_result["cleanup_actions"] = cleanup_actions
+        diameter_results.append(final_result)
+        print(f"[map_mirheo]   {dataset_name}: {status} ({final_result['elapsed_seconds']:.1f}s)")
 
     overall_status = (
         "passed" if diameter_results and all(r["status"] == "passed" for r in diameter_results)
@@ -224,6 +309,8 @@ def run_map_mirheo(
         "n_displacements": n_displacements,
         "mpi_ranks": mpi_ranks,
         "timeout_seconds": timeout_seconds,
+        "max_retries": max_retries,
+        "retry_dt_scale_factor": retry_dt_scale_factor,
         "selected_datasets": sorted(requested),
         "status": overall_status,
         "diameters": diameter_results,
@@ -275,6 +362,21 @@ def main(argv: list[str] | None = None) -> int:
         help=f"Per-diameter timeout for evaluate subprocesses (default: {TIMEOUT_SECONDS})"
     )
     parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=MAX_RETRIES,
+        help=f"Retry count for timed-out diameters (default: {MAX_RETRIES}).",
+    )
+    parser.add_argument(
+        "--retry-dt-scale-factor",
+        type=float,
+        default=RETRY_DT_SCALE_FACTOR,
+        help=(
+            "dt scaling passed to evaluate scripts during automatic retries "
+            f"(default: {RETRY_DT_SCALE_FACTOR})."
+        ),
+    )
+    parser.add_argument(
         "--numsteps", type=int, default=None,
         help="Optional override passed through to evaluate_map_mirheo_optimized*.py"
     )
@@ -300,6 +402,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.timeout_seconds < 1:
         print("ERROR: --timeout-seconds must be >= 1", file=sys.stderr)
         return 1
+    if args.max_retries < 0:
+        print("ERROR: --max-retries must be >= 0", file=sys.stderr)
+        return 1
+    if args.retry_dt_scale_factor <= 0:
+        print("ERROR: --retry-dt-scale-factor must be > 0", file=sys.stderr)
+        return 1
 
     extra_args: list[str] = []
     if args.retry_attempt > 0:
@@ -321,6 +429,8 @@ def main(argv: list[str] | None = None) -> int:
             model_family=args.model_family,
             timeout_seconds=args.timeout_seconds,
             dataset_names=args.dataset_name,
+            max_retries=args.max_retries,
+            retry_dt_scale_factor=args.retry_dt_scale_factor,
         )
     except (FileNotFoundError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

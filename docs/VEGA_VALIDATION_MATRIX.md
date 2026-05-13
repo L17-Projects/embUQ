@@ -35,7 +35,7 @@ Run the matrix directly inside an allocated Vega job:
 python scripts/platforms/vega/run_validation_matrix.py \
   --experiments compression indentation \
   --model-families full-model reduced-model \
-  --output-root _vega/validation_matrix \
+  --output-root _runs/vega/validation_matrix \
   --phase2-cpu-ranks 4
 ```
 
@@ -57,13 +57,13 @@ Each selection runs:
 The command writes:
 
 - one top-level report:
-  - `_vega/validation_matrix/workflow_matrix_report.json`
+  - `_runs/vega/validation_matrix/workflow_matrix_report.json`
 - one summary per selection:
-  - `_vega/validation_matrix/summaries/<experiment>__<model-family>__<profile>.json`
+  - `_runs/vega/validation_matrix/summaries/<experiment>__<model-family>__<profile>.json`
 - captured stdout/stderr logs for every step:
-  - `_vega/validation_matrix/logs/...`
+  - `_runs/vega/validation_matrix/logs/...`
 - nested workflow outputs:
-  - `_vega/validation_matrix/runs/<experiment>/<model-family>/<profile>/`
+  - `_runs/vega/validation_matrix/runs/<experiment>/<model-family>/<profile>/`
 
 ## sbatch template
 
@@ -96,6 +96,13 @@ For targeted debugging, a selection-specific config can be injected with:
 ```bash
 python scripts/platforms/vega/run_validation_matrix.py \
   --selection compression:full-model:validation \
-  --output-root _vega/validation_matrix/custom_debug \
+  --output-root _runs/vega/validation_matrix/custom_debug \
   --config-override compression:full-model:validation=/abs/path/config.yaml
 ```
+
+### Output-root policy
+
+For active runtime outputs, route artifacts under canonical `_runs/...` trees (or the site scratch override configured by the caller).
+For durable paper-facing campaign outputs, use `paper_data/...`.
+
+If an explicit `--output-root` does not resolve into one of those trees, this command fails fast.

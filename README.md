@@ -68,6 +68,25 @@ python -m coverage run -m pytest
 python -m coverage report --skip-covered
 ```
 
+Merge-ready coverage gate (strict, manual/local):
+
+GitHub CI is intentionally a fast feedback gate. The `full-ci`-labelled path still runs a coverage delta check in CI feedback mode; before marking a PR merge-ready, run the strict local gate:
+
+```bash
+python scripts/qa/ci/run_merge_ready_coverage.py \
+  --base-ref origin/main \
+  --test-command "pytest"
+```
+
+If you already have coverage JSON artifacts, run the strict checker directly:
+
+```bash
+python scripts/qa/ci/check_coverage_increase.py \
+  --base-json path/to/base-coverage.json \
+  --head-json path/to/head-coverage.json \
+  --strict
+```
+
 CI / smoke-test install:
 
 ```bash
@@ -129,7 +148,7 @@ python scripts/platforms/vega/doctor_vega.py --strict
 REPO_ROOT=$(pwd) sbatch scripts/platforms/vega/sbatch/validation_matrix.sbatch
 ```
 
-That submission runs the public validation workflow matrix on the Vega `dev` partition and writes the machine-readable report to `_vega/validation_matrix/workflow_matrix_report.json`.
+That submission runs the public validation workflow matrix on the Vega `dev` partition and writes the machine-readable report under `_runs/vega/validation_matrix/<run-tag>/workflow_matrix_report.json`.
 
 If you are already inside an allocated Vega job, replace the last line with:
 
@@ -137,7 +156,7 @@ If you are already inside an allocated Vega job, replace the last line with:
 python scripts/platforms/vega/run_validation_matrix.py \
   --experiments compression indentation \
   --model-families full-model reduced-model \
-  --output-root _vega/validation_matrix \
+  --output-root _runs/vega/validation_matrix \
   --phase2-cpu-ranks 4
 ```
 
@@ -165,7 +184,7 @@ Direct command inside an allocated Vega job:
 
 ```bash
 python scripts/platforms/vega/run_validation_matrix.py \
-  --output-root _vega/validation_matrix \
+  --output-root _runs/vega/validation_matrix \
   --phase2-cpu-ranks 4
 ```
 
@@ -175,7 +194,7 @@ Tracked `sbatch` template:
 REPO_ROOT=$(pwd) sbatch scripts/platforms/vega/sbatch/validation_matrix.sbatch
 ```
 
-The machine-readable report is written to `_vega/validation_matrix/workflow_matrix_report.json`. Detailed usage and artifact layout are documented in `docs/VEGA_VALIDATION_MATRIX.md`.
+The machine-readable report is written to `_runs/vega/validation_matrix/workflow_matrix_report.json` when you pass the explicit root above, or under `_runs/vega/validation_matrix/<run-tag>/` when you use the sbatch default. Detailed usage and artifact layout are documented in `docs/VEGA_VALIDATION_MATRIX.md`.
 
 ## Canonical configuration entrypoints
 

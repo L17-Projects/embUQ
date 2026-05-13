@@ -127,6 +127,49 @@ def test_coverage_delta_gate_ignores_optional_bnn_files(tmp_path):
     assert rc == 0
 
 
+def test_coverage_delta_gate_applies_strict_mode_to_optional_paths(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "qa" / "ci" / "check_coverage_increase.py",
+        "check_coverage_increase_test_strict",
+    )
+
+    def _write_files_json(path: Path, *, core_missing: int, bnn_missing: int) -> None:
+        path.write_text(
+            json.dumps(
+                {
+                    "files": {
+                        "src/meso_uq/core.py": {
+                            "summary": {"num_statements": 10, "missing_lines": core_missing}
+                        },
+                        "src/meso_uq/surrogate/bnn.py": {
+                            "summary": {"num_statements": 100, "missing_lines": bnn_missing}
+                        },
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    base_json = tmp_path / "base.json"
+    head_json = tmp_path / "head.json"
+
+    _write_files_json(base_json, core_missing=1, bnn_missing=0)
+    _write_files_json(head_json, core_missing=0, bnn_missing=90)
+
+    non_strict_rc = module.main(["--base-json", str(base_json), "--head-json", str(head_json)])
+    strict_rc = module.main([
+        "--base-json",
+        str(base_json),
+        "--head-json",
+        str(head_json),
+        "--strict",
+    ])
+
+    assert non_strict_rc == 0
+    assert strict_rc == 1
+
+
 def test_coverage_delta_gate_falls_back_to_totals_when_file_entries_are_invalid(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(

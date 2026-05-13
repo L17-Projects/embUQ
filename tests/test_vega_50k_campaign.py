@@ -58,8 +58,13 @@ def test_vega_50k_campaign_uses_sbatch_and_postprocess(tmp_path, monkeypatch):
     assert any(Path(call[0][-1]).name == "complete_reduced_indentation.sbatch" for call in sbatch_calls)
     assert any(Path(call[0][-1]).name == "workflow_map.sbatch" for call in sbatch_calls)
     assert any(Path(call[0][-1]).name == "workflow_map_mirheo.sbatch" for call in sbatch_calls)
+    assert all("--export" in call[0] for call in sbatch_calls)
     complete_env = next(env for cmd, env in sbatch_calls if Path(cmd[-1]).name == "complete_inference_compression.sbatch")
     mirheo_env = next(env for cmd, env in sbatch_calls if Path(cmd[-1]).name == "workflow_map_mirheo.sbatch")
+    mirheo_cmd = next(cmd for cmd, _env in sbatch_calls if Path(cmd[-1]).name == "workflow_map_mirheo.sbatch")
     assert complete_env["PHASE2_BACKEND"] == "native-cuda"
     assert complete_env["LOGS_DIR"].endswith("compression__full-model__production")
     assert mirheo_env["GPU_TIME_LIMIT"] == "02:00:00"
+    export_arg = mirheo_cmd[mirheo_cmd.index("--export") + 1]
+    assert "OUTPUT_DIR=" in export_arg
+    assert "CONFIG_PATH=" in export_arg

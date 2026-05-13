@@ -71,7 +71,7 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     codecov_upload = _step_by_name(package_steps, "Upload coverage to Codecov")
     preserve_head = _step_by_name(package_steps, "Preserve head coverage report")
     compute_base = _step_by_name(package_steps, "Compute base branch coverage")
-    coverage_delta = _step_by_name(package_steps, "Enforce strict coverage increase")
+    coverage_delta = _step_by_name(package_steps, "Enforce feedback coverage increase")
     coverage_scope = _step_by_name(package_steps, "Detect coverage-sensitive changes")
     assert preserve_head["if"] == "always()"
     assert "test -f coverage.json" in preserve_head["run"]

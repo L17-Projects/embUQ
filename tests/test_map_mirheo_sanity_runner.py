@@ -45,8 +45,12 @@ def test_map_mirheo_sanity_runner_writes_report(tmp_path, monkeypatch):
         encoding="utf-8",
     )
 
+    captured: dict[str, object] = {}
+
     def fake_run(command, cwd=None, text=False, capture_output=False, check=False, env=None):
         if command[0] == "sbatch":
+            captured["sbatch_command"] = command
+            captured["sbatch_env"] = env
             return _Result(stdout="12345\n")
         if command[0] == "squeue":
             return _Result(stdout="")
@@ -76,3 +80,10 @@ def test_map_mirheo_sanity_runner_writes_report(tmp_path, monkeypatch):
     assert report["numsteps_eq"] == 200
     assert report["lanes"][0]["selection"] == "compression:full-model:production"
     assert report["lanes"][0]["job_id"] == "12345"
+    sbatch_command = captured["sbatch_command"]
+    assert isinstance(sbatch_command, list)
+    assert "--export" in sbatch_command
+    export_arg = sbatch_command[sbatch_command.index("--export") + 1]
+    assert "OUTPUT_DIR=" in export_arg
+    assert "GPU_TIME_LIMIT=" in export_arg
+    assert "MAP_MIRHEO_NUMSTEPS=" in export_arg

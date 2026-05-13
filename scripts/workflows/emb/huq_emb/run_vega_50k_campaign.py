@@ -82,6 +82,12 @@ REFERENCE_DATA = {
 }
 
 
+def _sbatch_export_arg(env: dict[str, str]) -> str:
+    explicit = sorted(key for key, value in env.items() if os.environ.get(key) != value)
+    parts = ["ALL", *(f"{key}={env[key]}" for key in explicit)]
+    return ",".join(parts)
+
+
 def _resolve_path(value: str | Path) -> Path:
     return Path(value).expanduser().resolve()
 
@@ -145,6 +151,7 @@ def _submit_sbatch(
     command = ["sbatch", "--parsable", "--output", str(logs_root / f"{name}_%j.out"), "--error", str(logs_root / f"{name}_%j.err")]
     if wait:
         command.insert(1, "--wait")
+    command.extend(["--export", _sbatch_export_arg(env)])
     if extra_args:
         command.extend(extra_args)
     command.append(str(script))
