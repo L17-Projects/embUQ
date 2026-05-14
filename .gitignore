@@ -18,6 +18,9 @@ _init*/
 _*
 out_*
 logs/
+/runtime/
+/*-*.out
+/*-*.err
 /mesouq-*.out
 /mesouq-*.err
 /AGENTS.md
@@ -81,3 +84,5 @@ gv/**/force/
 !src/meso_uq/core/**/__init__.py
 !src/meso_uq/modalities/**/__init__.py
 !src/meso_uq/workflows/**/__init__.py
+!src/learning/**/__init__.py
+!src/meso_uq/platforms/**/__init__.py
