@@ -111,6 +111,34 @@ def test_generated_root_detector_matches_dirtree_hints() -> None:
     assert not is_source_tree_generated_root("paper_data/surrogates/model.pt")
 
 
+def test_generated_root_detector_preserves_placeholder_roots() -> None:
+    assert not is_source_tree_generated_root("${MESOUQ_RUNS_ROOT}/logs/driver.log")
+    assert not is_source_tree_generated_root("$MESOUQ_RUNS_ROOT/_runs/run_001/output.bin")
+
+
+def test_artifact_manifest_accepts_generated_placeholder_roots() -> None:
+    errors = validate_artifact_manifest_document(
+        {
+            "schema_version": "1.0",
+            "manifest_id": "placeholder-root-run",
+            "generated_at": "2026-05-13T00:00:00Z",
+            "cleanup_policy": {"protected_roots": ["extern/korali"]},
+            "artifacts": [
+                {
+                    "artifact_id": "generated-placeholder-log",
+                    "artifact_class": "log",
+                    "path": "${MESOUQ_RUNS_ROOT}/logs/driver.log",
+                    "storage_location": "hpc_output",
+                    "retention_policy": "generated",
+                    "release_critical": False,
+                }
+            ],
+        }
+    )
+
+    assert errors == []
+
+
 def test_artifact_manifest_record_type_accepts_metadata_shape() -> None:
     record_payload = {
         "artifact_id": "record-001",

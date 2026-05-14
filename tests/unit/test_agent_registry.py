@@ -69,7 +69,7 @@ def test_agent_registry_reports_support_and_dependency_state():
     status = classify_agent_modality_support("gv", "stretching")
     unsupported = classify_agent_modality_support("emb", "shear_flow")
     requirements = runtime_requirements_for_agent("gv")
-    missing = missing_dependency_requirements_for_agent("emb", {"torch": False, "pyro": True, "korali": False})
+    missing = missing_dependency_requirements_for_agent("emb", {"torch": False, "pyro": False, "korali": False})
 
     assert status["status"] == "supported"
     assert unsupported["status"] == "unsupported"
