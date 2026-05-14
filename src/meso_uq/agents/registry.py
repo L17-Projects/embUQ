@@ -146,7 +146,7 @@ def missing_dependency_requirements_for_agent(
     missing = []
     for requirement in runtime_requirements_for_agent(family):
         key = requirement.package or requirement.name
-        if requirement.state is RequirementState.UNSUPPORTED:
+        if not requirement.is_missing_dependency_state:
             continue
         if availability.get(key, True) is False:
             missing.append(requirement)
