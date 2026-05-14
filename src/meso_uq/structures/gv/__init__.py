@@ -1,5 +1,10 @@
 from .controls import ALL_GV_CONTROLS, EXPERIMENT_CONTROLS
-from .experiments import GV_EXPERIMENTS
+from .experiments import (
+    GV_EXPERIMENT_LAYOUT_DIRS,
+    GV_EXPERIMENTS,
+    gv_experiment_layout,
+    gv_experiment_layouts,
+)
 from .geometries import DEFAULT_GV_GEOMETRY, build_geometry, geometry_id
 from .observables import GV_OBSERVABLE_SCHEMAS
 from .paper_replay_constants import (
@@ -39,12 +44,15 @@ __all__ = [
     "DEFAULT_GV_GEOMETRY",
     "EXPERIMENT_CONTROLS",
     "GV_EXPERIMENTS",
+    "GV_EXPERIMENT_LAYOUT_DIRS",
     "GV_NOISE_MODEL",
     "GV_PARAMETER_CONTRACT",
     "GV_STRUCTURE",
     "build_geometry",
     "geometry_id",
     "GV_OBSERVABLE_SCHEMAS",
+    "gv_experiment_layout",
+    "gv_experiment_layouts",
     "GV_PAPER_REPLAY_FIGURE_TARGETS",
     "GV_PAPER_REPLAY_PAPER_PDF",
     "GV_PAPER_REPLAY_PROFILE_ID",

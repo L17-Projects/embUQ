@@ -20,6 +20,16 @@ The non-shear stack must demonstrate this `Mirheo -> DNN surrogate -> hierarchic
 
 See also [GV_NUMERICAL_DATA_GENERATION.md](GV_NUMERICAL_DATA_GENERATION.md) for the full numerical-data handoff schema.
 
+## Repository layout
+
+Every checked-in `gv/<experiment>/` directory uses the normalized GV experiment layout:
+
+- `src/`: Mirheo/runtime provenance templates and experiment-local static inputs.
+- `evalkit/`: experiment-local evaluation fixtures or manifests.
+- `surrogate/`: experiment-local surrogate fixtures, manifests, or artifact placeholders.
+
+Empty `evalkit/` and `surrogate/` directories are committed with `README.md` placeholders. Shared implementation belongs under `src/meso_uq`, not under experiment-local folders.
+
 ## Parameter and control contract
 
 GV material calibration is constrained to exactly these parameters:
