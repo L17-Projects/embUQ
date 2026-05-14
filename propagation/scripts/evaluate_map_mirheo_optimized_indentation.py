@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate MAP parameters with Mirheo DPD simulation (Optimized Grid) — indentation.
+"""Evaluate MAP parameters with Mirheo DPD simulation (Optimized Grid) — emb.indentation.
 
 Runs a single Mirheo simulation for the MAP parameters using an optimized
 displacement grid that extends ±X% beyond the experimental range (after d0
@@ -32,11 +32,11 @@ from mpi4py import MPI
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
-sys.path.insert(0, str(PROJECT_ROOT / "indentation"))
-sys.path.insert(0, str(PROJECT_ROOT / "indentation" / "evalkit"))
+sys.path.insert(0, str(PROJECT_ROOT / "emb" / "indentation"))
+sys.path.insert(0, str(PROJECT_ROOT / "emb" / "indentation" / "evalkit"))
 
-from indentation.evalkit.posterior_indentation import compute_indentation
-from indentation.evalkit.tools import datedPrint, getReferencePoints
+from emb.indentation.evalkit.posterior_indentation import compute_indentation
+from emb.indentation.evalkit.tools import datedPrint, getReferencePoints
 from meso_uq.mirheo.baseline import validate_training_baseline
 from meso_uq.mirheo.radp import infer_radp_for_diameter
 
@@ -78,7 +78,7 @@ def setup_map_specific_init_dir(
     """
     comm = MPI.COMM_WORLD
     diam_str = f"{diameter_um:.1f}"
-    base_template_dir = PROJECT_ROOT / "indentation" / "src"
+    base_template_dir = PROJECT_ROOT / "emb" / "indentation" / "src"
     emb_defaults_path = base_template_dir / "parameters-default.emb.yaml"
     if scratch_root is None:
         map_init_dir = PROJECT_ROOT / f"_init_indentation_{diam_str}um_map"

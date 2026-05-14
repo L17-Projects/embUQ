@@ -72,6 +72,8 @@ class EmbGenerationWorkflow:
 
 
 _COMPRESSION_GENERATION_CONFIGS = (
+    "../../../inference/configs/production/inference_config_compression.yaml",
+    "../../../inference/configs/production/inference_config.yaml",
     "../../inference/configs/production/inference_config_compression.yaml",
     "../../inference/configs/production/inference_config.yaml",
     "inference/configs/production/inference_config_compression.yaml",
@@ -89,6 +91,7 @@ _COMPRESSION_PARAMETER_CONFIGS = (
 )
 
 _INDENTATION_GENERATION_CONFIGS = (
+    "../../../inference/configs/production/inference_config_indentation.yaml",
     "../../inference/configs/production/inference_config_indentation.yaml",
     "inference/configs/production/inference_config_indentation.yaml",
     "../inference/configs/production/inference_config_indentation.yaml",
@@ -102,18 +105,18 @@ _INDENTATION_PARAMETER_CONFIGS = (
 EMB_GENERATION_WORKFLOWS: dict[Modality, EmbGenerationWorkflow] = {
     Modality.COMPRESSION: EmbGenerationWorkflow(
         modality=Modality.COMPRESSION,
-        legacy_root="compression",
-        generation_script="compression/src/generate.py",
-        parameters_script="compression/src/parameters.py",
+        legacy_root="emb/compression",
+        generation_script="emb/compression/src/generate.py",
+        parameters_script="emb/compression/src/parameters.py",
         generation_config_candidates=_COMPRESSION_GENERATION_CONFIGS,
         parameter_config_candidates=_COMPRESSION_PARAMETER_CONFIGS,
         indentation_mass_multiplier=1.0,
     ),
     Modality.INDENTATION: EmbGenerationWorkflow(
         modality=Modality.INDENTATION,
-        legacy_root="indentation",
-        generation_script="indentation/src/generate.py",
-        parameters_script="indentation/src/parameters.py",
+        legacy_root="emb/indentation",
+        generation_script="emb/indentation/src/generate.py",
+        parameters_script="emb/indentation/src/parameters.py",
         generation_config_candidates=_INDENTATION_GENERATION_CONFIGS,
         parameter_config_candidates=_INDENTATION_PARAMETER_CONFIGS,
         indentation_mass_multiplier=5.0,
@@ -135,7 +138,10 @@ def get_emb_generation_workflow(modality: Modality | str) -> EmbGenerationWorkfl
 
 
 def _legacy_repo_root(anchor_file: str | Path) -> Path:
-    return Path(anchor_file).resolve().parents[2]
+    anchor = Path(anchor_file).resolve()
+    if len(anchor.parents) >= 4 and anchor.parents[2].name == "emb":
+        return anchor.parents[3]
+    return anchor.parents[2]
 
 
 def emb_config_candidate_paths(

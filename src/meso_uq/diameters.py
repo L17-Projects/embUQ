@@ -65,14 +65,14 @@ def get_data_file_path(diameter_um: float, project_root: Optional[Path] = None) 
     config = get_diameter_config(diameter_um)
     if project_root is None:
         project_root = Path(__file__).resolve().parents[2]
-    return project_root / "compression" / "evalkit" / "data" / config.data_file
+    return project_root / "emb" / "compression" / "evalkit" / "data" / config.data_file
 
 
 def get_surrogate_path(diameter_um: float, project_root: Optional[Path] = None) -> Path:
     config = get_diameter_config(diameter_um)
     if project_root is None:
         project_root = Path(__file__).resolve().parents[2]
-    return project_root / "compression" / "surrogate" / "diameters" / config.surrogate_dir / "trained"
+    return project_root / "emb" / "compression" / "surrogate" / "diameters" / config.surrogate_dir / "trained"
 
 
 def validate_diameter(diameter_um: float) -> bool:

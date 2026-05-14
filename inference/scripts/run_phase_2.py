@@ -12,10 +12,10 @@ import yaml
 from mpi4py import MPI
 
 project_root = str(Path(__file__).resolve().parents[2])
-sys.path.insert(0, os.path.join(project_root, "compression"))
-sys.path.insert(0, os.path.join(project_root, "compression", "evalkit"))
+sys.path.insert(0, os.path.join(project_root, "emb", "compression"))
+sys.path.insert(0, os.path.join(project_root, "emb", "compression", "evalkit"))
 
-from compression.evalkit.tools import datedPrint
+from emb.compression.evalkit.tools import datedPrint
 from meso_uq.config import resolve_inference_config_path
 from meso_uq.experiments import load_experiments
 from meso_uq.workflow_acceleration import (

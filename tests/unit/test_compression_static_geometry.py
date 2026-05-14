@@ -1,4 +1,4 @@
-"""Tests that compression static geometry files exist in compression/src/.
+"""Tests that compression static geometry files exist in emb/compression/src/.
 
 These files are required at runtime by posterior_compression.py
 (prepare_simulation_parameters) and equil.py — they are copied into the
@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-COMPRESSION_SRC = REPO_ROOT / "compression" / "src"
+COMPRESSION_SRC = REPO_ROOT / "emb" / "compression" / "src"
 
 
 @pytest.fixture(params=[

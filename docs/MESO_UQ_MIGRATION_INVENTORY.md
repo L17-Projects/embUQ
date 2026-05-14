@@ -30,10 +30,10 @@ Snapshot date: 2026-05-13.
 | Root | Notes |
 |---|---|
 | `src/meso_uq` | Shared import surface; keep `import meso_uq` stable |
-| `compression/src` | Compression-specific runtime and geometry helpers |
-| `compression/surrogate` | Compression surrogate training and evaluation |
-| `indentation/src` | Indentation-specific runtime and geometry helpers |
-| `indentation/surrogate` | Indentation surrogate training and evaluation |
+| `emb/compression/src` | Compression-specific runtime and geometry helpers |
+| `emb/compression/surrogate` | Compression surrogate training and evaluation |
+| `emb/indentation/src` | Indentation-specific runtime and geometry helpers |
+| `emb/indentation/surrogate` | Indentation surrogate training and evaluation |
 | `inference/scripts` | Full-model phase entrypoints |
 | `reduced/scripts` | Reduced-model phase entrypoints |
 | `sampling` | Sampling and LHS generation |
@@ -89,7 +89,7 @@ git status --short --ignored=matching --untracked-files=all --branch
 git ls-files
 git ls-files | rg '(^(_out|_runs|_ci|out_hierarchical)/|^_init_compression_|^logs/|^slurm-.*\.(out|err)$|\.coverage$|\.pytest_cache/|__pycache__/|\.egg-info/|\.(pkl|pt|pth|h5|hdf5|xmf|dat|csv|npy|npz)$)'
 git ls-files -z | xargs -0 du -b 2>/dev/null | sort -nr | head -80
-for p in compression/evalkit/data indentation/evalkit/data compression/surrogate/diameters indentation/surrogate/diameters gv; do
+for p in emb/compression/evalkit/data emb/indentation/evalkit/data emb/compression/surrogate/diameters emb/indentation/surrogate/diameters gv; do
   echo "$p"
   find "$p" -type f 2>/dev/null | wc -l
   git ls-files "$p" | wc -l
@@ -126,13 +126,13 @@ or `_init_compression_*`.
 
 | Path or glob | File count | Size | Representative files | Likely class | Proposed disposition | Confidence |
 |---|---:|---:|---|---|---|---|
-| `compression/evalkit/data` | 12 | 56K | `data_1.csv`, `compression_data_2.1um.dat`, `plot_reference_data.py` | Raw/reference with small processed `.dat` aliases | Keep tracked; manifest as reference inputs and conversion outputs | High |
-| `indentation/evalkit/data` | 15 | 52K | `data_morris_3.40.csv`, `indentation_data_3.2um.dat`, `.full`, `.filtered` | Raw/reference plus small processed files | Keep tracked; mark generated/filtered files as processed in manifests | High |
-| `compression/surrogate/diameters/*/data` | 3 | 13M | `F_Delta.dat` | Generated or processed training input | Move external once regeneration provenance exists; keep tracked until manifest and validation cover it | Medium |
-| `indentation/surrogate/diameters/*/data` | 3 | 46M | `samples_all.dat` | Generated training data | Move external once regeneration provenance exists; keep tracked until manifest and validation cover it | Medium |
-| `compression/surrogate/diameters/*/trained` | 6 | 1.1M | `microbubble_force_BEST.pkl`, `microbubble_force_BNN.pt` | Release-critical surrogate checkpoints | Keep `*BEST.pkl` tracked with manifest; BNN checkpoints need explicit release/retrain policy | High for BEST, medium for BNN |
-| `indentation/surrogate/diameters/*/trained` | 4 | 431K | `microbubble_displacement_BEST.pkl`, `microbubble_displacement_BNN.pt` | Release-critical surrogate checkpoints | Keep `*BEST.pkl` tracked with manifest; owner decision for incomplete BNN coverage | High for BEST, low for BNN consistency |
-| `indentation/evalkit/data/data_morris_3.40_old.csv` | 1 | 983 bytes | legacy-looking CSV | Owner decision / historical reference candidate | Archive or move external only after compatibility decision | Medium |
+| `emb/compression/evalkit/data` | 12 | 56K | `data_1.csv`, `compression_data_2.1um.dat`, `plot_reference_data.py` | Raw/reference with small processed `.dat` aliases | Keep tracked; manifest as reference inputs and conversion outputs | High |
+| `emb/indentation/evalkit/data` | 15 | 52K | `data_morris_3.40.csv`, `indentation_data_3.2um.dat`, `.full`, `.filtered` | Raw/reference plus small processed files | Keep tracked; mark generated/filtered files as processed in manifests | High |
+| `emb/compression/surrogate/diameters/*/data` | 3 | 13M | `F_Delta.dat` | Generated or processed training input | Move external once regeneration provenance exists; keep tracked until manifest and validation cover it | Medium |
+| `emb/indentation/surrogate/diameters/*/data` | 3 | 46M | `samples_all.dat` | Generated training data | Move external once regeneration provenance exists; keep tracked until manifest and validation cover it | Medium |
+| `emb/compression/surrogate/diameters/*/trained` | 6 | 1.1M | `microbubble_force_BEST.pkl`, `microbubble_force_BNN.pt` | Release-critical surrogate checkpoints | Keep `*BEST.pkl` tracked with manifest; BNN checkpoints need explicit release/retrain policy | High for BEST, medium for BNN |
+| `emb/indentation/surrogate/diameters/*/trained` | 4 | 431K | `microbubble_displacement_BEST.pkl`, `microbubble_displacement_BNN.pt` | Release-critical surrogate checkpoints | Keep `*BEST.pkl` tracked with manifest; owner decision for incomplete BNN coverage | High for BEST, low for BNN consistency |
+| `emb/indentation/evalkit/data/data_morris_3.40_old.csv` | 1 | 983 bytes | legacy-looking CSV | Owner decision / historical reference candidate | Archive or move external only after compatibility decision | Medium |
 
 ## Large tracked artifact watchlist
 
@@ -142,12 +142,12 @@ artifact policy decisions:
 
 | Path | Size | Classification |
 |---|---:|---|
-| `indentation/surrogate/diameters/3.4um/data/samples_all.dat` | 23.9M | Generated training data; externalization candidate |
-| `indentation/surrogate/diameters/5.8um/data/samples_all.dat` | 11.4M | Generated training data; externalization candidate |
-| `indentation/surrogate/diameters/3.2um/data/samples_all.dat` | 11.4M | Generated training data; externalization candidate |
-| `compression/surrogate/diameters/2.9um/data/F_Delta.dat` | 4.5M | Generated/processed training data; externalization candidate |
-| `compression/surrogate/diameters/3.0um/data/F_Delta.dat` | 4.1M | Generated/processed training data; externalization candidate |
-| `compression/surrogate/diameters/2.1um/data/F_Delta.dat` | 4.0M | Generated/processed training data; externalization candidate |
+| `emb/indentation/surrogate/diameters/3.4um/data/samples_all.dat` | 23.9M | Generated training data; externalization candidate |
+| `emb/indentation/surrogate/diameters/5.8um/data/samples_all.dat` | 11.4M | Generated training data; externalization candidate |
+| `emb/indentation/surrogate/diameters/3.2um/data/samples_all.dat` | 11.4M | Generated training data; externalization candidate |
+| `emb/compression/surrogate/diameters/2.9um/data/F_Delta.dat` | 4.5M | Generated/processed training data; externalization candidate |
+| `emb/compression/surrogate/diameters/3.0um/data/F_Delta.dat` | 4.1M | Generated/processed training data; externalization candidate |
+| `emb/compression/surrogate/diameters/2.1um/data/F_Delta.dat` | 4.0M | Generated/processed training data; externalization candidate |
 | `extern/korali/python/korali/profiler/examples/example_single_4096Nodes.json` | 2.5M | Vendored dependency example; keep with `extern/korali` unless vendoring policy changes |
 
 ## Disposition definitions
@@ -165,10 +165,10 @@ artifact policy decisions:
 ## Decisions still required
 
 - Decide whether top-level `runtime/` should be ignored as a local artifact root or migrated under `_runs/...`.
-- Confirm the external storage and manifest policy for `compression/surrogate/diameters/*/data/F_Delta.dat`.
-- Confirm the external storage and manifest policy for `indentation/surrogate/diameters/*/data/samples_all.dat`.
+- Confirm the external storage and manifest policy for `emb/compression/surrogate/diameters/*/data/F_Delta.dat`.
+- Confirm the external storage and manifest policy for `emb/indentation/surrogate/diameters/*/data/samples_all.dat`.
 - Decide whether incomplete indentation BNN checkpoint coverage is acceptable, should be regenerated, or should be moved out of release scope.
-- Decide whether `indentation/evalkit/data/data_morris_3.40_old.csv` is a historical reference, an archive candidate, or removable after owner confirmation.
+- Decide whether `emb/indentation/evalkit/data/data_morris_3.40_old.csv` is a historical reference, an archive candidate, or removable after owner confirmation.
 - Keep `extern/korali` vendored unless a separate vendoring policy changes; the large profiler examples are part of that vendored surface for now.
 
 ## Artifact classes

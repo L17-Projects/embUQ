@@ -7,8 +7,8 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 _EQUIL_PATHS: dict[str, Path] = {
-    "compression": _REPO_ROOT / "compression" / "src" / "equil.py",
-    "indentation": _REPO_ROOT / "indentation" / "src" / "equil.py",
+    "compression": _REPO_ROOT / "emb" / "compression" / "src" / "equil.py",
+    "indentation": _REPO_ROOT / "emb" / "indentation" / "src" / "equil.py",
 }
 
 

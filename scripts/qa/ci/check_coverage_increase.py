@@ -9,8 +9,8 @@ from pathlib import Path
 _OPTIONAL_BNN_COVERAGE_EXCLUDES = {
     "src/meso_uq/surrogate/bnn.py",
     "src/meso_uq/surrogate/bnn_training.py",
-    "compression/surrogate/evaluate_bnn.py",
-    "indentation/surrogate/evaluate_bnn.py",
+    "emb/compression/surrogate/evaluate_bnn.py",
+    "emb/indentation/surrogate/evaluate_bnn.py",
     "scripts/platforms/karolina/train_bnn_surrogates.py",
 }
 

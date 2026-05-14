@@ -6,8 +6,8 @@ ignore:
   # which is intentionally not part of the default CI test extra.
   - "src/meso_uq/surrogate/bnn.py"
   - "src/meso_uq/surrogate/bnn_training.py"
-  - "compression/surrogate/scripts/emb_train_bnn.py"
-  - "indentation/surrogate/scripts/emb_train_bnn.py"
+  - "emb/compression/surrogate/scripts/emb_train_bnn.py"
+  - "emb/indentation/surrogate/scripts/emb_train_bnn.py"
   # Generated outputs, notebooks, vendored trees, and runtime artifacts are
   # tracked by policy and docs, not by line coverage.
   - "docs/**"

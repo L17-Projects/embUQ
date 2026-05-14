@@ -49,7 +49,7 @@ def test_run_sobol_matrix_orchestrator_builds_and_records_runs(
                 "diameter": "2.1",
                 "dnn_model": model_file,
                 "bnn_model": model_file,
-                "script": repo_root / "compression" / "surrogate" / "sensitivity" / "scripts" / "run_sobol_vs_disp.py",
+                "script": repo_root / "emb" / "compression" / "surrogate" / "sensitivity" / "scripts" / "run_sobol_vs_disp.py",
                 "axis_flag": "--n-displacements",
                 "output_name": "sobol_vs_disp_2.1um.csv",
             }
@@ -114,7 +114,7 @@ def test_run_sobol_matrix_orchestrator_handles_missing_models_and_failures(
                 "diameter": "3.2",
                 "dnn_model": model_file,
                 "bnn_model": missing_model,
-                "script": repo_root / "indentation" / "surrogate" / "sensitivity" / "scripts" / "run_sobol_vs_force.py",
+                "script": repo_root / "emb" / "indentation" / "surrogate" / "sensitivity" / "scripts" / "run_sobol_vs_force.py",
                 "axis_flag": "--n-forces",
                 "output_name": "sobol_vs_force_3.2um.csv",
             }

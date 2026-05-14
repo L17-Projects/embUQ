@@ -43,26 +43,26 @@ class LegacySurrogateRuntime:
 LEGACY_WORKFLOW_SURFACES: tuple[LegacyWorkflowSurface, ...] = (
     LegacyWorkflowSurface(
         family="compression",
-        legacy_path="compression/src/generate.py",
+        legacy_path="emb/compression/src/generate.py",
         replacement_api="meso_uq.simulation.generate_emb_simulation",
         purpose="EMB compression simulation generation",
     ),
     LegacyWorkflowSurface(
         family="indentation",
-        legacy_path="indentation/src/generate.py",
+        legacy_path="emb/indentation/src/generate.py",
         replacement_api="meso_uq.simulation.generate_emb_simulation",
         purpose="EMB indentation simulation generation",
     ),
     LegacyWorkflowSurface(
         family="compression",
-        legacy_path="compression/evalkit/posterior_compression.py",
-        replacement_api="meso_uq.workflows.legacy + compression.evalkit compatibility functions",
+        legacy_path="emb/compression/evalkit/posterior_compression.py",
+        replacement_api="meso_uq.workflows.legacy + emb.compression.evalkit compatibility functions",
         purpose="compression posterior evaluation and surrogate runtime setup",
     ),
     LegacyWorkflowSurface(
         family="indentation",
-        legacy_path="indentation/evalkit/posterior_indentation.py",
-        replacement_api="meso_uq.workflows.legacy + indentation.evalkit compatibility functions",
+        legacy_path="emb/indentation/evalkit/posterior_indentation.py",
+        replacement_api="meso_uq.workflows.legacy + emb.indentation.evalkit compatibility functions",
         purpose="indentation posterior evaluation and surrogate runtime setup",
     ),
     LegacyWorkflowSurface(
@@ -271,16 +271,16 @@ def resolve_legacy_surrogate_trained_dir(
         raise ValueError(
             f"Legacy EMB surrogate directories are registered only for compression and indentation, got '{selected.value}'."
         )
-    return Path(project_root) / selected.value / "surrogate" / "diameters" / f"{diameter_um}um" / "trained"
+    return Path(project_root) / "emb" / selected.value / "surrogate" / "diameters" / f"{diameter_um}um" / "trained"
 
 
 def legacy_evalkit_import_paths(project_root: str | Path) -> tuple[Path, ...]:
     root = Path(project_root)
     return (
-        root / "compression",
-        root / "compression" / "evalkit",
-        root / "indentation",
-        root / "indentation" / "evalkit",
+        root / "emb" / "compression",
+        root / "emb" / "compression" / "evalkit",
+        root / "emb" / "indentation",
+        root / "emb" / "indentation" / "evalkit",
     )
 
 

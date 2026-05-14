@@ -206,9 +206,9 @@ def load_scaling(modality: str, diameter: str) -> tuple[float, float]:
         if candidates:
             path = candidates[0]
         else:
-            path = REPO_ROOT / "compression" / "src" / "parameters-default.emb.yaml"
+            path = REPO_ROOT / "emb" / "compression" / "src" / "parameters-default.emb.yaml"
     else:
-        path = REPO_ROOT / "indentation" / "src" / "parameters-default.emb.yaml"
+        path = REPO_ROOT / "emb" / "indentation" / "src" / "parameters-default.emb.yaml"
 
     with path.open("rb") as f:
         p = yaml.load(f, Loader=yaml.CLoader)
@@ -261,7 +261,14 @@ def indentation_initial_diameter_dpd(diameter: str) -> float:
     if samples_path.exists():
         samples = np.loadtxt(samples_path, ndmin=2)
         return 2.0 * float(np.median(samples[:, 7]))
-    param_path = REPO_ROOT / "indentation" / "src" / "parameter" / "parameters-default00001.yaml"
+    param_path = (
+        REPO_ROOT
+        / "emb"
+        / "indentation"
+        / "src"
+        / "parameter"
+        / "parameters-default00001.yaml"
+    )
     with param_path.open("rb") as f:
         p = yaml.load(f, Loader=yaml.CLoader)
     return 2.0 * float(p["radp"])

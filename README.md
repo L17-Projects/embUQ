@@ -165,7 +165,7 @@ python scripts/platforms/vega/run_validation_matrix.py \
 The default GitHub CI lane now includes two real canaries:
 
 - one CPU workflow lane for `compression:reduced-model:validation`, driven by `reduced/configs/ci/ci_canary_config_compression.yaml`
-- one public surrogate retraining smoke, driven by `compression/surrogate/ci/retraining_smoke.yaml`
+- one public surrogate retraining smoke, driven by `emb/compression/surrogate/ci/retraining_smoke.yaml`
 
 These are intentionally much smaller than the Vega validation matrix, but they still run the public entrypoints and assert real artifacts.
 
@@ -258,8 +258,9 @@ MesoUQ/
 ├── examples/
 ├── scripts/
 ├── extern/korali/
-├── compression/
-├── indentation/
+├── emb/
+│   ├── compression/
+│   └── indentation/
 ├── inference/
 ├── propagation/
 ├── reduced/

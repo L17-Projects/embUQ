@@ -5,9 +5,9 @@ emb_diameters:
   - 2.9
 
 experiment: compression
-data_dir: compression/evalkit/data
+data_dir: emb/compression/evalkit/data
 data_prefix: compression_data_
-surrogate_dir: compression/surrogate/diameters
+surrogate_dir: emb/compression/surrogate/diameters
 
 frac_diam: 0.2
 use_surrogate: true

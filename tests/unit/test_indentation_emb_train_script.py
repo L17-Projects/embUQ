@@ -68,7 +68,7 @@ def test_indentation_emb_train_uses_shared_cleaned_loader(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     module = _load_module(
-        repo_root / "indentation" / "surrogate" / "scripts" / "emb_train.py",
+        repo_root / "emb" / "indentation" / "surrogate" / "scripts" / "emb_train.py",
         "indentation_emb_train_reader_test",
     )
 

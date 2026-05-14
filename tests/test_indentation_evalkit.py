@@ -7,9 +7,9 @@ import numpy as np
 import pytest
 import yaml
 
-from indentation.evalkit import convert_reference_data
-from indentation.evalkit import prepare_env
-from indentation.evalkit import tools
+from emb.indentation.evalkit import convert_reference_data
+from emb.indentation.evalkit import prepare_env
+from emb.indentation.evalkit import tools
 
 
 def _write_params(path: Path) -> None:
@@ -129,10 +129,10 @@ def test_prepare_env_delegates_and_filters(monkeypatch: pytest.MonkeyPatch):
         3.2,
         data_dir="/tmp/indentation",
         data_prefix="prefix_",
-        data_file="/tmp/indentation/custom.dat",
+        data_file="/tmp/emb/indentation/custom.dat",
     )
 
-    assert calls["prepare"] == (3.2, "/tmp/indentation", "prefix_", "/tmp/indentation/custom.dat")
+    assert calls["prepare"] == (3.2, "/tmp/indentation", "prefix_", "/tmp/emb/indentation/custom.dat")
     assert calls["filter"] == (3.2, Path("/tmp/indentation/prefix_3.2um.dat"))
 
 

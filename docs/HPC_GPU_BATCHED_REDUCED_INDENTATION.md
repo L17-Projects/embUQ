@@ -136,7 +136,7 @@ The strict GPU partition rule is:
 By default, the reduced-model indentation workflow lands under:
 
 ```text
-_runs/vega/runs/<run-tag>/indentation/reduced-model/production/
+_runs/vega/runs/<run-tag>/emb/indentation/reduced-model/production/
 ```
 
 That tree then contains:

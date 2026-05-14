@@ -59,7 +59,7 @@ def test_dataset_split_metadata_validates_fraction() -> None:
 
 
 def test_run_dnn_training_cli_uses_shared_compression_contract(tmp_path: Path) -> None:
-    data = tmp_path / "compression.dat"
+    data = tmp_path / "emb.compression.dat"
     out = tmp_path / "out.pkl"
     report = tmp_path / "report.json"
     data.write_text("placeholder", encoding="utf-8")
@@ -89,7 +89,7 @@ def test_run_dnn_training_cli_uses_shared_compression_contract(tmp_path: Path) -
 
 
 def test_run_bnn_training_cli_preserves_indentation_loader_knobs(tmp_path: Path) -> None:
-    data = tmp_path / "indentation.dat"
+    data = tmp_path / "emb.indentation.dat"
     dnn = tmp_path / "dnn.pkl"
     out = tmp_path / "out.pt"
     data.write_text("placeholder", encoding="utf-8")

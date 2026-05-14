@@ -148,8 +148,8 @@ def _init_directory_policy(map_mirheo_dir: Path) -> dict[str, object]:
         "preexisting_init_dirs_required": False,
         "scratch_root_base": str(scratch_root_base),
         "scratch_root_pattern": str(scratch_root_base / "<dataset_name>"),
-        "compression_template": "compression/src regenerated through generate_sim/write_parameters",
-        "indentation_template": "indentation/src copied into the scratch root",
+        "compression_template": "emb/compression/src regenerated through generate_sim/write_parameters",
+        "indentation_template": "emb/indentation/src copied into the scratch root",
         "missing_template_behavior": (
             "evaluator fails explicitly; MAP Mirheo smoke does not skip missing init inputs"
         ),

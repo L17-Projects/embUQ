@@ -18,8 +18,8 @@ def test_migration_inventory_records_reproducible_artifact_snapshot() -> None:
         "## Artifact inventory snapshot (2026-05-13)",
         "| Path or glob | Tracked status | Ignored status | Approximate size and count | Extension or class examples | Suspected artifact class | Proposed disposition |",
         "`runtime/` | Untracked | Not ignored in this snapshot",
-        "`compression/surrogate/diameters/*/data`",
-        "`indentation/surrogate/diameters/*/data`",
+        "`emb/compression/surrogate/diameters/*/data`",
+        "`emb/indentation/surrogate/diameters/*/data`",
         "## Decisions still required",
     )
     for fragment in required_fragments:

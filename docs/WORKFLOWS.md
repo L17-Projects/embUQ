@@ -49,14 +49,14 @@ These validation configs are execution-profile choices for smoke and acceptance 
 ## 4. Surrogate retraining and evaluation
 
 Compression:
-- evaluator: `compression/surrogate/evaluate.py`
-- lightweight training entrypoint: `compression/surrogate/scripts/emb_train.py`
-- paper-facing 12-architecture sweep + BEST promotion: `compression/surrogate/scripts/train_multi_arch.py`
+- evaluator: `emb/compression/surrogate/evaluate.py`
+- lightweight training entrypoint: `emb/compression/surrogate/scripts/emb_train.py`
+- paper-facing 12-architecture sweep + BEST promotion: `emb/compression/surrogate/scripts/train_multi_arch.py`
 
 Indentation:
-- evaluator: `indentation/surrogate/evaluate.py`
-- lightweight training entrypoint: `indentation/surrogate/scripts/emb_train.py`
-- paper-facing 12-architecture sweep + BEST promotion: `indentation/surrogate/scripts/train_multi_arch.py`
+- evaluator: `emb/indentation/surrogate/evaluate.py`
+- lightweight training entrypoint: `emb/indentation/surrogate/scripts/emb_train.py`
+- paper-facing 12-architecture sweep + BEST promotion: `emb/indentation/surrogate/scripts/train_multi_arch.py`
 
 Vega DNN rebuild matrix:
 - `scripts/platforms/vega/run_dnn_surrogate_training.py`
@@ -77,10 +77,10 @@ Shared training logic is implemented once in `src/meso_uq/surrogate/`.
 ## 5. Sensitivity and lightweight design generation
 
 Compression Sobol sensitivity:
-- `compression/surrogate/sensitivity/scripts/run_sobol_vs_disp.py`
+- `emb/compression/surrogate/sensitivity/scripts/run_sobol_vs_disp.py`
 
 Indentation Sobol sensitivity:
-- `indentation/surrogate/sensitivity/scripts/run_sobol_vs_force.py`
+- `emb/indentation/surrogate/sensitivity/scripts/run_sobol_vs_force.py`
 
 Lightweight design generation:
 - `sampling/run_LHS.py`
@@ -184,8 +184,8 @@ Scratch/runtime rule:
 - do not reuse repo-root `_init_*_map` scratch directories across concurrent full/reduced lanes
 - the orchestration path now passes a unique scratch root per dataset under `map_mirheo/_scratch/`
 - operators do not pre-create MAP smoke-test init directories; `run_map_mirheo.py` passes `--scratch-root <lane output>/map_mirheo/_scratch/<dataset_name>` to the evaluator
-- compression smoke init directories are regenerated from `compression/src` through `generate_sim` and `write_parameters`
-- indentation smoke init directories are copied from `indentation/src`, then their `parameter/parameters-default*.yaml` files are rewritten for the selected diameter and retry settings
+- compression smoke init directories are regenerated from `emb/compression/src` through `generate_sim` and `write_parameters`
+- indentation smoke init directories are copied from `emb/indentation/src`, then their `parameter/parameters-default*.yaml` files are rewritten for the selected diameter and retry settings
 - missing Phase 3b MAP manifests fail before Slurm submission; missing init templates or Mirheo bootstrap inputs fail the MAP Mirheo lane explicitly and are not skip conditions
 
 Production walltime rule:

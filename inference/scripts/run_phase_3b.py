@@ -12,18 +12,18 @@ import yaml
 from mpi4py import MPI
 
 project_root = os.path.join(os.path.dirname(__file__), "..", "..")
-sys.path.insert(0, os.path.join(project_root, "compression"))
-sys.path.insert(0, os.path.join(project_root, "compression", "evalkit"))
-sys.path.insert(0, os.path.join(project_root, "indentation"))
-sys.path.insert(0, os.path.join(project_root, "indentation", "evalkit"))
+sys.path.insert(0, os.path.join(project_root, "emb", "compression"))
+sys.path.insert(0, os.path.join(project_root, "emb", "compression", "evalkit"))
+sys.path.insert(0, os.path.join(project_root, "emb", "indentation"))
+sys.path.insert(0, os.path.join(project_root, "emb", "indentation", "evalkit"))
 
-from compression.evalkit.posterior_compression import (
+from emb.compression.evalkit.posterior_compression import (
     compute_compression_surrogate,
     compute_compression_surrogate_batch,
     preload_compression_surrogate,
 )
-from compression.evalkit.tools import datedPrint
-from indentation.evalkit.posterior_indentation import (
+from emb.compression.evalkit.tools import datedPrint
+from emb.indentation.evalkit.posterior_indentation import (
     compute_indentation_surrogate,
     compute_indentation_surrogate_batch,
     preload_indentation_surrogate,

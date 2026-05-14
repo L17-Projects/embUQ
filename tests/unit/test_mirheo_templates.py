@@ -9,11 +9,11 @@ import yaml
 from meso_uq.mirheo.radp import RADP_LOOKUP, get_radp, infer_radp_for_diameter
 
 _REPO = Path(__file__).resolve().parents[2]
-_IND_SRC = _REPO / "indentation" / "src"
+_IND_SRC = _REPO / "emb" / "indentation" / "src"
 
 
 # ---------------------------------------------------------------------------
-# EMB baseline validation (indentation/src/parameters-default.emb.yaml)
+# EMB baseline validation (emb/indentation/src/parameters-default.emb.yaml)
 # ---------------------------------------------------------------------------
 
 def _emb() -> dict:

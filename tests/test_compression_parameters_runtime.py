@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import yaml
 
-from compression.src import parameters
+from emb.compression.src import parameters
 
 
 def _write_runtime_config(root: Path) -> None:

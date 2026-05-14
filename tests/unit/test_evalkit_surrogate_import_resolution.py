@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import types
 
-from compression.evalkit import posterior_compression
-from indentation.evalkit import posterior_indentation
+from emb.compression.evalkit import posterior_compression
+from emb.indentation.evalkit import posterior_indentation
 
 
 def _fake_module(tag: str):
@@ -22,22 +22,22 @@ def _fake_module(tag: str):
 def test_evalkits_resolve_modality_specific_surrogate_modules(monkeypatch):
     monkeypatch.setitem(
         __import__("sys").modules,
-        "compression.surrogate.evaluate",
+        "emb.compression.surrogate.evaluate",
         _fake_module("compression-dnn"),
     )
     monkeypatch.setitem(
         __import__("sys").modules,
-        "compression.surrogate.evaluate_bnn",
+        "emb.compression.surrogate.evaluate_bnn",
         _fake_module("compression-bnn"),
     )
     monkeypatch.setitem(
         __import__("sys").modules,
-        "indentation.surrogate.evaluate",
+        "emb.indentation.surrogate.evaluate",
         _fake_module("indentation-dnn"),
     )
     monkeypatch.setitem(
         __import__("sys").modules,
-        "indentation.surrogate.evaluate_bnn",
+        "emb.indentation.surrogate.evaluate_bnn",
         _fake_module("indentation-bnn"),
     )
 

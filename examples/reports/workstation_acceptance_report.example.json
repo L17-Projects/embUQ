@@ -25,7 +25,7 @@
       "name": "surrogate_retraining",
       "status": "passed",
       "commands": [
-        "python scripts/qa/ci/run_retraining_canary.py --config compression/surrogate/ci/retraining_smoke.yaml --output-root /tmp/mesouq_workstation_acceptance/retraining"
+        "python scripts/qa/ci/run_retraining_canary.py --config emb/compression/surrogate/ci/retraining_smoke.yaml --output-root /tmp/mesouq_workstation_acceptance/retraining"
       ],
       "artifacts": {
         "output_root": "/tmp/mesouq_workstation_acceptance/retraining"

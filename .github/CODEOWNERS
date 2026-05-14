@@ -7,8 +7,8 @@
 /scripts/ @BrieucB
 /src/ @BrieucB
 /tests/ @BrieucB
-/compression/ @BrieucB
-/indentation/ @BrieucB
+/emb/compression/ @BrieucB
+/emb/indentation/ @BrieucB
 /inference/ @BrieucB
 /propagation/ @BrieucB
 /reduced/ @BrieucB

@@ -47,7 +47,7 @@ def _load_compression_model_select_module():
     repo_root = Path(__file__).resolve().parents[2]
     key = "mesouq_test_compression_emb_model_select"
     sys.modules.pop(key, None)
-    module_path = repo_root / "compression" / "surrogate" / "scripts" / "emb_model_select.py"
+    module_path = repo_root / "emb" / "compression" / "surrogate" / "scripts" / "emb_model_select.py"
     spec = importlib.util.spec_from_file_location(key, module_path)
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader

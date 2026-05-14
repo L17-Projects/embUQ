@@ -29,12 +29,12 @@ omit =
     */artifacts/*
     */archive/*
     */archives/*
-    compression/evalkit/data/*
-    indentation/evalkit/data/*
-    compression/surrogate/diameters/*/trained/*
-    indentation/surrogate/diameters/*/trained/*
-    compression/src/equil.py
-    indentation/src/equil.py
+    emb/compression/evalkit/data/*
+    emb/indentation/evalkit/data/*
+    emb/compression/surrogate/diameters/*/trained/*
+    emb/indentation/surrogate/diameters/*/trained/*
+    emb/compression/src/equil.py
+    emb/indentation/src/equil.py
     propagation/scripts/evaluate_map_mirheo_optimized.py
     propagation/scripts/evaluate_map_mirheo_optimized_indentation.py
     scripts/postprocess/generate_map_overlay_figure.py

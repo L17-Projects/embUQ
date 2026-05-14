@@ -22,7 +22,7 @@ def test_equil_skipped_without_mirheo():
         import importlib.util
         spec = importlib.util.spec_from_file_location(
             "_compression_equil_test",
-            str(__import__("pathlib").Path(__file__).resolve().parents[1] / "compression" / "src" / "equil.py"),
+            str(__import__("pathlib").Path(__file__).resolve().parents[1] / "emb" / "compression" / "src" / "equil.py"),
         )
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)

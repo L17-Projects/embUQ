@@ -3,8 +3,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from compression.evalkit import posterior_compression as posterior_compression
-from indentation.evalkit import posterior_indentation as posterior_indentation
+from emb.compression.evalkit import posterior_compression as posterior_compression
+from emb.indentation.evalkit import posterior_indentation as posterior_indentation
 
 
 class _CompressionBnnStub:

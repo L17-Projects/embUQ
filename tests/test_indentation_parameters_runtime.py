@@ -19,7 +19,7 @@ def _load_module(path: Path, key: str):
 def test_write_parameters_emb_runtime_outputs(tmp_path, monkeypatch) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "indentation" / "src" / "parameters.py",
+        repo_root / "emb" / "indentation" / "src" / "parameters.py",
         "mesouq_indentation_parameters",
     )
 
@@ -28,7 +28,7 @@ def test_write_parameters_emb_runtime_outputs(tmp_path, monkeypatch) -> None:
     (simu_dir / "microbubble").mkdir(parents=True)
     (simu_dir / "mesh").mkdir(parents=True)
 
-    defaults_path = repo_root / "indentation" / "src" / "parameters-default.emb.yaml"
+    defaults_path = repo_root / "emb" / "indentation" / "src" / "parameters-default.emb.yaml"
     defaults = yaml.safe_load(defaults_path.read_text(encoding="utf-8"))
     defaults["numObjects"] = 2
     (simu_dir / "parameter" / "parameters-default00001.yaml").write_text(

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from compression.src import generate
+from emb.compression.src import generate
 
 
 def _write_config(root: Path) -> None:

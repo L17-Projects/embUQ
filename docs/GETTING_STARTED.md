@@ -54,8 +54,8 @@ The most important top-level directories are:
 - `src/meso_uq/` shared package code
 - `inference/` full hierarchical workflow entrypoints and configs
 - `reduced/` reduced-model configs and wrappers
-- `compression/` compression-specific surrogate/evalkit surface
-- `indentation/` indentation-specific surrogate/evalkit surface
+- `emb/compression/` compression-specific surrogate/evalkit surface
+- `emb/indentation/` indentation-specific surrogate/evalkit surface
 - `sampling/` lightweight design-of-experiments helpers
 - `propagation/` public plotting/postprocessing entrypoints
 - `extern/korali/` focused vendored backend patch surface
@@ -72,13 +72,13 @@ python scripts/shared/config/list_experiment_datasets.py --config inference/conf
 Train a compression surrogate from a wide table:
 
 ```bash
-python compression/surrogate/scripts/emb_train.py path/to/training_table.dat --out trained/microbubble_force_BEST.pkl
+python emb/compression/surrogate/scripts/emb_train.py path/to/training_table.dat --out trained/microbubble_force_BEST.pkl
 ```
 
 Train an indentation surrogate:
 
 ```bash
-python indentation/surrogate/scripts/emb_train.py path/to/training_table.dat --out trained/microbubble_disp_BEST.pkl
+python emb/indentation/surrogate/scripts/emb_train.py path/to/training_table.dat --out trained/microbubble_disp_BEST.pkl
 ```
 
 Generate a lightweight Latin-hypercube design:

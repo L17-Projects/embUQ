@@ -113,7 +113,7 @@ def test_read_wide_curve_table_drops_inf_and_nan(tmp_path: Path) -> None:
 
 
 def test_read_indentation_table_tracks_cleaned_source_curves(tmp_path: Path) -> None:
-    path = tmp_path / "indentation.dat"
+    path = tmp_path / "emb.indentation.dat"
     rows = [
         [1.0, 0.0, 2.0, 0.1, 0.2, 0.3, 0.4, 1.0, 2.0, 1.8, 1.6, 0.0, 0.5, 1.0],
         [1.5, 0.0, 2.5, 0.1, 0.2, 0.3, 0.4, 1.0, 0.2, 0.8, 2.0, 0.1, 0.2, 0.3],
@@ -131,7 +131,7 @@ def test_read_indentation_table_tracks_cleaned_source_curves(tmp_path: Path) -> 
 
 
 def test_read_compression_training_table_applies_uqdpd_cleaning(tmp_path: Path) -> None:
-    path = tmp_path / "compression.dat"
+    path = tmp_path / "emb.compression.dat"
     # 8 header columns + 5 disp + 5 force.
     # Cleaning expectations:
     # - disp<=0 removed

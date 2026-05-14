@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import yaml
 
-from compression.evalkit import tools
+from emb.compression.evalkit import tools
 
 
 def _write_compression_params(path: Path) -> None:
@@ -41,7 +41,7 @@ def test_public_compression_reference_series_are_well_formed():
 
 
 def test_generate_compression_data_skips_initial_rows(tmp_path: Path):
-    csv_path = tmp_path / "compression.csv"
+    csv_path = tmp_path / "emb.compression.csv"
     csv_path.write_text(
         "# header 1\n# header 2\n# header 3\n"
         "0.1,1.0\n0.2,2.0\n0.3,3.0\n0.4,4.0\n0.5,5.0\n0.6,6.0\n0.7,7.0\n",
@@ -50,7 +50,7 @@ def test_generate_compression_data_skips_initial_rows(tmp_path: Path):
 
     tools.generateCompressionData(str(csv_path), str(tmp_path))
 
-    interpolated = np.loadtxt(csv_path.with_name("compression_interp.dat"), skiprows=1, ndmin=2)
+    interpolated = np.loadtxt(csv_path.with_name("emb.compression_interp.dat"), skiprows=1, ndmin=2)
     assert interpolated.shape == (4, 2)
     assert np.allclose(interpolated[:, 0], [0.4, 0.5, 0.6, 0.7])
     assert np.allclose(interpolated[:, 1], [4.0, 5.0, 6.0, 7.0])
@@ -109,8 +109,8 @@ def test_prepare_compression_rejects_missing_explicit_csv(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     project_root = tmp_path / "project"
-    source_dir = project_root / "compression" / "src"
-    data_dir = project_root / "compression" / "evalkit" / "data"
+    source_dir = project_root / "emb" / "compression" / "src"
+    data_dir = project_root / "emb" / "compression" / "evalkit" / "data"
     source_dir.mkdir(parents=True)
     data_dir.mkdir(parents=True)
     (data_dir / "data_1.csv").write_text(
@@ -134,8 +134,8 @@ def test_find_project_root_falls_back_to_module_location(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     project_root = tmp_path / "project"
-    source_dir = project_root / "compression" / "src"
-    evalkit_dir = project_root / "compression" / "evalkit"
+    source_dir = project_root / "emb" / "compression" / "src"
+    evalkit_dir = project_root / "emb" / "compression" / "evalkit"
     source_dir.mkdir(parents=True)
     evalkit_dir.mkdir(parents=True)
     outside = tmp_path / "outside"
@@ -172,7 +172,7 @@ def test_resolve_compression_paths_uses_fallback_raw_data_only_for_generated_dpd
     tmp_path: Path,
 ):
     project_root = tmp_path / "project"
-    fallback_root = project_root / "compression" / "evalkit" / "data"
+    fallback_root = project_root / "emb" / "compression" / "evalkit" / "data"
     fallback_root.mkdir(parents=True)
     fallback_csv = fallback_root / "data_1.csv"
     fallback_csv.write_text("# h1\n# h2\n# h3\n0.1,1.0\n", encoding="utf-8")
@@ -197,7 +197,7 @@ def test_resolve_compression_paths_uses_fallback_raw_data_only_for_generated_dpd
 
 def test_resolve_compression_paths_raises_when_raw_data_is_missing(tmp_path: Path):
     project_root = tmp_path / "project"
-    (project_root / "compression" / "evalkit" / "data").mkdir(parents=True)
+    (project_root / "emb" / "compression" / "evalkit" / "data").mkdir(parents=True)
     external_root = tmp_path / "lane-data"
     external_root.mkdir()
 
@@ -245,8 +245,8 @@ def test_prepare_compression_rejects_empty_parameter_template(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     project_root = tmp_path / "project"
-    source_dir = project_root / "compression" / "src"
-    data_dir = project_root / "compression" / "evalkit" / "data"
+    source_dir = project_root / "emb" / "compression" / "src"
+    data_dir = project_root / "emb" / "compression" / "evalkit" / "data"
     source_dir.mkdir(parents=True)
     data_dir.mkdir(parents=True)
     (data_dir / "data_1.csv").write_text(
@@ -278,8 +278,8 @@ def test_prepare_compression_rejects_empty_parameter_template(
 
 def test_prepare_compression_with_mocked_pipeline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     project_root = tmp_path / "project"
-    source_dir = project_root / "compression" / "src"
-    data_dir = project_root / "compression" / "evalkit" / "data"
+    source_dir = project_root / "emb" / "compression" / "src"
+    data_dir = project_root / "emb" / "compression" / "evalkit" / "data"
     source_dir.mkdir(parents=True)
     data_dir.mkdir(parents=True)
     (data_dir / "data_1.csv").write_text(
@@ -329,8 +329,8 @@ def test_prepare_compression_generates_missing_reference_data_in_target_dir(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     project_root = tmp_path / "project"
-    source_dir = project_root / "compression" / "src"
-    data_dir = project_root / "compression" / "evalkit" / "data"
+    source_dir = project_root / "emb" / "compression" / "src"
+    data_dir = project_root / "emb" / "compression" / "evalkit" / "data"
     source_dir.mkdir(parents=True)
     data_dir.mkdir(parents=True)
     raw_csv = data_dir / "data_1.csv"

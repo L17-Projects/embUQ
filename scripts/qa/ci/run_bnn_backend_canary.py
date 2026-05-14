@@ -46,12 +46,12 @@ REQUIRED_SNIPPETS = [
         "phase3b propagation preload must honor configured surrogate backend",
     ),
     (
-        "compression/evalkit/posterior_compression.py",
+        "emb/compression/evalkit/posterior_compression.py",
         "def compute_compression_surrogate(\n    sample: Dict[str, Any], displ: List[float], diameter_um: float, device: str = \"cpu\"\n)",
         "compression single-sample surrogate path must accept explicit device",
     ),
     (
-        "indentation/evalkit/posterior_indentation.py",
+        "emb/indentation/evalkit/posterior_indentation.py",
         "def compute_indentation_surrogate(\n    sample: Dict[str, Any], forces: List[float], diameter_um: float, device: str = \"cpu\"\n)",
         "indentation single-sample surrogate path must accept explicit device",
     ),

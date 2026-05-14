@@ -20,7 +20,7 @@ Use this when you want to run a packaged reduced/full validation sequence and co
 
 ### 2. Richer indentation multi-architecture trainer
 
-`indentation/surrogate/scripts/train_multi_arch.py`
+`emb/indentation/surrogate/scripts/train_multi_arch.py`
 
 Use this when you want a more diagnostic architecture-comparison loop than the lightweight public model-selection wrapper. This script keeps:
 

@@ -18,7 +18,7 @@ It does **not** currently claim to expose every architecture-search utility that
 Compression:
 
 ```bash
-python compression/surrogate/scripts/emb_model_select.py TRAINING_TABLE.dat \
+python emb/compression/surrogate/scripts/emb_model_select.py TRAINING_TABLE.dat \
   --output-dir trained/model_selection
 ```
 
@@ -31,7 +31,7 @@ You can override this with `--architectures WIDTHxDEPTH,...`.
 Indentation:
 
 ```bash
-python indentation/surrogate/scripts/emb_model_select.py TRAINING_TABLE.dat \
+python emb/indentation/surrogate/scripts/emb_model_select.py TRAINING_TABLE.dat \
   --output-dir trained/model_selection \
   --widths 32,64,128 \
   --depths 2,3,4
@@ -40,8 +40,8 @@ python indentation/surrogate/scripts/emb_model_select.py TRAINING_TABLE.dat \
 Paper-facing full sweep + BEST promotion:
 
 ```bash
-python compression/surrogate/scripts/train_multi_arch.py --diameter 2.1
-python indentation/surrogate/scripts/train_multi_arch.py --diameter 3.2
+python emb/compression/surrogate/scripts/train_multi_arch.py --diameter 2.1
+python emb/indentation/surrogate/scripts/train_multi_arch.py --diameter 3.2
 ```
 
 ## Outputs

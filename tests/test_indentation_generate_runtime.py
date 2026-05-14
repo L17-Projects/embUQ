@@ -17,7 +17,7 @@ def _load_module(path: Path, key: str):
 def test_generate_sim_parallel_writes_commands_and_sbatch(tmp_path, monkeypatch) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "indentation" / "src" / "generate.py",
+        repo_root / "emb" / "indentation" / "src" / "generate.py",
         "mesouq_indentation_generate_parallel",
     )
 
@@ -52,7 +52,7 @@ def test_generate_sim_parallel_writes_commands_and_sbatch(tmp_path, monkeypatch)
 def test_generate_sim_parameter_loop_writes_parameter_files(tmp_path, monkeypatch) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "indentation" / "src" / "generate.py",
+        repo_root / "emb" / "indentation" / "src" / "generate.py",
         "mesouq_indentation_generate_parameter_loop",
     )
 

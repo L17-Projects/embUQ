@@ -271,7 +271,7 @@ def test_workflow_matrix_writes_paper_release_manifest_with_assets_and_mapping(
             {
                 "figures/main/experimental_reference_curves.pdf": {
                     "source_lane": "compression:full-model:production",
-                    "source_artifacts": ["runs/compression/full-model/production/phase3b"],
+                    "source_artifacts": ["runs/emb/compression/full-model/production/phase3b"],
                 }
             }
         ),

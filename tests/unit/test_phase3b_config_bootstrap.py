@@ -19,26 +19,26 @@ def _install_phase3b_backend_stubs():
     mpi4py_module.MPI = types.SimpleNamespace(COMM_WORLD=_FakeComm())
     sys.modules.setdefault("mpi4py", mpi4py_module)
 
-    compression_module = types.ModuleType("compression.evalkit.posterior_compression")
+    compression_module = types.ModuleType("emb.compression.evalkit.posterior_compression")
     compression_module.compute_compression_surrogate = lambda *args, **kwargs: None
     compression_module.compute_compression_surrogate_batch = lambda *args, **kwargs: None
     compression_module.preload_compression_surrogate = lambda *args, **kwargs: None
-    sys.modules.setdefault("compression.evalkit.posterior_compression", compression_module)
+    sys.modules.setdefault("emb.compression.evalkit.posterior_compression", compression_module)
 
-    indentation_module = types.ModuleType("indentation.evalkit.posterior_indentation")
+    indentation_module = types.ModuleType("emb.indentation.evalkit.posterior_indentation")
     indentation_module.compute_indentation_surrogate = lambda *args, **kwargs: None
     indentation_module.compute_indentation_surrogate_batch = lambda *args, **kwargs: None
     indentation_module.preload_indentation_surrogate = lambda *args, **kwargs: None
-    sys.modules.setdefault("indentation.evalkit.posterior_indentation", indentation_module)
+    sys.modules.setdefault("emb.indentation.evalkit.posterior_indentation", indentation_module)
 
 
 def _load_phase3b_module():
     repo_root = Path(__file__).resolve().parents[2]
     sys.path.insert(0, str(repo_root))
-    sys.path.insert(0, str(repo_root / "compression"))
-    sys.path.insert(0, str(repo_root / "compression" / "evalkit"))
-    sys.path.insert(0, str(repo_root / "indentation"))
-    sys.path.insert(0, str(repo_root / "indentation" / "evalkit"))
+    sys.path.insert(0, str(repo_root / "emb" / "compression"))
+    sys.path.insert(0, str(repo_root / "emb" / "compression" / "evalkit"))
+    sys.path.insert(0, str(repo_root / "emb" / "indentation"))
+    sys.path.insert(0, str(repo_root / "emb" / "indentation" / "evalkit"))
     _install_phase3b_backend_stubs()
     module_path = repo_root / "inference" / "scripts" / "run_phase_3b.py"
     spec = importlib.util.spec_from_file_location("mesouq_test_run_phase3b", module_path)

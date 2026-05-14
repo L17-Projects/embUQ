@@ -224,7 +224,7 @@ def test_read_indentation_table_and_compression_table(tmp_path: Path) -> None:
     )
     assert len(parsed_no_rupture_filter) > len(parsed_with_rupture_filter)
 
-    compression_path = tmp_path / "compression.dat"
+    compression_path = tmp_path / "emb.compression.dat"
     compression_rows = [
         [1.0, 0.0, 2.0, 0.1, 0.2, 0.3, 0.4, 0.0, 0.0, 0.5, 1.0, 60.0, 80.0, 100.0],
     ]

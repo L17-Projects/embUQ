@@ -184,7 +184,7 @@ def _length_force_factors(experiment: str) -> tuple[float, float]:
 
 def _load_reference_curve(spec: DiameterSpec) -> tuple[np.ndarray, np.ndarray]:
     prefix = "compression_data" if spec.experiment == "compression" else "indentation_data"
-    path = REPO_ROOT / spec.experiment / "evalkit" / "data" / f"{prefix}_{spec.diameter}um.dat"
+    path = REPO_ROOT / "emb" / spec.experiment / "evalkit" / "data" / f"{prefix}_{spec.diameter}um.dat"
     data = np.loadtxt(path, skiprows=1)
     length_factor, force_factor = _length_force_factors(spec.experiment)
     return convert_to_physical(spec.experiment, data[:, 0], data[:, 1], length_factor, force_factor)

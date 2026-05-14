@@ -25,13 +25,13 @@ def test_emb_generation_workflow_contracts_cover_compression_and_indentation() -
 
     assert set(workflows) == {Modality.COMPRESSION, Modality.INDENTATION}
     assert workflows[Modality.COMPRESSION].family is AgentFamily.EMB
-    assert workflows[Modality.COMPRESSION].legacy_root == "compression"
-    assert workflows[Modality.COMPRESSION].generation_script == "compression/src/generate.py"
-    assert workflows[Modality.COMPRESSION].parameters_script == "compression/src/parameters.py"
+    assert workflows[Modality.COMPRESSION].legacy_root == "emb/compression"
+    assert workflows[Modality.COMPRESSION].generation_script == "emb/compression/src/generate.py"
+    assert workflows[Modality.COMPRESSION].parameters_script == "emb/compression/src/parameters.py"
     assert workflows[Modality.COMPRESSION].indentation_mass_multiplier == pytest.approx(1.0)
-    assert workflows[Modality.INDENTATION].legacy_root == "indentation"
-    assert workflows[Modality.INDENTATION].generation_script == "indentation/src/generate.py"
-    assert workflows[Modality.INDENTATION].parameters_script == "indentation/src/parameters.py"
+    assert workflows[Modality.INDENTATION].legacy_root == "emb/indentation"
+    assert workflows[Modality.INDENTATION].generation_script == "emb/indentation/src/generate.py"
+    assert workflows[Modality.INDENTATION].parameters_script == "emb/indentation/src/parameters.py"
     assert workflows[Modality.INDENTATION].indentation_mass_multiplier == pytest.approx(5.0)
 
     parameter_files = workflows[Modality.COMPRESSION].parameter_files
@@ -52,7 +52,7 @@ def test_emb_config_resolution_preserves_cwd_and_legacy_script_fallbacks(tmp_pat
     )
 
     repo_root = tmp_path / "repo"
-    anchor = repo_root / "compression" / "src" / "generate.py"
+    anchor = repo_root / "emb" / "compression" / "src" / "generate.py"
     anchor.parent.mkdir(parents=True)
     file_config = repo_root / "inference" / "configs" / "production" / "inference_config_compression.yaml"
     file_config.parent.mkdir(parents=True)
@@ -71,9 +71,12 @@ def test_emb_config_resolution_preserves_cwd_and_legacy_script_fallbacks(tmp_pat
     candidate_paths = emb_config_candidate_paths(
         Modality.INDENTATION,
         purpose="generation",
-        anchor_file=repo_root / "indentation" / "src" / "generate.py",
+        anchor_file=repo_root / "emb" / "indentation" / "src" / "generate.py",
         cwd=cwd_root,
     )
+    assert (
+        cwd_root / "../../../inference/configs/production/inference_config_indentation.yaml"
+    ) in candidate_paths
     assert cwd_root / "inference/configs/production/inference_config_indentation.yaml" in candidate_paths
     assert repo_root / "inference/configs/production/inference_config_indentation.yaml" in candidate_paths
 

@@ -43,7 +43,7 @@ This directory hosts the public documentation set for the `v0.1.0` release line.
 - `PAPER_REPRODUCTION_ARTIFACT_POLICY.md` for the paper source versus external artifact boundary
 - `TEST_STRUCTURE_POLICY.md` for the unit, integration, operational, optional-runtime, and GPU/HPC test layout
 - `PLATFORM_POLICY.md` for Karolina, Vega, workstation, and generic Slurm platform config policy
-- `EMB_WORKFLOW_EXTRACTION_PLAN.md` for the compression/indentation workflow extraction inventory and compatibility plan
+- `EMB_WORKFLOW_EXTRACTION_PLAN.md` for the EMB compression/indentation workflow extraction inventory and compatibility plan
 - `MES-59_MERGE_READINESS_CHECKLIST.md` for the delayed/thread-aware connector review sweep required before merge readiness
 - `MES-59_74_76_79_CLOSEOUT_EVIDENCE.md` for the MES-59/MES-74/MES-76/MES-79 closeout decisions and validation evidence
 - `GV_EXTENSION_CLOSEOUT.md` for provisional MES-78 release hardening scope and GV rollout gate
@@ -58,7 +58,7 @@ This directory hosts the public documentation set for the `v0.1.0` release line.
 - `MES-59_74_76_79_CLOSEOUT_EVIDENCE.md` for prior closeout evidence and decisions
 - `MES-125_KAROLINA_ACCEPTANCE_CLOSEOUT.md` for MES-125 closeout evidence skeleton
 - `GV_EXTENSION_CLOSEOUT.md` for provisional MES-78 closeout scope and GV rollout gate
-- `EMB_WORKFLOW_EXTRACTION_PLAN.md` for extraction planning under the compression/indentation slice
+- `EMB_WORKFLOW_EXTRACTION_PLAN.md` for extraction planning under the EMB compression/indentation slice
 
 Also see legacy release/operational notes:
 

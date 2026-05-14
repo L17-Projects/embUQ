@@ -95,31 +95,31 @@ def phase3b_runtime(monkeypatch: pytest.MonkeyPatch):
     sys.modules.pop(key, None)
     monkeypatch.syspath_prepend(str(repo_root / "src"))
     monkeypatch.syspath_prepend(str(repo_root))
-    monkeypatch.syspath_prepend(str(repo_root / "compression"))
-    monkeypatch.syspath_prepend(str(repo_root / "compression" / "evalkit"))
-    monkeypatch.syspath_prepend(str(repo_root / "indentation"))
-    monkeypatch.syspath_prepend(str(repo_root / "indentation" / "evalkit"))
+    monkeypatch.syspath_prepend(str(repo_root / "emb" / "compression"))
+    monkeypatch.syspath_prepend(str(repo_root / "emb" / "compression" / "evalkit"))
+    monkeypatch.syspath_prepend(str(repo_root / "emb" / "indentation"))
+    monkeypatch.syspath_prepend(str(repo_root / "emb" / "indentation" / "evalkit"))
 
     fake_korali = _FakeKoraliModule()
     fake_comm = _FakeComm()
     monkeypatch.setitem(sys.modules, "korali", fake_korali)
     monkeypatch.setitem(sys.modules, "mpi4py", _FakeMPI4PY(fake_comm))
 
-    comp_mod = types.ModuleType("compression.evalkit.posterior_compression")
+    comp_mod = types.ModuleType("emb.compression.evalkit.posterior_compression")
     comp_mod.compute_compression_surrogate = lambda *args, **kwargs: None
     comp_mod.compute_compression_surrogate_batch = lambda *args, **kwargs: None
     comp_mod.preload_compression_surrogate = lambda *args, **kwargs: None
-    monkeypatch.setitem(sys.modules, "compression.evalkit.posterior_compression", comp_mod)
+    monkeypatch.setitem(sys.modules, "emb.compression.evalkit.posterior_compression", comp_mod)
 
-    comp_tools = types.ModuleType("compression.evalkit.tools")
+    comp_tools = types.ModuleType("emb.compression.evalkit.tools")
     comp_tools.datedPrint = lambda *args, **kwargs: None
-    monkeypatch.setitem(sys.modules, "compression.evalkit.tools", comp_tools)
+    monkeypatch.setitem(sys.modules, "emb.compression.evalkit.tools", comp_tools)
 
-    ind_mod = types.ModuleType("indentation.evalkit.posterior_indentation")
+    ind_mod = types.ModuleType("emb.indentation.evalkit.posterior_indentation")
     ind_mod.compute_indentation_surrogate = lambda *args, **kwargs: None
     ind_mod.compute_indentation_surrogate_batch = lambda *args, **kwargs: None
     ind_mod.preload_indentation_surrogate = lambda *args, **kwargs: None
-    monkeypatch.setitem(sys.modules, "indentation.evalkit.posterior_indentation", ind_mod)
+    monkeypatch.setitem(sys.modules, "emb.indentation.evalkit.posterior_indentation", ind_mod)
 
     spec = importlib.util.spec_from_file_location(key, module_path)
     module = importlib.util.module_from_spec(spec)

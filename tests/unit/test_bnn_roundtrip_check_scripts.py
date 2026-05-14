@@ -73,7 +73,7 @@ def test_karolina_roundtrip_helpers_cover_selection_and_degradation() -> None:
     spec = module._resolve_selection_spec("compression_2.1um")
     assert spec["modality"] == "compression"
     assert spec["diameter_um"] == "2.1"
-    assert spec["data"].endswith("compression/surrogate/diameters/2.1um/data/F_Delta.dat")
+    assert spec["data"].endswith("emb/compression/surrogate/diameters/2.1um/data/F_Delta.dat")
 
     abs_deg, rel_deg = module._compute_degradation(0.08, 0.10)
     assert abs_deg == pytest.approx(0.02)

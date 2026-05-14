@@ -13,7 +13,7 @@ For each legacy surface, define the deprecation message contract using these fie
 
 ## compression
 
-- legacy path/import: `meso_uq/compression`, `compression/` entrypoints, and historical compression convenience imports.
+- legacy path/import: `meso_uq/compression`, `emb/compression/` entrypoints, and historical compression convenience imports.
 - canonical replacement: current `src/meso_uq/surrogate/*` package interfaces plus future EMB package/workflow runners introduced by the migration.
 - migration window: one release cycle from first Wave 1 merge.
 - removal condition: remove only after canonical entrypoints are stable, compatibility tests are green for one full release cycle, and users have had warning exposure.
@@ -22,7 +22,7 @@ For each legacy surface, define the deprecation message contract using these fie
 
 ## indentation
 
-- legacy path/import: `meso_uq/indentation`, `indentation/` entrypoints, and indentation launcher aliases.
+- legacy path/import: `meso_uq/indentation`, `emb/indentation/` entrypoints, and indentation launcher aliases.
 - canonical replacement: current `src/meso_uq/surrogate/*` package interfaces plus future EMB package/workflow runners introduced by the migration.
 - migration window: one release cycle from first Wave 1 merge.
 - removal condition: remove only after the canonical path demonstrates parity in production-smoke and acceptance-style runs and all migration evidence has been refreshed.

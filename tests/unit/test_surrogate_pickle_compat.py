@@ -71,6 +71,7 @@ def test_committed_release_surrogate_pickle_loads_with_compat_loader():
     repo_root = Path(__file__).resolve().parents[2]
     path = (
         repo_root
+        / "emb"
         / "compression"
         / "surrogate"
         / "diameters"

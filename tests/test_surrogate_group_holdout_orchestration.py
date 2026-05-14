@@ -51,7 +51,7 @@ def test_run_surrogate_group_holdout_orchestrator_builds_and_records_runs(
                 "data": data_file,
                 "dnn_model": model_file,
                 "bnn_model": model_file,
-                "script": repo_root / "compression" / "surrogate" / "scripts" / "run_group_holdout.py",
+                "script": repo_root / "emb" / "compression" / "surrogate" / "scripts" / "run_group_holdout.py",
             }
         ],
     )
@@ -114,7 +114,7 @@ def test_run_surrogate_group_holdout_orchestrator_handles_missing_models_and_fai
                 "data": data_file,
                 "dnn_model": model_file,
                 "bnn_model": missing_model,
-                "script": repo_root / "indentation" / "surrogate" / "scripts" / "run_group_holdout.py",
+                "script": repo_root / "emb" / "indentation" / "surrogate" / "scripts" / "run_group_holdout.py",
             }
         ],
     )

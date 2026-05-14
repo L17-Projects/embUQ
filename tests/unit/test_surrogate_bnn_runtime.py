@@ -8,8 +8,8 @@ import torch
 
 pytest.importorskip("pyro")
 
-from compression.surrogate import evaluate_bnn as compression_evaluate_bnn
-from indentation.surrogate import evaluate_bnn as indentation_evaluate_bnn
+from emb.compression.surrogate import evaluate_bnn as compression_evaluate_bnn
+from emb.indentation.surrogate import evaluate_bnn as indentation_evaluate_bnn
 from meso_uq.surrogate import bnn as bnn_runtime
 
 

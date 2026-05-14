@@ -29,7 +29,7 @@ Cleanup must not delete or rewrite curated repository content, including:
 
 - `extern/korali/`
 - curated surrogate manifests, fixtures, trained baseline artifacts, and example reports
-- source, configuration, documentation, and test paths: `src/`, `compression/`, `indentation/`, `inference/`, `examples/`, `scripts/`, `docs/`, and `tests/`
+- source, configuration, documentation, and test paths: `src/`, `emb/compression/`, `emb/indentation/`, `inference/`, `examples/`, `scripts/`, `docs/`, and `tests/`
 - paper-specific source scripts and documentation
 - compatibility-shim documentation and tests
 
