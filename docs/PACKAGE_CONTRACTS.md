@@ -13,6 +13,9 @@ It defines where new metadata belongs while the legacy workflow entry points rem
 - `src/meso_uq/simulation/emb_generation.py`: shared EMB parameter-sweep, command-file, and legacy Sbatch generation logic consumed by the compatibility `compression/src/generate.py` and `indentation/src/generate.py` entry points.
 - `src/meso_uq/surrogate/emb_workflows.py`: shared EMB surrogate workflow contracts for deterministic NN and BNN wrapper commands, checkpoint metadata, dataset split metadata, backend resolution, and grouped holdout orchestration.
 - `src/meso_uq/surrogate/compat.py`: dependency-light serialized-surrogate compatibility manifest and pickle-alias installer for legacy class paths.
+- `src/meso_uq/config/aliases.py`: dependency-light legacy config-root alias inventory and resolution records used during config-path migration.
+- `src/meso_uq/artifacts/policy.py`: dependency-light artifact manifest schema, retention/storage policy, generated-root classification, and validation helpers.
+- `src/meso_uq/platforms/policy.py`: dependency-light platform policy records for Karolina, Vega, workstation, and generic Slurm path/runtime expectations.
 - `src/meso_uq/workflows/legacy.py`: compatibility inventory, legacy evalkit path setup, project-root/config resolution, surrogate runtime parsing, trained-directory resolution, and once-per-surface warning helpers for legacy compression, indentation, inference, reduced, and propagation entry points.
 - `src/meso_uq/public_api.py`: narrow dependency-light public API for contracts, registries, and descriptor lookup.
 - `src/learning/`: deprecated installed-package shim for historical `learning.model` imports used by older deterministic surrogate pickles.
@@ -60,8 +63,12 @@ Workflow code:
 
 - `meso_uq`
 - `meso_uq.public_api`
+- `meso_uq.artifacts`
+- `meso_uq.artifacts.policy`
 - `meso_uq.agents`
 - `meso_uq.modalities`
+- `meso_uq.platforms`
+- `meso_uq.platforms.policy`
 - `meso_uq.structures`
 - `meso_uq.structures.gv`
 - `meso_uq.surrogate.catalogs`

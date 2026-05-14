@@ -41,6 +41,9 @@ jobs:
       - name: Build package metadata
         run: python -m build --sdist --wheel
 
+      - name: Run installed package smoke
+        run: python scripts/ci/run_installed_package_smoke.py --wheel dist
+
       - name: Run unit tests with coverage
         shell: bash
         run: |
