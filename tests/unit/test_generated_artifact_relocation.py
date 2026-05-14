@@ -52,6 +52,25 @@ def test_classifies_approved_generated_roots_as_archive_delete_candidates() -> N
     assert archive_plan.decision_valid is True
 
 
+def test_rejects_generated_root_traversal_before_approval() -> None:
+    traversal_path = "_runs/../src/meso_uq"
+    record = classify_generated_artifact_path(traversal_path)
+
+    assert record.kind is GeneratedArtifactPathKind.PATH_TRAVERSAL
+    assert record.is_generated_root_candidate is False
+    assert record.can_archive is False
+    assert record.can_delete is False
+    assert record.forbidden is True
+    assert any("traversal" in reason for reason in record.reasons)
+
+    plan = build_generated_artifact_plan(
+        [traversal_path],
+        owner_decisions={traversal_path: "delete"},
+    )[0]
+    assert plan.planned_action is GeneratedArtifactPlanAction.REJECT
+    assert plan.decision_valid is False
+
+
 def test_classifies_root_level_slurm_logs_and_keeps_nested_logs_investigation_needed() -> None:
     root_log = classify_generated_artifact_path("job-42.out")
     nested_log = classify_generated_artifact_path("runs/job-42.err")

@@ -27,6 +27,7 @@ class GeneratedArtifactPathKind(str, Enum):
     AMBIGUOUS_NESTED_LOG = "ambiguous_nested_log"
     PROTECTED_ROOT = "protected_root"
     OWNER_DECISION_ONLY_CHECKPOINT = "owner_decision_only_checkpoint"
+    PATH_TRAVERSAL = "path_traversal"
     FORBIDDEN_PRIVATE_PATH = "forbidden_private_path"
     OTHER = "other"
 
@@ -107,6 +108,10 @@ def _has_forbidden_private_literal(normalized_path: str) -> bool:
     return any(fragment in normalized_path for fragment in FORBIDDEN_PRIVATE_PATHS)
 
 
+def _has_path_traversal(segments: tuple[str, ...]) -> bool:
+    return any(part == ".." for part in segments)
+
+
 def _is_approved_generated_root(normalized_path: str, segments: tuple[str, ...]) -> bool:
     if not segments:
         return False
@@ -165,6 +170,11 @@ def _validation_notes_for_kind(kind: GeneratedArtifactPathKind) -> tuple[str, ..
             "Compression/indentation trained checkpoints require owner decision before any destructive action.",
             "Keep these artifacts intact until the checkpoint lineage is confirmed.",
         )
+    if kind == GeneratedArtifactPathKind.PATH_TRAVERSAL:
+        return (
+            "Path traversal segments are rejected before generated-root approval.",
+            "Do not relocate or delete paths that escape their apparent top-level root.",
+        )
     if kind == GeneratedArtifactPathKind.FORBIDDEN_PRIVATE_PATH:
         return (
             "Karolina-forbidden private paths must be rejected.",
@@ -200,6 +210,11 @@ def _rollback_notes_for_kind(kind: GeneratedArtifactPathKind) -> tuple[str, ...]
             "Checkpoint rollback must preserve the latest trained state until the owner confirms a replacement.",
             "Snapshot the checkpoint directory before any relocation plan is executed.",
         )
+    if kind == GeneratedArtifactPathKind.PATH_TRAVERSAL:
+        return (
+            "Reject the path and stop planning; traversal makes the generated-root classification unsafe.",
+            "Ask the owner for a normalized, repo-relative path before any future action.",
+        )
     if kind == GeneratedArtifactPathKind.FORBIDDEN_PRIVATE_PATH:
         return (
             "Reject the path and stop planning; the forbidden location is out of scope for relocation.",
@@ -218,6 +233,8 @@ def _classify_kind(path_value: str | Path) -> GeneratedArtifactPathKind:
 
     if _has_forbidden_private_literal(normalized_path):
         return GeneratedArtifactPathKind.FORBIDDEN_PRIVATE_PATH
+    if _has_path_traversal(segments):
+        return GeneratedArtifactPathKind.PATH_TRAVERSAL
     if _is_protected_root(normalized_path, segments):
         return GeneratedArtifactPathKind.PROTECTED_ROOT
     if _is_approved_generated_root(normalized_path, segments):
@@ -262,7 +279,10 @@ def _default_planned_action(kind: GeneratedArtifactPathKind) -> GeneratedArtifac
         GeneratedArtifactPathKind.OWNER_DECISION_ONLY_CHECKPOINT,
     }:
         return GeneratedArtifactPlanAction.HOLD
-    if kind == GeneratedArtifactPathKind.FORBIDDEN_PRIVATE_PATH:
+    if kind in {
+        GeneratedArtifactPathKind.FORBIDDEN_PRIVATE_PATH,
+        GeneratedArtifactPathKind.PATH_TRAVERSAL,
+    }:
         return GeneratedArtifactPlanAction.REJECT
     return GeneratedArtifactPlanAction.HOLD
 
@@ -300,7 +320,10 @@ def classify_generated_artifact_path(path_value: str | Path) -> GeneratedArtifac
     kind = _classify_kind(path_value)
     protected = kind == GeneratedArtifactPathKind.PROTECTED_ROOT
     owner_decision_only = _is_owner_decision_only(kind)
-    forbidden = kind == GeneratedArtifactPathKind.FORBIDDEN_PRIVATE_PATH
+    forbidden = kind in {
+        GeneratedArtifactPathKind.FORBIDDEN_PRIVATE_PATH,
+        GeneratedArtifactPathKind.PATH_TRAVERSAL,
+    }
     is_root_log = kind == GeneratedArtifactPathKind.ROOT_LEVEL_SLURM_LOG
     is_generated_root = kind == GeneratedArtifactPathKind.APPROVED_GENERATED_ROOT
 
@@ -315,6 +338,8 @@ def classify_generated_artifact_path(path_value: str | Path) -> GeneratedArtifac
         reasons.append("protected source/tree root")
     elif kind == GeneratedArtifactPathKind.OWNER_DECISION_ONLY_CHECKPOINT:
         reasons.append("compression/indentation checkpoint lineage needs owner decision")
+    elif kind == GeneratedArtifactPathKind.PATH_TRAVERSAL:
+        reasons.append("path traversal is rejected before generated-root approval")
     elif kind == GeneratedArtifactPathKind.FORBIDDEN_PRIVATE_PATH:
         reasons.append("forbidden private Karolina path")
     else:
@@ -322,8 +347,10 @@ def classify_generated_artifact_path(path_value: str | Path) -> GeneratedArtifac
 
     if normalized_path.startswith("/"):
         reasons.append("absolute path requires ownership review")
-    if forbidden:
+    if kind == GeneratedArtifactPathKind.FORBIDDEN_PRIVATE_PATH:
         reasons.append("private path literal is blocked")
+    if kind == GeneratedArtifactPathKind.PATH_TRAVERSAL:
+        reasons.append("path traversal is blocked")
 
     validation_notes = _validation_notes_for_kind(kind)
     if normalized_path.startswith("/") and not forbidden:

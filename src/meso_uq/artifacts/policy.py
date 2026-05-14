@@ -187,7 +187,10 @@ def class_policy_for_artifact_class(
 
 def is_source_tree_generated_root(path_value: str) -> bool:
     normalized = path_value.replace("\\", "/").strip()
-    normalized = re.sub(r"^\$\{[^}]+\}/?", "", normalized).strip("/")
+    if _has_placeholder_root(normalized):
+        return False
+
+    normalized = normalized.strip("/")
     if not normalized:
         return False
 
@@ -195,6 +198,12 @@ def is_source_tree_generated_root(path_value: str) -> bool:
     return (
         root_segment in SOURCE_TREE_GENERATED_ROOTS
         or bool(re.fullmatch(r"_init_compression_[^/]+", root_segment))
+    )
+
+
+def _has_placeholder_root(path_value: str) -> bool:
+    return path_value.startswith("${") or bool(
+        re.match(r"^\$[A-Za-z_][A-Za-z0-9_]*(?:/|$)", path_value)
     )
 
 

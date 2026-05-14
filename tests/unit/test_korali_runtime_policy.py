@@ -118,6 +118,31 @@ def test_build_korali_runtime_validation_command_shape(tmp_path: Path) -> None:
     assert command.env
 
 
+def test_korali_runtime_module_executes_cli(tmp_path: Path) -> None:
+    repo_root = _make_repo(tmp_path, vendor=True)
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[2] / "src")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "meso_uq.platforms.korali_runtime",
+            "--repo-root",
+            str(repo_root),
+            "--json",
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"ok": true' in result.stdout
+    assert "Korali runtime validation" not in result.stdout
+
+
 def test_korali_runtime_module_import_is_light() -> None:
     code = """
 import sys
