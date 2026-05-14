@@ -533,3 +533,7 @@ def _validate_path_hint_entries(
                     )
                 )
                 break
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())
