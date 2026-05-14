@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from meso_uq.configs.policy import FORBIDDEN_PRIVATE_PATHS
+from meso_uq.core import Platform
 from meso_uq.platforms import (
     PlatformPolicyLookupError,
     PlatformPolicyRecord,
@@ -51,6 +52,17 @@ def test_generic_slurm_policy_has_no_private_root_forbidden_prefix() -> None:
     assert all(
         forbidden not in FORBIDDEN_PRIVATE_PATHS for forbidden in policy.forbidden_path_prefixes
     )
+
+
+def test_generic_platform_enum_uses_generic_slurm_baseline() -> None:
+    policy = lookup_platform_policy(Platform.GENERIC)
+
+    assert policy.site == "generic_slurm"
+    assert validate_platform_path_policy(
+        Platform.GENERIC,
+        {"runs_root": "${MESOUQ_RUNS_ROOT}/validation"},
+        label="generic",
+    ) == []
 
 
 def test_generic_slurm_path_validation_rejects_private_path_literals() -> None:
