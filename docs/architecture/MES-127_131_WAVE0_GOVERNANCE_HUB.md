@@ -31,6 +31,7 @@ The migration decisions being recorded here are:
 - [Compatibility surface](../MESO_UQ_COMPATIBILITY_SURFACE.md)
 - [Migration risk register](../MESO_UQ_MIGRATION_RISK_REGISTER.md)
 - [GPU validation gate](../MESO_UQ_GPU_VALIDATION_GATE.md)
+- [Package contracts](../PACKAGE_CONTRACTS.md)
 
 ## Repo evidence anchors
 

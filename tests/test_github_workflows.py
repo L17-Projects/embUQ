@@ -73,8 +73,10 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     compute_base = _step_by_name(package_steps, "Compute base branch coverage")
     coverage_delta = _step_by_name(package_steps, "Enforce feedback coverage increase")
     coverage_scope = _step_by_name(package_steps, "Detect coverage-sensitive changes")
+    installed_smoke = _step_by_name(package_steps, "Run installed package smoke")
     assert preserve_head["if"] == "always()"
     assert "test -f coverage.json" in preserve_head["run"]
+    assert installed_smoke["run"] == "python scripts/ci/run_installed_package_smoke.py --wheel dist"
     assert compute_base["if"] == f"success() && {FULL_CI_PR_IF}"
     assert "${{ github.event.pull_request.base.sha }}" in compute_base["run"]
     assert "${{ github.base_ref }}" not in compute_base["run"]

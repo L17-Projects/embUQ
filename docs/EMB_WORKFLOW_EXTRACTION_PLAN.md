@@ -167,6 +167,17 @@ Recommended first PR boundary:
 Rationale:
 - This isolates contract introduction from runtime behavior changes, minimizing break risk while enabling follow-up extraction PRs to move logic incrementally.
 
+MES-140 implementation note:
+- `src/meso_uq/agents/emb/workflows.py` now records the EMB compression/indentation generation contracts, config-resolution candidates, parameter-file naming, legacy script identities, and modality-specific runtime-prep constants such as indentation's mass multiplier.
+- `src/meso_uq/simulation/emb_generation.py` now owns the shared parameter-sweep expansion, generated `parameters-default*.yaml` grid, `commands.txt` writing, and legacy `run_HPC.sbatch` text.
+- `compression/src/generate.py` and `indentation/src/generate.py` remain compatibility entry points with the same CLI flags while delegating the duplicated generation loop to the package helper.
+- `compression/src/parameters.py` and `indentation/src/parameters.py` still own the heavy runtime-preparation physics and mesh generation; their extraction remains a follow-up because it depends on preserving the documented compression/indentation numeric differences.
+
+MES-141 implementation note:
+- `src/meso_uq/surrogate/emb_workflows.py` now records the EMB compression/indentation surrogate workflow contracts for deterministic NN and BNN wrappers, checkpoint metadata, dataset split metadata, backend resolution, and grouped holdout orchestration.
+- `compression/surrogate/scripts/emb_train.py`, `indentation/surrogate/scripts/emb_train.py`, `compression/surrogate/scripts/emb_train_bnn.py`, `indentation/surrogate/scripts/emb_train_bnn.py`, and both `run_group_holdout.py` wrappers remain callable compatibility entry points while delegating shared CLI/parser/orchestration behavior.
+- `compression/surrogate/evaluate.py` and `indentation/surrogate/evaluate.py` remain untouched in this slice because evaluator extraction has higher coupling to serialized artifact names and runtime prediction semantics.
+
 ## Recommended next extraction issue order
 
 1. MES-140: land shared EMB workflow contracts (path/spec constants, naming, modality metadata) + compatibility tests.

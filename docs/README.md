@@ -34,7 +34,20 @@ This directory hosts the public documentation set for the `v0.1.0` release line.
 - `VEGA_PRODUCTION_SANITY.md` for the canonical reduced-cost production smoke command
 - `VEGA_VALIDATION_MATRIX.md` for the public Vega validation matrix and report surface
 - `KAROLINA_FULL_PLATFORM.md` for the Karolina scratch, Slurm, runtime-root, and acceptance-evidence contract
-- `VALIDATION_CONFIGS.md` for the validation-config bundle
+- `MES-125_KAROLINA_ACCEPTANCE_CLOSEOUT.md` for the MES-125 Karolina closeout evidence skeleton
+- `architecture/MES-127_131_WAVE0_GOVERNANCE_HUB.md` for the architecture-migration governance, inventory, risk, compatibility, and GPU validation gate
+- `CONFIGURATION_POLICY.md` for the schema-versioned central config taxonomy
+- `ARTIFACT_POLICY.md` for generated-output, curated-artifact, manifest, and cleanup rules
+- `PHASE6_GENERATED_CLEANUP_RECORD.md` for the owner-approved generated-root cleanup closeout
+- `COMPATIBILITY_SHIM_RETIREMENT_RECORD.md` for compatibility shim retention, blockers, and review triggers
+- `PAPER_REPRODUCTION_ARTIFACT_POLICY.md` for the paper source versus external artifact boundary
+- `TEST_STRUCTURE_POLICY.md` for the unit, integration, operational, optional-runtime, and GPU/HPC test layout
+- `PLATFORM_POLICY.md` for Karolina, Vega, workstation, and generic Slurm platform config policy
+- `EMB_WORKFLOW_EXTRACTION_PLAN.md` for the compression/indentation workflow extraction inventory and compatibility plan
+- `MES-59_MERGE_READINESS_CHECKLIST.md` for the delayed/thread-aware connector review sweep required before merge readiness
+- `MES-59_74_76_79_CLOSEOUT_EVIDENCE.md` for the MES-59/MES-74/MES-76/MES-79 closeout decisions and validation evidence
+- `GV_EXTENSION_CLOSEOUT.md` for provisional MES-78 release hardening scope and GV rollout gate
+- `VALIDATION_CONFIGS.md` for the tiny validation config bundle
 - `WORKFLOWS.md` for workflow entrypoints and operator expectations
 
 ## Historical / release-specific docs

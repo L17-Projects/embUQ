@@ -3,13 +3,17 @@ from __future__ import annotations
 import pytest
 
 from meso_uq.agents import (
+    classify_agent_modality_support,
     get_agent_definition,
     list_agent_definitions,
     list_agent_modalities,
+    missing_dependency_requirements_for_agent,
     resolve_agent_modality,
+    resolve_agent_family_identifier,
+    runtime_requirements_for_agent,
     supported_modalities_for_agent,
 )
-from meso_uq.core import AgentFamily, Modality
+from meso_uq.core import AgentFamily, Modality, RequirementState
 
 
 def test_agent_registry_contains_emb_and_gv_definitions():
@@ -21,19 +25,22 @@ def test_agent_registry_contains_emb_and_gv_definitions():
         "indentation",
     )
     assert tuple(item.value for item in definitions[AgentFamily.GV].supported_modalities) == (
+        "stretching",
         "buckling",
         "torsion",
         "eigenmodes",
         "shear_flow",
     )
+    assert definitions[AgentFamily.EMB].default_for_legacy is True
 
 
 def test_agent_registry_resolves_supported_combinations():
-    agent, modality = resolve_agent_modality("emb", "compression")
+    agent, modality = resolve_agent_modality("elastic_microbubble", "compression")
 
     assert agent.family is AgentFamily.EMB
     assert modality.modality is Modality.COMPRESSION
     assert supported_modalities_for_agent("gv") == (
+        Modality.STRETCHING,
         Modality.BUCKLING,
         Modality.TORSION,
         Modality.EIGENMODES,
@@ -43,11 +50,12 @@ def test_agent_registry_resolves_supported_combinations():
         Modality.COMPRESSION,
         Modality.INDENTATION,
     )
+    assert resolve_agent_family_identifier("gas-vesicle") is AgentFamily.GV
 
 
 def test_agent_registry_rejects_invalid_family_identifier():
-    with pytest.raises(ValueError, match="Unsupported agent family 'vesicle'"):
-        get_agent_definition("vesicle")
+    with pytest.raises(ValueError, match="Unsupported agent family 'cell'"):
+        get_agent_definition("cell")
 
 
 def test_agent_registry_rejects_unsupported_family_modality_combinations():
@@ -55,3 +63,15 @@ def test_agent_registry_rejects_unsupported_family_modality_combinations():
         resolve_agent_modality("emb", "buckling")
     with pytest.raises(ValueError, match="Agent family 'gv' does not support modality 'compression'"):
         resolve_agent_modality("gv", "compression")
+
+
+def test_agent_registry_reports_support_and_dependency_state():
+    status = classify_agent_modality_support("gv", "stretching")
+    unsupported = classify_agent_modality_support("emb", "shear_flow")
+    requirements = runtime_requirements_for_agent("gv")
+    missing = missing_dependency_requirements_for_agent("emb", {"torch": False, "pyro": False, "korali": False})
+
+    assert status["status"] == "supported"
+    assert unsupported["status"] == "unsupported"
+    assert any(requirement.state is RequirementState.EXTERNAL for requirement in requirements)
+    assert tuple(requirement.name for requirement in missing) == ("torch", "korali")

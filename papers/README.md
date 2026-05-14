@@ -1,5 +1,20 @@
 # Vega paper run
 
+This tree is reserved for paper reproduction source material. Keep source
+scripts, configuration templates, manifest examples, and reproduction notes here
+when they are small enough to review in git.
+
+Heavy paper outputs do not belong in this tree. Generated figures, logs,
+posterior samples, chains, checkpoints, MAP outputs, Mirheo run directories, and
+copied datasets must live under an external `PAPER_DATA_ROOT`, under the
+configured MesoUQ runs root, or on artifact storage, and be referenced through
+manifests.
+
+The current source/artifact boundary is documented in
+`../docs/PAPER_REPRODUCTION_ARTIFACT_POLICY.md`. For HUQ EMB reproduction
+material, `papers/huq_emb` is for source scripts, config docs, and small
+fixtures only; completed replay products are external artifacts.
+
 Run everything from the root of your `MesoUQ` copy on Vega. Use `tmux` or `screen`.
 
 ## 1. Setup once

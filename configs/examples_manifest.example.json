@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "manifest_id": "examples-config-policy-example",
+  "generated_at": "2026-05-13T00:00:00Z",
+  "examples": [
+    {
+      "path": "examples/configs/compression_full.yaml",
+      "canonical_path": "inference/configs/production/inference_config_compression.yaml",
+      "status": "needs_refresh",
+      "reason": "Convenience copy lags the canonical compression workflow config and should be refreshed before it is treated as maintained.",
+      "validation_notes": [
+        "YAML parses as a structured document",
+        "path is relative under examples/configs",
+        "no private path literals were found",
+        "canonical production config now carries the refreshed surrogate and phase settings"
+      ]
+    },
+    {
+      "path": "examples/configs/compression_reduced.yaml",
+      "canonical_path": "reduced/configs/production/reduced_config_compression.yaml",
+      "status": "needs_refresh",
+      "reason": "Convenience copy lags the canonical reduced compression workflow config and should be refreshed before it is treated as maintained.",
+      "validation_notes": [
+        "YAML parses as a structured document",
+        "path is relative under examples/configs",
+        "no private path literals were found",
+        "canonical reduced config now carries the refreshed surrogate and phase settings"
+      ]
+    },
+    {
+      "path": "examples/configs/indentation_full.yaml",
+      "canonical_path": "inference/configs/production/inference_config_indentation.yaml",
+      "status": "needs_refresh",
+      "reason": "Convenience copy lags the canonical indentation workflow config and should be refreshed before it is treated as maintained.",
+      "validation_notes": [
+        "YAML parses as a structured document",
+        "path is relative under examples/configs",
+        "no private path literals were found",
+        "canonical production config now carries the refreshed surrogate, bounds, and phase settings"
+      ]
+    },
+    {
+      "path": "examples/configs/indentation_reduced.yaml",
+      "canonical_path": "reduced/configs/production/reduced_config_indentation.yaml",
+      "status": "needs_refresh",
+      "reason": "Convenience copy lags the canonical reduced indentation workflow config and should be refreshed before it is treated as maintained.",
+      "validation_notes": [
+        "YAML parses as a structured document",
+        "path is relative under examples/configs",
+        "no private path literals were found",
+        "canonical reduced config now carries the refreshed surrogate, bounds, and phase settings"
+      ]
+    }
+  ]
+}

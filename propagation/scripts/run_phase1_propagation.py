@@ -11,10 +11,18 @@ import pandas as pd
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "compression"))
-sys.path.insert(0, str(PROJECT_ROOT / "compression" / "evalkit"))
-sys.path.insert(0, str(PROJECT_ROOT / "indentation"))
-sys.path.insert(0, str(PROJECT_ROOT / "indentation" / "evalkit"))
+SRC_ROOT = PROJECT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from meso_uq.workflows.legacy import (
+    prepend_legacy_evalkit_paths,
+    resolve_legacy_relative_path,
+    resolve_legacy_surrogate_backend,
+    warn_legacy_workflow_surface,
+)
+
+prepend_legacy_evalkit_paths(PROJECT_ROOT)
 
 from compression.evalkit.posterior_compression import (
     compute_compression_surrogate,
@@ -28,18 +36,6 @@ from meso_uq.experiments import load_experiments
 from meso_uq.postprocess.propagation import propagate_run_directory
 
 
-def _resolve_surrogate_backend(config: dict) -> str:
-    surrogate_cfg = config.get("surrogate", {})
-    if surrogate_cfg is None:
-        surrogate_cfg = {}
-    if not isinstance(surrogate_cfg, dict):
-        raise ValueError("Expected 'surrogate' config section to be a mapping.")
-    backend = str(surrogate_cfg.get("backend", "dnn")).strip().lower()
-    if backend not in {"dnn", "bnn"}:
-        raise ValueError(f"Unsupported surrogate backend '{backend}'. Expected 'dnn' or 'bnn'.")
-    return backend
-
-
 def _reference_csv_for_experiment(exp, diameter_um: float, output_dir: Path) -> Path:
     data_file = exp.data_file(diameter_um)
     reference_df = pd.read_csv(data_file, sep=r"\s+", engine="python", comment="#")
@@ -50,6 +46,7 @@ def _reference_csv_for_experiment(exp, diameter_um: float, output_dir: Path) -> 
 
 
 def main() -> int:
+    warn_legacy_workflow_surface("propagation/scripts/run_phase1_propagation.py")
     parser = argparse.ArgumentParser(description="Run lightweight propagation from Phase 1 posterior samples")
     parser.add_argument("--config", required=True)
     parser.add_argument("--output-dir", default="_setup")
@@ -61,19 +58,14 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    config_path = Path(args.config)
-    if not config_path.is_absolute():
-        config_path = PROJECT_ROOT / config_path
-    config_path = config_path.resolve()
+    config_path = resolve_legacy_relative_path(PROJECT_ROOT, args.config)
     os.environ["HUQ_INFERENCE_CONFIG"] = str(config_path)
-    output_root = Path(args.output_dir)
-    if not output_root.is_absolute():
-        output_root = PROJECT_ROOT / output_root
+    output_root = resolve_legacy_relative_path(PROJECT_ROOT, args.output_dir)
 
     with open(config_path, "rb") as handle:
         config = yaml.load(handle, Loader=yaml.CLoader)
     experiments = [exp for exp in load_experiments(config, PROJECT_ROOT) if exp.enabled]
-    surrogate_backend = _resolve_surrogate_backend(config)
+    surrogate_backend = resolve_legacy_surrogate_backend(config)
 
     preload_map = {
         "compression": preload_compression_surrogate,
