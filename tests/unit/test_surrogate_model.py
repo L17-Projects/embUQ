@@ -94,3 +94,4 @@ def test_save_load_round_trip(tmp_path: Path) -> None:
 def test_install_legacy_pickle_aliases_creates_sys_modules_entries() -> None:
     _install_legacy_pickle_aliases()
     assert "learning.model" in sys.modules
+    assert sys.modules["learning.model"].MLP is MLP

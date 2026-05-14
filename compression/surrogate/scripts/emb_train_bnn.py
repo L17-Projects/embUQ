@@ -2,78 +2,37 @@
 
 from __future__ import annotations
 
-import argparse
+import sys
 from pathlib import Path
 
-from meso_uq.surrogate.bnn_training import train_tabular_bnn_surrogate
-from meso_uq.surrogate.cli import read_compression_training_table
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+SRC_ROOT = REPO_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from meso_uq.core import Modality
+from meso_uq.surrogate.emb_workflows import run_emb_bnn_training_cli
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Train compression variational BNN surrogate: force = f(Yt, kb, b1, b2, a3, a4, disp)"
-    )
-    parser.add_argument("data", help="Path to whitespace training table")
-    parser.add_argument("--out", default="trained/microbubble_force_BNN.pt")
-    parser.add_argument("--dnn-reference", default="trained/microbubble_force_BEST.pkl")
-    parser.add_argument("--report-path", default=None)
-    parser.add_argument("--width", type=int, default=64)
-    parser.add_argument("--depth", type=int, default=3)
-    parser.add_argument("--prior-scale", type=float, default=1.0)
-    parser.add_argument(
-        "--obs-noise-prior-scale",
-        "--obs-noise",
-        dest="obs_noise_prior_scale",
-        type=float,
-        default=1.0,
-    )
-    parser.add_argument("--batch-size", type=int, default=512)
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--max-steps", type=int, default=2500)
-    parser.add_argument("--max-epochs", type=int, default=None)
-    parser.add_argument("--eval-every", type=int, default=25)
-    parser.add_argument("--predictive-mc-samples", type=int, default=64)
-    parser.add_argument("--max-walltime-seconds", type=int, default=1200)
-    parser.add_argument("--seed", type=int, default=None)
-    parser.add_argument("--parity-tol", type=float, default=1.20)
-    parser.add_argument("--no-require-parity", action="store_true", default=False)
-    parser.add_argument("--device", default="cpu")
-    args = parser.parse_args()
+def read_compression_training_table(*args, **kwargs):
+    from meso_uq.surrogate.cli import read_compression_training_table as _reader
 
-    data_path = Path(args.data).resolve()
-    out_path = Path(args.out).resolve()
-    dnn_ref = Path(args.dnn_reference).resolve()
-    report_path = Path(args.report_path).resolve() if args.report_path else None
-    df = read_compression_training_table(str(data_path), curve_axis_name="disp", value_name="F")
-    result = train_tabular_bnn_surrogate(
-        df,
-        input_cols=["Yt", "kb", "b1", "b2", "a3", "a4", "disp"],
-        target_col="F",
-        out_path=str(out_path),
-        dnn_reference_path=str(dnn_ref),
-        report_path=str(report_path) if report_path else None,
-        width=args.width,
-        depth=args.depth,
-        prior_scale=args.prior_scale,
-        obs_noise_prior_scale=args.obs_noise_prior_scale,
-        batch_size=args.batch_size,
-        lr=args.lr,
-        max_steps=args.max_steps,
-        max_epochs=args.max_epochs,
-        eval_every=args.eval_every,
-        predictive_mc_samples=args.predictive_mc_samples,
-        max_walltime_seconds=args.max_walltime_seconds,
-        seed=args.seed,
-        parity_tol=args.parity_tol,
-        require_parity=not args.no_require_parity,
-        device=args.device,
-    )
-    t = result["training"]
-    print(
-        "Saved -> "
-        f"{result['out']} | val_rmse={t['final_val_rmse']:.4e} | "
-        f"dnn_rmse={t['parity_dnn_rmse']:.4e} | ratio={t['parity_ratio']:.4f} | "
-        f"steps={t['step_count']} | reason={t['stop_reason']}"
+    return _reader(*args, **kwargs)
+
+
+def train_tabular_bnn_surrogate(*args, **kwargs):
+    from meso_uq.surrogate.bnn_training import train_tabular_bnn_surrogate as _trainer
+
+    return _trainer(*args, **kwargs)
+
+
+def main(argv: list[str] | None = None) -> dict:
+    return run_emb_bnn_training_cli(
+        Modality.COMPRESSION,
+        argv=argv,
+        reader=read_compression_training_table,
+        trainer=train_tabular_bnn_surrogate,
     )
 
 

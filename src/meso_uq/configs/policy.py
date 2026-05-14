@@ -133,7 +133,10 @@ def _validate_string_value(
     value: str,
     errors: list[str],
 ) -> None:
-    is_forbidden_slot = len(trail) >= 2 and trail[-2] == "forbidden_literals"
+    is_forbidden_slot = (
+        len(trail) >= 2
+        and trail[-2] in {"forbidden_literals", "forbidden_path_prefixes"}
+    )
     joined_trail = ".".join(str(part) for part in trail)
 
     if any(fragment in value for fragment in FORBIDDEN_PRIVATE_PATHS) and not is_forbidden_slot:

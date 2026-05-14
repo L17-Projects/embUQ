@@ -1,21 +1,38 @@
 [run]
 branch = True
 relative_files = True
-include =
-    src/meso_uq/*
-    compression/*
-    indentation/*
-    inference/*
-    propagation/*
-    reduced/*
-    scripts/*
+# Canonical package source and deliberate compatibility roots.
+source =
+    src/meso_uq
+    compression
+    indentation
+    inference
+    propagation
+    reduced
+    scripts
+
+# Exclude generated, vendored, notebook-checkpoint, and operational trees.
 omit =
     */__pycache__/*
+    */.ipynb_checkpoints/*
+    *.ipynb
     tests/*
+    docs/*
     extern/*
-    upstream/*
+    papers/*
+    runtime/*
+    _ci/*
+    _out/*
+    _runs/*
+    logs/*
+    */generated/*
+    */artifacts/*
+    */archive/*
+    */archives/*
     compression/evalkit/data/*
     indentation/evalkit/data/*
+    compression/surrogate/diameters/*/trained/*
+    indentation/surrogate/diameters/*/trained/*
     compression/src/equil.py
     indentation/src/equil.py
     propagation/scripts/evaluate_map_mirheo_optimized.py

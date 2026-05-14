@@ -16,8 +16,12 @@ spec:
     korali_vendor_root: extern/korali
 path_policy:
   allow_absolute_paths: false
+  canonical_runs_root: ${MESOUQ_RUNS_ROOT}
   required_placeholders:
     - ${MESOUQ_REPO_ROOT}
     - ${MESOUQ_RUNS_ROOT}
     - ${MESOUQ_SCRATCH_ROOT}
+  forbidden_path_prefixes: []
+  gpu_resource_syntax: []
+  environment_scripts: []
   forbidden_literals: []

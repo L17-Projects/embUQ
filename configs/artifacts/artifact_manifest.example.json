@@ -38,7 +38,8 @@
     },
     {
       "artifact_id": "surrogate-checkpoint",
-      "artifact_class": "surrogate",
+      "artifact_class": "surrogate_checkpoint",
+      "release_critical": true,
       "path": "paper_data/surrogates/emb_dnn_baseline.pt",
       "format": "application/octet-stream"
     },

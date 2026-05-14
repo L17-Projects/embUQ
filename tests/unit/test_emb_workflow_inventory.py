@@ -15,6 +15,7 @@ EMB_WORKFLOW_ENTRYPOINTS = (
     "indentation/src/generate.py",
     "indentation/src/parameters.py",
     # DNN/BNN surrogate evaluation.
+    "src/meso_uq/surrogate/emb_workflows.py",
     "compression/surrogate/evaluate.py",
     "compression/surrogate/evaluate_bnn.py",
     "indentation/surrogate/evaluate.py",

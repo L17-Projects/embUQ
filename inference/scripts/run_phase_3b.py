@@ -30,6 +30,7 @@ from indentation.evalkit.posterior_indentation import (
 )
 from meso_uq.config import resolve_inference_config_path
 from meso_uq.experiments import load_experiments
+from meso_uq.workflows.legacy import resolve_legacy_surrogate_backend
 from meso_uq.workflow_acceleration import (
     configure_device_conduit,
     configure_gpu_batch_sub_experiment,
@@ -39,15 +40,7 @@ from meso_uq.workflow_acceleration import (
 
 
 def _resolve_surrogate_backend(config: dict) -> str:
-    surrogate_cfg = config.get("surrogate", {})
-    if surrogate_cfg is None:
-        surrogate_cfg = {}
-    if not isinstance(surrogate_cfg, dict):
-        raise ValueError("Expected 'surrogate' config section to be a mapping.")
-    backend = str(surrogate_cfg.get("backend", "dnn")).strip().lower()
-    if backend not in {"dnn", "bnn"}:
-        raise ValueError(f"Unsupported surrogate backend '{backend}'. Expected 'dnn' or 'bnn'.")
-    return backend
+    return resolve_legacy_surrogate_backend(config)
 
 
 def _resolve_config_path(config_path: str | None) -> Path:

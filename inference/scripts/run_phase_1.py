@@ -17,6 +17,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "indentation" / "evalkit"))
 from meso_uq.config import resolve_inference_config_path
 from meso_uq.experiments import load_experiments
 from meso_uq.inference import run_gv_phase1_dnn_execution, write_gv_phase1_setup_manifest
+from meso_uq.workflows.legacy import resolve_legacy_surrogate_backend
 from meso_uq.workflow_acceleration import (
     configure_device_conduit,
     configure_korali_conduit,
@@ -45,15 +46,7 @@ def prepareIndentation(*args, **kwargs):
 
 
 def _resolve_surrogate_backend(config: dict) -> str:
-    surrogate_cfg = config.get("surrogate", {})
-    if surrogate_cfg is None:
-        surrogate_cfg = {}
-    if not isinstance(surrogate_cfg, dict):
-        raise ValueError("Expected 'surrogate' config section to be a mapping.")
-    backend = str(surrogate_cfg.get("backend", "dnn")).strip().lower()
-    if backend not in {"dnn", "bnn"}:
-        raise ValueError(f"Unsupported surrogate backend '{backend}'. Expected 'dnn' or 'bnn'.")
-    return backend
+    return resolve_legacy_surrogate_backend(config)
 
 
 def _align_reference_data(ref_points, ref_data, exp_name, rank):
