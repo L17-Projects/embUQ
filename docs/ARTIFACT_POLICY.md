@@ -1,14 +1,27 @@
 # Artifact Policy
 
-Artifact manifests in this slice are intentionally small and machine-readable. The example manifest lives at `configs/artifacts/artifact_manifest.example.json` and carries:
+Generated artifacts are treated as runtime/state and must not be source-controlled. Artifact manifests are the reproducibility contract for anything that must survive a run.
 
-- `schema_version`
-- `manifest_id`
-- `generated_at`
-- `cleanup_policy`
-- `artifacts`
+The example manifest lives at `configs/artifacts/artifact_manifest.example.json` and carries `schema_version`, `manifest_id`, `generated_at`, `cleanup_policy`, and `artifacts`.
 
-Supported `artifact_class` values in the initial policy slice:
+## Generated-root policy (not tracked)
+
+- `_out`
+- `_runs`
+- `_init_compression_*`
+- `_init_indentation_*`
+- `out_hierarchical`
+- `_ci`
+- `logs`
+- repo-root `runtime`
+- root Slurm logs `mesouq-*.out`, `mesouq-*.err`
+- root Slurm logs `slurm-*.out`, `slurm-*.err`
+- `.coverage`, `.pytest_cache`, `__pycache__`, `*.py[cod]`, `*.egg-info`
+- `build`, `dist`
+
+## Manifest artifact classes
+
+The initial policy supports these `artifact_class` values:
 
 - `raw`
 - `reference`
@@ -25,10 +38,18 @@ Supported `artifact_class` values in the initial policy slice:
 - `runtime_manifest`
 - `run_manifest`
 
-Cleanup policy is conservative:
+## Source vs artifact exceptions (stay tracked)
 
-- do not delete generated roots or artifacts as part of this migration slice
-- treat manifests as inventory and validation inputs first
-- keep cleanup exclusions explicit and machine-readable
+- package entry points:
+  - `src/meso_uq/**/__init__.py`
+- lightweight source config/docs that are not runtime artifacts:
+  - `configs/artifacts/artifact_manifest.example.json`
+  - `configs/platforms/generic_slurm.example.yaml`
+  - `docs/ARTIFACT_POLICY.md`
 
-`extern/korali` remains vendored source, not a generated artifact root. It is protected from generated-artifact cleanup and must stay outside any automatic cleanup target set.
+## Governance direction
+
+- Do not broad-delete generated roots under this policy slice.
+- Current governance is manifest-first: avoid deleting `run`/`surrogate`/`reference` artifacts unless a later migration slice defines explicit cleanup behavior.
+- Keep cleanup exclusions explicit and machine-readable.
+- `extern/korali` is vendored source and remains outside generated-artifact cleanup.
