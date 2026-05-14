@@ -46,6 +46,12 @@ def test_parser_defaults_and_smoke_surface_modules():
     assert "meso_uq.public_api" in module.SMOKE_MODULES
     assert "meso_uq.config.loader" in module.SMOKE_MODULES
     assert "meso_uq.artifacts.policy" in module.SMOKE_MODULES
+    assert "meso_uq.surrogates.contracts" in module.SMOKE_MODULES
+    assert "meso_uq.noise.contracts" in module.SMOKE_MODULES
+    assert "meso_uq.active_learning.engine" in module.SMOKE_MODULES
+    assert "meso_uq.orchestration.lineage" in module.SMOKE_MODULES
+    assert "meso_uq.plotting.contracts" in module.SMOKE_MODULES
+    assert "meso_uq.reporting.contracts" in module.SMOKE_MODULES
     assert module.HEAVY_OPTIONAL_MODULES == ("torch", "pyro", "matplotlib", "mpi4py", "mirheo", "korali", "slurm")
 
 
