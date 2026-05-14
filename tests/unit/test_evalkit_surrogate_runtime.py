@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 import yaml
 
-from compression.evalkit import posterior_compression
-from indentation.evalkit import posterior_indentation
+from emb.compression.evalkit import posterior_compression
+from emb.indentation.evalkit import posterior_indentation
 
 
 class _CompressionDnnStub:
@@ -185,33 +185,55 @@ def test_indentation_worker_comm_prefers_korali_and_falls_back(monkeypatch: pyte
 
 def test_compression_resolve_project_root_from_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     project = tmp_path / "project"
-    (project / "compression" / "src").mkdir(parents=True)
+    (project / "emb" / "compression" / "src").mkdir(parents=True)
     workdir = project / "nested" / "child"
     workdir.mkdir(parents=True)
     monkeypatch.chdir(workdir)
     assert posterior_compression._resolve_project_root() == str(project)
 
 
+def test_compression_resolve_project_root_from_relocated_evalkit_cwd(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    project = tmp_path / "project"
+    (project / "emb" / "compression" / "src").mkdir(parents=True)
+    evalkit_dir = project / "emb" / "compression" / "evalkit"
+    evalkit_dir.mkdir(parents=True)
+    monkeypatch.chdir(evalkit_dir)
+    assert posterior_compression._resolve_project_root() == str(project)
+
+
 def test_indentation_resolve_project_root_from_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     project = tmp_path / "project"
-    (project / "indentation" / "src").mkdir(parents=True)
+    (project / "emb" / "indentation" / "src").mkdir(parents=True)
     workdir = project / "nested" / "child"
     workdir.mkdir(parents=True)
     monkeypatch.chdir(workdir)
     assert posterior_indentation._resolve_project_root() == str(project)
 
 
+def test_indentation_resolve_project_root_from_relocated_evalkit_cwd(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    project = tmp_path / "project"
+    (project / "emb" / "indentation" / "src").mkdir(parents=True)
+    evalkit_dir = project / "emb" / "indentation" / "evalkit"
+    evalkit_dir.mkdir(parents=True)
+    monkeypatch.chdir(evalkit_dir)
+    assert posterior_indentation._resolve_project_root() == str(project)
+
+
 def test_compression_resolve_project_root_raises_when_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(posterior_compression.os.path, "exists", lambda _path: False)
-    with pytest.raises(RuntimeError, match="compression/src"):
+    with pytest.raises(RuntimeError, match="emb/compression/src"):
         posterior_compression._resolve_project_root()
 
 
 def test_indentation_resolve_project_root_raises_when_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(posterior_indentation.os.path, "exists", lambda _path: False)
-    with pytest.raises(RuntimeError, match="indentation/src"):
+    with pytest.raises(RuntimeError, match="emb/indentation/src"):
         posterior_indentation._resolve_project_root()
 
 
@@ -279,7 +301,7 @@ def test_resolve_config_path_raises_when_missing(
 
 
 def test_compression_load_config_caches_by_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    config_path = tmp_path / "compression.yaml"
+    config_path = tmp_path / "emb.compression.yaml"
     config_path.write_text("value: 1\n", encoding="utf-8")
     monkeypatch.setattr(posterior_compression, "_resolve_config_path", lambda _root: config_path)
     first = posterior_compression._load_config(str(tmp_path))
@@ -290,7 +312,7 @@ def test_compression_load_config_caches_by_path(monkeypatch: pytest.MonkeyPatch,
 
 
 def test_indentation_load_config_caches_and_dump_flag(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    config_path = tmp_path / "indentation.yaml"
+    config_path = tmp_path / "emb.indentation.yaml"
     config_path.write_text("dump: true\n", encoding="utf-8")
     monkeypatch.setattr(posterior_indentation, "_resolve_config_path", lambda _root: config_path)
     first = posterior_indentation._load_config(str(tmp_path))
@@ -668,7 +690,7 @@ def test_indentation_adjust_and_prepare_simulation_parameters(
     )
     monkeypatch.setitem(
         sys.modules,
-        "indentation.src.parameters",
+        "emb.indentation.src.parameters",
         types.SimpleNamespace(
             write_parameters=lambda **kwargs: write_calls.append(kwargs),
         ),

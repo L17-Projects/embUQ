@@ -10,10 +10,10 @@ from pathlib import Path
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "compression"))
-sys.path.insert(0, str(PROJECT_ROOT / "compression" / "evalkit"))
-sys.path.insert(0, str(PROJECT_ROOT / "indentation"))
-sys.path.insert(0, str(PROJECT_ROOT / "indentation" / "evalkit"))
+sys.path.insert(0, str(PROJECT_ROOT / "emb" / "compression"))
+sys.path.insert(0, str(PROJECT_ROOT / "emb" / "compression" / "evalkit"))
+sys.path.insert(0, str(PROJECT_ROOT / "emb" / "indentation"))
+sys.path.insert(0, str(PROJECT_ROOT / "emb" / "indentation" / "evalkit"))
 from meso_uq.config import resolve_inference_config_path
 from meso_uq.experiments import load_experiments
 from meso_uq.inference import run_gv_phase1_dnn_execution, write_gv_phase1_setup_manifest
@@ -28,19 +28,19 @@ from meso_uq.workflow_acceleration import (
 
 
 def datedPrint(*args, **kwargs):
-    from compression.evalkit.tools import datedPrint as _datedPrint
+    from emb.compression.evalkit.tools import datedPrint as _datedPrint
 
     return _datedPrint(*args, **kwargs)
 
 
 def prepareCompression(*args, **kwargs):
-    from compression.evalkit.tools import prepareCompression as _prepareCompression
+    from emb.compression.evalkit.tools import prepareCompression as _prepareCompression
 
     return _prepareCompression(*args, **kwargs)
 
 
 def prepareIndentation(*args, **kwargs):
-    from indentation.evalkit.prepare_env import prepareIndentation as _prepareIndentation
+    from emb.indentation.evalkit.prepare_env import prepareIndentation as _prepareIndentation
 
     return _prepareIndentation(*args, **kwargs)
 
@@ -235,13 +235,13 @@ def run_inference(
         return
 
     os.environ["HUQ_INFERENCE_CONFIG"] = str(config_path_resolved)
-    from compression.evalkit.posterior_compression import (
+    from emb.compression.evalkit.posterior_compression import (
         compute_compression,
         compute_compression_surrogate,
         compute_compression_surrogate_batch,
         preload_compression_surrogate,
     )
-    from indentation.evalkit.posterior_indentation import (
+    from emb.indentation.evalkit.posterior_indentation import (
         compute_indentation_surrogate,
         compute_indentation_surrogate_batch,
         preload_indentation_surrogate,

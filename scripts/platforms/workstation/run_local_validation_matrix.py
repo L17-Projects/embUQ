@@ -209,7 +209,7 @@ def _validate_overlay_outputs(overlay_paths: dict[str, dict[str, list[str]]]) ->
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Run o369 local validation workflows (full/reduced x compression/indentation) "
+            "Run o369 local validation workflows (full/reduced x EMB compression/indentation) "
             "without SLURM, then generate propagation and MAP overlays."
         )
     )

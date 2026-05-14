@@ -98,7 +98,7 @@ _MODALITIES: tuple[ModalityDescriptor, ...] = (
         surrogate_outputs=("force",),
         config_schema="meso_uq.emb.compression.v1",
         artifact_manifest_kinds=(ArtifactClass.TRAINING_MANIFEST, ArtifactClass.RUN_MANIFEST),
-        metadata={"legacy_root": "compression", "smoke_scope": "metadata"},
+        metadata={"legacy_root": "emb/compression", "smoke_scope": "metadata"},
     ),
     ModalityDescriptor(
         modality=Modality.INDENTATION,
@@ -117,7 +117,7 @@ _MODALITIES: tuple[ModalityDescriptor, ...] = (
         surrogate_outputs=("displacement",),
         config_schema="meso_uq.emb.indentation.v1",
         artifact_manifest_kinds=(ArtifactClass.TRAINING_MANIFEST, ArtifactClass.RUN_MANIFEST),
-        metadata={"legacy_root": "indentation", "smoke_scope": "metadata"},
+        metadata={"legacy_root": "emb/indentation", "smoke_scope": "metadata"},
     ),
     ModalityDescriptor(
         modality=Modality.STRETCHING,

@@ -49,7 +49,7 @@ def test_experiment_reference_loading(tmp_path: Path):
                 "diameters": [2.1],
                 "data_dir": str(data_dir),
                 "data_prefix": "indentation_data_",
-                "surrogate_dir": "indentation/surrogate/diameters",
+                "surrogate_dir": "emb/indentation/surrogate/diameters",
             }
         ],
     }

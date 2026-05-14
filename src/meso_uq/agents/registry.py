@@ -58,7 +58,7 @@ AGENT_REGISTRY: dict[AgentFamily, AgentDefinition] = {
             ),
         ),
         default_for_legacy=True,
-        metadata={"legacy_roots": ("compression", "indentation")},
+        metadata={"legacy_roots": ("emb/compression", "emb/indentation")},
     ),
     AgentFamily.GV: AgentDefinition(
         family=AgentFamily.GV,

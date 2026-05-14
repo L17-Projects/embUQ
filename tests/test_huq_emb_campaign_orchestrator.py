@@ -59,7 +59,7 @@ def test_huq_emb_orchestrator_runs_workflow_and_manifest_postprocess(tmp_path, m
                 "job_manifests": [],
                 "policy": {"status": "pass", "violations": []},
             }
-            (lane_root / "compression.json").write_text(
+            (lane_root / "emb.compression.json").write_text(
                 json.dumps(lane_payload), encoding="utf-8"
             )
         elif script_name == "run_postprocess_figures.py":

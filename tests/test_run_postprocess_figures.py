@@ -133,7 +133,7 @@ def test_run_postprocess_figures_emits_release_manifest_and_passes_when_complete
 
     monkeypatch.setattr(module, "_run", fake_run)
     _write_required_assets(module, tmp_path)
-    lane_manifest = tmp_path / "manifests" / "lanes" / "compression.json"
+    lane_manifest = tmp_path / "manifests" / "lanes" / "emb.compression.json"
     lane_manifest.parent.mkdir(parents=True, exist_ok=True)
     _write_lane_manifest(lane_manifest)
 
@@ -166,7 +166,7 @@ def test_run_postprocess_figures_release_gate_fails_on_missing_assets(
         return 0
 
     monkeypatch.setattr(module, "_run", fake_run)
-    lane_manifest = tmp_path / "manifests" / "lanes" / "compression.json"
+    lane_manifest = tmp_path / "manifests" / "lanes" / "emb.compression.json"
     lane_manifest.parent.mkdir(parents=True, exist_ok=True)
     _write_lane_manifest(lane_manifest)
 

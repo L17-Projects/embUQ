@@ -266,7 +266,7 @@ def test_common_catalog_preserves_emb_lookup_behavior() -> None:
     assert resolved["dataset_id"] == "emb:compression:diameter_2.1um:default"
     assert resolved["metadata"]["legacy_name"] == "compression_2.1um"
     assert resolved["surrogate_artifact"].endswith(
-        "/compression/surrogate/diameters/2.1um/trained/microbubble_force_BNN.pt"
+        "/emb/compression/surrogate/diameters/2.1um/trained/microbubble_force_BNN.pt"
     )
 
 

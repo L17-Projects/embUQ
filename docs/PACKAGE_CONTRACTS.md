@@ -10,7 +10,7 @@ It defines where new metadata belongs while the legacy workflow entry points rem
 - `src/meso_uq/agents/emb/` and `src/meso_uq/agents/gv/`: metadata-only family boundaries for EMB and GV constants.
 - `src/meso_uq/agents/emb/workflows.py`: EMB compression/indentation generation contracts, legacy script identities, config-resolution candidates, parameter-file names, and modality-specific runtime-prep constants.
 - `src/meso_uq/modalities/registry.py`: modality descriptors for EMB compression, EMB indentation, GV stretching, GV buckling, GV torsion, GV eigenmodes, and experimental GV shear flow.
-- `src/meso_uq/simulation/emb_generation.py`: shared EMB parameter-sweep, command-file, and legacy Sbatch generation logic consumed by the compatibility `compression/src/generate.py` and `indentation/src/generate.py` entry points.
+- `src/meso_uq/simulation/emb_generation.py`: shared EMB parameter-sweep, command-file, and legacy Sbatch generation logic consumed by the compatibility `emb/compression/src/generate.py` and `emb/indentation/src/generate.py` entry points.
 - `src/meso_uq/surrogate/emb_workflows.py`: shared EMB surrogate workflow contracts for deterministic NN and BNN wrapper commands, checkpoint metadata, dataset split metadata, backend resolution, and grouped holdout orchestration.
 - `src/meso_uq/surrogate/compat.py`: dependency-light serialized-surrogate compatibility manifest and pickle-alias installer for legacy class paths.
 - `src/meso_uq/config/aliases.py`: dependency-light legacy config-root alias inventory and resolution records used during config-path migration.

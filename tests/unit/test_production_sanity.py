@@ -265,16 +265,16 @@ def test_evaluate_map_surrogate_prediction_for_both_experiments(
     map_csv = tmp_path / "map.csv"
     map_csv.write_text("Yt,kb,d0,sigma\n1.0,2.0,0.1,0.01\n", encoding="utf-8")
 
-    comp_mod = types.ModuleType("compression.evalkit.posterior_compression")
+    comp_mod = types.ModuleType("emb.compression.evalkit.posterior_compression")
     comp_mod.compute_compression_surrogate = lambda sample, points, diameter: sample.__setitem__(
         "Reference Evaluations", [diameter + x for x in points]
     )
-    ind_mod = types.ModuleType("indentation.evalkit.posterior_indentation")
+    ind_mod = types.ModuleType("emb.indentation.evalkit.posterior_indentation")
     ind_mod.compute_indentation_surrogate = lambda sample, points, diameter: sample.__setitem__(
         "Reference Evaluations", [diameter - x for x in points]
     )
-    monkeypatch.setitem(sys.modules, "compression.evalkit.posterior_compression", comp_mod)
-    monkeypatch.setitem(sys.modules, "indentation.evalkit.posterior_indentation", ind_mod)
+    monkeypatch.setitem(sys.modules, "emb.compression.evalkit.posterior_compression", comp_mod)
+    monkeypatch.setitem(sys.modules, "emb.indentation.evalkit.posterior_indentation", ind_mod)
 
     comp = ps._evaluate_map_surrogate_prediction(
         tmp_path,
@@ -341,10 +341,10 @@ def test_ensure_evalkit_paths_and_render_bundle_cover_remaining_branches(
         repo_root = tmp_path / "repo"
         ps._ensure_evalkit_paths(repo_root)
         expected_prefixes = [
-            str(repo_root / "compression"),
-            str(repo_root / "compression" / "evalkit"),
-            str(repo_root / "indentation"),
-            str(repo_root / "indentation" / "evalkit"),
+            str(repo_root / "emb" / "compression"),
+            str(repo_root / "emb" / "compression" / "evalkit"),
+            str(repo_root / "emb" / "indentation"),
+            str(repo_root / "emb" / "indentation" / "evalkit"),
         ]
         for entry in expected_prefixes:
             assert entry in sys.path

@@ -30,7 +30,7 @@ def _load_module(path: Path, name: str):
 def test_compression_train_multi_arch_helpers(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        repo_root / "emb" / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
         "compression_train_multi_arch_test",
     )
 
@@ -86,7 +86,7 @@ def test_compression_train_multi_arch_helpers(tmp_path, monkeypatch):
 def test_compression_train_multi_arch_main_writes_report(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        repo_root / "emb" / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
         "compression_train_multi_arch_main_test",
     )
 
@@ -135,7 +135,7 @@ def test_compression_train_multi_arch_main_writes_report(tmp_path, monkeypatch):
 def test_compression_resolve_data_path_uses_fallback_candidates(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        repo_root / "emb" / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
         "compression_train_multi_arch_paths_test",
     )
 
@@ -153,7 +153,7 @@ def test_compression_resolve_data_path_uses_fallback_candidates(tmp_path, monkey
 def test_compression_train_multi_arch_collect_only_and_error_paths(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        repo_root / "emb" / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
         "compression_train_multi_arch_collect_only_test",
     )
 
@@ -206,7 +206,7 @@ def test_compression_train_multi_arch_collect_only_and_error_paths(tmp_path, mon
 def test_compression_train_multi_arch_rejects_invalid_arch_selection(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        repo_root / "emb" / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
         "compression_train_multi_arch_invalid_arch_test",
     )
 
@@ -250,7 +250,7 @@ def test_compression_train_multi_arch_rejects_invalid_arch_selection(tmp_path, m
 def test_compression_train_multi_arch_resolve_data_path_fallbacks(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        repo_root / "emb" / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
         "compression_train_multi_arch_paths_test",
     )
 
@@ -279,7 +279,7 @@ def test_compression_train_multi_arch_resolve_data_path_fallbacks(tmp_path, monk
 def test_compression_train_multi_arch_finalize_results_writes_artifacts(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        repo_root / "emb" / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
         "compression_train_multi_arch_finalize_test",
     )
 
@@ -318,7 +318,7 @@ def test_compression_train_multi_arch_finalize_results_writes_artifacts(tmp_path
 def test_compression_train_multi_arch_finalize_results_rejects_empty_results(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        repo_root / "emb" / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
         "compression_train_multi_arch_finalize_empty_test",
     )
 
@@ -334,7 +334,7 @@ def test_compression_train_multi_arch_finalize_results_rejects_empty_results(tmp
 def test_compression_train_multi_arch_main_collect_only_aggregates_results(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        repo_root / "emb" / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
         "compression_train_multi_arch_collect_only_test",
     )
 
@@ -384,7 +384,7 @@ def test_compression_train_multi_arch_main_collect_only_aggregates_results(tmp_p
 def test_compression_train_multi_arch_main_collect_only_requires_result_jsons(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        repo_root / "emb" / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
         "compression_train_multi_arch_collect_only_missing_results_test",
     )
 
@@ -415,7 +415,7 @@ def test_compression_train_multi_arch_main_collect_only_requires_result_jsons(tm
 def test_compression_train_multi_arch_main_rejects_invalid_single_arch_selection(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        repo_root / "emb" / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
         "compression_train_multi_arch_single_arch_errors_test",
     )
 
@@ -459,7 +459,7 @@ def test_compression_train_multi_arch_main_rejects_invalid_single_arch_selection
 def test_compression_train_multi_arch_main_requires_existing_training_data(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
+        repo_root / "emb" / "compression" / "surrogate" / "scripts" / "train_multi_arch.py",
         "compression_train_multi_arch_missing_data_test",
     )
 

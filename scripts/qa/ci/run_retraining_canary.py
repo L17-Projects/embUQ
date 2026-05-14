@@ -11,7 +11,7 @@ from pathlib import Path
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_CONFIG = REPO_ROOT / "compression" / "surrogate" / "ci" / "retraining_smoke.yaml"
+DEFAULT_CONFIG = REPO_ROOT / "emb" / "compression" / "surrogate" / "ci" / "retraining_smoke.yaml"
 DEFAULT_OUTPUT_ROOT = REPO_ROOT / "_ci" / "surrogate_retraining"
 
 

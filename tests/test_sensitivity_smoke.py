@@ -116,7 +116,7 @@ def test_run_sobol_over_axis_supports_predictor_backend():
 def test_compression_sobol_cli_writes_csv(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "compression" / "surrogate" / "sensitivity" / "scripts" / "run_sobol_vs_disp.py",
+        repo_root / "emb" / "compression" / "surrogate" / "sensitivity" / "scripts" / "run_sobol_vs_disp.py",
         "compression_sobol_cli_test",
     )
     model_path = tmp_path / "compression_model.pkl"
@@ -149,7 +149,7 @@ def test_compression_sobol_cli_writes_csv(tmp_path, monkeypatch):
 def test_indentation_sobol_cli_writes_csv(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "indentation" / "surrogate" / "sensitivity" / "scripts" / "run_sobol_vs_force.py",
+        repo_root / "emb" / "indentation" / "surrogate" / "sensitivity" / "scripts" / "run_sobol_vs_force.py",
         "indentation_sobol_cli_test",
     )
     model_path = tmp_path / "indentation_model.pkl"

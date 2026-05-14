@@ -103,7 +103,7 @@ def test_extract_map_surrogate_curve_uses_map_parameters_and_surrogate(monkeypat
 
     monkeypatch.setitem(
         sys.modules,
-        "compression.evalkit.posterior_compression",
+        "emb.compression.evalkit.posterior_compression",
         types.SimpleNamespace(
             compute_compression_surrogate=fake_compute,
             compute_compression_surrogate_batch=lambda *args, **kwargs: None,

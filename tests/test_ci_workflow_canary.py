@@ -79,8 +79,8 @@ def test_ci_workflow_canary_config_uses_multiple_public_diameters():
     assert len(diameters) >= 2
 
     for diameter in diameters:
-        data_file = repo_root / "compression" / "evalkit" / "data" / f"compression_data_{diameter}um.dat"
-        surrogate_dir = repo_root / "compression" / "surrogate" / "diameters" / f"{diameter}um"
+        data_file = repo_root / "emb" / "compression" / "evalkit" / "data" / f"compression_data_{diameter}um.dat"
+        surrogate_dir = repo_root / "emb" / "compression" / "surrogate" / "diameters" / f"{diameter}um"
         assert data_file.exists()
         assert surrogate_dir.is_dir()
 

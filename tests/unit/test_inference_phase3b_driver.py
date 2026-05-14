@@ -22,10 +22,10 @@ def _load_module():
     repo_root = Path(__file__).resolve().parents[2]
     for extra in [
         repo_root,
-        repo_root / "compression",
-        repo_root / "compression" / "evalkit",
-        repo_root / "indentation",
-        repo_root / "indentation" / "evalkit",
+        repo_root / "emb" / "compression",
+        repo_root / "emb" / "compression" / "evalkit",
+        repo_root / "emb" / "indentation",
+        repo_root / "emb" / "indentation" / "evalkit",
     ]:
         if str(extra) not in sys.path:
             sys.path.insert(0, str(extra))
@@ -48,17 +48,17 @@ def _load_module():
     mpi4py_mod.MPI = types.SimpleNamespace(COMM_WORLD=_FakeComm())
     sys.modules.setdefault("mpi4py", mpi4py_mod)
 
-    comp_mod = types.ModuleType("compression.evalkit.posterior_compression")
+    comp_mod = types.ModuleType("emb.compression.evalkit.posterior_compression")
     comp_mod.compute_compression_surrogate = lambda *a, **kw: None
     comp_mod.compute_compression_surrogate_batch = lambda *a, **kw: None
     comp_mod.preload_compression_surrogate = lambda *a, **kw: None
-    sys.modules.setdefault("compression.evalkit.posterior_compression", comp_mod)
+    sys.modules.setdefault("emb.compression.evalkit.posterior_compression", comp_mod)
 
-    ind_mod = types.ModuleType("indentation.evalkit.posterior_indentation")
+    ind_mod = types.ModuleType("emb.indentation.evalkit.posterior_indentation")
     ind_mod.compute_indentation_surrogate = lambda *a, **kw: None
     ind_mod.compute_indentation_surrogate_batch = lambda *a, **kw: None
     ind_mod.preload_indentation_surrogate = lambda *a, **kw: None
-    sys.modules.setdefault("indentation.evalkit.posterior_indentation", ind_mod)
+    sys.modules.setdefault("emb.indentation.evalkit.posterior_indentation", ind_mod)
 
     module_path = repo_root / "inference" / "scripts" / "run_phase_3b.py"
     key = "mesouq_test_phase3b_driver"

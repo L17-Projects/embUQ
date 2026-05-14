@@ -5,7 +5,7 @@ It inventories current EMB workflow surfaces and identifies the smallest safe ex
 
 ## Scope and constraints in this slice
 
-- No broad runtime moves in `compression/`, `indentation/`, `reduced/`, `inference/`, `src/meso_uq/core/**`, or workflow runner scripts.
+- No broad runtime moves in `emb/compression/`, `emb/indentation/`, `reduced/`, `inference/`, `src/meso_uq/core/**`, or workflow runner scripts.
 - Focus on evidence gathering, compatibility risks, and first extraction sequencing.
 - Add inventory guardrails so path/entrypoint drift is caught early.
 
@@ -15,40 +15,40 @@ It inventories current EMB workflow surfaces and identifies the smallest safe ex
 
 Shared behavior:
 - Both modality generators implement the same parameter sweep loop shape, command generation, and `run_HPC.sbatch` creation.
-  - `compression/src/generate.py` lines 29-139
-  - `indentation/src/generate.py` lines 24-129
+  - `emb/compression/src/generate.py` lines 29-139
+  - `emb/indentation/src/generate.py` lines 24-129
 - Both parameter writers support EMB-only runtime prep and generate `parameters*.yaml`, `parameters.prms*.yaml`, and `posq.txt`.
-  - `compression/src/parameters.py` lines 41-148
-  - `indentation/src/parameters.py` lines 19-131
+  - `emb/compression/src/parameters.py` lines 41-148
+  - `emb/indentation/src/parameters.py` lines 19-131
 
 Divergence:
 - Config resolution style differs:
-  - compression scans many fallback paths (`compression/src/generate.py` lines 10-27, `compression/src/parameters.py` lines 13-35)
-  - indentation primarily uses repo-root absolute resolution in `parameters.py` (`indentation/src/parameters.py` lines 14-17), but fallback scan in `generate.py` (`indentation/src/generate.py` lines 9-21)
+  - compression scans many fallback paths (`emb/compression/src/generate.py` lines 10-27, `emb/compression/src/parameters.py` lines 13-35)
+  - indentation primarily uses repo-root absolute resolution in `parameters.py` (`emb/indentation/src/parameters.py` lines 14-17), but fallback scan in `generate.py` (`emb/indentation/src/generate.py` lines 9-21)
 - Execution method differs:
-  - compression uses `os.system("cd ... && python3 sphere_icosphere.py ...")` (`compression/src/parameters.py` line 76)
-  - indentation uses `subprocess.run(..., cwd=...)` (`indentation/src/parameters.py` lines 56-60)
+  - compression uses `os.system("cd ... && python3 sphere_icosphere.py ...")` (`emb/compression/src/parameters.py` line 76)
+  - indentation uses `subprocess.run(..., cwd=...)` (`emb/indentation/src/parameters.py` lines 56-60)
 - Numeric behavior diverges in at least one physics parameter:
-  - indentation scales `mvert *= 5.0` (`indentation/src/parameters.py` line 70), compression does not.
+  - indentation scales `mvert *= 5.0` (`emb/indentation/src/parameters.py` line 70), compression does not.
 
 ### 2) Surrogate evaluate flows (DNN/BNN)
 
 Shared behavior:
 - DNN evaluators expose single-sample and batch APIs with shape checks and non-negative clipping.
-  - compression DNN: `compression/surrogate/evaluate.py` lines 64-202
-  - indentation DNN: `indentation/surrogate/evaluate.py` lines 74-210
+  - compression DNN: `emb/compression/surrogate/evaluate.py` lines 64-202
+  - indentation DNN: `emb/indentation/surrogate/evaluate.py` lines 74-210
 - BNN evaluators expose parallel APIs returning `(mean, std)` for single and batch modes.
-  - compression BNN: `compression/surrogate/evaluate_bnn.py` lines 50-133
-  - indentation BNN: `indentation/surrogate/evaluate_bnn.py` lines 52-137
+  - compression BNN: `emb/compression/surrogate/evaluate_bnn.py` lines 50-133
+  - indentation BNN: `emb/indentation/surrogate/evaluate_bnn.py` lines 52-137
 
 Divergence:
 - Artifact name handling differs:
-  - compression DNN expects `microbubble_force_BEST.pkl` directly (`compression/surrogate/evaluate.py` lines 32-34)
-  - indentation DNN has dual-name fallback (`indentation/surrogate/evaluate.py` lines 33-41)
+  - compression DNN expects `microbubble_force_BEST.pkl` directly (`emb/compression/surrogate/evaluate.py` lines 32-34)
+  - indentation DNN has dual-name fallback (`emb/indentation/surrogate/evaluate.py` lines 33-41)
   - compression BNN candidate set is smaller than indentation BNN candidate set (`evaluate_bnn.py` candidate tuples at lines 12-15 vs 12-17)
 - Batch correction semantics differ by modality axis:
-  - compression subtracts `d0` from displacement before inference (`compression/surrogate/evaluate.py` line 166)
-  - indentation adds `d0` after displacement prediction (`indentation/surrogate/evaluate.py` lines 184-186)
+  - compression subtracts `d0` from displacement before inference (`emb/compression/surrogate/evaluate.py` line 166)
+  - indentation adds `d0` after displacement prediction (`emb/indentation/surrogate/evaluate.py` lines 184-186)
 
 ### 3) Train / holdout / BNN / multi-arch flows
 
@@ -64,13 +64,13 @@ Shared behavior:
   - indentation: `run_group_holdout.py` lines 28-158
 
 Divergence:
-- Indentation training wrappers carry loader-specific knobs (`--disp-source`, `--rupture-ratio`) not present in compression.
-  - `indentation/surrogate/scripts/emb_train.py` lines 19-23
-  - `indentation/surrogate/scripts/emb_train_bnn.py` lines 41-54
-  - `indentation/surrogate/scripts/run_group_holdout.py` lines 39-66
+- Indentation training wrappers carry loader-specific knobs (`--disp-source`, `--rupture-ratio`) not present in emb.compression.
+  - `emb/indentation/surrogate/scripts/emb_train.py` lines 19-23
+  - `emb/indentation/surrogate/scripts/emb_train_bnn.py` lines 41-54
+  - `emb/indentation/surrogate/scripts/run_group_holdout.py` lines 39-66
 - Multi-arch implementations are asymmetrical:
-  - compression multi-arch uses shared CLI loader/trainer (`compression/.../train_multi_arch.py` lines 21, 44-71)
-  - indentation multi-arch has custom data cleaning + custom torch loop in script (`indentation/.../train_multi_arch.py` lines 68-206)
+  - compression multi-arch uses shared CLI loader/trainer (`emb/compression/.../train_multi_arch.py` lines 21, 44-71)
+  - indentation multi-arch has custom data cleaning + custom torch loop in script (`emb/indentation/.../train_multi_arch.py` lines 68-206)
 
 ### 4) Validation-matrix and wrapper references
 
@@ -92,10 +92,10 @@ Divergence:
 
 Risk:
 - Evalkit root/config discovery still probes `cwd`, parent, grandparent and relative config paths.
-  - compression: `compression/evalkit/posterior_compression.py` lines 65-93 and 252-259
-  - indentation: `indentation/evalkit/posterior_indentation.py` lines 61-85
+  - compression: `emb/compression/evalkit/posterior_compression.py` lines 65-93 and 252-259
+  - indentation: `emb/indentation/evalkit/posterior_indentation.py` lines 61-85
 - Legacy runtime `compute_compression()` writes beneath project-root-relative folders discovered from cwd (`_out/...`, `_init_...`).
-  - `compression/evalkit/posterior_compression.py` lines 280-286
+  - `emb/compression/evalkit/posterior_compression.py` lines 280-286
 
 Compatibility implication:
 - Moving scripts/modules without a stable path resolver contract can silently break runtime discovery in downstream wrapper usage.
@@ -104,7 +104,7 @@ Compatibility implication:
 
 Risk:
 - Legacy compression runtime still uses `_out/compression_<d>um` and `_init_compression_<d>um`.
-  - `compression/evalkit/posterior_compression.py` lines 280-286
+  - `emb/compression/evalkit/posterior_compression.py` lines 280-286
 - Validation matrix and modern wrappers enforce canonical `_runs/...` (or `paper_data/...`) roots.
   - docs policy: `docs/VEGA_VALIDATION_MATRIX.md` lines 103-108
   - wrapper enforcement path: `scripts/platforms/vega/run_validation_matrix.py` lines 61-70 and `run_workflow_matrix.py` lines 454-459
@@ -170,13 +170,13 @@ Rationale:
 MES-140 implementation note:
 - `src/meso_uq/agents/emb/workflows.py` now records the EMB compression/indentation generation contracts, config-resolution candidates, parameter-file naming, legacy script identities, and modality-specific runtime-prep constants such as indentation's mass multiplier.
 - `src/meso_uq/simulation/emb_generation.py` now owns the shared parameter-sweep expansion, generated `parameters-default*.yaml` grid, `commands.txt` writing, and legacy `run_HPC.sbatch` text.
-- `compression/src/generate.py` and `indentation/src/generate.py` remain compatibility entry points with the same CLI flags while delegating the duplicated generation loop to the package helper.
-- `compression/src/parameters.py` and `indentation/src/parameters.py` still own the heavy runtime-preparation physics and mesh generation; their extraction remains a follow-up because it depends on preserving the documented compression/indentation numeric differences.
+- `emb/compression/src/generate.py` and `emb/indentation/src/generate.py` remain compatibility entry points with the same CLI flags while delegating the duplicated generation loop to the package helper.
+- `emb/compression/src/parameters.py` and `emb/indentation/src/parameters.py` still own the heavy runtime-preparation physics and mesh generation; their extraction remains a follow-up because it depends on preserving the documented compression/indentation numeric differences.
 
 MES-141 implementation note:
 - `src/meso_uq/surrogate/emb_workflows.py` now records the EMB compression/indentation surrogate workflow contracts for deterministic NN and BNN wrappers, checkpoint metadata, dataset split metadata, backend resolution, and grouped holdout orchestration.
-- `compression/surrogate/scripts/emb_train.py`, `indentation/surrogate/scripts/emb_train.py`, `compression/surrogate/scripts/emb_train_bnn.py`, `indentation/surrogate/scripts/emb_train_bnn.py`, and both `run_group_holdout.py` wrappers remain callable compatibility entry points while delegating shared CLI/parser/orchestration behavior.
-- `compression/surrogate/evaluate.py` and `indentation/surrogate/evaluate.py` remain untouched in this slice because evaluator extraction has higher coupling to serialized artifact names and runtime prediction semantics.
+- `emb/compression/surrogate/scripts/emb_train.py`, `emb/indentation/surrogate/scripts/emb_train.py`, `emb/compression/surrogate/scripts/emb_train_bnn.py`, `emb/indentation/surrogate/scripts/emb_train_bnn.py`, and both `run_group_holdout.py` wrappers remain callable compatibility entry points while delegating shared CLI/parser/orchestration behavior.
+- `emb/compression/surrogate/evaluate.py` and `emb/indentation/surrogate/evaluate.py` remain untouched in this slice because evaluator extraction has higher coupling to serialized artifact names and runtime prediction semantics.
 
 ## Recommended next extraction issue order
 
@@ -186,6 +186,6 @@ MES-141 implementation note:
 
 ## Out of scope in this slice
 
-- No movement of runtime simulation code from `compression/src` or `indentation/src`.
+- No movement of runtime simulation code from `emb/compression/src` or `emb/indentation/src`.
 - No wrapper deletions.
 - No GPU matrix execution; integrator still must run target-environment evidence flows.

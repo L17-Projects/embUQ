@@ -363,11 +363,11 @@ def extract_map_surrogate_curve(
 
     with inference_config_environment(workflow_config_path(modality, model_kind)):
         if modality == "compression":
-            from compression.evalkit.posterior_compression import compute_compression_surrogate
+            from emb.compression.evalkit.posterior_compression import compute_compression_surrogate
 
             compute_compression_surrogate(sample, x_dpd.tolist(), float(diameter))
         else:
-            from indentation.evalkit.posterior_indentation import compute_indentation_surrogate
+            from emb.indentation.evalkit.posterior_indentation import compute_indentation_surrogate
 
             compute_indentation_surrogate(sample, x_dpd.tolist(), float(diameter))
 
@@ -406,8 +406,8 @@ def resolve_parameters_file(modality: str, diameter: str) -> Path:
         return diameter_specific
 
     if modality == "compression":
-        return REPO_ROOT / "compression" / "src" / "parameters-default.emb.yaml"
-    return REPO_ROOT / "indentation" / "src" / "parameters-default.emb.yaml"
+        return REPO_ROOT / "emb" / "compression" / "src" / "parameters-default.emb.yaml"
+    return REPO_ROOT / "emb" / "indentation" / "src" / "parameters-default.emb.yaml"
 
 
 def load_scaling(modality: str, diameter: str) -> tuple[float, float]:
@@ -461,7 +461,14 @@ def convert_map_mirheo_to_real(
 
 
 def indentation_reference_diameter_dpd() -> float:
-    param_path = REPO_ROOT / "indentation" / "src" / "parameter" / "parameters-default00001.yaml"
+    param_path = (
+        REPO_ROOT
+        / "emb"
+        / "indentation"
+        / "src"
+        / "parameter"
+        / "parameters-default00001.yaml"
+    )
     with param_path.open("rb") as handle:
         params = yaml.load(handle, Loader=yaml.CLoader)
     return 2.0 * float(params["radp"])

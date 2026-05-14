@@ -12,33 +12,41 @@ from pathlib import Path
 
 def test_compression_equil_module_exists():
     """The file must be present regardless of Mirheo availability."""
-    path = Path(__file__).resolve().parents[2] / "compression" / "src" / "equil.py"
-    assert path.exists(), f"compression/src/equil.py not found at {path}"
+    path = Path(__file__).resolve().parents[2] / "emb" / "compression" / "src" / "equil.py"
+    assert path.exists(), f"emb/compression/src/equil.py not found at {path}"
 
 
 def test_indentation_equil_module_exists():
     """The file must be present regardless of Mirheo availability."""
-    path = Path(__file__).resolve().parents[2] / "indentation" / "src" / "equil.py"
-    assert path.exists(), f"indentation/src/equil.py not found at {path}"
+    path = Path(__file__).resolve().parents[2] / "emb" / "indentation" / "src" / "equil.py"
+    assert path.exists(), f"emb/indentation/src/equil.py not found at {path}"
+
+
+def test_compression_equil_config_lookup_reaches_repo_root_from_moved_source_dir():
+    """The moved emb/compression/src driver needs one more parent than compression/src."""
+    path = Path(__file__).resolve().parents[2] / "emb" / "compression" / "src" / "equil.py"
+    text = path.read_text(encoding="utf-8")
+    assert "../../../inference/configs/production/inference_config_compression.yaml" in text
+    assert "file_based_root" in text
 
 
 def test_compression_equil_importable():
     pytest = __import__("pytest")
     pytest.importorskip("mirheo")
-    from compression.src.equil import run_equil  # noqa: F401
+    from emb.compression.src.equil import run_equil  # noqa: F401
 
 
 def test_indentation_equil_importable():
     pytest = __import__("pytest")
     pytest.importorskip("mirheo")
-    from indentation.src.equil import run_equil  # noqa: F401
+    from emb.indentation.src.equil import run_equil  # noqa: F401
 
 
 def test_compression_run_equil_signature():
     """run_equil must accept the expected parameters."""
     pytest = __import__("pytest")
     pytest.importorskip("mirheo")
-    from compression.src.equil import run_equil
+    from emb.compression.src.equil import run_equil
 
     sig = inspect.signature(run_equil)
     params = list(sig.parameters)
@@ -50,7 +58,7 @@ def test_indentation_run_equil_signature():
     """run_equil must accept the expected parameters (including vacuum)."""
     pytest = __import__("pytest")
     pytest.importorskip("mirheo")
-    from indentation.src.equil import run_equil
+    from emb.indentation.src.equil import run_equil
 
     sig = inspect.signature(run_equil)
     params = list(sig.parameters)
@@ -61,12 +69,12 @@ def test_indentation_run_equil_signature():
 def test_compression_equil_has_findpids():
     pytest = __import__("pytest")
     pytest.importorskip("mirheo")
-    from compression.src import equil
+    from emb.compression.src import equil
     assert callable(equil.findpids)
 
 
 def test_indentation_equil_has_findpids():
     pytest = __import__("pytest")
     pytest.importorskip("mirheo")
-    from indentation.src import equil
+    from emb.indentation.src import equil
     assert callable(equil.findpids)

@@ -24,11 +24,11 @@ from meso_uq.workflows.legacy import (
 
 prepend_legacy_evalkit_paths(PROJECT_ROOT)
 
-from compression.evalkit.posterior_compression import (
+from emb.compression.evalkit.posterior_compression import (
     compute_compression_surrogate,
     preload_compression_surrogate,
 )
-from indentation.evalkit.posterior_indentation import (
+from emb.indentation.evalkit.posterior_indentation import (
     compute_indentation_surrogate,
     preload_indentation_surrogate,
 )

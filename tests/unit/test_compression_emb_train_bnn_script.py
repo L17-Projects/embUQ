@@ -74,7 +74,7 @@ def test_compression_emb_train_bnn_accepts_legacy_obs_noise_flag(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     module = _load_module(
-        repo_root / "compression" / "surrogate" / "scripts" / "emb_train_bnn.py",
+        repo_root / "emb" / "compression" / "surrogate" / "scripts" / "emb_train_bnn.py",
         "compression_emb_train_bnn_legacy_flag_test",
     )
 
@@ -96,7 +96,7 @@ def test_compression_emb_train_bnn_accepts_new_prior_scale_flag(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     module = _load_module(
-        repo_root / "compression" / "surrogate" / "scripts" / "emb_train_bnn.py",
+        repo_root / "emb" / "compression" / "surrogate" / "scripts" / "emb_train_bnn.py",
         "compression_emb_train_bnn_new_flag_test",
     )
 
@@ -116,7 +116,7 @@ def test_compression_emb_train_bnn_passes_max_epochs(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     module = _load_module(
-        repo_root / "compression" / "surrogate" / "scripts" / "emb_train_bnn.py",
+        repo_root / "emb" / "compression" / "surrogate" / "scripts" / "emb_train_bnn.py",
         "compression_emb_train_bnn_max_epochs_test",
     )
 

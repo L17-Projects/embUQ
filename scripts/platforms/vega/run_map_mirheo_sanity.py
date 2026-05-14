@@ -37,8 +37,8 @@ INIT_DIRECTORY_POLICY = {
     "mode": "auto_prepared_per_dataset_scratch_root",
     "preexisting_init_dirs_required": False,
     "scratch_root_pattern": "<lane output>/map_mirheo/_scratch/<dataset_name>",
-    "compression_template": "compression/src regenerated through generate_sim/write_parameters",
-    "indentation_template": "indentation/src copied into the scratch root",
+    "compression_template": "emb/compression/src regenerated through generate_sim/write_parameters",
+    "indentation_template": "emb/indentation/src copied into the scratch root",
     "missing_template_behavior": (
         "job fails explicitly; MAP Mirheo sanity does not skip missing init inputs"
     ),

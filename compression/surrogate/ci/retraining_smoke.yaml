@@ -1,8 +1,0 @@
-entrypoint: compression/surrogate/scripts/emb_train.py
-data: compression/surrogate/ci/compression_retraining_smoke.dat
-output_name: microbubble_force_ci.pkl
-width: 8
-depth: 1
-batch_size: 4
-lr: 0.001
-max_epoch: 5

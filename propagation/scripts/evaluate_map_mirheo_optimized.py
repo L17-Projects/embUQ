@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate MAP parameters with Mirheo DPD simulation (Optimized Grid) — compression.
+"""Evaluate MAP parameters with Mirheo DPD simulation (Optimized Grid) — emb.compression.
 
 Runs a single Mirheo simulation for the MAP parameters using an optimized
 displacement grid that extends ±X% beyond the experimental range (after d0
@@ -33,11 +33,11 @@ from mpi4py import MPI
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
-sys.path.insert(0, str(PROJECT_ROOT / "compression"))
-sys.path.insert(0, str(PROJECT_ROOT / "compression" / "evalkit"))
+sys.path.insert(0, str(PROJECT_ROOT / "emb" / "compression"))
+sys.path.insert(0, str(PROJECT_ROOT / "emb" / "compression" / "evalkit"))
 
-from compression.evalkit.posterior_compression import compute_compression
-from compression.evalkit.tools import datedPrint, getReferencePoints
+from emb.compression.evalkit.posterior_compression import compute_compression
+from emb.compression.evalkit.tools import datedPrint, getReferencePoints
 
 
 def load_map_parameters(map_file: str) -> dict:
@@ -76,7 +76,7 @@ def setup_map_specific_init_dir(
     Returns the path to the MAP-specific directory.
     """
     comm = MPI.COMM_WORLD
-    source_compression_path = str(PROJECT_ROOT / "compression" / "src") + "/"
+    source_compression_path = str(PROJECT_ROOT / "emb" / "compression" / "src") + "/"
     if scratch_root is None:
         map_init_dir = str(PROJECT_ROOT / f"_init_compression_{diameter_um}um_map")
     else:

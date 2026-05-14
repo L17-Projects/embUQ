@@ -183,7 +183,7 @@ def test_paper_release_manifest_pass_with_complete_assets_and_clean_lane(tmp_pat
     source_map = {
         "figures/main/experimental_reference_curves.pdf": {
             "source_lane": "compression:full-model:production",
-            "source_artifacts": ["runs/compression/full-model/production/phase3b"],
+            "source_artifacts": ["runs/emb/compression/full-model/production/phase3b"],
         }
     }
     main_entries = build_required_asset_entries(
@@ -270,14 +270,14 @@ def test_derive_asset_source_map_from_lane_metadata():
             "lane": "compression:full-model:production",
             "selection": {"experiment": "compression", "model_family": "full-model", "profile": "production"},
             "artifacts": {
-                "phase3b_map_manifest": "/runs/compression/full-model/production/map_phase3b/phase3b_map_manifest.json"
+                "phase3b_map_manifest": "/runs/emb/compression/full-model/production/map_phase3b/phase3b_map_manifest.json"
             },
         },
         {
             "lane": "indentation:reduced-model:production",
             "selection": {"experiment": "indentation", "model_family": "reduced-model", "profile": "production"},
             "artifacts": {
-                "phase3b_map_manifest": "/runs/indentation/reduced-model/production/map_phase3b/phase3b_map_manifest.json"
+                "phase3b_map_manifest": "/runs/emb/indentation/reduced-model/production/map_phase3b/phase3b_map_manifest.json"
             },
         },
     ]

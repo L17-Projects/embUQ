@@ -37,7 +37,7 @@ def test_retraining_canary_runner_writes_report_and_checks_outputs(tmp_path, mon
     rc = module.main(["--output-root", str(tmp_path)])
 
     assert rc == 0
-    assert str(repo_root / "compression" / "surrogate" / "scripts" / "emb_train.py") in captured["command"]
+    assert str(repo_root / "emb" / "compression" / "surrogate" / "scripts" / "emb_train.py") in captured["command"]
     report = json.loads((tmp_path / "retraining_canary_report.json").read_text(encoding="utf-8"))
     assert report["status"] == "passed"
     assert Path(report["artifacts"]["model"]).exists()
@@ -53,8 +53,8 @@ def test_retraining_canary_reports_command_failure_and_missing_outputs(tmp_path,
         "run_retraining_canary_error_paths_test",
     )
 
-    relative = module._resolve_repo_path("compression/surrogate/ci/retraining_smoke.yaml")
-    assert relative == repo_root / "compression" / "surrogate" / "ci" / "retraining_smoke.yaml"
+    relative = module._resolve_repo_path("emb/compression/surrogate/ci/retraining_smoke.yaml")
+    assert relative == repo_root / "emb" / "compression" / "surrogate" / "ci" / "retraining_smoke.yaml"
     assert module._loss_history_path(tmp_path / "model.pkl") == tmp_path / "model_loss_hist.pkl"
 
     def failing_run(command, cwd=None, capture_output=False, text=False):

@@ -6,10 +6,10 @@ import numpy as np
 import pytest
 import torch
 
-from compression.surrogate import evaluate as compression_evaluate
-from compression.surrogate import evaluate_bnn as compression_evaluate_bnn
-from indentation.surrogate import evaluate as indentation_evaluate
-from indentation.surrogate import evaluate_bnn as indentation_evaluate_bnn
+from emb.compression.surrogate import evaluate as compression_evaluate
+from emb.compression.surrogate import evaluate_bnn as compression_evaluate_bnn
+from emb.indentation.surrogate import evaluate as indentation_evaluate
+from emb.indentation.surrogate import evaluate_bnn as indentation_evaluate_bnn
 
 
 class _CompressionModel:

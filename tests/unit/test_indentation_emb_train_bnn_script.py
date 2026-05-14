@@ -80,7 +80,7 @@ def test_indentation_emb_train_bnn_uses_read_indentation_table(
     """
     repo_root = Path(__file__).resolve().parents[2]
     module = _load_module(
-        repo_root / "indentation" / "surrogate" / "scripts" / "emb_train_bnn.py",
+        repo_root / "emb" / "indentation" / "surrogate" / "scripts" / "emb_train_bnn.py",
         "indentation_emb_train_bnn_reader_test",
     )
 
@@ -105,7 +105,7 @@ def test_indentation_emb_train_bnn_accepts_obs_noise_flag(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     module = _load_module(
-        repo_root / "indentation" / "surrogate" / "scripts" / "emb_train_bnn.py",
+        repo_root / "emb" / "indentation" / "surrogate" / "scripts" / "emb_train_bnn.py",
         "indentation_emb_train_bnn_obs_noise_test",
     )
     captured = _run_script_with_args(module, monkeypatch, tmp_path, "--obs-noise", "0.42")
@@ -117,7 +117,7 @@ def test_indentation_emb_train_bnn_accepts_loader_knobs(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     module = _load_module(
-        repo_root / "indentation" / "surrogate" / "scripts" / "emb_train_bnn.py",
+        repo_root / "emb" / "indentation" / "surrogate" / "scripts" / "emb_train_bnn.py",
         "indentation_emb_train_bnn_loader_knobs_test",
     )
     captured = _run_script_with_args(
@@ -138,7 +138,7 @@ def test_indentation_emb_train_bnn_passes_max_epochs(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     module = _load_module(
-        repo_root / "indentation" / "surrogate" / "scripts" / "emb_train_bnn.py",
+        repo_root / "emb" / "indentation" / "surrogate" / "scripts" / "emb_train_bnn.py",
         "indentation_emb_train_bnn_max_epochs_test",
     )
     captured = _run_script_with_args(

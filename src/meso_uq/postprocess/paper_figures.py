@@ -77,7 +77,7 @@ def emb_yaml_path(modality: str, repo_root: Path) -> Path:
     """Return the parameters-default.emb.yaml path for a given modality."""
     if modality not in ("compression", "indentation"):
         raise ValueError(f"Unknown modality: {modality!r}")
-    return repo_root / modality / "src" / "parameters-default.emb.yaml"
+    return repo_root / "emb" / modality / "src" / "parameters-default.emb.yaml"
 
 
 # ---------------------------------------------------------------------------

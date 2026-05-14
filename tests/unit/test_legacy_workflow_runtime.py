@@ -24,14 +24,16 @@ from meso_uq.workflows.legacy import (
 
 def test_legacy_project_root_resolves_from_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     project = tmp_path / "repo"
-    (project / "compression" / "src").mkdir(parents=True)
+    (project / "emb" / "compression" / "src").mkdir(parents=True)
     workdir = project / "nested" / "child"
     workdir.mkdir(parents=True)
 
     monkeypatch.chdir(workdir)
 
     assert (
-        resolve_legacy_project_root(marker_parts=("compression", "src"), start_path=Path.cwd())
+        resolve_legacy_project_root(
+            marker_parts=("emb", "compression", "src"), start_path=Path.cwd()
+        )
         == project
     )
 
@@ -40,8 +42,8 @@ def test_legacy_project_root_uses_anchor_when_cwd_is_elsewhere(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     project = tmp_path / "repo"
-    anchor = project / "compression" / "evalkit" / "posterior_compression.py"
-    marker = project / "compression" / "src"
+    anchor = project / "emb" / "compression" / "evalkit" / "posterior_compression.py"
+    marker = project / "emb" / "compression" / "src"
     anchor.parent.mkdir(parents=True)
     marker.mkdir(parents=True)
     anchor.write_text("# anchor\n", encoding="utf-8")
@@ -51,16 +53,16 @@ def test_legacy_project_root_uses_anchor_when_cwd_is_elsewhere(
     monkeypatch.chdir(elsewhere)
 
     assert resolve_legacy_project_root(
-        marker_parts=("compression", "src"),
+        marker_parts=("emb", "compression", "src"),
         start_path=Path.cwd(),
         anchor_file=anchor,
     ) == project
 
 
 def test_legacy_project_root_raises_with_marker_name(tmp_path: Path) -> None:
-    with pytest.raises(RuntimeError, match="indentation/src"):
+    with pytest.raises(RuntimeError, match="emb/indentation/src"):
         resolve_legacy_project_root(
-            marker_parts=("indentation", "src"),
+            marker_parts=("emb", "indentation", "src"),
             start_path=tmp_path,
             max_parent_depth=0,
         )
@@ -120,10 +122,10 @@ def test_legacy_surrogate_backend_ignores_bnn_mc_knobs_for_backend_only_callers(
 
 def test_legacy_surrogate_trained_dir_is_modality_specific(tmp_path: Path) -> None:
     assert resolve_legacy_surrogate_trained_dir(tmp_path, "compression", 2.9) == (
-        tmp_path / "compression" / "surrogate" / "diameters" / "2.9um" / "trained"
+        tmp_path / "emb" / "compression" / "surrogate" / "diameters" / "2.9um" / "trained"
     )
     assert resolve_legacy_surrogate_trained_dir(tmp_path, "indentation", 3.2) == (
-        tmp_path / "indentation" / "surrogate" / "diameters" / "3.2um" / "trained"
+        tmp_path / "emb" / "indentation" / "surrogate" / "diameters" / "3.2um" / "trained"
     )
 
 
@@ -140,10 +142,10 @@ def test_legacy_evalkit_path_prepend_preserves_historical_precedence(
 
     assert inserted == tuple(str(path) for path in legacy_evalkit_import_paths(tmp_path))
     assert sys.path[:4] == [
-        str(tmp_path / "indentation" / "evalkit"),
-        str(tmp_path / "indentation"),
-        str(tmp_path / "compression" / "evalkit"),
-        str(tmp_path / "compression"),
+        str(tmp_path / "emb" / "indentation" / "evalkit"),
+        str(tmp_path / "emb" / "indentation"),
+        str(tmp_path / "emb" / "compression" / "evalkit"),
+        str(tmp_path / "emb" / "compression"),
     ]
 
 

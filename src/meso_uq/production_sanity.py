@@ -142,10 +142,10 @@ def _selection_output_root(matrix_root: Path, selection: VegaWorkflowSelection) 
 
 def _ensure_evalkit_paths(repo_root: Path) -> None:
     for path in (
-        repo_root / "compression",
-        repo_root / "compression" / "evalkit",
-        repo_root / "indentation",
-        repo_root / "indentation" / "evalkit",
+        repo_root / "emb" / "compression",
+        repo_root / "emb" / "compression" / "evalkit",
+        repo_root / "emb" / "indentation",
+        repo_root / "emb" / "indentation" / "evalkit",
     ):
         text = str(path)
         if text not in sys.path:
@@ -187,11 +187,11 @@ def _evaluate_map_surrogate_prediction(
 
     with _inference_config_environment(config_path):
         if experiment == "compression":
-            from compression.evalkit.posterior_compression import compute_compression_surrogate
+            from emb.compression.evalkit.posterior_compression import compute_compression_surrogate
 
             compute_compression_surrogate(sample, reference_points, diameter_um)
         elif experiment == "indentation":
-            from indentation.evalkit.posterior_indentation import compute_indentation_surrogate
+            from emb.indentation.evalkit.posterior_indentation import compute_indentation_surrogate
 
             compute_indentation_surrogate(sample, reference_points, diameter_um)
         else:

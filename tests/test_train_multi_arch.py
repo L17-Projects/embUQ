@@ -28,7 +28,7 @@ def _load_module(path: Path, name: str):
 def test_train_multi_arch_public_helpers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "indentation" / "surrogate" / "scripts" / "train_multi_arch.py",
+        repo_root / "emb" / "indentation" / "surrogate" / "scripts" / "train_multi_arch.py",
         "train_multi_arch_test",
     )
 
@@ -151,7 +151,7 @@ def test_train_multi_arch_public_helpers(tmp_path: Path, monkeypatch: pytest.Mon
 def test_train_multi_arch_main_single_arch_writes_result(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "indentation" / "surrogate" / "scripts" / "train_multi_arch.py",
+        repo_root / "emb" / "indentation" / "surrogate" / "scripts" / "train_multi_arch.py",
         "train_multi_arch_main_test",
     )
 

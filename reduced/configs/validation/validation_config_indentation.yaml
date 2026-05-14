@@ -7,13 +7,13 @@ emb_diameters:
   - 3.4
 
 experiment: indentation
-data_dir: indentation/evalkit/data
+data_dir: emb/indentation/evalkit/data
 data_prefix: indentation_data_
 data_files:
   3.2: data_morris_3.19.csv
   5.8: data_morris_5.76.csv
   3.4: data_morris_3.40.csv
-surrogate_dir: indentation/surrogate/diameters
+surrogate_dir: emb/indentation/surrogate/diameters
 
 frac_diam: 0.2
 use_surrogate: true

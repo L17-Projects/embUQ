@@ -337,7 +337,7 @@ def classify_generated_artifact_path(path_value: str | Path) -> GeneratedArtifac
     elif kind == GeneratedArtifactPathKind.PROTECTED_ROOT:
         reasons.append("protected source/tree root")
     elif kind == GeneratedArtifactPathKind.OWNER_DECISION_ONLY_CHECKPOINT:
-        reasons.append("compression/indentation checkpoint lineage needs owner decision")
+        reasons.append("EMB compression/indentation checkpoint lineage needs owner decision")
     elif kind == GeneratedArtifactPathKind.PATH_TRAVERSAL:
         reasons.append("path traversal is rejected before generated-root approval")
     elif kind == GeneratedArtifactPathKind.FORBIDDEN_PRIVATE_PATH:

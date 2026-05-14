@@ -80,10 +80,10 @@ def phase1_runtime(monkeypatch: pytest.MonkeyPatch):
     sys.modules.pop(key, None)
     monkeypatch.syspath_prepend(str(repo_root / "src"))
     monkeypatch.syspath_prepend(str(repo_root))
-    monkeypatch.syspath_prepend(str(repo_root / "compression"))
-    monkeypatch.syspath_prepend(str(repo_root / "compression" / "evalkit"))
-    monkeypatch.syspath_prepend(str(repo_root / "indentation"))
-    monkeypatch.syspath_prepend(str(repo_root / "indentation" / "evalkit"))
+    monkeypatch.syspath_prepend(str(repo_root / "emb" / "compression"))
+    monkeypatch.syspath_prepend(str(repo_root / "emb" / "compression" / "evalkit"))
+    monkeypatch.syspath_prepend(str(repo_root / "emb" / "indentation"))
+    monkeypatch.syspath_prepend(str(repo_root / "emb" / "indentation" / "evalkit"))
 
     fake_korali = _FakeKoraliModule()
     fake_comm = _FakeComm()
@@ -91,27 +91,27 @@ def phase1_runtime(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setitem(sys.modules, "korali", fake_korali)
     monkeypatch.setitem(sys.modules, "mpi4py", fake_mpi4py)
 
-    comp_mod = types.ModuleType("compression.evalkit.posterior_compression")
+    comp_mod = types.ModuleType("emb.compression.evalkit.posterior_compression")
     comp_mod.compute_compression = lambda *a, **kw: None
     comp_mod.compute_compression_surrogate = lambda *a, **kw: None
     comp_mod.compute_compression_surrogate_batch = lambda *a, **kw: None
     comp_mod.preload_compression_surrogate = lambda *a, **kw: None
-    monkeypatch.setitem(sys.modules, "compression.evalkit.posterior_compression", comp_mod)
+    monkeypatch.setitem(sys.modules, "emb.compression.evalkit.posterior_compression", comp_mod)
 
-    comp_tools = types.ModuleType("compression.evalkit.tools")
+    comp_tools = types.ModuleType("emb.compression.evalkit.tools")
     comp_tools.datedPrint = lambda *a, **kw: None
     comp_tools.prepareCompression = lambda *a, **kw: None
-    monkeypatch.setitem(sys.modules, "compression.evalkit.tools", comp_tools)
+    monkeypatch.setitem(sys.modules, "emb.compression.evalkit.tools", comp_tools)
 
-    ind_mod = types.ModuleType("indentation.evalkit.posterior_indentation")
+    ind_mod = types.ModuleType("emb.indentation.evalkit.posterior_indentation")
     ind_mod.compute_indentation_surrogate = lambda *a, **kw: None
     ind_mod.compute_indentation_surrogate_batch = lambda *a, **kw: None
     ind_mod.preload_indentation_surrogate = lambda *a, **kw: None
-    monkeypatch.setitem(sys.modules, "indentation.evalkit.posterior_indentation", ind_mod)
+    monkeypatch.setitem(sys.modules, "emb.indentation.evalkit.posterior_indentation", ind_mod)
 
-    ind_prep = types.ModuleType("indentation.evalkit.prepare_env")
+    ind_prep = types.ModuleType("emb.indentation.evalkit.prepare_env")
     ind_prep.prepareIndentation = lambda *a, **kw: None
-    monkeypatch.setitem(sys.modules, "indentation.evalkit.prepare_env", ind_prep)
+    monkeypatch.setitem(sys.modules, "emb.indentation.evalkit.prepare_env", ind_prep)
 
     spec = importlib.util.spec_from_file_location(key, module_path)
     module = importlib.util.module_from_spec(spec)
@@ -656,7 +656,7 @@ def test_phase1_non_surrogate_compression_model_uses_lane_local_init_path(
             return tmp_path / f"compression_data_{diameter_um}um.dat"
 
     captured = {}
-    comp_mod = sys.modules["compression.evalkit.posterior_compression"]
+    comp_mod = sys.modules["emb.compression.evalkit.posterior_compression"]
 
     def _compute_compression(sample_data, reference_points, diameter_um, **kwargs):
         captured["sample_data"] = sample_data
@@ -748,7 +748,7 @@ def test_phase1_restart_non_surrogate_compression_model_uses_lane_local_init_pat
             return [0.0, 1.0, 2.0]
 
     captured = {}
-    comp_mod = sys.modules["compression.evalkit.posterior_compression"]
+    comp_mod = sys.modules["emb.compression.evalkit.posterior_compression"]
 
     def _compute_compression(sample_data, reference_points, diameter_um, **kwargs):
         captured["sample_data"] = sample_data
@@ -834,7 +834,7 @@ def test_phase1_restart_cpu_surrogate_uses_standard_model_assignment(
             return [0.0, 1.0, 2.0]
 
     captured = {}
-    comp_mod = sys.modules["compression.evalkit.posterior_compression"]
+    comp_mod = sys.modules["emb.compression.evalkit.posterior_compression"]
 
     def _compute_surrogate(sample_data, reference_points, diameter_um):
         captured["sample_data"] = sample_data

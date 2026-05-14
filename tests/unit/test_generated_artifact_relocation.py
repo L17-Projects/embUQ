@@ -99,7 +99,7 @@ def test_classifies_root_level_slurm_logs_and_keeps_nested_logs_investigation_ne
 
 def test_protected_roots_and_checkpoint_like_paths_are_not_marked_safe_to_delete() -> None:
     protected_record = classify_generated_artifact_path("extern/korali/checkpoints/latest.json")
-    checkpoint_record = classify_generated_artifact_path("compression/trained_checkpoint/run-17.ckpt")
+    checkpoint_record = classify_generated_artifact_path("emb/compression/trained_checkpoint/run-17.ckpt")
 
     assert protected_record.kind is GeneratedArtifactPathKind.PROTECTED_ROOT
     assert protected_record.can_archive is False

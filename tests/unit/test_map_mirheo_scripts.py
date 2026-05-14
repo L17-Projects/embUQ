@@ -101,12 +101,12 @@ def test_compression_map_init_uses_fresh_src_template(tmp_path, monkeypatch):
         datedPrint=lambda *args, **kwargs: None,
         getReferencePoints=lambda diameter_um: [0.0, 1.0],
     )
-    monkeypatch.setitem(sys.modules, "compression.evalkit.posterior_compression", fake_posterior)
-    monkeypatch.setitem(sys.modules, "compression.evalkit.tools", fake_tools)
+    monkeypatch.setitem(sys.modules, "emb.compression.evalkit.posterior_compression", fake_posterior)
+    monkeypatch.setitem(sys.modules, "emb.compression.evalkit.tools", fake_tools)
     mod = importlib.import_module("propagation.scripts.evaluate_map_mirheo_optimized")
 
     project_root = tmp_path / "repo"
-    src_dir = project_root / "compression" / "src"
+    src_dir = project_root / "emb" / "compression" / "src"
     (src_dir / "microbubble").mkdir(parents=True)
     (src_dir / "microbubble" / "sphere_icosphere.py").write_text("# stub\n")
 
@@ -170,8 +170,8 @@ def test_indentation_map_init_copies_template_to_scratch(tmp_path, monkeypatch):
         datedPrint=lambda *args, **kwargs: None,
         getReferencePoints=lambda diameter_um: [0.0, 1.0],
     )
-    monkeypatch.setitem(sys.modules, "indentation.evalkit.posterior_indentation", fake_posterior)
-    monkeypatch.setitem(sys.modules, "indentation.evalkit.tools", fake_tools)
+    monkeypatch.setitem(sys.modules, "emb.indentation.evalkit.posterior_indentation", fake_posterior)
+    monkeypatch.setitem(sys.modules, "emb.indentation.evalkit.tools", fake_tools)
     monkeypatch.delitem(
         sys.modules,
         "propagation.scripts.evaluate_map_mirheo_optimized_indentation",
@@ -180,7 +180,7 @@ def test_indentation_map_init_copies_template_to_scratch(tmp_path, monkeypatch):
     mod = importlib.import_module("propagation.scripts.evaluate_map_mirheo_optimized_indentation")
 
     project_root = tmp_path / "repo"
-    template_dir = project_root / "indentation" / "src"
+    template_dir = project_root / "emb" / "indentation" / "src"
     parameter_dir = template_dir / "parameter"
     parameter_dir.mkdir(parents=True)
     defaults = {
@@ -229,8 +229,8 @@ def test_indentation_map_init_requires_template_dir(tmp_path, monkeypatch):
         datedPrint=lambda *args, **kwargs: None,
         getReferencePoints=lambda diameter_um: [0.0, 1.0],
     )
-    monkeypatch.setitem(sys.modules, "indentation.evalkit.posterior_indentation", fake_posterior)
-    monkeypatch.setitem(sys.modules, "indentation.evalkit.tools", fake_tools)
+    monkeypatch.setitem(sys.modules, "emb.indentation.evalkit.posterior_indentation", fake_posterior)
+    monkeypatch.setitem(sys.modules, "emb.indentation.evalkit.tools", fake_tools)
     monkeypatch.delitem(
         sys.modules,
         "propagation.scripts.evaluate_map_mirheo_optimized_indentation",

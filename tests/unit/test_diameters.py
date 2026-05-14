@@ -83,7 +83,7 @@ def test_get_plotting_style_invalid_raises() -> None:
 
 def test_get_data_file_path_with_explicit_root(tmp_path: Path) -> None:
     p = get_data_file_path(2.1, project_root=tmp_path)
-    assert p == tmp_path / "compression" / "evalkit" / "data" / "data_1.csv"
+    assert p == tmp_path / "emb" / "compression" / "evalkit" / "data" / "data_1.csv"
 
 
 def test_get_data_file_path_uses_expected_filenames() -> None:
@@ -100,7 +100,7 @@ def test_get_data_file_path_invalid_diameter_raises() -> None:
 
 def test_get_surrogate_path_with_explicit_root(tmp_path: Path) -> None:
     p = get_surrogate_path(2.1, project_root=tmp_path)
-    assert p == tmp_path / "compression" / "surrogate" / "diameters" / "2.1um" / "trained"
+    assert p == tmp_path / "emb" / "compression" / "surrogate" / "diameters" / "2.1um" / "trained"
 
 
 def test_get_surrogate_path_distinct_per_diameter(tmp_path: Path) -> None:

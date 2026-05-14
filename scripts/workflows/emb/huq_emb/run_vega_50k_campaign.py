@@ -57,27 +57,27 @@ MAP_MIRHEO_TIME_LIMITS = {
 
 TRAINING_DATA = {
     "compression": (
-        REPO_ROOT / "compression" / "surrogate" / "diameters" / "2.1um" / "data" / "F_Delta.dat",
-        REPO_ROOT / "compression" / "surrogate" / "diameters" / "2.9um" / "data" / "F_Delta.dat",
-        REPO_ROOT / "compression" / "surrogate" / "diameters" / "3.0um" / "data" / "F_Delta.dat",
+        REPO_ROOT / "emb" / "compression" / "surrogate" / "diameters" / "2.1um" / "data" / "F_Delta.dat",
+        REPO_ROOT / "emb" / "compression" / "surrogate" / "diameters" / "2.9um" / "data" / "F_Delta.dat",
+        REPO_ROOT / "emb" / "compression" / "surrogate" / "diameters" / "3.0um" / "data" / "F_Delta.dat",
     ),
     "indentation": (
-        REPO_ROOT / "indentation" / "surrogate" / "diameters" / "3.2um" / "data" / "samples_all.dat",
-        REPO_ROOT / "indentation" / "surrogate" / "diameters" / "3.4um" / "data" / "samples_all.dat",
-        REPO_ROOT / "indentation" / "surrogate" / "diameters" / "5.8um" / "data" / "samples_all.dat",
+        REPO_ROOT / "emb" / "indentation" / "surrogate" / "diameters" / "3.2um" / "data" / "samples_all.dat",
+        REPO_ROOT / "emb" / "indentation" / "surrogate" / "diameters" / "3.4um" / "data" / "samples_all.dat",
+        REPO_ROOT / "emb" / "indentation" / "surrogate" / "diameters" / "5.8um" / "data" / "samples_all.dat",
     ),
 }
 
 REFERENCE_DATA = {
     "compression": (
-        REPO_ROOT / "compression" / "evalkit" / "data" / "compression_data_2.1um.dat",
-        REPO_ROOT / "compression" / "evalkit" / "data" / "compression_data_2.9um.dat",
-        REPO_ROOT / "compression" / "evalkit" / "data" / "compression_data_3.0um.dat",
+        REPO_ROOT / "emb" / "compression" / "evalkit" / "data" / "compression_data_2.1um.dat",
+        REPO_ROOT / "emb" / "compression" / "evalkit" / "data" / "compression_data_2.9um.dat",
+        REPO_ROOT / "emb" / "compression" / "evalkit" / "data" / "compression_data_3.0um.dat",
     ),
     "indentation": (
-        REPO_ROOT / "indentation" / "evalkit" / "data" / "indentation_data_3.2um.dat",
-        REPO_ROOT / "indentation" / "evalkit" / "data" / "indentation_data_3.4um.dat",
-        REPO_ROOT / "indentation" / "evalkit" / "data" / "indentation_data_5.8um.dat",
+        REPO_ROOT / "emb" / "indentation" / "evalkit" / "data" / "indentation_data_3.2um.dat",
+        REPO_ROOT / "emb" / "indentation" / "evalkit" / "data" / "indentation_data_3.4um.dat",
+        REPO_ROOT / "emb" / "indentation" / "evalkit" / "data" / "indentation_data_5.8um.dat",
     ),
 }
 

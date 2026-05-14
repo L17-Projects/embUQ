@@ -15,7 +15,7 @@
     {
       "artifact_id": "raw-indent-reference",
       "artifact_class": "raw",
-      "path": "data/raw/indentation/reference.csv",
+      "path": "data/raw/emb/indentation/reference.csv",
       "format": "text/csv"
     },
     {

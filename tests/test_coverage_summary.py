@@ -33,7 +33,7 @@ def test_coverage_summary_script_writes_markdown(tmp_path):
                             "percent_covered": 75.0,
                         }
                     },
-                    "indentation/evalkit/tools.py": {
+                    "emb/indentation/evalkit/tools.py": {
                         "summary": {
                             "num_statements": 10,
                             "covered_lines": 5,
@@ -58,5 +58,5 @@ def test_coverage_summary_script_writes_markdown(tmp_path):
     assert rc == 0
     summary = markdown_path.read_text(encoding="utf-8")
     assert "Total coverage: 66.7%" in summary
-    assert "`indentation/evalkit/tools.py`" in summary
+    assert "`emb/indentation/evalkit/tools.py`" in summary
     assert "`src/meso_uq/experiments.py`" not in summary

@@ -16,8 +16,8 @@ from meso_uq.postprocess.paper_figures import (
 )
 
 REPO = Path(__file__).resolve().parents[2]
-_IND_EMB = REPO / "indentation" / "src" / "parameters-default.emb.yaml"
-_CMP_EMB = REPO / "compression" / "src" / "parameters-default.emb.yaml"
+_IND_EMB = REPO / "emb" / "indentation" / "src" / "parameters-default.emb.yaml"
+_CMP_EMB = REPO / "emb" / "compression" / "src" / "parameters-default.emb.yaml"
 
 
 # ---------------------------------------------------------------------------
@@ -26,12 +26,12 @@ _CMP_EMB = REPO / "compression" / "src" / "parameters-default.emb.yaml"
 
 def test_emb_yaml_path_indentation():
     p = emb_yaml_path("indentation", REPO)
-    assert p == REPO / "indentation" / "src" / "parameters-default.emb.yaml"
+    assert p == REPO / "emb" / "indentation" / "src" / "parameters-default.emb.yaml"
 
 
 def test_emb_yaml_path_compression():
     p = emb_yaml_path("compression", REPO)
-    assert p == REPO / "compression" / "src" / "parameters-default.emb.yaml"
+    assert p == REPO / "emb" / "compression" / "src" / "parameters-default.emb.yaml"
 
 
 def test_emb_yaml_path_unknown_raises():

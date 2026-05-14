@@ -88,7 +88,7 @@ def test_manifest_metadata_serializes_round_trip():
 def test_dataset_artifact_and_surrogate_identifiers_round_trip():
     dataset = DatasetSourceMetadata(
         dataset_id="emb-compression-2.1um",
-        source="compression/surrogate/diameters/2.1um/data/F_Delta.dat",
+        source="emb/compression/surrogate/diameters/2.1um/data/F_Delta.dat",
         artifact_class="reference",
         checksum="sha256:test",
         unit_system="micrometer",
@@ -96,7 +96,7 @@ def test_dataset_artifact_and_surrogate_identifiers_round_trip():
     artifact = ArtifactReference(
         artifact_id="emb-compression-2.1um-dnn",
         artifact_class="surrogate_checkpoint",
-        uri="compression/surrogate/diameters/2.1um/trained/microbubble_force_BEST.pkl",
+        uri="emb/compression/surrogate/diameters/2.1um/trained/microbubble_force_BEST.pkl",
         checksum="sha256:model",
     )
     surrogate = SurrogateIdentifier(
