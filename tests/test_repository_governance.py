@@ -69,6 +69,7 @@ def test_gitignore_covers_generated_gv_artifacts() -> None:
     gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
 
     required_entries = (
+        "/runtime/",
         "gv_simulation_files/**/CMakeFiles/",
         "gv_simulation_files/**/*.py[cod]",
         "gv_simulation_files/**/*.off",
