@@ -73,6 +73,12 @@
           ]
         },
         {
+          "path": "docs/COMPATIBILITY_SHIMS.md",
+          "fragments": [
+            "deprecated-only"
+          ]
+        },
+        {
           "path": "docs/PACKAGE_CONTRACTS.md",
           "fragments": [
             "deprecated installed-package shim"
@@ -81,13 +87,20 @@
         {
           "path": "docs/MESO_UQ_COMPATIBILITY_SURFACE.md",
           "fragments": [
-            "deprecated installed-package shim"
+            "deprecated installed-package shim",
+            "deprecated implicit defaults"
           ]
         },
         {
           "path": "docs/MESO_UQ_MIGRATION_INVENTORY.md",
           "fragments": [
             "retired"
+          ]
+        },
+        {
+          "path": "docs/MESO_UQ_MIGRATION_RISK_REGISTER.md",
+          "fragments": [
+            "deprecated, or removed"
           ]
         },
         {
