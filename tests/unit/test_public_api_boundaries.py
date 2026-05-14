@@ -20,8 +20,12 @@ def test_public_api_exposes_narrow_contract_boundary():
     exported = set(public_api.__all__)
     assert "AgentFamily" in exported
     assert "ManifestMetadata" in exported
+    assert "SerializedSurrogateAlias" in exported
     assert "resolve_agent_modality" in exported
     assert public_api.resolve_agent_modality("gv", "torsion")[1].modality.value == "torsion"
+    aliases = public_api.list_serialized_surrogate_aliases()
+    assert aliases[0].legacy_module == "learning.model"
+    assert aliases[0].replacement_module == "meso_uq.surrogate.model"
 
 
 def test_public_api_import_does_not_load_heavy_runtime_dependencies(tmp_path):

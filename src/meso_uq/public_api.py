@@ -33,6 +33,11 @@ from meso_uq.core import (
     UnitSystem,
 )
 from meso_uq.modalities import get_modality_descriptor, list_modality_descriptors
+from meso_uq.surrogate.compat import (
+    SURROGATE_SERIALIZATION_ALIASES,
+    SerializedSurrogateAlias,
+    list_serialized_surrogate_aliases,
+)
 
 __all__ = [
     "AgentDefinition",
@@ -52,6 +57,8 @@ __all__ = [
     "RuntimeRequirement",
     "RuntimeRequirementKind",
     "RunMetadata",
+    "SURROGATE_SERIALIZATION_ALIASES",
+    "SerializedSurrogateAlias",
     "SurrogateIdentifier",
     "UnitSystem",
     "classify_agent_modality_support",
@@ -60,6 +67,7 @@ __all__ = [
     "list_agent_definitions",
     "list_agent_modalities",
     "list_modality_descriptors",
+    "list_serialized_surrogate_aliases",
     "missing_dependency_requirements_for_agent",
     "resolve_agent_modality",
     "resolve_agent_family_identifier",
