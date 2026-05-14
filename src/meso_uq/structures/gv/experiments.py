@@ -11,6 +11,26 @@ from .observables import (
 )
 
 
+GV_EXPERIMENT_LAYOUT_DIRS = ("src", "evalkit", "surrogate")
+
+
+def gv_experiment_layout(experiment_name: str) -> dict[str, str]:
+    known_experiments = {experiment.name for experiment in GV_EXPERIMENTS}
+    if experiment_name not in known_experiments:
+        raise KeyError(f"Unknown GV experiment '{experiment_name}'.")
+    return {
+        directory: f"gv/{experiment_name}/{directory}"
+        for directory in GV_EXPERIMENT_LAYOUT_DIRS
+    }
+
+
+def gv_experiment_layouts() -> dict[str, dict[str, str]]:
+    return {
+        experiment.name: gv_experiment_layout(experiment.name)
+        for experiment in GV_EXPERIMENTS
+    }
+
+
 GV_EXPERIMENTS = (
     ExperimentSpec(
         structure="gv",

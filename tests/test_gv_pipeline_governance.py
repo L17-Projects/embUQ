@@ -6,6 +6,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
+from meso_uq.structures.gv import GV_EXPERIMENT_LAYOUT_DIRS, gv_experiment_layouts
 from meso_uq.structures.gv.runtime import RUNTIME_EXPERIMENTS, plan_runtime, runtime_module_name
 
 
@@ -39,6 +40,20 @@ def test_gv_runtime_surface_uses_python_modules_not_raw_staging_imports() -> Non
             stripped = line.strip()
             assert not stripped.startswith("import gv_simulation_files")
             assert not stripped.startswith("from gv_simulation_files")
+
+
+def test_gv_experiment_directories_have_normalized_layout_and_readme_placeholders() -> None:
+    for experiment_name, layout in gv_experiment_layouts().items():
+        experiment_root = REPO_ROOT / "gv" / experiment_name
+        assert tuple(layout) == GV_EXPERIMENT_LAYOUT_DIRS
+        for directory_name in GV_EXPERIMENT_LAYOUT_DIRS:
+            directory = experiment_root / directory_name
+            assert layout[directory_name] == f"gv/{experiment_name}/{directory_name}"
+            assert directory.is_dir()
+        for placeholder_name in ("evalkit", "surrogate"):
+            placeholder = experiment_root / placeholder_name / "README.md"
+            assert placeholder.is_file()
+            assert not (experiment_root / placeholder_name / "dir.md").exists()
 
 
 def test_gv_runtime_plans_route_generated_outputs_outside_canonical_source(tmp_path: Path) -> None:
