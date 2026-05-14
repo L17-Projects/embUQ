@@ -93,6 +93,10 @@ _PLATFORM_POLICIES: dict[PlatformPolicy, PlatformPolicyRecord] = {
     ),
 }
 
+_PLATFORM_POLICY_ALIASES: dict[PlatformPolicy, PlatformPolicy] = {
+    Platform.GENERIC.value: Platform.GENERIC_SLURM.value,
+}
+
 
 def list_platform_policies() -> tuple[PlatformPolicy, ...]:
     """Return the known platform policy names."""
@@ -103,7 +107,7 @@ def list_platform_policies() -> tuple[PlatformPolicy, ...]:
 def lookup_platform_policy(platform: Platform | PlatformPolicy) -> PlatformPolicyRecord:
     """Return immutable policy metadata for a known platform."""
 
-    platform_key = platform.value if isinstance(platform, Platform) else platform
+    platform_key = _platform_policy_key(platform)
     try:
         return _PLATFORM_POLICIES[platform_key]
     except KeyError as exc:
@@ -111,6 +115,11 @@ def lookup_platform_policy(platform: Platform | PlatformPolicy) -> PlatformPolic
         raise PlatformPolicyLookupError(
             f"Unknown platform: {platform_key!r}. Known platforms: [{known}]"
         ) from exc
+
+
+def _platform_policy_key(platform: Platform | PlatformPolicy) -> PlatformPolicy:
+    platform_key = platform.value if isinstance(platform, Platform) else str(platform)
+    return _PLATFORM_POLICY_ALIASES.get(platform_key, platform_key)
 
 
 def validate_platform_path_policy(
