@@ -8,11 +8,14 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 EMB_WORKFLOW_ENTRYPOINTS = (
     # Legacy runtime preparation surfaces.
+    "src/meso_uq/agents/emb/workflows.py",
+    "src/meso_uq/simulation/emb_generation.py",
     "compression/src/generate.py",
     "compression/src/parameters.py",
     "indentation/src/generate.py",
     "indentation/src/parameters.py",
     # DNN/BNN surrogate evaluation.
+    "src/meso_uq/surrogate/emb_workflows.py",
     "compression/surrogate/evaluate.py",
     "compression/surrogate/evaluate_bnn.py",
     "indentation/surrogate/evaluate.py",

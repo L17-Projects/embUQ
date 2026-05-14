@@ -1,40 +1,39 @@
 #!/usr/bin/env python3
 
-import argparse
+from __future__ import annotations
 
-from meso_uq.surrogate.cli import read_indentation_table, train_tabular_surrogate
+import sys
+from pathlib import Path
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("data")
-    ap.add_argument("--out", default="trained/microbubble_disp_BEST.pkl")
-    ap.add_argument("--report-path", default=None)
-    ap.add_argument("--width", type=int, default=64)
-    ap.add_argument("--depth", type=int, default=3)
-    ap.add_argument("--batch-size", type=int, default=128)
-    ap.add_argument("--lr", type=float, default=5e-4)
-    ap.add_argument("--max-epoch", type=int, default=100)
-    ap.add_argument("--seed", type=int, default=None)
-    ap.add_argument("--disp-source", type=str, default="auto", choices=["auto", "diameter", "displacement"])
-    ap.add_argument("--rupture-ratio", type=float, default=2.0)
-    args = ap.parse_args()
-    rupture_ratio = None if args.rupture_ratio <= 0 else float(args.rupture_ratio)
-    df = read_indentation_table(args.data, disp_source=args.disp_source, rupture_ratio_threshold=rupture_ratio)
-    result = train_tabular_surrogate(
-        df,
-        input_cols=["Yt", "kb", "b1", "b2", "a3", "a4", "F"],
-        target_col="disp",
-        out_path=args.out,
-        width=args.width,
-        depth=args.depth,
-        batch_size=args.batch_size,
-        lr=args.lr,
-        max_epoch=args.max_epoch,
-        seed=args.seed,
-        report_path=args.report_path,
+REPO_ROOT = Path(__file__).resolve().parents[3]
+SRC_ROOT = REPO_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from meso_uq.core import Modality
+from meso_uq.surrogate.emb_workflows import run_emb_dnn_training_cli
+
+
+def read_indentation_table(*args, **kwargs):
+    from meso_uq.surrogate.cli import read_indentation_table as _reader
+
+    return _reader(*args, **kwargs)
+
+
+def train_tabular_surrogate(*args, **kwargs):
+    from meso_uq.surrogate.cli import train_tabular_surrogate as _trainer
+
+    return _trainer(*args, **kwargs)
+
+
+def main(argv: list[str] | None = None):
+    return run_emb_dnn_training_cli(
+        Modality.INDENTATION,
+        argv=argv,
+        reader=read_indentation_table,
+        trainer=train_tabular_surrogate,
     )
-    print(f"Saved -> {result['out']}. Final train={result['train_loss']:.3e}, valid={result['val_loss']:.3e}")
 
 
 if __name__ == "__main__":

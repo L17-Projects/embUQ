@@ -9,6 +9,12 @@ from .loader import (
     load_sampling_config,
     resolve_inference_config_path,
 )
+from .aliases import (
+    LegacyConfigPathAlias,
+    LegacyConfigPathResolution,
+    list_legacy_config_path_aliases,
+    resolve_legacy_config_path,
+)
 from .models import (
     HyperpriorBounds,
     InferenceConfig,
@@ -30,4 +36,8 @@ __all__ = [
     "load_propagation_config",
     "load_config",
     "resolve_inference_config_path",
+    "LegacyConfigPathAlias",
+    "LegacyConfigPathResolution",
+    "list_legacy_config_path_aliases",
+    "resolve_legacy_config_path",
 ]
