@@ -9,10 +9,11 @@ The example manifest lives at `configs/artifacts/artifact_manifest.example.json`
 - `_out`
 - `_runs`
 - `_init_compression_*`
+- `_init_indentation_*`
 - `out_hierarchical`
 - `_ci`
 - `logs`
-- `runtime`
+- repo-root `runtime`
 - root Slurm logs `mesouq-*.out`, `mesouq-*.err`
 - root Slurm logs `slurm-*.out`, `slurm-*.err`
 - `.coverage`, `.pytest_cache`, `__pycache__`, `*.py[cod]`, `*.egg-info`

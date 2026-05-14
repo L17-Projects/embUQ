@@ -20,6 +20,7 @@ FORBIDDEN_ROOT_PREFIXES = (
     "dist",
 )
 INIT_COMPRESSION_PREFIX = "_init_compression_"
+INIT_INDENTATION_PREFIX = "_init_indentation_"
 ROOT_SLURM_LOG_PATTERN = re.compile(r"^(?:mesouq|slurm)-.*\.(?:out|err)$")
 PYTHON_COMPILED_SUFFIXES = (".pyc", ".pyd", ".pyo")
 
@@ -27,9 +28,10 @@ REQUIRED_GITIGNORE_PATTERNS = (
     "_out/",
     "_runs/",
     "_init_compression_*/",
+    "_init_indentation_*/",
     "out_hierarchical/",
     "_ci/",
-    "runtime/",
+    "/runtime/",
     "logs/",
     "build/",
     "dist/",
@@ -85,6 +87,8 @@ def _is_forbidden_artifact(path: Path) -> bool:
     root = path.parts[0]
     if root.startswith(INIT_COMPRESSION_PREFIX):
         return True
+    if root.startswith(INIT_INDENTATION_PREFIX):
+        return True
     if root in FORBIDDEN_ROOT_PREFIXES:
         return True
     if len(path.parts) == 1 and ROOT_SLURM_LOG_PATTERN.fullmatch(path.name):
@@ -116,6 +120,15 @@ def test_gitignore_capture_governance_for_generated_roots() -> None:
         "Required artifact-governance ignore patterns are missing from .gitignore: "
         f"{missing}"
     )
+
+
+def test_root_runtime_ignore_does_not_hide_source_runtime_packages() -> None:
+    ignored = subprocess.run(
+        ["git", "check-ignore", "-q", "src/meso_uq/structures/gv/runtime/new_module.py"],
+        cwd=str(REPO_ROOT),
+        check=False,
+    )
+    assert ignored.returncode == 1
 
 
 def test_source_exceptions_remain_tracked() -> None:
