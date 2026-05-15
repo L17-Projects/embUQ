@@ -135,6 +135,10 @@ class GVLaunchSchedulerScript:
     renderer: str
     scheduler: str
     script_path: Path
+    runtime_script: str
+    runtime_environment_path: str
+    gpu_resource_directives: tuple[str, ...]
+    operator_checks: tuple[str, ...]
     job_name: str
     array_size: int
     gpu_count: int
@@ -146,6 +150,10 @@ class GVLaunchSchedulerScript:
             "renderer": self.renderer,
             "scheduler": self.scheduler,
             "script_path": str(self.script_path),
+            "runtime_script": self.runtime_script,
+            "runtime_environment_path": self.runtime_environment_path,
+            "gpu_resource_directives": list(self.gpu_resource_directives),
+            "operator_checks": list(self.operator_checks),
             "job_name": self.job_name,
             "array_size": self.array_size,
             "gpu_count": self.gpu_count,
@@ -161,6 +169,7 @@ class GVLaunchRenderedCampaign:
     campaign_dir: Path
     manifest_path: Path
     scheduler_scripts: tuple[GVLaunchSchedulerScript, ...]
+    git_state: Mapping[str, Any]
 
     def to_manifest(self) -> dict[str, Any]:
         payload = self.campaign_manifest.to_manifest()
@@ -204,6 +213,7 @@ class GVLaunchRenderedCampaign:
                 "provenance": {
                     "tags": dict(self.request.provenance_tags),
                     "renderer": "meso_uq.structures.gv.launch.render_gv_launch_campaign",
+                    "git": dict(self.git_state),
                 },
                 "submission": {
                     "submitted": False,
@@ -356,6 +366,7 @@ def _render_one_gv_launch_campaign(
         campaign_dir=campaign_dir,
         manifest_path=manifest_path,
         scheduler_scripts=scripts,
+        git_state=_repo_git_state(),
     )
     manifest_path.write_text(
         json.dumps(rendered.to_manifest(), indent=2, sort_keys=True) + "\n",
@@ -482,6 +493,7 @@ def _write_scheduler_script(
     script_dir = campaign_dir / "scripts" / platform.value
     script_dir.mkdir(parents=True, exist_ok=True)
     script_path = script_dir / f"{_path_token(request.campaign_id)}.sbatch"
+    runtime_script = _platform_runtime_script(platform)
     script_path.write_text(
         _render_slurm_script(
             request=request,
@@ -498,6 +510,10 @@ def _write_scheduler_script(
         renderer=renderer,
         scheduler="slurm",
         script_path=script_path,
+        runtime_script=runtime_script,
+        runtime_environment_path=_platform_runtime_environment_path(platform),
+        gpu_resource_directives=_gpu_resource_directives(platform=platform, gpu_count=request.gpu_count),
+        operator_checks=_platform_operator_checks(platform),
         job_name=job_name,
         array_size=len(campaign_manifest.runs),
         gpu_count=request.gpu_count,
@@ -560,7 +576,7 @@ def _render_slurm_script(
             "",
             "command=(",
             '  "${PYTHON_BIN}"',
-            f"  scripts/platforms/{platform.value}/run_gv_runtime.py",
+            f"  {_platform_runtime_script(platform)}",
             '  --experiment "${EXPERIMENT}"',
             '  --radius "${GEOMETRY_RADIUS}"',
             '  --height "${GEOMETRY_HEIGHT}"',
@@ -614,6 +630,34 @@ def _slurm_header(*, request: GVLaunchRequest, platform: Platform, job_name: str
         ]
     )
     return lines
+
+
+def _platform_runtime_script(platform: Platform) -> str:
+    return f"scripts/platforms/{platform.value}/run_gv_runtime.py"
+
+
+def _platform_runtime_environment_path(platform: Platform) -> str:
+    if platform == Platform.KAROLINA:
+        return "${MESOUQ_GV_ENV_SCRIPT:-${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/env.sh}"
+    return "${MESOUQ_GV_ENV_SCRIPT:-${REPO_ROOT}/_vega/gv_venv/env.sh}"
+
+
+def _gpu_resource_directives(*, platform: Platform, gpu_count: int) -> tuple[str, ...]:
+    if platform == Platform.KAROLINA:
+        return (f"#SBATCH --gpus={gpu_count}",)
+    return (f"#SBATCH --gres=gpu:{gpu_count}",)
+
+
+def _platform_operator_checks(platform: Platform) -> tuple[str, ...]:
+    if platform == Platform.VEGA:
+        return (
+            "Vega maintenance state and partition availability must be checked by the operator before submission.",
+            "Verify that the Vega module stack and _vega/gv_venv/env.sh are current for the checkout.",
+        )
+    return (
+        "Verify Karolina project allocation and qgpu availability before submission.",
+        "Verify MESOUQ_SITE_RUNTIME_ROOT contains the GV runtime environment for this checkout.",
+    )
 
 
 def _platform_setup(platform: Platform) -> list[str]:
@@ -711,6 +755,94 @@ def _slurm_job_name(campaign_id: str) -> str:
 def _path_token(value: str) -> str:
     token = "".join(char if char.isalnum() or char in {"-", "_", "."} else "_" for char in value.strip())
     return token or "campaign"
+
+
+def _repo_git_state() -> dict[str, Any]:
+    repo_root = _find_repo_root()
+    git_pointer = repo_root / ".git"
+    git_dir = _resolve_git_dir(repo_root=repo_root, git_pointer=git_pointer)
+    if git_dir is None:
+        return {
+            "available": False,
+            "head": None,
+            "branch": None,
+            "commit": None,
+        }
+
+    head_path = git_dir / "HEAD"
+    try:
+        head = head_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return {
+            "available": False,
+            "head": None,
+            "branch": None,
+            "commit": None,
+        }
+
+    branch = None
+    commit = head
+    if head.startswith("ref: "):
+        ref = head.removeprefix("ref: ").strip()
+        branch = ref.removeprefix("refs/heads/")
+        commit = _read_git_ref(git_dir=git_dir, ref=ref)
+    return {
+        "available": commit is not None,
+        "head": head,
+        "branch": branch,
+        "commit": commit,
+    }
+
+
+def _resolve_git_dir(*, repo_root: Path, git_pointer: Path) -> Path | None:
+    if git_pointer.is_dir():
+        return git_pointer
+    try:
+        text = git_pointer.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    prefix = "gitdir:"
+    if not text.startswith(prefix):
+        return None
+    git_dir = Path(text.removeprefix(prefix).strip())
+    if not git_dir.is_absolute():
+        git_dir = (repo_root / git_dir).resolve()
+    return git_dir
+
+
+def _read_git_ref(*, git_dir: Path, ref: str) -> str | None:
+    for candidate_dir in _candidate_git_ref_dirs(git_dir):
+        ref_path = candidate_dir / ref
+        try:
+            return ref_path.read_text(encoding="utf-8").strip()
+        except OSError:
+            pass
+
+        packed_refs = candidate_dir / "packed-refs"
+        try:
+            lines = packed_refs.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        suffix = f" {ref}"
+        for line in lines:
+            if line.startswith("#") or not line.endswith(suffix):
+                continue
+            return line.split(" ", 1)[0]
+    return None
+
+
+def _candidate_git_ref_dirs(git_dir: Path) -> tuple[Path, ...]:
+    candidates = [git_dir]
+    common_dir_path = git_dir / "commondir"
+    try:
+        common_dir = Path(common_dir_path.read_text(encoding="utf-8").strip())
+    except OSError:
+        return tuple(candidates)
+    if not common_dir.is_absolute():
+        common_dir = (git_dir / common_dir).resolve()
+    if common_dir not in candidates:
+        candidates.append(common_dir)
+    return tuple(candidates)
 
 
 def _normalize_launch_platform(platform: Platform | str) -> Platform:
