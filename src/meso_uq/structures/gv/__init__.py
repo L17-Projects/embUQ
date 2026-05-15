@@ -73,6 +73,11 @@ __all__ = [
     "sample_gv",
     "GVNumericalGenerationResult",
     "generate_gv_numerical_data",
+    "GVLaunchRequest",
+    "GVLaunchRunManifest",
+    "GVLaunchCampaignManifest",
+    "validate_gv_launch_request",
+    "build_gv_launch_campaign_manifest",
 ]
 
 
@@ -109,6 +114,26 @@ def __getattr__(name: str):
         from .sampling import GV_SAMPLING_EXPERIMENTS
 
         return GV_SAMPLING_EXPERIMENTS
+    if name == "GVLaunchRequest":
+        from .launch import GVLaunchRequest
+
+        return GVLaunchRequest
+    if name == "GVLaunchRunManifest":
+        from .launch import GVLaunchRunManifest
+
+        return GVLaunchRunManifest
+    if name == "GVLaunchCampaignManifest":
+        from .launch import GVLaunchCampaignManifest
+
+        return GVLaunchCampaignManifest
+    if name == "validate_gv_launch_request":
+        from .launch import validate_gv_launch_request
+
+        return validate_gv_launch_request
+    if name == "build_gv_launch_campaign_manifest":
+        from .launch import build_gv_launch_campaign_manifest
+
+        return build_gv_launch_campaign_manifest
     raise AttributeError(f"module 'meso_uq.structures.gv' has no attribute {name!r}")
 
 
@@ -124,5 +149,10 @@ def __dir__() -> list[str]:
             "GVNumericalGenerationResult",
             "generate_gv_numerical_data",
             "sample_gv",
+            "GVLaunchRequest",
+            "GVLaunchRunManifest",
+            "GVLaunchCampaignManifest",
+            "validate_gv_launch_request",
+            "build_gv_launch_campaign_manifest",
         ]
     )
