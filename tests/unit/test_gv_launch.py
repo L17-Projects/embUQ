@@ -63,6 +63,10 @@ def test_validate_gv_launch_request_normalizes_required_fields() -> None:
             {"material_parameters": {**_VALID_MATERIAL_PARAMETERS, "b1": 0.0}},
             "must be finite and > 0",
         ),
+        (
+            {"controls": {"tot_force": (500.0, 500.0), "bpress": -91.0}},
+            "sweep values must be unique",
+        ),
     ],
 )
 def test_validate_gv_launch_request_rejects_invalid_inputs(overrides, message: str) -> None:
@@ -81,6 +85,22 @@ def test_validate_gv_launch_request_rejects_invalid_inputs(overrides, message: s
 
     with pytest.raises(ValueError, match=message):
         validate_gv_launch_request(**kwargs)
+
+
+@pytest.mark.parametrize("output_root", ["src", "tests", "scripts", "gv", "gv_simulation_files", "src/generated"])
+def test_validate_gv_launch_request_rejects_repo_source_output_roots(output_root: str) -> None:
+    with pytest.raises(ValueError, match="output_root must not be"):
+        validate_gv_launch_request(
+            experiment="stretching",
+            material_parameters=_VALID_MATERIAL_PARAMETERS,
+            geometry={"radGV": 2.0, "height": 14.28},
+            controls={"tot_force": (500.0, 750.0), "bpress": -91.0},
+            platform="vega",
+            output_root=output_root,
+            walltime="01:30:00",
+            gpu_count=2,
+            provenance_tags={"linear_issue": "MES-177"},
+        )
 
 
 def test_validate_gv_launch_request_fails_before_creating_output_root(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:

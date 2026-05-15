@@ -147,6 +147,7 @@ def validate_gv_launch_request(
         radGV=radGV,
         height=height,
     )
+    _validate_unique_sweep_values(sweep)
     geometry_id = build_geometry(
         radius=validated_geometry.radGV,
         height=validated_geometry.height,
@@ -245,10 +246,51 @@ def _normalize_output_root(*, output_root: str | Path, platform: Platform) -> Pa
     path = Path(raw).expanduser()
     if any(part == ".." for part in path.parts):
         raise ValueError("GV launch output_root must not contain path traversal segments.")
+    _reject_unsafe_repo_output_root(path)
     errors = validate_platform_path_policy(platform, {"output_root": path.as_posix()}, label="gv_launch")
     if errors:
         raise ValueError(errors[0])
     return path
+
+
+def _validate_unique_sweep_values(sweep: GVSweep) -> None:
+    seen: set[float] = set()
+    duplicates: list[str] = []
+    for value in sweep.values:
+        if value in seen:
+            duplicates.append(format_float(value))
+        seen.add(value)
+    if duplicates:
+        duplicate_list = ", ".join(duplicates)
+        raise ValueError(
+            "GV launch sweep values must be unique to produce unambiguous output ids; "
+            f"duplicates: {duplicate_list}."
+        )
+
+
+def _reject_unsafe_repo_output_root(path: Path) -> None:
+    repo_root = _find_repo_root()
+    resolved_path = path.resolve()
+    unsafe_roots = (
+        repo_root / "gv_simulation_files",
+        repo_root / "gv",
+        repo_root / "src",
+        repo_root / "scripts",
+        repo_root / "tests",
+    )
+    for unsafe_root in unsafe_roots:
+        if resolved_path == unsafe_root or unsafe_root in resolved_path.parents:
+            raise ValueError(f"GV launch output_root must not be inside repository source roots: {unsafe_root}.")
+    if path.name in {"gv", "src", "scripts", "tests", "gv_simulation_files"}:
+        raise ValueError("GV launch output_root must not be a repository source directory.")
+
+
+def _find_repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if (parent / "pyproject.toml").is_file():
+            return parent
+    raise RuntimeError("Could not locate repository root for GV launch validation.")
 
 
 def _derive_campaign_id(output_root: Path) -> str:
