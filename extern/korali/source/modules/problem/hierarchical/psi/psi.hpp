@@ -166,6 +166,10 @@ class Psi : public Hierarchical
   CUdeviceptr _nativeCudaParameterBIsVariableDevice = 0;
   CUdeviceptr _nativeCudaParameterBPositionDevice = 0;
   CUdeviceptr _nativeCudaParameterBValueDevice = 0;
+  CUdeviceptr _nativeCudaBatchParametersDevice = 0;
+  size_t _nativeCudaBatchParametersCapacityBytes = 0;
+  CUdeviceptr _nativeCudaSubProblemLogLikelihoodDevice = 0;
+  size_t _nativeCudaSubProblemLogLikelihoodCapacityBytes = 0;
 #endif
 
   size_t findVariablePosition(const std::string &variableName, const std::string &propertyName, size_t priorIndex) const;

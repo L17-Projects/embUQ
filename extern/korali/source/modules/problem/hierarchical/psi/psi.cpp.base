@@ -192,6 +192,40 @@ void psiBatchLogLikelihoodKernel(
   const double *baseLogWeights = subProblemBaseLogWeights[subProblemId];
   const unsigned int sampleCount = subProblemSampleCounts[subProblemId];
 
+  __shared__ int sharedParametersAreFeasible;
+  if (tid == 0)
+  {
+    bool parametersAreFeasible = true;
+    for (unsigned int priorId = 0; priorId < dynamicPriorCount; ++priorId)
+    {
+      const double parameterA = parameterAIsVariable[priorId] != 0 ? parameters[parameterAPositions[priorId]] : parameterAValues[priorId];
+      const double parameterB = parameterBIsVariable[priorId] != 0 ? parameters[parameterBPositions[priorId]] : parameterBValues[priorId];
+
+      if (priorKinds[priorId] == 0)
+      {
+        if (parameterB <= 0.0)
+        {
+          parametersAreFeasible = false;
+          break;
+        }
+      }
+      else if (parameterB <= parameterA)
+      {
+        parametersAreFeasible = false;
+        break;
+      }
+    }
+    sharedParametersAreFeasible = parametersAreFeasible ? 1 : 0;
+  }
+  __syncthreads();
+
+  if (sharedParametersAreFeasible == 0)
+  {
+    if (tid == 0)
+      subProblemLogLikelihoods[(size_t)subProblemId * batchSize + candidateId] = koraliNegativeInfinity();
+    return;
+  }
+
   double localMax = koraliNegativeInfinity();
 
   for (unsigned int sampleId = tid; sampleId < sampleCount; sampleId += blockDim.x)
@@ -208,18 +242,12 @@ void psiBatchLogLikelihoodKernel(
 
       if (priorKinds[priorId] == 0)
       {
-        if (parameterB <= 0.0)
-        {
-          logValue = koraliNegativeInfinity();
-          break;
-        }
-
         const double delta = (sampleValue - parameterA) / parameterB;
         logValue += -0.91893853320467266954 - log(parameterB) - 0.5 * delta * delta;
       }
       else
       {
-        if (parameterB <= parameterA || sampleValue < parameterA || sampleValue > parameterB)
+        if (sampleValue < parameterA || sampleValue > parameterB)
         {
           logValue = koraliNegativeInfinity();
           break;
@@ -261,18 +289,12 @@ void psiBatchLogLikelihoodKernel(
 
         if (priorKinds[priorId] == 0)
         {
-          if (parameterB <= 0.0)
-          {
-            logValue = koraliNegativeInfinity();
-            break;
-          }
-
           const double delta = (sampleValue - parameterA) / parameterB;
           logValue += -0.91893853320467266954 - log(parameterB) - 0.5 * delta * delta;
         }
         else
         {
-          if (parameterB <= parameterA || sampleValue < parameterA || sampleValue > parameterB)
+          if (sampleValue < parameterA || sampleValue > parameterB)
           {
             logValue = koraliNegativeInfinity();
             break;
@@ -494,6 +516,8 @@ void Psi::releaseNativeCudaBatch()
   if (_nativeCudaParameterBIsVariableDevice != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaParameterBIsVariableDevice));
   if (_nativeCudaParameterBPositionDevice != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaParameterBPositionDevice));
   if (_nativeCudaParameterBValueDevice != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaParameterBValueDevice));
+  if (_nativeCudaBatchParametersDevice != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaBatchParametersDevice));
+  if (_nativeCudaSubProblemLogLikelihoodDevice != 0) KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaSubProblemLogLikelihoodDevice));
 
   _nativeCudaSubProblemCoordinatesDevice = 0;
   _nativeCudaSubProblemBaseLogWeightsDevice = 0;
@@ -505,6 +529,10 @@ void Psi::releaseNativeCudaBatch()
   _nativeCudaParameterBIsVariableDevice = 0;
   _nativeCudaParameterBPositionDevice = 0;
   _nativeCudaParameterBValueDevice = 0;
+  _nativeCudaBatchParametersDevice = 0;
+  _nativeCudaBatchParametersCapacityBytes = 0;
+  _nativeCudaSubProblemLogLikelihoodDevice = 0;
+  _nativeCudaSubProblemLogLikelihoodCapacityBytes = 0;
 
   if (_nativeCudaModule != nullptr) KORALI_CUDA_DRIVER_CHECK(cuModuleUnload(_nativeCudaModule));
   if (_nativeCudaContext != nullptr) KORALI_CUDA_DRIVER_CHECK(cuDevicePrimaryCtxRelease(_nativeCudaDevice));
@@ -1025,20 +1053,43 @@ void Psi::evaluateBatchNativeCuda(Sample &sample)
   KORALI_CUDA_DRIVER_CHECK(cuCtxSetCurrent(_nativeCudaContext));
   contextSeconds = elapsedSeconds(contextStart, steadyClock::now());
 
-  CUdeviceptr batchParametersDevice = 0;
-  CUdeviceptr subProblemLogLikelihoodDevice = 0;
+  const size_t batchParametersBytes = flattenedBatchParameters.size() * sizeof(double);
+  const size_t subProblemLogLikelihoodBytes = static_cast<size_t>(batchSizeInt) * subProblemCount * sizeof(double);
+
+  auto freeStart = steadyClock::now();
+  if (_nativeCudaBatchParametersCapacityBytes < batchParametersBytes && _nativeCudaBatchParametersDevice != 0)
+  {
+    KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaBatchParametersDevice));
+    _nativeCudaBatchParametersDevice = 0;
+    _nativeCudaBatchParametersCapacityBytes = 0;
+  }
+  if (_nativeCudaSubProblemLogLikelihoodCapacityBytes < subProblemLogLikelihoodBytes && _nativeCudaSubProblemLogLikelihoodDevice != 0)
+  {
+    KORALI_CUDA_DRIVER_CHECK(cuMemFree(_nativeCudaSubProblemLogLikelihoodDevice));
+    _nativeCudaSubProblemLogLikelihoodDevice = 0;
+    _nativeCudaSubProblemLogLikelihoodCapacityBytes = 0;
+  }
+  freeSeconds += elapsedSeconds(freeStart, steadyClock::now());
 
   auto allocStart = steadyClock::now();
-  KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&batchParametersDevice, flattenedBatchParameters.size() * sizeof(double)));
-  KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&subProblemLogLikelihoodDevice, static_cast<size_t>(batchSizeInt) * subProblemCount * sizeof(double)));
+  if (_nativeCudaBatchParametersCapacityBytes < batchParametersBytes)
+  {
+    KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&_nativeCudaBatchParametersDevice, batchParametersBytes));
+    _nativeCudaBatchParametersCapacityBytes = batchParametersBytes;
+  }
+  if (_nativeCudaSubProblemLogLikelihoodCapacityBytes < subProblemLogLikelihoodBytes)
+  {
+    KORALI_CUDA_DRIVER_CHECK(cuMemAlloc(&_nativeCudaSubProblemLogLikelihoodDevice, subProblemLogLikelihoodBytes));
+    _nativeCudaSubProblemLogLikelihoodCapacityBytes = subProblemLogLikelihoodBytes;
+  }
   allocSeconds = elapsedSeconds(allocStart, steadyClock::now());
 
   auto h2dStart = steadyClock::now();
-  KORALI_CUDA_DRIVER_CHECK(cuMemcpyHtoD(batchParametersDevice, flattenedBatchParameters.data(), flattenedBatchParameters.size() * sizeof(double)));
+  KORALI_CUDA_DRIVER_CHECK(cuMemcpyHtoD(_nativeCudaBatchParametersDevice, flattenedBatchParameters.data(), batchParametersBytes));
   h2dSeconds = elapsedSeconds(h2dStart, steadyClock::now());
 
   void *kernelParameters[] = {
-      &batchParametersDevice,
+      &_nativeCudaBatchParametersDevice,
       &parameterCount,
       &batchSizeInt,
       &dynamicPriorCount,
@@ -1053,7 +1104,7 @@ void Psi::evaluateBatchNativeCuda(Sample &sample)
       &_nativeCudaSubProblemBaseLogWeightsDevice,
       &_nativeCudaSubProblemSampleCountsDevice,
       &subProblemCount,
-      &subProblemLogLikelihoodDevice};
+      &_nativeCudaSubProblemLogLikelihoodDevice};
 
   auto launchStart = steadyClock::now();
   KORALI_CUDA_DRIVER_CHECK(cuLaunchKernel(
@@ -1076,13 +1127,8 @@ void Psi::evaluateBatchNativeCuda(Sample &sample)
 
   std::vector<double> subProblemLogLikelihoods(static_cast<size_t>(batchSizeInt) * subProblemCount, -Inf);
   auto d2hStart = steadyClock::now();
-  KORALI_CUDA_DRIVER_CHECK(cuMemcpyDtoH(subProblemLogLikelihoods.data(), subProblemLogLikelihoodDevice, subProblemLogLikelihoods.size() * sizeof(double)));
+  KORALI_CUDA_DRIVER_CHECK(cuMemcpyDtoH(subProblemLogLikelihoods.data(), _nativeCudaSubProblemLogLikelihoodDevice, subProblemLogLikelihoods.size() * sizeof(double)));
   d2hSeconds = elapsedSeconds(d2hStart, steadyClock::now());
-
-  auto freeStart = steadyClock::now();
-  KORALI_CUDA_DRIVER_CHECK(cuMemFree(batchParametersDevice));
-  KORALI_CUDA_DRIVER_CHECK(cuMemFree(subProblemLogLikelihoodDevice));
-  freeSeconds = elapsedSeconds(freeStart, steadyClock::now());
 
   auto hostReduceStart = steadyClock::now();
   std::vector<double> batchLogLikelihood(batchSize, -Inf);
