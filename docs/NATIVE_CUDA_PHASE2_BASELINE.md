@@ -26,6 +26,10 @@ For `phase2_backend=cpu-mpi`, the driver keeps the Distributed/MPI Korali path
 available. The reduced wrapper delegates to the same driver, and the Vega/HPC
 helper surface forwards the same `--phase2-backend` contract.
 
+Public production helpers must therefore pair `phase2_backend=native-cuda` with
+one Phase 2 CPU rank. Multi-rank Phase 2 belongs to the maintained
+`phase2_backend=cpu-mpi` fallback.
+
 ## Korali baseline
 
 The implementation lives under

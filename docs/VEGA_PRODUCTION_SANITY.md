@@ -55,9 +55,14 @@ Run it inside an allocated Vega job:
 ```bash
 python scripts/platforms/vega/run_production_sanity.py \
   --output-root _vega/production_sanity \
-  --phase2-cpu-ranks 2 \
+  --phase2-cpu-ranks 1 \
   --python-bin python
 ```
+
+The default production backend is `native-cuda`, which is a single-rank Phase 2
+path. Use `--phase2-cpu-ranks 1` for native-CUDA. To exercise the maintained
+CPU-MPI fallback instead, pass `--phase2-backend cpu-mpi` and choose the MPI
+rank count explicitly.
 
 To run a non-default lane:
 

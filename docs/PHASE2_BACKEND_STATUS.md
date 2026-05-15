@@ -34,6 +34,10 @@ For `phase2_backend=native-cuda`, `run_phase_2.py` now:
 
 For `phase2_backend=cpu-mpi`, the entrypoint keeps the MPI path available as an explicit fallback.
 
+Operator helpers must preserve that split: production native-CUDA commands pass
+one Phase 2 CPU rank, while multi-rank Phase 2 examples must use
+`--phase2-backend cpu-mpi`.
+
 ## Build surface
 
 The repo-local Korali build still depends on the vendored build surface exposing:
@@ -69,4 +73,5 @@ The hardware-facing validation checklist remains:
 
 - `docs/VEGA_PHASE2_NATIVE_CUDA_CHECKLIST.md`
 
-That checklist is the place to record the actual canary evidence and any failure modes.
+Despite the historical filename, that checklist is now target-platform aware
+and is the place to record Karolina/Vega evidence and any failure modes.

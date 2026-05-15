@@ -467,6 +467,8 @@ def test_production_sanity_template_uses_public_command() -> None:
     assert "run_production_sanity.py" in text
     assert "SELECTIONS" in text
     assert "ALL_LANES" in text
+    assert 'PHASE2_CPU_RANKS="1"' in text
+    assert "--phase2-backend" in text
 
 
 def test_validation_matrix_template_uses_public_command() -> None:

@@ -237,6 +237,19 @@ def test_phase2_native_cuda_enforces_backend_and_calls_stage2() -> None:
     assert "--phase2-backend" in text
 
 
+def test_complete_workflows_default_native_cuda_to_single_phase2_rank() -> None:
+    for name in (
+        "complete_inference_compression.sbatch",
+        "complete_inference_indentation.sbatch",
+        "complete_reduced_compression.sbatch",
+        "complete_reduced_indentation.sbatch",
+    ):
+        text = _read(name)
+        assert 'PHASE2_BACKEND="${PHASE2_BACKEND:-native-cuda}"' in text
+        assert 'PHASE2_CPU_RANKS="1"' in text
+        assert 'PHASE2_CPU_RANKS="64"' in text
+
+
 # ---------------------------------------------------------------------------
 # phase3b_gpu.sbatch specifics
 # ---------------------------------------------------------------------------

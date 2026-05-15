@@ -77,6 +77,19 @@ python scripts/platforms/vega/run_inference_stage.py \
   --profile production \
   --stage phase2 \
   --phase2-backend native-cuda \
+  --cpu-ranks 1
+```
+
+`native-cuda` Phase 2 is a single-rank backend. Use `--cpu-ranks 1` for that
+path. The maintained CPU-MPI fallback remains explicit:
+
+```bash
+python scripts/platforms/vega/run_inference_stage.py \
+  --experiment indentation \
+  --model-family reduced-model \
+  --profile production \
+  --stage phase2 \
+  --phase2-backend cpu-mpi \
   --cpu-ranks 4
 ```
 

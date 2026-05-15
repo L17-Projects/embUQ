@@ -1,10 +1,10 @@
-# Vega Phase 2 native-CUDA validation checklist
+# Target-platform Phase 2 native-CUDA validation checklist
 
 This checklist is the minimum acceptance layer needed before `MesoUQ` can honestly claim a supported **Phase 2 native-CUDA** path.
 
 ## Goal
 
-Validate whether the vendored Korali native-CUDA backend can support the public `Hierarchical/Psi` Phase 2 workflow on the real target environment.
+Validate whether the vendored Korali native-CUDA backend can support the public `Hierarchical/Psi` Phase 2 workflow on the real target environment. The current target platforms are Karolina and Vega; archive platform-specific deltas separately.
 
 ## Preconditions
 
@@ -16,6 +16,7 @@ Before attempting this checklist, verify:
 - a matching MPI toolchain is loaded,
 - `mpi4py` imports correctly in the runtime environment,
 - successful Phase 1 outputs already exist for the intended dataset set.
+- the NativeCuda Phase 2 command uses one CPU/MPI rank. Multi-rank Phase 2 is the CPU-MPI fallback path, not native-CUDA.
 
 ## Build-side checks
 
@@ -31,11 +32,27 @@ Before attempting this checklist, verify:
 
 ## Runtime-side checks
 
-1. Run a small public Phase 2 dataset set on Vega.
+1. Run a small public Phase 2 dataset set on the target platform.
 2. Record the exact config used.
 3. Record whether the run completes without Korali load/state errors.
 4. Record whether the run writes a valid `results_phase_2/latest` output.
 5. Record whether downstream Phase 3b can load that Phase 2 result.
+
+For Karolina full-lane validation, prefer the current workflow-matrix entrypoint
+with a single production lane:
+
+```bash
+python scripts/platforms/vega/run_workflow_matrix.py \
+  --selection compression:full-model:production \
+  --output-root "${MESOUQ_RUNS_ROOT}/native_cuda_phase2/<run-tag>" \
+  --site karolina \
+  --python-bin "${MESOUQ_SITE_RUNTIME_ROOT}/venv/bin/python" \
+  --phase2-backend native-cuda \
+  --phase2-cpu-ranks 1 \
+  --inference-device gpu \
+  --propagation-device gpu \
+  --skip-release-manifest
+```
 
 ## Performance / behavior checks
 
@@ -54,6 +71,7 @@ For a successful acceptance result, archive at least:
 - the runtime launch command,
 - stdout/stderr logs,
 - the resulting `results_phase_2/latest` artifact path,
+- the posterior sanity summary generated from `results_phase_2/latest`,
 - a short statement about whether Phase 3b successfully consumed the Phase 2 output.
 
 ## Honest pass/fail rule
@@ -63,5 +81,6 @@ Do **not** mark Phase 2 native-CUDA as supported unless all of the following are
 - build configuration succeeds,
 - runtime execution succeeds,
 - valid Phase 2 outputs are written,
+- posterior sanity passes for `results_phase_2/latest`,
 - Phase 3b can consume those outputs,
 - the evidence listed above is archived.

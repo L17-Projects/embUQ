@@ -21,7 +21,7 @@ from meso_uq.production_sanity import (  # noqa: E402
     write_production_smoke_config,
 )
 from meso_uq.hpc_paths import default_runs_root, detect_hpc_site  # noqa: E402
-from meso_uq.vega_workflows import format_command, selection_key  # noqa: E402
+from meso_uq.vega_workflows import VALID_PHASE2_BACKENDS, format_command, selection_key  # noqa: E402
 
 
 def _resolve_path(value: str | Path) -> Path:
@@ -51,11 +51,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run-tag", type=str, default=None)
     parser.add_argument("--site", choices=["vega", "karolina"], default=None)
     parser.add_argument("--python-bin", type=str, default=sys.executable)
-    parser.add_argument("--phase2-cpu-ranks", type=int, default=2)
+    parser.add_argument("--phase2-cpu-ranks", type=int, default=1)
+    parser.add_argument(
+        "--phase2-backend",
+        choices=VALID_PHASE2_BACKENDS,
+        default=None,
+        help=(
+            "Optional explicit Phase 2 backend override. By default, production sanity "
+            "inherits the production workflow default: native-cuda."
+        ),
+    )
     args = parser.parse_args(argv)
 
     if args.phase2_cpu_ranks < 1:
         raise ValueError("--phase2-cpu-ranks must be a positive integer.")
+    resolved_phase2_backend = args.phase2_backend or "native-cuda"
+    if resolved_phase2_backend == "native-cuda" and args.phase2_cpu_ranks != 1:
+        raise ValueError(
+            "Production sanity native-cuda Phase 2 requires --phase2-cpu-ranks 1; "
+            f"got {args.phase2_cpu_ranks}."
+        )
 
     resolved_site = args.site if args.site is not None else detect_hpc_site()
     output_root = (
@@ -91,6 +106,8 @@ def main(argv: list[str] | None = None) -> int:
         resolved_site,
         "--skip-release-manifest",
     ]
+    if args.phase2_backend is not None:
+        command.extend(["--phase2-backend", args.phase2_backend])
     if args.run_tag is not None:
         command.extend(["--run-tag", args.run_tag])
     for selection in selections:
@@ -138,6 +155,7 @@ def main(argv: list[str] | None = None) -> int:
         "status": "passed" if command_exit_code == 0 else "failed",
         "python_bin": args.python_bin,
         "phase2_cpu_ranks": args.phase2_cpu_ranks,
+        "phase2_backend": resolved_phase2_backend,
         "default_selection": selection_key(selections[0]) if selections else None,
         "selections": [
             {

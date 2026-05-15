@@ -22,7 +22,14 @@ ALL_LANES="${ALL_LANES:-0}"
 SITE="${SITE:-vega}"
 RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/${SITE}/production_sanity/${RUN_TAG}}"
-PHASE2_CPU_RANKS="${PHASE2_CPU_RANKS:-2}"
+PHASE2_BACKEND="${PHASE2_BACKEND:-}"
+if [[ -z "${PHASE2_CPU_RANKS:-}" ]]; then
+  if [[ "${PHASE2_BACKEND}" == "cpu-mpi" ]]; then
+    PHASE2_CPU_RANKS="64"
+  else
+    PHASE2_CPU_RANKS="1"
+  fi
+fi
 PYTHON_BIN="${PYTHON_BIN:-python}"
 
 module purge
@@ -47,6 +54,10 @@ command=(
   --phase2-cpu-ranks "$PHASE2_CPU_RANKS"
   --python-bin "$PYTHON_BIN"
 )
+
+if [[ -n "$PHASE2_BACKEND" ]]; then
+  command+=(--phase2-backend "$PHASE2_BACKEND")
+fi
 
 if [[ "$ALL_LANES" == "1" ]]; then
   command+=(--all-lanes)

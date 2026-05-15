@@ -31,8 +31,14 @@ PROFILE="${PROFILE:-production}"
 PHASE3B_MEM_ARG="${PHASE3B_MEM_ARG:-}"
 DEVICE="${DEVICE:-gpu}"
 RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
-PHASE2_CPU_RANKS="${PHASE2_CPU_RANKS:-64}"
 PHASE2_BACKEND="${PHASE2_BACKEND:-native-cuda}"
+if [[ -z "${PHASE2_CPU_RANKS:-}" ]]; then
+  if [[ "${PHASE2_BACKEND}" == "native-cuda" ]]; then
+    PHASE2_CPU_RANKS="1"
+  else
+    PHASE2_CPU_RANKS="64"
+  fi
+fi
 PYTHON_BIN="${PYTHON_BIN:-python}"
 CONFIG_PATH="${CONFIG_PATH:-${REPO_ROOT}/inference/configs/production/inference_config_indentation.yaml}"
 OUTPUT_DIR="${OUTPUT_DIR:-_runs/${EXPERIMENT}/${RUN_TAG}/production/setup}"
