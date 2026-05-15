@@ -60,6 +60,7 @@ Do not document new root-level EMB experiment source trees. Those EMB assets now
 - `MES-59_MERGE_READINESS_CHECKLIST.md` for the delayed/thread-aware connector review sweep required before merge readiness
 - `MES-59_74_76_79_CLOSEOUT_EVIDENCE.md` for the MES-59/MES-74/MES-76/MES-79 closeout decisions and validation evidence
 - `GV_EXTENSION_CLOSEOUT.md` for provisional MES-78 release hardening scope and GV rollout gate
+- `GV_SHEAR_FLOW_DEFERRAL.md` for the experimental `gv:shear_flow` blockers and graduation criteria
 - `VALIDATION_CONFIGS.md` for the tiny validation config bundle
 - `WORKFLOWS.md` for workflow entrypoints and operator expectations
 - `NATIVE_CUDA_PHASE2_BASELINE.md` for the NativeCuda Phase 2 baseline and build/kernel delivery decision
@@ -72,6 +73,7 @@ Do not document new root-level EMB experiment source trees. Those EMB assets now
 - `MES-59_74_76_79_CLOSEOUT_EVIDENCE.md` for prior closeout evidence and decisions
 - `MES-125_KAROLINA_ACCEPTANCE_CLOSEOUT.md` for MES-125 closeout evidence skeleton
 - `GV_EXTENSION_CLOSEOUT.md` for provisional MES-78 closeout scope and GV rollout gate
+- `GV_SHEAR_FLOW_DEFERRAL.md` for the deferred GV shear-flow lane
 - `EMB_WORKFLOW_EXTRACTION_PLAN.md` for extraction planning under the EMB compression and indentation slice
 
 Also see legacy release/operational notes:

@@ -57,6 +57,7 @@ The GV noise model for this slice is multiplicative `sigma`.
 ## Deferrals and active-learning reminder
 
 - `shear_flow` remains in experimental scope and deferred from the non-shear core closeout.
+- See [GV_SHEAR_FLOW_DEFERRAL.md](GV_SHEAR_FLOW_DEFERRAL.md) for the current runtime blocker, minimum data product, and graduation criteria.
 - After the core GV stack is accepted, schedule an active-learning brainstorming session on adaptive control selection before any production rollout decisions.
 
 ## Merge evidence and hardening gate

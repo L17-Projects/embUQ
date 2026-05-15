@@ -2,6 +2,10 @@
 
 `gv/shear_flow/src/` contains the shear-flow-specific runtime source templates and helper scripts. This lane uses the experimental mirheoOBMD runtime surface; shared GV runtime planning, contracts, and sampling helpers belong under `src/meso_uq/structures/gv`.
 
+This lane is deferred from the active GV launch interface. See
+`../../../docs/GV_SHEAR_FLOW_DEFERRAL.md` for the current bouncer-overflow
+blocker and graduation criteria.
+
 - `copy_and_modify.py` copies and adjusts shear-flow setup folders for conservative-force sweeps.
 - `run_all.py` and `run_all_HPC.sh` are experiment-local helpers for submitting or running the generated shear-flow cases.
 
