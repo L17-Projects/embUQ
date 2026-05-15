@@ -67,6 +67,14 @@ per-subproblem likelihoods back, frees those per-batch buffers, and writes
 timing. For Phase 2 migration this profiling output is for optimization runs,
 not for every validation run.
 
+`meso_uq.inference.native_cuda_performance` and
+`scripts/platforms/hpc/check_native_cuda_profile.py` are the fixed-threshold
+profile harness for those optimization runs. They parse setup and batch records,
+report maximum and mean timing buckets, and fail with the exact exceeded bucket
+when a threshold is violated. The default thresholds are intentionally broad
+synthetic-harness gates; Karolina or Vega validation evidence must record any
+platform-specific overrides used for a campaign.
+
 ## Build surface
 
 The current build gate is `-Dnative_cuda_batch=true` in
@@ -199,3 +207,26 @@ python -m pytest -q -m cuda tests/integration/test_native_cuda_psi_runtime.py
 Use the same command after sourcing the documented Vega environment on Vega.
 If CUDA driver devices or NVRTC are absent, the test skips with an actionable
 message; an executed test failure is a NativeCuda correctness or runtime issue.
+
+## Performance profile harness
+
+Enable the Korali profile writer during an optimization run, then check the
+resulting JSONL file with explicit thresholds:
+
+```bash
+export HUQ_PSI_NATIVE_CUDA_PROFILE_JSONL="$PWD/_runs/native_cuda/phase2_native_cuda.jsonl"
+# run the targeted NativeCuda Phase 2 or synthetic CUDA harness here
+python scripts/platforms/hpc/check_native_cuda_profile.py \
+  "$HUQ_PSI_NATIVE_CUDA_PROFILE_JSONL" \
+  --output-json "$PWD/_runs/native_cuda/native_cuda_profile_report.json" \
+  --max-batch-total-seconds 10 \
+  --max-batch-alloc-seconds 1 \
+  --max-batch-h2d-seconds 1 \
+  --max-batch-compute-seconds 5 \
+  --max-batch-d2h-seconds 1 \
+  --max-batch-host-reduce-seconds 1
+```
+
+The report includes setup and batch counts, max/mean setup buckets, max/mean
+batch buckets, maximum batch size, parameter count, sub-problem count, dynamic
+prior count, the thresholds used, and any exceeded bucket names.
