@@ -1,0 +1,53 @@
+schema_version: "1.0"
+kind: active_learning
+metadata:
+  id: gv_selected_candidates_example
+  name: GV Selected Candidates Example
+  description: Example handoff from active-learning selection to GV launch rendering.
+spec:
+  platform: karolina
+  campaign_root: _runs/gv/active_learning/gv_selected_candidates_example
+  walltime: "00:30:00"
+  gpu_count: 1
+  provenance_tags:
+    linear_project: GV Numerical Data Generation
+    linear_issues: MES-185 MES-186 MES-187
+  defaults:
+    geometry:
+      radGV: 2.0
+      height: 14.28
+    material_parameters:
+      ka: 1.1
+      kb: 1.2
+      mu: 0.9
+      b1: 0.1
+      b2: 0.2
+      a3: 0.3
+      a4: 0.4
+      mu_l: 0.5
+      c: 0.6
+    controls:
+      bpress: -91.0
+  selected_candidates:
+    - candidate_id: gv-al-stretch-001
+      parameters:
+        gv_launch:
+          experiment: stretching
+          controls:
+            tot_force:
+              - 500.0
+              - 750.0
+      metadata:
+        acquisition_score: 0.81
+        acquisition_policy: qei
+    - candidate_id: gv-al-buckling-002
+      parameters:
+        gv_launch:
+          experiment: buckling
+          controls:
+            buck:
+              - 0.8
+              - 0.9
+      metadata:
+        acquisition_score: 0.79
+        acquisition_policy: qei

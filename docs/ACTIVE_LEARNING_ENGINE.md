@@ -48,3 +48,43 @@ restored, and resumed in a fresh process.
 
 The dry-run engine keeps a full execution trail in state (`simulation_requests`,
 `simulation_results`, `retraining_results`, and `failures`) for post-run inspection and resumability.
+
+## GV selected-candidates handoff
+
+GV numerical data generation uses a loose boundary between active learning and
+the DPD launch stack:
+
+- active learning owns candidate generation, acquisition scoring, selection,
+  and loop state
+- GV owns conversion from selected candidates into validated launch requests,
+  scheduler-ready scripts, and expected HDF5 dataset paths
+- operators remain responsible for submitting rendered scheduler scripts
+
+Use `meso_uq.structures.gv.build_gv_active_learning_launch_handoff` for this
+boundary. It accepts selected `Candidate` objects or candidate dictionaries and
+builds `GVLaunchRequest` objects through the existing GV launch validator. The
+candidate payload may contain only scientific launch fields:
+
+- `experiment`
+- `material_parameters`
+- `geometry` or `radGV` plus `height`
+- `controls`
+
+Defaults may provide shared scientific fields. `controls` defaults are merged
+with candidate controls, so common fixed controls can live at the batch boundary
+while each candidate supplies its own sweep axis. Candidate control names take
+precedence if a key is present in both places.
+
+Scheduler and provenance fields (`platform`, `output_root`, `walltime`,
+`gpu_count`, and `provenance_tags`) are adapter-owned and must be passed to the
+handoff builder. This keeps acquisition code independent from platform launch
+policy.
+
+The optional render step is
+`meso_uq.structures.gv.render_gv_active_learning_launch_handoff`. It delegates
+to the GV launch renderer and writes manifests/scripts only; it does not submit
+jobs. See `configs/active_learning/gv_selected_candidates.example.yaml` for a
+two-candidate GV input example and
+`configs/active_learning/gv_selected_candidates_handoff_manifest.example.json`
+for the derived, non-submitting handoff manifest with expected HDF5 dataset
+paths.

@@ -11,6 +11,7 @@ The current examples are additive policy/configuration skeletons:
 - `inference/`: algorithm and runtime-config template selection.
 - `noise/`: observation-noise model examples.
 - `platforms/`: workstation, Vega, Karolina, and generic Slurm path/runtime policy examples.
+- `active_learning/`: dry-run active-learning examples plus GV selected-candidates handoff payloads and expected handoff-manifest examples.
 - `reports/` and `artifacts/`: reporting and artifact-manifest examples.
 
 Active EMB production and validation workflow configs still live under `inference/configs/` and `reduced/configs/`. Use `configs/` for structure-general composition examples and policy-facing schema work; update the active runtime config roots when changing the workflows that current operators actually run.

@@ -77,4 +77,22 @@ No controls are calibrated in this stack; control names are kept as experiment d
 ## Downstream handoff
 
 - Downstream handoff is to DNN surrogate retraining/prediction and hierarchical inference.
-- `active_learning` planning remains unresolved; a follow-up brainstorm is still required before production rollout decisions on adaptive GV control selection.
+- Active-learning acquisition/scoring/selection remains outside the GV runtime stack.
+- Selected active-learning candidates can be converted to GV launch requests with
+  `meso_uq.structures.gv.build_gv_active_learning_launch_handoff`.
+- The GV handoff adapter owns validation against the existing launch schema,
+  expected HDF5 dataset paths, and render-only scheduler artifact generation
+  through `render_gv_active_learning_launch_handoff`.
+- The adapter does not submit scheduler jobs. Rendered scripts and manifests
+  remain operator-reviewed campaign artifacts under the requested `_runs/...`
+  campaign root.
+- Candidate payloads may provide only experiment, material, geometry, and
+  control fields. Platform, walltime, GPU count, output root, and provenance are
+  provided at the handoff boundary.
+- Shared default controls are merged with candidate controls before launch
+  validation, which keeps common fixed controls such as `bpress` from being
+  repeated in every selected candidate.
+- A minimal two-candidate selected-candidates input example lives at
+  `configs/active_learning/gv_selected_candidates.example.yaml`. The matching
+  derived, non-submitting handoff manifest with expected HDF5 dataset paths is
+  `configs/active_learning/gv_selected_candidates_handoff_manifest.example.json`.

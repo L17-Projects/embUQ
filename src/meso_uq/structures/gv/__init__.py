@@ -78,10 +78,14 @@ __all__ = [
     "GVLaunchCampaignManifest",
     "GVLaunchSchedulerScript",
     "GVLaunchRenderedCampaign",
+    "GVActiveLearningLaunchCandidate",
+    "GVActiveLearningLaunchHandoff",
     "validate_gv_launch_request",
     "build_gv_launch_campaign_manifest",
     "render_gv_launch_campaign",
     "render_gv_launch_campaigns",
+    "build_gv_active_learning_launch_handoff",
+    "render_gv_active_learning_launch_handoff",
 ]
 
 
@@ -138,6 +142,14 @@ def __getattr__(name: str):
         from .launch import GVLaunchRenderedCampaign
 
         return GVLaunchRenderedCampaign
+    if name == "GVActiveLearningLaunchCandidate":
+        from .active_learning_handoff import GVActiveLearningLaunchCandidate
+
+        return GVActiveLearningLaunchCandidate
+    if name == "GVActiveLearningLaunchHandoff":
+        from .active_learning_handoff import GVActiveLearningLaunchHandoff
+
+        return GVActiveLearningLaunchHandoff
     if name == "validate_gv_launch_request":
         from .launch import validate_gv_launch_request
 
@@ -154,6 +166,14 @@ def __getattr__(name: str):
         from .launch import render_gv_launch_campaigns
 
         return render_gv_launch_campaigns
+    if name == "build_gv_active_learning_launch_handoff":
+        from .active_learning_handoff import build_gv_active_learning_launch_handoff
+
+        return build_gv_active_learning_launch_handoff
+    if name == "render_gv_active_learning_launch_handoff":
+        from .active_learning_handoff import render_gv_active_learning_launch_handoff
+
+        return render_gv_active_learning_launch_handoff
     raise AttributeError(f"module 'meso_uq.structures.gv' has no attribute {name!r}")
 
 
@@ -174,9 +194,13 @@ def __dir__() -> list[str]:
             "GVLaunchCampaignManifest",
             "GVLaunchSchedulerScript",
             "GVLaunchRenderedCampaign",
+            "GVActiveLearningLaunchCandidate",
+            "GVActiveLearningLaunchHandoff",
             "validate_gv_launch_request",
             "build_gv_launch_campaign_manifest",
             "render_gv_launch_campaign",
             "render_gv_launch_campaigns",
+            "build_gv_active_learning_launch_handoff",
+            "render_gv_active_learning_launch_handoff",
         ]
     )
