@@ -65,7 +65,11 @@ def test_validate_gv_launch_request_normalizes_required_fields() -> None:
         ),
         (
             {"controls": {"tot_force": (500.0, 500.0), "bpress": -91.0}},
-            "sweep values must be unique",
+            "sweep values must produce unique formatted output ids",
+        ),
+        (
+            {"controls": {"tot_force": (500.000000000001, 500.000000000002), "bpress": -91.0}},
+            "sweep values must produce unique formatted output ids",
         ),
     ],
 )

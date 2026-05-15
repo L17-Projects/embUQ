@@ -254,16 +254,17 @@ def _normalize_output_root(*, output_root: str | Path, platform: Platform) -> Pa
 
 
 def _validate_unique_sweep_values(sweep: GVSweep) -> None:
-    seen: set[float] = set()
+    seen: set[str] = set()
     duplicates: list[str] = []
     for value in sweep.values:
-        if value in seen:
-            duplicates.append(format_float(value))
-        seen.add(value)
+        value_id = format_float(value)
+        if value_id in seen:
+            duplicates.append(value_id)
+        seen.add(value_id)
     if duplicates:
         duplicate_list = ", ".join(duplicates)
         raise ValueError(
-            "GV launch sweep values must be unique to produce unambiguous output ids; "
+            "GV launch sweep values must produce unique formatted output ids; "
             f"duplicates: {duplicate_list}."
         )
 
