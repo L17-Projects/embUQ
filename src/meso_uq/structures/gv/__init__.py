@@ -76,8 +76,12 @@ __all__ = [
     "GVLaunchRequest",
     "GVLaunchRunManifest",
     "GVLaunchCampaignManifest",
+    "GVLaunchSchedulerScript",
+    "GVLaunchRenderedCampaign",
     "validate_gv_launch_request",
     "build_gv_launch_campaign_manifest",
+    "render_gv_launch_campaign",
+    "render_gv_launch_campaigns",
 ]
 
 
@@ -126,6 +130,14 @@ def __getattr__(name: str):
         from .launch import GVLaunchCampaignManifest
 
         return GVLaunchCampaignManifest
+    if name == "GVLaunchSchedulerScript":
+        from .launch import GVLaunchSchedulerScript
+
+        return GVLaunchSchedulerScript
+    if name == "GVLaunchRenderedCampaign":
+        from .launch import GVLaunchRenderedCampaign
+
+        return GVLaunchRenderedCampaign
     if name == "validate_gv_launch_request":
         from .launch import validate_gv_launch_request
 
@@ -134,6 +146,14 @@ def __getattr__(name: str):
         from .launch import build_gv_launch_campaign_manifest
 
         return build_gv_launch_campaign_manifest
+    if name == "render_gv_launch_campaign":
+        from .launch import render_gv_launch_campaign
+
+        return render_gv_launch_campaign
+    if name == "render_gv_launch_campaigns":
+        from .launch import render_gv_launch_campaigns
+
+        return render_gv_launch_campaigns
     raise AttributeError(f"module 'meso_uq.structures.gv' has no attribute {name!r}")
 
 
@@ -152,7 +172,11 @@ def __dir__() -> list[str]:
             "GVLaunchRequest",
             "GVLaunchRunManifest",
             "GVLaunchCampaignManifest",
+            "GVLaunchSchedulerScript",
+            "GVLaunchRenderedCampaign",
             "validate_gv_launch_request",
             "build_gv_launch_campaign_manifest",
+            "render_gv_launch_campaign",
+            "render_gv_launch_campaigns",
         ]
     )

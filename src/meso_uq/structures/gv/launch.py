@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
+import shlex
 from dataclasses import dataclass
 from math import isfinite
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping, Sequence
 
 from meso_uq.core import Platform, coerce_platform
 from meso_uq.experiments import canonical_dataset_id
@@ -25,11 +27,19 @@ from .sampling.validation import validate_sample_gv_request
 
 
 GV_LAUNCH_MANIFEST_SCHEMA_VERSION = 1
+GV_LAUNCH_RENDER_MANIFEST_SCHEMA_VERSION = 1
+GV_LAUNCH_RENDER_MANIFEST_FILENAME = "gv_launch_campaign_manifest.json"
 _GV_LAUNCH_SUPPORTED_PLATFORMS = frozenset(
     {
         Platform.VEGA,
         Platform.KAROLINA,
         Platform.GENERIC_SLURM,
+    }
+)
+_GV_LAUNCH_RENDER_PLATFORMS = frozenset(
+    {
+        Platform.VEGA,
+        Platform.KAROLINA,
     }
 )
 
@@ -119,6 +129,91 @@ class GVLaunchCampaignManifest:
         return payload
 
 
+@dataclass(frozen=True)
+class GVLaunchSchedulerScript:
+    platform: Platform
+    renderer: str
+    scheduler: str
+    script_path: Path
+    job_name: str
+    array_size: int
+    gpu_count: int
+    walltime: str
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "platform": self.platform.value,
+            "renderer": self.renderer,
+            "scheduler": self.scheduler,
+            "script_path": str(self.script_path),
+            "job_name": self.job_name,
+            "array_size": self.array_size,
+            "gpu_count": self.gpu_count,
+            "walltime": self.walltime,
+            "submits_jobs": False,
+        }
+
+
+@dataclass(frozen=True)
+class GVLaunchRenderedCampaign:
+    request: GVLaunchRequest
+    campaign_manifest: GVLaunchCampaignManifest
+    campaign_dir: Path
+    manifest_path: Path
+    scheduler_scripts: tuple[GVLaunchSchedulerScript, ...]
+
+    def to_manifest(self) -> dict[str, Any]:
+        payload = self.campaign_manifest.to_manifest()
+        scripts = [script.to_manifest() for script in self.scheduler_scripts]
+        payload.update(
+            {
+                "render_manifest_schema_version": GV_LAUNCH_RENDER_MANIFEST_SCHEMA_VERSION,
+                "campaign_dir": str(self.campaign_dir),
+                "campaign_manifest_path": str(self.manifest_path),
+                "platform_renderers": [
+                    {
+                        "platform": script.platform.value,
+                        "renderer": script.renderer,
+                        "scheduler": script.scheduler,
+                    }
+                    for script in self.scheduler_scripts
+                ],
+                "generated_script_paths": [script["script_path"] for script in scripts],
+                "scheduler_scripts": scripts,
+                "output_paths": {
+                    "campaign_dir": str(self.campaign_dir),
+                    "manifest_path": str(self.manifest_path),
+                    "datasets_root": str(self.campaign_dir / GV_NUMERICAL_DATASET_DIRNAME),
+                    "campaign_dataset_manifest": str(self.campaign_manifest.manifest_path),
+                    "campaign_hdf5": str(self.campaign_manifest.hdf5_path),
+                },
+                "expected_hdf5_datasets": {
+                    "campaign": {
+                        "dataset_id": self.campaign_manifest.dataset_id,
+                        "hdf5_path": str(self.campaign_manifest.hdf5_path),
+                    },
+                    "runs": [
+                        {
+                            "dataset_id": run.dataset_id,
+                            "hdf5_path": str(run.hdf5_path),
+                            "manifest_path": str(run.manifest_path),
+                        }
+                        for run in self.campaign_manifest.runs
+                    ],
+                },
+                "provenance": {
+                    "tags": dict(self.request.provenance_tags),
+                    "renderer": "meso_uq.structures.gv.launch.render_gv_launch_campaign",
+                },
+                "submission": {
+                    "submitted": False,
+                    "submission_commands": [],
+                },
+            }
+        )
+        return payload
+
+
 def validate_gv_launch_request(
     *,
     experiment: object,
@@ -202,6 +297,73 @@ def build_gv_launch_campaign_manifest(request: GVLaunchRequest) -> GVLaunchCampa
     )
 
 
+def render_gv_launch_campaign(
+    request: GVLaunchRequest,
+    *,
+    platforms: Platform | str | Iterable[Platform | str] | None = None,
+    overwrite: bool = False,
+) -> GVLaunchRenderedCampaign:
+    """Materialize one validated GV launch request without submitting jobs."""
+
+    return render_gv_launch_campaigns(request, platforms=platforms, overwrite=overwrite)[0]
+
+
+def render_gv_launch_campaigns(
+    requests: GVLaunchRequest | Iterable[GVLaunchRequest],
+    *,
+    platforms: Platform | str | Iterable[Platform | str] | None = None,
+    overwrite: bool = False,
+) -> tuple[GVLaunchRenderedCampaign, ...]:
+    """Materialize one or more GV launch requests as manifests and scheduler scripts."""
+
+    normalized_requests = _normalize_render_requests(requests)
+    _validate_unique_campaign_dirs(normalized_requests)
+    return tuple(
+        _render_one_gv_launch_campaign(request=request, platforms=platforms, overwrite=overwrite)
+        for request in normalized_requests
+    )
+
+
+def _render_one_gv_launch_campaign(
+    *,
+    request: GVLaunchRequest,
+    platforms: Platform | str | Iterable[Platform | str] | None,
+    overwrite: bool,
+) -> GVLaunchRenderedCampaign:
+    target_platforms = _normalize_render_platforms(platforms=platforms, default_platform=request.platform)
+    for platform in target_platforms:
+        _validate_render_output_root_for_platform(output_root=request.output_root, platform=platform)
+
+    campaign_manifest = build_gv_launch_campaign_manifest(request)
+    campaign_dir = request.output_root
+    _prepare_campaign_dir(campaign_dir=campaign_dir, overwrite=overwrite)
+
+    (campaign_dir / "logs").mkdir(parents=True, exist_ok=True)
+    scripts = tuple(
+        _write_scheduler_script(
+            request=request,
+            campaign_manifest=campaign_manifest,
+            platform=platform,
+            campaign_dir=campaign_dir,
+        )
+        for platform in target_platforms
+    )
+
+    manifest_path = campaign_dir / GV_LAUNCH_RENDER_MANIFEST_FILENAME
+    rendered = GVLaunchRenderedCampaign(
+        request=request,
+        campaign_manifest=campaign_manifest,
+        campaign_dir=campaign_dir,
+        manifest_path=manifest_path,
+        scheduler_scripts=scripts,
+    )
+    manifest_path.write_text(
+        json.dumps(rendered.to_manifest(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return rendered
+
+
 def _build_run_manifest(*, request: GVLaunchRequest, sweep_value: float) -> GVLaunchRunManifest:
     controls = dict(request.fixed_controls)
     controls[request.sweep.axis] = float(sweep_value)
@@ -230,6 +392,325 @@ def _campaign_output_id(*, fixed_controls: Mapping[str, float], sweep: GVSweep) 
     value_token = "__".join(format_float(value) for value in sweep.values)
     parts.append(f"values_{value_token}")
     return "__".join(parts)
+
+
+def _normalize_render_requests(
+    requests: GVLaunchRequest | Iterable[GVLaunchRequest],
+) -> tuple[GVLaunchRequest, ...]:
+    if isinstance(requests, GVLaunchRequest):
+        return (requests,)
+    normalized = tuple(requests)
+    if not normalized:
+        raise ValueError("At least one GVLaunchRequest is required.")
+    for request in normalized:
+        if not isinstance(request, GVLaunchRequest):
+            raise ValueError("All GV launch render inputs must be GVLaunchRequest instances.")
+    return normalized
+
+
+def _validate_unique_campaign_dirs(requests: Sequence[GVLaunchRequest]) -> None:
+    seen: dict[Path, str] = {}
+    for request in requests:
+        key = request.output_root
+        previous = seen.get(key)
+        if previous is not None:
+            raise ValueError(
+                "GV launch batch contains duplicate campaign output roots: "
+                f"{key} ({previous!r} and {request.campaign_id!r})."
+            )
+        seen[key] = request.campaign_id
+
+
+def _normalize_render_platforms(
+    *,
+    platforms: Platform | str | Iterable[Platform | str] | None,
+    default_platform: Platform,
+) -> tuple[Platform, ...]:
+    if platforms is None:
+        raw_platforms: tuple[Platform | str, ...] = (default_platform,)
+    elif isinstance(platforms, (Platform, str)):
+        raw_platforms = (platforms,)
+    else:
+        raw_platforms = tuple(platforms)
+    if not raw_platforms:
+        raise ValueError("At least one GV launch render platform is required.")
+
+    normalized: list[Platform] = []
+    seen: set[Platform] = set()
+    for raw_platform in raw_platforms:
+        platform = _normalize_launch_platform(raw_platform)
+        if platform not in _GV_LAUNCH_RENDER_PLATFORMS:
+            supported = ", ".join(sorted(item.value for item in _GV_LAUNCH_RENDER_PLATFORMS))
+            raise ValueError(f"GV launch render platform must be one of: {supported}.")
+        if platform not in seen:
+            normalized.append(platform)
+            seen.add(platform)
+    return tuple(normalized)
+
+
+def _validate_render_output_root_for_platform(*, output_root: Path, platform: Platform) -> None:
+    errors = validate_platform_path_policy(
+        platform,
+        {"output_root": output_root.as_posix()},
+        label="gv_launch_renderer",
+    )
+    if errors:
+        raise ValueError(errors[0])
+
+
+def _prepare_campaign_dir(*, campaign_dir: Path, overwrite: bool) -> None:
+    if campaign_dir.exists():
+        if not campaign_dir.is_dir():
+            raise ValueError(f"GV launch campaign path exists and is not a directory: {campaign_dir}.")
+        if not overwrite:
+            raise ValueError(
+                "GV launch campaign directory already exists; choose a new campaign id "
+                f"or pass overwrite=True: {campaign_dir}."
+            )
+    campaign_dir.mkdir(parents=True, exist_ok=True)
+
+
+def _write_scheduler_script(
+    *,
+    request: GVLaunchRequest,
+    campaign_manifest: GVLaunchCampaignManifest,
+    platform: Platform,
+    campaign_dir: Path,
+) -> GVLaunchSchedulerScript:
+    renderer = _renderer_name(platform)
+    job_name = _slurm_job_name(request.campaign_id)
+    script_dir = campaign_dir / "scripts" / platform.value
+    script_dir.mkdir(parents=True, exist_ok=True)
+    script_path = script_dir / f"{_path_token(request.campaign_id)}.sbatch"
+    script_path.write_text(
+        _render_slurm_script(
+            request=request,
+            campaign_manifest=campaign_manifest,
+            platform=platform,
+            job_name=job_name,
+            renderer=renderer,
+        ),
+        encoding="utf-8",
+    )
+    script_path.chmod(0o755)
+    return GVLaunchSchedulerScript(
+        platform=platform,
+        renderer=renderer,
+        scheduler="slurm",
+        script_path=script_path,
+        job_name=job_name,
+        array_size=len(campaign_manifest.runs),
+        gpu_count=request.gpu_count,
+        walltime=request.walltime,
+    )
+
+
+def _render_slurm_script(
+    *,
+    request: GVLaunchRequest,
+    campaign_manifest: GVLaunchCampaignManifest,
+    platform: Platform,
+    job_name: str,
+    renderer: str,
+) -> str:
+    header = _slurm_header(request=request, platform=platform, job_name=job_name)
+    setup = _platform_setup(platform)
+    run_arrays = _run_arrays(campaign_manifest)
+    material_args = _shell_arg_array(_material_cli_args(request.material_parameters))
+    return "\n".join(
+        [
+            "#!/usr/bin/env bash",
+            "# Generated by meso_uq.structures.gv.launch.render_gv_launch_campaign.",
+            "# This script is submission-free; submit it explicitly from the scheduler if needed.",
+            f"# GV launch renderer: {renderer}",
+            *header,
+            "",
+            "set -euo pipefail",
+            "",
+            'REPO_ROOT="${REPO_ROOT:-${SLURM_SUBMIT_DIR:-$(pwd)}}"',
+            'if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then',
+            '  echo "Set REPO_ROOT explicitly or submit the job from the repo root." >&2',
+            "  exit 2",
+            "fi",
+            'cd "${REPO_ROOT}"',
+            "",
+            f"CAMPAIGN_DIR={_shell_quote(request.output_root.as_posix())}",
+            'mkdir -p "${CAMPAIGN_DIR}/logs"',
+            'PYTHON_BIN="${PYTHON_BIN:-python}"',
+            'export PYTHONPATH="${REPO_ROOT}/src:${REPO_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"',
+            "",
+            *setup,
+            "",
+            f"EXPERIMENT={_shell_quote(request.experiment)}",
+            f"GEOMETRY_RADIUS={_shell_quote(str(request.geometry.radGV))}",
+            f"GEOMETRY_HEIGHT={_shell_quote(str(request.geometry.height))}",
+            f"CAMPAIGN_DATASET_ID={_shell_quote(campaign_manifest.dataset_id)}",
+            f"CAMPAIGN_HDF5_PATH={_shell_quote(campaign_manifest.hdf5_path.as_posix())}",
+            *run_arrays,
+            f"MATERIAL_ARGV=({material_args})",
+            "",
+            'RUN_INDEX="${SLURM_ARRAY_TASK_ID:-0}"',
+            'if (( RUN_INDEX < 0 || RUN_INDEX >= ${#RUN_DATASET_IDS[@]} )); then',
+            '  echo "Invalid GV launch run index: ${RUN_INDEX}" >&2',
+            "  exit 2",
+            "fi",
+            "",
+            'IFS=" " read -r -a CONTROL_ARGV <<< "${RUN_CONTROL_ARGS[$RUN_INDEX]}"',
+            'RUN_OUTPUT_ROOT="${CAMPAIGN_DIR}/runtime/${RUN_OUTPUT_IDS[$RUN_INDEX]}"',
+            "",
+            "command=(",
+            '  "${PYTHON_BIN}"',
+            f"  scripts/platforms/{platform.value}/run_gv_runtime.py",
+            '  --experiment "${EXPERIMENT}"',
+            '  --radius "${GEOMETRY_RADIUS}"',
+            '  --height "${GEOMETRY_HEIGHT}"',
+            '  --output-root "${RUN_OUTPUT_ROOT}"',
+            ")",
+            'command+=("${CONTROL_ARGV[@]}" "${MATERIAL_ARGV[@]}")',
+            "",
+            'echo "[gv-launch] campaign_dataset_id=${CAMPAIGN_DATASET_ID}"',
+            'echo "[gv-launch] campaign_hdf5_path=${CAMPAIGN_HDF5_PATH}"',
+            'echo "[gv-launch] run_dataset_id=${RUN_DATASET_IDS[$RUN_INDEX]}"',
+            'echo "[gv-launch] run_manifest_path=${RUN_MANIFEST_PATHS[$RUN_INDEX]}"',
+            'echo "[gv-launch] run_hdf5_path=${RUN_HDF5_PATHS[$RUN_INDEX]}"',
+            '"${command[@]}"',
+            "",
+        ]
+    )
+
+
+def _slurm_header(*, request: GVLaunchRequest, platform: Platform, job_name: str) -> list[str]:
+    output_path = (request.output_root / "logs" / "%x-%A_%a.out").as_posix()
+    error_path = (request.output_root / "logs" / "%x-%A_%a.err").as_posix()
+    lines = [
+        f"#SBATCH --job-name={job_name}",
+        f"#SBATCH --time={request.walltime}",
+        "#SBATCH --nodes=1",
+        "#SBATCH --ntasks=1",
+    ]
+    if platform == Platform.KAROLINA:
+        lines.extend(
+            [
+                "#SBATCH --account=eu-26-17",
+                "#SBATCH --partition=qgpu",
+                "#SBATCH --cpus-per-task=8",
+                f"#SBATCH --gpus={request.gpu_count}",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "#SBATCH --partition=gpu",
+                "#SBATCH --cpus-per-task=4",
+                f"#SBATCH --gres=gpu:{request.gpu_count}",
+            ]
+        )
+    if len(request.sweep.values) > 1:
+        lines.append(f"#SBATCH --array=0-{len(request.sweep.values) - 1}")
+    lines.extend(
+        [
+            f"#SBATCH --output={output_path}",
+            f"#SBATCH --error={error_path}",
+        ]
+    )
+    return lines
+
+
+def _platform_setup(platform: Platform) -> list[str]:
+    if platform == Platform.KAROLINA:
+        return [
+            'source "${REPO_ROOT}/scripts/platforms/karolina/env_karolina.sh"',
+            'GV_ENV_SCRIPT="${MESOUQ_GV_ENV_SCRIPT:-${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/env.sh}"',
+            'if [[ ! -f "${GV_ENV_SCRIPT}" ]]; then',
+            '  echo "Missing required GV runtime environment: ${GV_ENV_SCRIPT}" >&2',
+            "  exit 1",
+            "fi",
+            'source "${GV_ENV_SCRIPT}"',
+            'export MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"',
+            'export MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"',
+            'export MESOUQ_SITE="karolina"',
+            'export HPC_SITE="karolina"',
+        ]
+    return [
+        "module purge",
+        "module load \\",
+        "  Python/3.10.8-GCCcore-12.2.0 \\",
+        "  OpenMPI/4.1.4-GCC-12.2.0 \\",
+        "  CUDA/12.2.2 \\",
+        "  GSL/2.7-GCC-12.2.0 \\",
+        "  Eigen/3.4.0-GCCcore-12.2.0 \\",
+        "  HDF5/1.14.0-gompi-2022b \\",
+        "  MPFR/4.2.0-GCCcore-12.2.0 \\",
+        "  GMP/6.2.1-GCCcore-12.2.0",
+        'GV_ENV_SCRIPT="${MESOUQ_GV_ENV_SCRIPT:-${REPO_ROOT}/_vega/gv_venv/env.sh}"',
+        'if [[ ! -f "${GV_ENV_SCRIPT}" ]]; then',
+        '  echo "Missing required GV runtime environment: ${GV_ENV_SCRIPT}" >&2',
+        "  exit 1",
+        "fi",
+        'source "${GV_ENV_SCRIPT}"',
+        'export MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"',
+        'export MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"',
+        'export MESOUQ_SITE="vega"',
+        'export HPC_SITE="vega"',
+    ]
+
+
+def _run_arrays(campaign_manifest: GVLaunchCampaignManifest) -> list[str]:
+    dataset_ids = _shell_array(run.dataset_id for run in campaign_manifest.runs)
+    output_ids = _shell_array(run.output_id for run in campaign_manifest.runs)
+    manifest_paths = _shell_array(run.manifest_path.as_posix() for run in campaign_manifest.runs)
+    hdf5_paths = _shell_array(run.hdf5_path.as_posix() for run in campaign_manifest.runs)
+    control_args = _shell_array(_control_cli_arg_string(run.controls) for run in campaign_manifest.runs)
+    return [
+        f"RUN_DATASET_IDS=({dataset_ids})",
+        f"RUN_OUTPUT_IDS=({output_ids})",
+        f"RUN_MANIFEST_PATHS=({manifest_paths})",
+        f"RUN_HDF5_PATHS=({hdf5_paths})",
+        f"RUN_CONTROL_ARGS=({control_args})",
+    ]
+
+
+def _control_cli_arg_string(controls: Mapping[str, float]) -> str:
+    return " ".join(_control_cli_args(controls))
+
+
+def _control_cli_args(controls: Mapping[str, float]) -> list[str]:
+    args: list[str] = []
+    for name in sorted(controls):
+        args.extend(["--control", f"{name}={controls[name]}"])
+    return args
+
+
+def _material_cli_args(material_parameters: Mapping[str, float]) -> list[str]:
+    args: list[str] = []
+    for name in GV_MATERIAL_PARAMETER_NAMES:
+        args.extend(["--material", f"{name}={material_parameters[name]}"])
+    return args
+
+
+def _shell_array(values: Iterable[str]) -> str:
+    return " ".join(_shell_quote(value) for value in values)
+
+
+def _shell_arg_array(values: Iterable[str]) -> str:
+    return " ".join(_shell_quote(value) for value in values)
+
+
+def _shell_quote(value: str) -> str:
+    return shlex.quote(str(value))
+
+
+def _renderer_name(platform: Platform) -> str:
+    return f"gv_launch_renderer:{platform.value}_slurm"
+
+
+def _slurm_job_name(campaign_id: str) -> str:
+    return f"mesouq-gv-{_path_token(campaign_id)}"[:128]
+
+
+def _path_token(value: str) -> str:
+    token = "".join(char if char.isalnum() or char in {"-", "_", "."} else "_" for char in value.strip())
+    return token or "campaign"
 
 
 def _normalize_launch_platform(platform: Platform | str) -> Platform:
@@ -365,9 +846,15 @@ def _normalize_provenance_tags(provenance_tags: Mapping[str, object]) -> dict[st
 
 __all__ = [
     "GV_LAUNCH_MANIFEST_SCHEMA_VERSION",
+    "GV_LAUNCH_RENDER_MANIFEST_FILENAME",
+    "GV_LAUNCH_RENDER_MANIFEST_SCHEMA_VERSION",
     "GVLaunchCampaignManifest",
+    "GVLaunchRenderedCampaign",
     "GVLaunchRequest",
     "GVLaunchRunManifest",
+    "GVLaunchSchedulerScript",
     "build_gv_launch_campaign_manifest",
+    "render_gv_launch_campaign",
+    "render_gv_launch_campaigns",
     "validate_gv_launch_request",
 ]

@@ -37,10 +37,18 @@ def test_gv_package_exports_launch_api() -> None:
     assert gv.GVLaunchRequest.__name__ == "GVLaunchRequest"
     assert gv.GVLaunchRunManifest.__name__ == "GVLaunchRunManifest"
     assert gv.GVLaunchCampaignManifest.__name__ == "GVLaunchCampaignManifest"
+    assert gv.GVLaunchSchedulerScript.__name__ == "GVLaunchSchedulerScript"
+    assert gv.GVLaunchRenderedCampaign.__name__ == "GVLaunchRenderedCampaign"
     assert callable(gv.validate_gv_launch_request)
     assert callable(gv.build_gv_launch_campaign_manifest)
+    assert callable(gv.render_gv_launch_campaign)
+    assert callable(gv.render_gv_launch_campaigns)
     assert "GVLaunchRequest" in exported
     assert "GVLaunchRunManifest" in exported
     assert "GVLaunchCampaignManifest" in exported
+    assert "GVLaunchSchedulerScript" in exported
+    assert "GVLaunchRenderedCampaign" in exported
     assert "validate_gv_launch_request" in exported
     assert "build_gv_launch_campaign_manifest" in exported
+    assert "render_gv_launch_campaign" in exported
+    assert "render_gv_launch_campaigns" in exported
