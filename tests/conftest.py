@@ -34,3 +34,20 @@ def clear_ambient_platform_runtime_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
     for name in _AMBIENT_PLATFORM_ENV:
         monkeypatch.delenv(name, raising=False)
+
+
+def _mark_expression_requests_cuda(mark_expression: str) -> bool:
+    tokens = mark_expression.replace("(", " ").replace(")", " ").split()
+    return any(token == "cuda" and (index == 0 or tokens[index - 1] != "not") for index, token in enumerate(tokens))
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    if _mark_expression_requests_cuda(str(config.getoption("markexpr", ""))):
+        return
+
+    skip_cuda = pytest.mark.skip(
+        reason="CUDA runtime tests are opt-in; run with '-m cuda' on a GPU allocation."
+    )
+    for item in items:
+        if item.get_closest_marker("cuda"):
+            item.add_marker(skip_cuda)

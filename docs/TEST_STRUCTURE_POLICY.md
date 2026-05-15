@@ -39,6 +39,8 @@ pytest
 
 Default tests must be deterministic and must not require GPU, Slurm, Mirheo, Korali, Pyro, MPI, large external data, or private filesystem paths. Tests that inspect HPC launchers or optional-runtime policy may run by default only when they are pure static checks.
 
+CUDA-marked runtime tests are skipped unless the pytest marker expression explicitly includes `cuda`; use `pytest -m cuda` or `pytest -m "gpu or cuda"` on a GPU allocation to opt in.
+
 `tests/conftest.py` clears ambient MesoUQ platform/runtime environment variables so a sourced Karolina or Vega shell does not change unit-test expectations. Tests that need those variables must set them explicitly.
 
 ## Explicit Test Slices

@@ -156,3 +156,19 @@ The Vega-facing checklist remains
 Karolina platform evidence is governed by
 [`docs/KAROLINA_FULL_PLATFORM.md`](KAROLINA_FULL_PLATFORM.md) and the GPU gate in
 [`docs/MESO_UQ_GPU_VALIDATION_GATE.md`](MESO_UQ_GPU_VALIDATION_GATE.md).
+
+## CUDA runtime test invocation
+
+The CUDA runtime harness is intentionally outside the default test path. Run it
+only on a GPU allocation with CUDA driver and NVRTC libraries visible:
+
+```bash
+source scripts/platforms/karolina/env_karolina.sh
+unset HPC_SITE MESOUQ_SITE MESOUQ_RUNS_ROOT MESOUQ_SCRATCH_ROOT MESOUQ_SITE_RUNTIME_ROOT MESOUQ_PROVENANCE_ROOT MESOUQ_GV_ENV_SCRIPT GV_SCALE_SPACE_BINARY GV_CGAL_TOOLS_ROOT SLURM_JOB_ID SLURM_ARRAY_JOB_ID
+export PYTHONPATH="${PWD}/src:${PWD}${PYTHONPATH:+:${PYTHONPATH}}"
+python -m pytest -q -m cuda tests/integration/test_native_cuda_psi_runtime.py
+```
+
+Use the same command after sourcing the documented Vega environment on Vega.
+If CUDA driver devices or NVRTC are absent, the test skips with an actionable
+message; an executed test failure is a NativeCuda correctness or runtime issue.
