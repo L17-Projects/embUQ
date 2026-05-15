@@ -2,6 +2,18 @@
 
 This directory hosts the public documentation set for the `v0.1.0` release line.
 
+## Repository architecture
+
+The current repository layout separates:
+
+- `src/meso_uq/`: reusable installable package code, including contracts, registries, config helpers, orchestration helpers, surrogate/inference APIs, validation helpers, reporting helpers, and platform/runtime helpers.
+- `emb/`: EMB numerical experiment assets with the canonical shapes `emb/compression/{src,evalkit,surrogate}` and `emb/indentation/{src,evalkit,surrogate}`.
+- `gv/`: GV numerical experiment assets with the canonical shape `gv/<modality>/{src,evalkit,surrogate}` for `buckling`, `eigenmodes`, `shear_flow`, `stretching`, and `torsion`.
+- `configs/`: study/composition examples for agents, modalities, datasets, surrogates, inference settings, noise, platforms, reports, and artifacts.
+- `_runs/`, external scratch/data roots, and documented paper-data roots: generated runtime and artifact outputs.
+
+Do not document new root-level EMB experiment source trees. Those EMB assets now live under `emb/`. Local `dir.md` files are ignored placement guides via `**/dir.md` and should not be committed.
+
 ## Start here
 
 - `../README.md` for the root overview and install extras
@@ -9,6 +21,7 @@ This directory hosts the public documentation set for the `v0.1.0` release line.
 - `../SECURITY.md` for the public security-reporting policy
 - `INSTALL.md` for the practical editable-install contract
 - `DEPENDENCY_EXTRAS.md` for the install-extras contract
+- `../emb/README.md`, `../gv/README.md`, and `../configs/README.md` for the current package-vs-asset split and composition layer
 
 ## Current architecture docs
 
@@ -43,7 +56,7 @@ This directory hosts the public documentation set for the `v0.1.0` release line.
 - `PAPER_REPRODUCTION_ARTIFACT_POLICY.md` for the paper source versus external artifact boundary
 - `TEST_STRUCTURE_POLICY.md` for the unit, integration, operational, optional-runtime, and GPU/HPC test layout
 - `PLATFORM_POLICY.md` for Karolina, Vega, workstation, and generic Slurm platform config policy
-- `EMB_WORKFLOW_EXTRACTION_PLAN.md` for the EMB compression/indentation workflow extraction inventory and compatibility plan
+- `EMB_WORKFLOW_EXTRACTION_PLAN.md` for the EMB compression and indentation workflow extraction inventory and compatibility plan
 - `MES-59_MERGE_READINESS_CHECKLIST.md` for the delayed/thread-aware connector review sweep required before merge readiness
 - `MES-59_74_76_79_CLOSEOUT_EVIDENCE.md` for the MES-59/MES-74/MES-76/MES-79 closeout decisions and validation evidence
 - `GV_EXTENSION_CLOSEOUT.md` for provisional MES-78 release hardening scope and GV rollout gate
@@ -58,7 +71,7 @@ This directory hosts the public documentation set for the `v0.1.0` release line.
 - `MES-59_74_76_79_CLOSEOUT_EVIDENCE.md` for prior closeout evidence and decisions
 - `MES-125_KAROLINA_ACCEPTANCE_CLOSEOUT.md` for MES-125 closeout evidence skeleton
 - `GV_EXTENSION_CLOSEOUT.md` for provisional MES-78 closeout scope and GV rollout gate
-- `EMB_WORKFLOW_EXTRACTION_PLAN.md` for extraction planning under the EMB compression/indentation slice
+- `EMB_WORKFLOW_EXTRACTION_PLAN.md` for extraction planning under the EMB compression and indentation slice
 
 Also see legacy release/operational notes:
 
