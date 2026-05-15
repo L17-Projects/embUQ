@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from math import isfinite
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, MutableMapping
 
 import numpy as np
 
@@ -103,6 +103,7 @@ class EigenmodesPaperReplayPlan:
             },
             "mode_count": self.mode_count,
             "paper_exact": self.paper_exact,
+            "paper_exact_requirements": _paper_exact_requirements_manifest(),
         }
 
 
@@ -271,6 +272,16 @@ def postprocess_eigenmodes_paper_replay_lane(
                 + ", ".join(_REQUIRED_ONE_OF)
                 + "."
             ) from exc
+        if plan is not None and plan.paper_exact and _is_spectrum_payload_error(exc):
+            raise ValueError(
+                "Paper-exact eigenmodes replay requires 30 finite eigenfrequencies/eigenvalues "
+                f"for {EIGENMODES_FIGURE_ID} first-30 spectrum evidence; {exc}"
+            ) from exc
+        if plan is not None and plan.paper_exact and _is_mode_shape_payload_error(exc):
+            raise ValueError(
+                "Paper-exact eigenmodes replay requires unambiguous selected Figure 8 "
+                f"surface-mode evidence and axial-profile evidence; {exc}"
+            ) from exc
         raise
 
     if not any(name in channels for name in _REQUIRED_ONE_OF):
@@ -281,6 +292,9 @@ def postprocess_eigenmodes_paper_replay_lane(
         )
     if _EIGENMODES_AXIS not in channels:
         raise ValueError("Eigenmodes paper replay requires channel 'mode_index'.")
+
+    if plan is not None and plan.paper_exact:
+        _validate_paper_exact_eigenmode_evidence(channels)
 
     figure_id = plan.figure_id if plan is not None else EIGENMODES_FIGURE_ID
     experiment = str(payload.get("experiment", plan.experiment if plan is not None else "eigenmodes"))
@@ -413,6 +427,149 @@ def _normalize_eigenmode_channels(sample_payload: Mapping[str, Any], *, mode_cou
     return normalized
 
 
+def _paper_exact_requirements_manifest() -> dict[str, object]:
+    return {
+        "first_spectrum_mode_count": _EXACT_MODE_COUNT,
+        "selected_surface_mode_indices": list(_SELECTED_SURFACE_MODE_INDICES),
+        "selected_axial_mode_indices": list(_SELECTED_AXIAL_MODE_INDICES),
+    }
+
+
+def _is_spectrum_payload_error(exc: ValueError) -> bool:
+    message = str(exc)
+    return any(
+        token in message
+        for token in (
+            "contains non-finite values",
+            "must contain data",
+            "must be 1D",
+            "frequency channel must be finite",
+        )
+    )
+
+
+def _is_mode_shape_payload_error(exc: ValueError) -> bool:
+    message = str(exc)
+    return any(
+        token in message
+        for token in (
+            "eigenvectors",
+            "reference_positions",
+            "mesh_vertices",
+            "mesh_faces",
+            "faces",
+        )
+    )
+
+
+def _validate_paper_exact_eigenmode_evidence(channels: MutableMapping[str, np.ndarray]) -> None:
+    mode_index = np.asarray(channels.get(_EIGENMODES_AXIS, ()), dtype=float)
+    if mode_index.ndim != 1 or mode_index.size < _EXACT_MODE_COUNT or not np.all(np.isfinite(mode_index)):
+        raise ValueError(
+            "Paper-exact eigenmodes replay requires first 30 finite modes for "
+            f"{EIGENMODES_FIGURE_ID}; received {int(mode_index.size)} mode indices."
+        )
+
+    frequency = np.asarray(channels.get("frequency", ()), dtype=float)
+    has_first_30_frequency = (
+        frequency.ndim == 1
+        and frequency.size >= _EXACT_MODE_COUNT
+        and np.all(np.isfinite(frequency[:_EXACT_MODE_COUNT]))
+    )
+    if not has_first_30_frequency:
+        raise ValueError(
+            "Paper-exact eigenmodes replay requires 30 finite eigenfrequencies for "
+            f"{EIGENMODES_FIGURE_ID} first-30 spectrum evidence; received {int(frequency.size)}."
+        )
+
+    _validate_paper_exact_mode_shape_payload(channels)
+
+
+def _validate_paper_exact_mode_shape_payload(channels: MutableMapping[str, np.ndarray]) -> None:
+    if "eigenvectors" not in channels:
+        raise ValueError(
+            "Paper-exact eigenmodes replay requires mode-shape evidence: "
+            "eigenvectors for the first 30 modes are missing."
+        )
+    eigenvectors = np.asarray(channels["eigenvectors"], dtype=float)
+    if eigenvectors.ndim != 2:
+        raise ValueError(
+            "Paper-exact eigenmodes replay has ambiguous mode-shape evidence: "
+            "eigenvectors must be a 2D (mode, vertex_displacement) array."
+        )
+    if eigenvectors.shape[0] < _EXACT_MODE_COUNT or not np.all(np.isfinite(eigenvectors[:_EXACT_MODE_COUNT])):
+        raise ValueError(
+            "Paper-exact eigenmodes replay requires finite eigenvectors for the first 30 modes; "
+            f"received {int(eigenvectors.shape[0])} mode-shape rows."
+        )
+
+    if "reference_positions" not in channels:
+        raise ValueError(
+            "Paper-exact eigenmodes replay requires axial-profile evidence: "
+            "reference_positions/mesh_vertices are missing."
+        )
+    reference_positions = np.asarray(channels["reference_positions"], dtype=float)
+    if (
+        reference_positions.ndim != 2
+        or reference_positions.shape[1] != 3
+        or reference_positions.size == 0
+        or not np.all(np.isfinite(reference_positions))
+    ):
+        raise ValueError(
+            "Paper-exact eigenmodes replay has ambiguous axial-profile evidence: "
+            "reference_positions/mesh_vertices must be a finite Nx3 array."
+        )
+    if eigenvectors.shape[1] != reference_positions.size:
+        raise ValueError(
+            "Paper-exact eigenmodes replay has ambiguous mode-shape evidence: "
+            f"eigenvector width {int(eigenvectors.shape[1])} does not match "
+            f"3D reference_positions size {int(reference_positions.size)}."
+        )
+
+    if "mesh_faces" not in channels:
+        raise ValueError(
+            "Paper-exact eigenmodes replay requires selected Figure 8 surface-mode evidence: "
+            "mesh_faces/faces are missing."
+        )
+    raw_mesh_faces = np.asarray(channels["mesh_faces"])
+    if raw_mesh_faces.ndim != 2 or raw_mesh_faces.shape[1] != 3 or raw_mesh_faces.size == 0:
+        raise ValueError(
+            "Paper-exact eigenmodes replay has ambiguous selected Figure 8 surface-mode evidence: "
+            "mesh_faces/faces must be a non-empty Nx3 triangle array."
+        )
+    try:
+        mesh_face_values = raw_mesh_faces.astype(float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "Paper-exact eigenmodes replay has ambiguous selected Figure 8 surface-mode evidence: "
+            "mesh_faces/faces must contain finite integer vertex indices."
+        ) from exc
+    if (
+        not np.all(np.isfinite(mesh_face_values))
+        or not np.all(np.equal(mesh_face_values, np.floor(mesh_face_values)))
+    ):
+        raise ValueError(
+            "Paper-exact eigenmodes replay has ambiguous selected Figure 8 surface-mode evidence: "
+            "mesh_faces/faces must contain finite integer vertex indices."
+        )
+    mesh_faces = mesh_face_values.astype(int)
+    if np.any(mesh_faces < 0) or np.any(mesh_faces >= reference_positions.shape[0]):
+        raise ValueError(
+            "Paper-exact eigenmodes replay has ambiguous selected Figure 8 surface-mode evidence: "
+            "mesh_faces/faces must contain valid vertex indices into reference_positions."
+        )
+    channels["mesh_faces"] = mesh_faces
+
+    paper_reference = _paper_reference_coordinates(reference_positions)
+    try:
+        _paper_axial_slice_indices(paper_reference)
+    except ValueError as exc:
+        raise ValueError(
+            "Paper-exact eigenmodes replay requires axial-profile evidence for Figure 8 panel (h): "
+            + str(exc)
+        ) from exc
+
+
 def _resolve_frequency(
     sample_payload: Mapping[str, Any],
     raw_channels: Mapping[str, Any],
@@ -469,7 +626,7 @@ def _extract_auxiliary_channel(
     lowered = {str(name).strip().lower(): value for name, value in payload.items()}
     for key in keys:
         if key in lowered:
-            array = np.asarray(lowered[key], dtype=float if channel_name == "reference_positions" else int)
+            array = np.asarray(lowered[key], dtype=float)
             if channel_name == "reference_positions" and array.ndim != 2:
                 raise ValueError("Eigenmodes reference_positions/mesh_vertices must be a 2D array.")
             if channel_name == "mesh_faces" and array.ndim != 2:
@@ -882,6 +1039,7 @@ def _resolve_provenance(
         "dropped_scripts_role": "Protocol references only; not operational source.",
         "canonical_replay_data": "Canonical eigenmode replay data come from Mirheo reruns.",
     }
+    provenance["paper_exact_requirements"] = _paper_exact_requirements_manifest()
     provenance["selected_modes"] = dict(selected_modes)
     if plan is not None:
         provenance["lane_plan"] = plan.to_manifest()

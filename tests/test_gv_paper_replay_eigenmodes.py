@@ -31,6 +31,36 @@ _BASE_MATERIAL_PARAMETERS = {
 }
 
 
+def _paper_exact_reference_positions() -> np.ndarray:
+    return np.array(
+        [
+            [-2.0, 0.0, -3.0],
+            [-1.0, 0.0, -2.0],
+            [0.0, 0.0, -1.0],
+            [1.0, 0.0, 0.0],
+            [2.0, 0.0, 1.0],
+            [3.0, 0.0, 2.0],
+        ],
+        dtype=float,
+    )
+
+
+def _paper_exact_mesh_faces() -> np.ndarray:
+    return np.array([(0, 1, 3), (1, 4, 3), (1, 2, 4), (2, 5, 4)], dtype=int)
+
+
+def _paper_exact_channels(**overrides: object) -> dict[str, object]:
+    channels: dict[str, object] = {
+        "eigenvalues": np.arange(1.0, 31.0),
+        "kBT": 9.0,
+        "eigenvectors": np.arange(30.0 * 18.0).reshape(30, 18),
+        "reference_positions": _paper_exact_reference_positions(),
+        "mesh_faces": _paper_exact_mesh_faces(),
+    }
+    channels.update(overrides)
+    return channels
+
+
 class _FakeFigure:
     def text(self, *args, **kwargs) -> None:
         return None
@@ -153,6 +183,117 @@ def test_plan_eigenmodes_paper_replay_lane_exact_replay_forces_30_modes() -> Non
 
     assert plan.mode_count == 30
     assert plan.paper_exact is True
+    assert plan.to_manifest()["paper_exact_requirements"] == {
+        "first_spectrum_mode_count": 30,
+        "selected_surface_mode_indices": [0, 4, 6, 7, 18, 24],
+        "selected_axial_mode_indices": [0, 6, 20],
+    }
+
+
+def test_postprocess_eigenmodes_paper_exact_records_review_requirements() -> None:
+    plan = plan_eigenmodes_paper_replay_lane(
+        material_parameters=_BASE_MATERIAL_PARAMETERS,
+        radGV=2.0,
+        height=14.28,
+        paper_exact=True,
+    )
+
+    result = postprocess_eigenmodes_paper_replay_lane(
+        {
+            "experiment": "eigenmodes",
+            "geometry": {"radGV": 2.0, "height": 14.28},
+            "material_parameters": _BASE_MATERIAL_PARAMETERS,
+            "controls": {"bpress": -91.0},
+            "channels": _paper_exact_channels(mesh_faces=_paper_exact_mesh_faces().astype(float)),
+        },
+        plan=plan,
+    )
+
+    assert result.provenance["paper_exact_requirements"]["first_spectrum_mode_count"] == 30
+    assert result.provenance["lane_plan"]["paper_exact_requirements"]["selected_surface_mode_indices"] == [
+        0,
+        4,
+        6,
+        7,
+        18,
+        24,
+    ]
+    assert result.selected_modes["surface_mode_indices_available"] == [0, 4, 6, 7, 18, 24]
+    assert np.issubdtype(result.channels["mesh_faces"].dtype, np.integer)
+
+
+@pytest.mark.parametrize(
+    ("channels", "message"),
+    (
+        (
+            {
+                "frequency": np.arange(1.0, 3.0),
+                "eigenvectors": np.arange(2.0 * 18.0).reshape(2, 18),
+                "reference_positions": _paper_exact_reference_positions(),
+                "mesh_faces": _paper_exact_mesh_faces(),
+            },
+            "first 30 finite modes",
+        ),
+        (_paper_exact_channels(eigenvectors=np.arange(30.0)), "ambiguous mode-shape evidence"),
+        (_paper_exact_channels(eigenvectors=np.zeros((30, 17))), "eigenvector width"),
+        (_paper_exact_channels(mesh_faces=np.array([(0, 1, 2, 3)])), "Nx3 triangle array"),
+        (_paper_exact_channels(mesh_faces=np.array([(0.9, 1.0, 2.0)])), "integer vertex indices"),
+        (_paper_exact_channels(mesh_faces=np.array([(0, 1, 6)])), "valid vertex indices"),
+        (_paper_exact_channels(mesh_faces=np.array([(0, -1, 2)])), "valid vertex indices"),
+        (
+            {
+                "frequency": np.arange(1.0, 31.0),
+                "reference_positions": _paper_exact_reference_positions(),
+                "mesh_faces": _paper_exact_mesh_faces(),
+            },
+            "mode-shape evidence",
+        ),
+        (_paper_exact_channels(mesh_faces=[]), "surface-mode evidence"),
+    ),
+)
+def test_postprocess_eigenmodes_paper_exact_rejects_missing_or_ambiguous_evidence(
+    channels: dict[str, object],
+    message: str,
+) -> None:
+    plan = plan_eigenmodes_paper_replay_lane(
+        material_parameters=_BASE_MATERIAL_PARAMETERS,
+        radGV=2.0,
+        height=14.28,
+        paper_exact=True,
+    )
+
+    with pytest.raises(ValueError, match=message):
+        postprocess_eigenmodes_paper_replay_lane(
+            {
+                "experiment": "eigenmodes",
+                "geometry": {"radGV": 2.0, "height": 14.28},
+                "material_parameters": _BASE_MATERIAL_PARAMETERS,
+                "controls": {"bpress": -91.0},
+                "channels": channels,
+            },
+            plan=plan,
+        )
+
+
+def test_postprocess_eigenmodes_paper_exact_rejects_nonfinite_spectrum() -> None:
+    plan = plan_eigenmodes_paper_replay_lane(
+        material_parameters=_BASE_MATERIAL_PARAMETERS,
+        radGV=2.0,
+        height=14.28,
+        paper_exact=True,
+    )
+
+    with pytest.raises(ValueError, match="30 finite eigenfrequencies/eigenvalues"):
+        postprocess_eigenmodes_paper_replay_lane(
+            {
+                "experiment": "eigenmodes",
+                "geometry": {"radGV": 2.0, "height": 14.28},
+                "material_parameters": _BASE_MATERIAL_PARAMETERS,
+                "controls": {"bpress": -91.0},
+                "channels": _paper_exact_channels(frequency=[1.0, np.nan]),
+            },
+            plan=plan,
+        )
 
 
 def test_postprocess_eigenmodes_paper_replay_lane_requires_spectrum_channel() -> None:
@@ -262,12 +403,7 @@ def test_eigenmodes_paper_exact_execution_sets_runtime_flag(
     monkeypatch.setattr(
         eigenmodes_module,
         "extract_sampling_channels",
-        lambda **_kwargs: {
-            "mode_index": np.array([0.0, 1.0, 2.0]),
-            "eigenvalues": np.array([9.0, 4.0, 1.0]),
-            "kBT": np.array([9.0]),
-            "eigenvectors": np.arange(27.0).reshape(3, 9),
-        },
+        lambda **_kwargs: _paper_exact_channels(),
     )
 
     result = run_eigenmodes_paper_replay_lane(plan)
@@ -743,16 +879,8 @@ def test_plot_eigenmodes_paper_replay_writes_selected_surface_modes_when_source_
                 "eigenvalues": np.arange(1.0, 31.0),
                 "kBT": 9.0,
                 "eigenvectors": np.arange(30.0 * 18.0).reshape(30, 18),
-                "reference_positions": np.array(
-                    [
-                        [-2.0, 0.0, -3.0],
-                        [-1.0, 0.0, -2.0],
-                        [0.0, 0.0, -1.0],
-                        [1.0, 0.0, 0.0],
-                        [2.0, 0.0, 1.0],
-                        [3.0, 0.0, 2.0],
-                    ],
-                ),
+                "reference_positions": _paper_exact_reference_positions(),
+                "mesh_faces": _paper_exact_mesh_faces(),
             },
         },
         plan=plan_eigenmodes_paper_replay_lane(
