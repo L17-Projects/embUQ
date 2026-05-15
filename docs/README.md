@@ -64,6 +64,7 @@ Do not document new root-level EMB experiment source trees. Those EMB assets now
 - `VALIDATION_CONFIGS.md` for the tiny validation config bundle
 - `WORKFLOWS.md` for workflow entrypoints and operator expectations
 - `NATIVE_CUDA_PHASE2_BASELINE.md` for the NativeCuda Phase 2 baseline and build/kernel delivery decision
+- `NATIVE_CUDA_PHASE2_VALIDATION_EVIDENCE.md` for NativeCuda Phase 2 validation evidence, remaining platform deltas, and Linear closeout paths
 
 ## Historical / release-specific docs
 
@@ -83,6 +84,7 @@ Also see legacy release/operational notes:
 - `PROPAGATION_EXECUTION.md`
 - `PHASE2_BACKEND_STATUS.md`
 - `NATIVE_CUDA_PHASE2_BASELINE.md`
+- `NATIVE_CUDA_PHASE2_VALIDATION_EVIDENCE.md`
 - `VEGA_PHASE2_NATIVE_CUDA_CHECKLIST.md`
 - `DEV_UTILITIES_PROMOTED.md`
 

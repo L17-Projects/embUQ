@@ -62,10 +62,12 @@ Today the CUDA kernel is embedded in `kPsiNativeCudaKernelSource` inside
   weights, sample counts, and dynamic-prior metadata.
 
 During `Psi::evaluateBatchNativeCuda()`, Korali still performs host-side prior
-evaluation and host-side final reduction. It allocates per-batch device buffers,
-copies flattened batch parameters to the device, launches the kernel, copies
-per-subproblem likelihoods back, frees those per-batch buffers, and writes
-`Batch logPrior` plus `Batch logLikelihood`.
+evaluation and host-side final reduction. It reuses persistent per-batch device
+buffers for flattened batch parameters and per-subproblem likelihood output,
+growing capacity when a larger batch requires it. The path copies flattened
+batch parameters to the device, launches the kernel, copies per-subproblem
+likelihoods back, and writes `Batch logPrior` plus `Batch logLikelihood`.
+`releaseNativeCudaBatch()` releases the retained device buffers during teardown.
 
 `HUQ_PSI_NATIVE_CUDA_PROFILE_JSONL` enables JSONL records for setup and batch
 timing. For Phase 2 migration this profiling output is for optimization runs,
@@ -160,8 +162,7 @@ actual threshold object used.
 
 ## Non-goals for K1
 
-- no kernel math, reduction, memory-lifecycle, transfer, buffer-reuse, or launch
-  optimization,
+- no Meson-built CUDA object/module delivery migration,
 - no public production-support claim,
 - no required Korali C++ interface or config-key change,
 - no requirement that JSONL profiling be enabled on every validation run,

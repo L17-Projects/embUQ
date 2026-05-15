@@ -27,6 +27,7 @@ def test_native_cuda_phase2_baseline_doc_tracks_current_source_and_strategy() ->
         "CPU-MPI remains the maintained fallback",
         "Meson-built CUDA object/module delivery path",
         "current implementation is NVRTC-based",
+        "reuses persistent per-batch device buffers",
         "HUQ_PSI_NATIVE_CUDA_PROFILE_JSONL",
         "Validation evidence must state which delivery mode was actually used",
     ):
@@ -48,3 +49,4 @@ def test_native_cuda_phase2_baseline_doc_tracks_current_source_and_strategy() ->
 
     assert "NATIVE_CUDA_PHASE2_BASELINE.md" in status_doc
     assert "NATIVE_CUDA_PHASE2_BASELINE.md" in docs_index
+    assert "NATIVE_CUDA_PHASE2_VALIDATION_EVIDENCE.md" in docs_index

@@ -15,6 +15,8 @@ Before attempting this checklist, verify:
 - a compatible CUDA module stack is loaded,
 - a matching MPI toolchain is loaded,
 - `mpi4py` imports correctly in the runtime environment,
+- the runtime Python environment is first on `PATH` so child `python3` calls use
+  the same packages as the launcher,
 - successful Phase 1 outputs already exist for the intended dataset set.
 - the NativeCuda Phase 2 command uses one CPU/MPI rank. Multi-rank Phase 2 is the CPU-MPI fallback path, not native-CUDA.
 
@@ -53,6 +55,17 @@ python scripts/platforms/vega/run_workflow_matrix.py \
   --propagation-device gpu \
   --skip-release-manifest
 ```
+
+If the lane prepares compression runtime assets, set:
+
+```bash
+export PYTHON_BIN="${MESOUQ_SITE_RUNTIME_ROOT}/venv/bin/python"
+export PATH="$(dirname "${PYTHON_BIN}"):${PATH}"
+```
+
+before launching. Some experiment setup helpers invoke `python3` from shell
+commands, so `PATH` must resolve to the same runtime environment as
+`--python-bin`.
 
 ## Performance / behavior checks
 
