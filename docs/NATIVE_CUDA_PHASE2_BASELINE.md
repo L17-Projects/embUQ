@@ -119,6 +119,33 @@ Until that migration lands, `--native-cuda-batch` still means the current
 NVRTC-backed implementation. Validation evidence must state which delivery mode
 was actually used.
 
+## Posterior parity contract
+
+CPU-MPI remains the maintained fallback while NativeCuda hardening proceeds. The
+Phase 2 validation contract is statistical equivalence, not byte-for-byte TMCMC
+trajectory identity.
+
+The package helper
+`meso_uq.inference.posterior_equivalence` defines the shared report shape used
+for CPU-MPI vs NativeCuda comparisons:
+
+- both backends are read through the same Korali posterior state reader,
+  `load_phase2_posterior_samples(...)`,
+- summaries compare parameter means, sample standard deviations, configured
+  quantiles, finite log-posterior ratio, sample count, variable names, and
+  maximum finite log-posterior,
+- failures name the backend side and statistic that violated the threshold,
+- reports serialize through `PosteriorEquivalenceReport.to_manifest()` for
+  later operational validation records.
+
+The default thresholds are intentionally small synthetic-harness defaults:
+`min_sample_count=2`, `min_finite_logposterior_ratio=1.0`,
+`max_mean_abs_delta=5e-2`, `max_std_scaled_delta=2e-1`,
+`max_quantile_abs_delta=1e-1`, and
+`max_logposterior_max_abs_delta=1.0`. Full EMB lane validation may tighten or
+loosen these explicitly in the validation manifest, but it must record the
+actual threshold object used.
+
 ## Non-goals for K1
 
 - no kernel math, reduction, memory-lifecycle, transfer, buffer-reuse, or launch
