@@ -62,6 +62,7 @@ Do not document new root-level EMB experiment source trees. Those EMB assets now
 - `GV_EXTENSION_CLOSEOUT.md` for provisional MES-78 release hardening scope and GV rollout gate
 - `VALIDATION_CONFIGS.md` for the tiny validation config bundle
 - `WORKFLOWS.md` for workflow entrypoints and operator expectations
+- `NATIVE_CUDA_PHASE2_BASELINE.md` for the NativeCuda Phase 2 baseline and build/kernel delivery decision
 
 ## Historical / release-specific docs
 
@@ -79,6 +80,7 @@ Also see legacy release/operational notes:
 - `SURROGATE_MODEL_SELECTION.md`
 - `PROPAGATION_EXECUTION.md`
 - `PHASE2_BACKEND_STATUS.md`
+- `NATIVE_CUDA_PHASE2_BASELINE.md`
 - `VEGA_PHASE2_NATIVE_CUDA_CHECKLIST.md`
 - `DEV_UTILITIES_PROMOTED.md`
 
