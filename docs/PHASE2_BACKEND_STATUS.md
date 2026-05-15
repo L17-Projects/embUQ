@@ -4,6 +4,9 @@ This note describes the current branch-level `Phase 2` contract in `MesoUQ`.
 
 ## Public entrypoint
 
+The NativeCuda Phase 2 baseline and build/kernel delivery decision are recorded
+in `docs/NATIVE_CUDA_PHASE2_BASELINE.md`.
+
 The public `Phase 2` entrypoint remains:
 
 - `inference/scripts/run_phase_2.py`
@@ -38,6 +41,10 @@ The repo-local Korali build still depends on the vendored build surface exposing
 - the `native_cuda_batch` Meson option,
 - CUDA driver / NVRTC linkage,
 - the corresponding Korali native-CUDA batch path.
+
+For production hardening, the selected target is a Meson-built CUDA
+object/module delivery path. The current implementation remains NVRTC-based
+until that follow-up migration is implemented and validated.
 
 ## Honest current conclusion
 
