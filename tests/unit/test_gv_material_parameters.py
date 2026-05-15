@@ -64,9 +64,15 @@ def test_validate_material_overrides_accepts_muL_alias() -> None:
 
 
 @pytest.mark.parametrize("parameter_name", ["b1", "b2", "a3", "a4"])
-def test_validate_material_overrides_rejects_zero_coupling_terms(parameter_name: str) -> None:
-    with pytest.raises(ValueError, match="must be finite and > 0"):
-        validate_material_parameter_overrides({**_VALID_MATERIAL_PARAMETER_OVERRIDES, parameter_name: 0.0})
+def test_validate_material_overrides_accepts_zero_coupling_terms(parameter_name: str) -> None:
+    normalized = validate_material_parameter_overrides({**_VALID_MATERIAL_PARAMETER_OVERRIDES, parameter_name: 0.0})
+    assert normalized[parameter_name] == 0.0
+
+
+@pytest.mark.parametrize("parameter_name", ["b1", "b2", "a3", "a4"])
+def test_validate_material_overrides_rejects_negative_coupling_terms(parameter_name: str) -> None:
+    with pytest.raises(ValueError, match="must be finite and >= 0"):
+        validate_material_parameter_overrides({**_VALID_MATERIAL_PARAMETER_OVERRIDES, parameter_name: -0.1})
 
 
 def test_validate_material_overrides_rejects_zero_core_parameters() -> None:

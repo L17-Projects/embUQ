@@ -283,20 +283,21 @@ def test_build_gv_numerical_manifest_rejects_non_positive_material_value() -> No
         )
 
 
-def test_build_gv_numerical_manifest_rejects_zero_coupling_material_value() -> None:
-    invalid = dict(_GV_MANIFEST_BASE)
-    invalid["material_parameters"] = dict(_GV_MANIFEST_BASE["material_parameters"])
-    invalid["material_parameters"]["b1"] = 0.0
+def test_build_gv_numerical_manifest_accepts_zero_coupling_material_value() -> None:
+    payload = dict(_GV_MANIFEST_BASE)
+    payload["material_parameters"] = dict(_GV_MANIFEST_BASE["material_parameters"])
+    payload["material_parameters"]["b1"] = 0.0
 
-    with pytest.raises(ValueError, match="must be positive"):
-        build_gv_numerical_dataset_manifest(
-            structure="gv",
-            experiment="torsion",
-            **invalid,
-        )
+    manifest = build_gv_numerical_dataset_manifest(
+        structure="gv",
+        experiment="torsion",
+        **payload,
+    )
+
+    assert manifest.material_parameters["b1"] == 0.0
 
 
-def test_material_override_validator_and_numerical_manifest_share_positive_policy() -> None:
+def test_material_override_validator_and_numerical_manifest_share_zero_allowed_policy() -> None:
     normalized = validate_material_parameter_overrides(_GV_MANIFEST_BASE["material_parameters"])
 
     manifest = build_gv_numerical_dataset_manifest(
@@ -308,16 +309,29 @@ def test_material_override_validator_and_numerical_manifest_share_positive_polic
     assert manifest.material_parameters == normalized
 
     invalid = dict(_GV_MANIFEST_BASE["material_parameters"])
-    invalid["a3"] = 0.0
+    invalid["a3"] = -0.1
+
+    with pytest.raises(ValueError, match="must be finite and >= 0"):
+        validate_material_parameter_overrides(invalid)
+
+    with pytest.raises(ValueError, match="must be non-negative"):
+        build_gv_numerical_dataset_manifest(
+            structure="gv",
+            experiment="torsion",
+            **{**_GV_MANIFEST_BASE, "material_parameters": invalid},
+        )
+
+    invalid_core = dict(_GV_MANIFEST_BASE["material_parameters"])
+    invalid_core["ka"] = 0.0
 
     with pytest.raises(ValueError, match="must be finite and > 0"):
-        validate_material_parameter_overrides(invalid)
+        validate_material_parameter_overrides(invalid_core)
 
     with pytest.raises(ValueError, match="must be positive"):
         build_gv_numerical_dataset_manifest(
             structure="gv",
             experiment="torsion",
-            **{**_GV_MANIFEST_BASE, "material_parameters": invalid},
+            **{**_GV_MANIFEST_BASE, "material_parameters": invalid_core},
         )
 
 

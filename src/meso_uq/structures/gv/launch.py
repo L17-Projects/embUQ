@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -18,6 +19,7 @@ from .numerical_data import (
     parse_gv_dataset_id,
     validate_gv_numerical_dataset_id,
 )
+from .parameters import GV_MATERIAL_PARAMETER_NAMES
 from .sampling.types import GVMaterialGeometry, GVSweep
 from .sampling.validation import validate_sample_gv_request
 
@@ -147,6 +149,7 @@ def validate_gv_launch_request(
         radGV=radGV,
         height=height,
     )
+    _validate_launch_material_parameters(validated_materials)
     _validate_unique_sweep_values(sweep)
     geometry_id = build_geometry(
         radius=validated_geometry.radGV,
@@ -251,6 +254,13 @@ def _normalize_output_root(*, output_root: str | Path, platform: Platform) -> Pa
     if errors:
         raise ValueError(errors[0])
     return path
+
+
+def _validate_launch_material_parameters(material_parameters: Mapping[str, float]) -> None:
+    for name in GV_MATERIAL_PARAMETER_NAMES:
+        value = float(material_parameters[name])
+        if not isfinite(value) or value <= 0.0:
+            raise ValueError(f"GV launch material parameter '{name}' must be finite and > 0.")
 
 
 def _validate_unique_sweep_values(sweep: GVSweep) -> None:

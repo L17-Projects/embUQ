@@ -14,6 +14,8 @@ from meso_uq.references.gv_common import control_identifier, normalize_controls
 from meso_uq.structures import get_structure
 from meso_uq.structures.gv import build_geometry
 
+from .material_parameters import GV_ZERO_ALLOWED_MATERIAL_PARAMETERS
+
 
 GV_NUMERICAL_MANIFEST_SCHEMA_VERSION = 1
 GV_NUMERICAL_POSTPROCESSOR_VERSION = "0.1.0"
@@ -172,6 +174,10 @@ def _validate_material_parameters(
     if extra:
         raise ValueError(f"GV numerical manifest contains unexpected material parameters: {', '.join(extra)}.")
     for name in calibrated:
+        if name in GV_ZERO_ALLOWED_MATERIAL_PARAMETERS:
+            if normalized[name] < 0.0:
+                raise ValueError(f"GV material parameter '{name}' must be non-negative.")
+            continue
         if normalized[name] <= 0.0:
             raise ValueError(f"GV material parameter '{name}' must be positive.")
     return normalized
