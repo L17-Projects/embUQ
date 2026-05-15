@@ -122,7 +122,18 @@ def test_plan_buckling_paper_replay_lane_uses_pressure_sweep_and_records_assumpt
     assert "Mirheo reruns" in plan.mapping_assumptions[-1]
 
 
-def test_plan_buckling_paper_replay_lane_uses_exact_paper_sweep_when_requested() -> None:
+def test_plan_buckling_paper_replay_lane_uses_exact_paper_sweep_when_requested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for name in (
+        "MESOUQ_GV_BUCKLING_MEMBRANE_BPRESS_MODE",
+        "MESOUQ_GV_BUCKLING_FLUID_MODE",
+        "MESOUQ_GV_BUCKLING_FLUID_STABILIZATION",
+        "MESOUQ_GV_BUCKLING_PIN_OBJECT",
+        "MESOUQ_GV_BUCKLING_ODPD_AMP_SCALE",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
     plan = plan_buckling_paper_replay_lane(
         material_parameters=_BASE_MATERIAL_PARAMETERS,
         radGV=2.0,
@@ -133,6 +144,64 @@ def test_plan_buckling_paper_replay_lane_uses_exact_paper_sweep_when_requested()
     assert len(plan.controls["buck"]) == 25
     assert len(plan.controls["pressure_difference"]) == 25
     assert plan.controls["pressure_difference"][-1] == pytest.approx(68.175)
+    assert plan.paper_protocol is not None
+    assert plan.paper_protocol["mesh_winding"] == "archived_paper_winding"
+    assert plan.paper_protocol["fluid_coupling"] == "dropped_imported"
+    assert plan.paper_protocol["environment"] == {
+        "MESOUQ_GV_PAPER_EXACT": "1",
+        "MESOUQ_GV_BUCKLING_MEMBRANE_BPRESS_MODE": "runtime",
+        "MESOUQ_GV_BUCKLING_FLUID_MODE": "dropped",
+        "MESOUQ_GV_BUCKLING_FLUID_STABILIZATION": "0.0",
+        "MESOUQ_GV_BUCKLING_PIN_OBJECT": "1",
+        "MESOUQ_GV_BUCKLING_ODPD_AMP_SCALE": "1.0",
+    }
+    assert plan.paper_protocol["pressure_mapping"]["delta_p_formula"] == "Delta_p = 90.9 * buck"
+    assert plan.paper_protocol["pressure_mapping"]["delta_p_scale"] == pytest.approx(90.9)
+    manifest = plan.to_manifest()
+    assert manifest["paper_protocol"]["environment"]["MESOUQ_GV_BUCKLING_FLUID_STABILIZATION"] == "0.0"
+
+
+def test_plan_buckling_paper_replay_lane_records_operator_protocol_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MESOUQ_GV_BUCKLING_FLUID_STABILIZATION", "0.25")
+    monkeypatch.setenv("MESOUQ_GV_BUCKLING_PIN_OBJECT", "0")
+
+    plan = plan_buckling_paper_replay_lane(
+        material_parameters=_BASE_MATERIAL_PARAMETERS,
+        radGV=2.0,
+        height=14.28,
+        paper_exact=True,
+    )
+
+    assert plan.paper_protocol is not None
+    assert plan.paper_protocol["environment"]["MESOUQ_GV_BUCKLING_FLUID_STABILIZATION"] == "0.25"
+    assert plan.paper_protocol["environment"]["MESOUQ_GV_BUCKLING_PIN_OBJECT"] == "0"
+    assert plan.paper_protocol["operator_overrides"] == {
+        "MESOUQ_GV_BUCKLING_FLUID_STABILIZATION": "0.25",
+        "MESOUQ_GV_BUCKLING_PIN_OBJECT": "0",
+    }
+
+
+def test_plan_buckling_paper_replay_lane_preserves_legacy_fluid_stabilization_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MESOUQ_GV_BUCKLING_FLUID_MODE", "legacy")
+    monkeypatch.delenv("MESOUQ_GV_BUCKLING_FLUID_STABILIZATION", raising=False)
+
+    plan = plan_buckling_paper_replay_lane(
+        material_parameters=_BASE_MATERIAL_PARAMETERS,
+        radGV=2.0,
+        height=14.28,
+        paper_exact=True,
+    )
+
+    assert plan.paper_protocol is not None
+    assert plan.paper_protocol["environment"]["MESOUQ_GV_BUCKLING_FLUID_MODE"] == "legacy"
+    assert plan.paper_protocol["environment"]["MESOUQ_GV_BUCKLING_FLUID_STABILIZATION"] == "1.0"
+    assert plan.paper_protocol["operator_overrides"] == {
+        "MESOUQ_GV_BUCKLING_FLUID_MODE": "legacy",
+    }
 
 
 def test_plan_buckling_paper_replay_lane_accepts_extended_sweep_request() -> None:
@@ -628,6 +697,15 @@ def test_buckling_paper_exact_execution_sets_runtime_flag(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    for name in (
+        "MESOUQ_GV_BUCKLING_MEMBRANE_BPRESS_MODE",
+        "MESOUQ_GV_BUCKLING_FLUID_MODE",
+        "MESOUQ_GV_BUCKLING_FLUID_STABILIZATION",
+        "MESOUQ_GV_BUCKLING_PIN_OBJECT",
+        "MESOUQ_GV_BUCKLING_ODPD_AMP_SCALE",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
     plan = plan_buckling_paper_replay_lane(
         material_parameters=_BASE_MATERIAL_PARAMETERS,
         radGV=2.0,
@@ -702,7 +780,27 @@ def test_buckling_paper_exact_execution_sets_runtime_flag(
     result = run_buckling_paper_replay_lane(plan)
 
     assert captured["env"]["MESOUQ_GV_PAPER_EXACT"] == "1"
+    assert captured["env"]["MESOUQ_GV_BUCKLING_MEMBRANE_BPRESS_MODE"] == "runtime"
+    assert captured["env"]["MESOUQ_GV_BUCKLING_FLUID_MODE"] == "dropped"
+    assert captured["env"]["MESOUQ_GV_BUCKLING_FLUID_STABILIZATION"] == "0.0"
+    assert captured["env"]["MESOUQ_GV_BUCKLING_PIN_OBJECT"] == "1"
+    assert captured["env"]["MESOUQ_GV_BUCKLING_ODPD_AMP_SCALE"] == "1.0"
     assert "--first" not in captured["generate_argv"]
     assert captured["first_restart"] is False
     assert result.provenance["status"] == "completed"
     assert result.controls["bpress"] == pytest.approx(-91.0)
+    assert result.provenance["paper_protocol"]["environment"] == {
+        name: captured["env"][name]
+        for name in (
+            "MESOUQ_GV_PAPER_EXACT",
+            "MESOUQ_GV_BUCKLING_MEMBRANE_BPRESS_MODE",
+            "MESOUQ_GV_BUCKLING_FLUID_MODE",
+            "MESOUQ_GV_BUCKLING_FLUID_STABILIZATION",
+            "MESOUQ_GV_BUCKLING_PIN_OBJECT",
+            "MESOUQ_GV_BUCKLING_ODPD_AMP_SCALE",
+        )
+    }
+    assert (
+        result.provenance["lane_plan"]["paper_protocol"]["environment"]["MESOUQ_GV_BUCKLING_FLUID_MODE"]
+        == "dropped"
+    )

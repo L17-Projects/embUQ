@@ -58,6 +58,14 @@ _DEFAULT_BUCK_MAX = 0.75
 _DEFAULT_PAPER_SWEEP_POINTS = 20
 _EXACT_PAPER_SWEEP_POINTS = 25
 _BUCK_TO_PRESSURE_SCALE = 100.0 * 3.0**2 * 0.101
+_PAPER_EXACT_PROTOCOL_ENV_DEFAULTS = {
+    "MESOUQ_GV_BUCKLING_MEMBRANE_BPRESS_MODE": "runtime",
+    "MESOUQ_GV_BUCKLING_FLUID_MODE": "dropped",
+    "MESOUQ_GV_BUCKLING_FLUID_STABILIZATION": "0.0",
+    "MESOUQ_GV_BUCKLING_PIN_OBJECT": "1",
+    "MESOUQ_GV_BUCKLING_ODPD_AMP_SCALE": "1.0",
+}
+_LEGACY_FLUID_MODES = frozenset({"legacy", "legacy_stabilized", "paper_legacy"})
 
 
 @dataclass(frozen=True)
@@ -70,9 +78,10 @@ class BucklingPaperReplayPlan:
     runtime_options: GVRuntimeOptions
     mapping_assumptions: tuple[str, ...]
     paper_exact: bool = False
+    paper_protocol: dict[str, Any] | None = None
 
     def to_manifest(self) -> dict[str, object]:
-        return {
+        manifest: dict[str, object] = {
             "figure_id": self.figure_id,
             "experiment": self.experiment,
             "geometry": dict(self.geometry),
@@ -89,6 +98,9 @@ class BucklingPaperReplayPlan:
             "mapping_assumptions": list(self.mapping_assumptions),
             "paper_exact": self.paper_exact,
         }
+        if self.paper_protocol is not None:
+            manifest["paper_protocol"] = _copy_json_mapping(self.paper_protocol)
+        return manifest
 
 
 @dataclass(frozen=True)
@@ -147,6 +159,7 @@ def plan_buckling_paper_replay_lane(
             )
     fixed_bpress = _coerce_scalar(bpress, name="bpress")
     validated_output_root = _validate_runs_root(output_root)
+    paper_protocol = _paper_exact_buckling_protocol(fixed_bpress) if paper_exact else None
     runtime_options = GVRuntimeOptions(
         controls={"bpress": fixed_bpress},
         output_root=str(validated_output_root),
@@ -166,9 +179,11 @@ def plan_buckling_paper_replay_lane(
         mapping_assumptions=(
             "Paper replay sweeps `buck` over the canonical Figure 7 range while holding `bpress=-91.0` fixed as a runtime control.",
             "Pressure difference is derived as Delta p = buck*aii*rhow**2*alpha with aii=100, rhow=3, alpha=0.101, so Delta p = 90.9*buck.",
+            "Paper-exact buckling replay uses archived paper winding and dropped/imported fluid coupling with explicit environment captured in the manifest.",
             "Dropped scripts under gv_paper_scripts are protocol references only; canonical replay artifacts for this lane come from Mirheo reruns.",
         ),
         paper_exact=bool(paper_exact),
+        paper_protocol=paper_protocol,
     )
 
 
@@ -257,6 +272,8 @@ def postprocess_buckling_paper_replay_lane(
 def _run_buckling_paper_exact_forward_sweep(plan: BucklingPaperReplayPlan) -> dict[str, Any]:
     buck_values = tuple(float(value) for value in _coerce_finite_1d(plan.controls["buck"], name="buck"))
     bpress = _coerce_scalar(plan.controls["bpress"], name="bpress")
+    paper_protocol = _paper_exact_buckling_protocol(bpress, captured=plan.paper_protocol)
+    protocol_environment = _paper_exact_protocol_environment(paper_protocol)
     geometry = build_geometry(
         radius=plan.geometry["radGV"],
         height=plan.geometry["height"],
@@ -281,16 +298,11 @@ def _run_buckling_paper_exact_forward_sweep(plan: BucklingPaperReplayPlan) -> di
         sampling_plan,
         timeout_seconds=plan.runtime_options.timeout_seconds,
         env={
-            "MESOUQ_GV_PAPER_EXACT": "1",
+            **protocol_environment,
             "MESOUQ_GV_MATERIAL_OVERRIDES_JSON": json.dumps(
                 dict(plan.material_parameters),
                 sort_keys=True,
             ),
-            **_optional_environment("MESOUQ_GV_BUCKLING_MEMBRANE_BPRESS_MODE"),
-            **_optional_environment("MESOUQ_GV_BUCKLING_FLUID_MODE"),
-            **_optional_environment("MESOUQ_GV_BUCKLING_FLUID_STABILIZATION"),
-            **_optional_environment("MESOUQ_GV_BUCKLING_PIN_OBJECT"),
-            **_optional_environment("MESOUQ_GV_BUCKLING_ODPD_AMP_SCALE"),
         },
     )
     runtime_seconds = time.perf_counter() - started
@@ -308,6 +320,7 @@ def _run_buckling_paper_exact_forward_sweep(plan: BucklingPaperReplayPlan) -> di
         "controls": {"buck": buck_values, "bpress": bpress},
         "channels": channels,
         "manifest": None,
+        "paper_protocol": paper_protocol,
         "runtime_manifests": (runtime.to_manifest(),),
         "plan_manifests": (sampling_plan.to_manifest(),),
         "execution_manifests": (
@@ -533,11 +546,106 @@ def _derive_buck_from_pressure_difference(pressure_differences: object) -> np.nd
     return _coerce_finite_1d(pressure_differences, name="pressure_difference") / _BUCK_TO_PRESSURE_SCALE
 
 
-def _optional_environment(name: str) -> dict[str, str]:
+def _paper_exact_buckling_protocol(
+    bpress: float,
+    *,
+    captured: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    if captured is not None:
+        protocol = _copy_json_mapping(captured)
+        environment = protocol.get("environment")
+        if isinstance(environment, Mapping):
+            operator_overrides = protocol.get("operator_overrides")
+            if not isinstance(operator_overrides, Mapping):
+                operator_overrides = {}
+            fluid_mode = str(
+                environment.get(
+                    "MESOUQ_GV_BUCKLING_FLUID_MODE",
+                    _PAPER_EXACT_PROTOCOL_ENV_DEFAULTS["MESOUQ_GV_BUCKLING_FLUID_MODE"],
+                )
+            )
+            protocol["environment"] = {
+                **{"MESOUQ_GV_PAPER_EXACT": "1"},
+                **{
+                    name: str(environment.get(name, default))
+                    for name, default in _PAPER_EXACT_PROTOCOL_ENV_DEFAULTS.items()
+                },
+            }
+            protocol["environment"]["MESOUQ_GV_BUCKLING_FLUID_MODE"] = fluid_mode
+            if "MESOUQ_GV_BUCKLING_FLUID_STABILIZATION" not in operator_overrides:
+                protocol["environment"]["MESOUQ_GV_BUCKLING_FLUID_STABILIZATION"] = (
+                    _default_fluid_stabilization(fluid_mode)
+                )
+        return protocol
+
     import os
 
-    value = os.environ.get(name)
-    return {name: value} if value else {}
+    environment: dict[str, str] = {"MESOUQ_GV_PAPER_EXACT": "1"}
+    operator_overrides: dict[str, str] = {}
+    for name, default in _PAPER_EXACT_PROTOCOL_ENV_DEFAULTS.items():
+        if name == "MESOUQ_GV_BUCKLING_FLUID_STABILIZATION":
+            continue
+        raw_value = os.environ.get(name)
+        value = raw_value if raw_value else default
+        environment[name] = value
+        if raw_value:
+            operator_overrides[name] = value
+    raw_stabilization = os.environ.get("MESOUQ_GV_BUCKLING_FLUID_STABILIZATION")
+    if raw_stabilization:
+        environment["MESOUQ_GV_BUCKLING_FLUID_STABILIZATION"] = raw_stabilization
+        operator_overrides["MESOUQ_GV_BUCKLING_FLUID_STABILIZATION"] = raw_stabilization
+    else:
+        environment["MESOUQ_GV_BUCKLING_FLUID_STABILIZATION"] = _default_fluid_stabilization(
+            environment["MESOUQ_GV_BUCKLING_FLUID_MODE"]
+        )
+    return {
+        "name": "gv_figure_7_buckling_corrected_paper_exact",
+        "mesh_winding": "archived_paper_winding",
+        "fluid_coupling": "dropped_imported",
+        "pressure_mapping": {
+            "bpress": bpress,
+            "delta_p_scale": _BUCK_TO_PRESSURE_SCALE,
+            "delta_p_formula": "Delta_p = 90.9 * buck",
+        },
+        "environment": environment,
+        "operator_overrides": operator_overrides,
+        "evidence": {
+            "linear": "MES-119",
+            "job_id": "31861460",
+            "run_root": "_runs/gv/figure_replay/gv-buckling-winding-dropped-12pt-20260507",
+        },
+    }
+
+
+def _paper_exact_protocol_environment(protocol: Mapping[str, Any]) -> dict[str, str]:
+    environment = protocol.get("environment")
+    if not isinstance(environment, Mapping):
+        raise ValueError("Buckling paper-exact protocol requires environment metadata.")
+    operator_overrides = protocol.get("operator_overrides")
+    if not isinstance(operator_overrides, Mapping):
+        operator_overrides = {}
+    fluid_mode = str(
+        environment.get(
+            "MESOUQ_GV_BUCKLING_FLUID_MODE",
+            _PAPER_EXACT_PROTOCOL_ENV_DEFAULTS["MESOUQ_GV_BUCKLING_FLUID_MODE"],
+        )
+    )
+    stabilization = environment.get("MESOUQ_GV_BUCKLING_FLUID_STABILIZATION")
+    if "MESOUQ_GV_BUCKLING_FLUID_STABILIZATION" not in operator_overrides:
+        stabilization = _default_fluid_stabilization(fluid_mode)
+    return {
+        "MESOUQ_GV_PAPER_EXACT": "1",
+        **{
+            name: str(environment.get(name, default))
+            for name, default in _PAPER_EXACT_PROTOCOL_ENV_DEFAULTS.items()
+        },
+        "MESOUQ_GV_BUCKLING_FLUID_MODE": fluid_mode,
+        "MESOUQ_GV_BUCKLING_FLUID_STABILIZATION": str(stabilization),
+    }
+
+
+def _default_fluid_stabilization(fluid_mode: str) -> str:
+    return "1.0" if fluid_mode.lower() in _LEGACY_FLUID_MODES else "0.0"
 
 
 def _coerce_mapping(payload: object, *, context: str) -> Mapping[str, Any]:
@@ -554,6 +662,8 @@ def _coerce_mapping(payload: object, *, context: str) -> Mapping[str, Any]:
         "manifest",
         "runtime_manifests",
         "plan_manifests",
+        "execution_manifests",
+        "paper_protocol",
         "work_dirs",
         "runtime_seconds",
         "status",
@@ -683,6 +793,12 @@ def _resolve_provenance(
     plan_manifests = payload.get("plan_manifests")
     if isinstance(plan_manifests, tuple | list):
         provenance["plan_manifests"] = list(plan_manifests)
+    execution_manifests = payload.get("execution_manifests")
+    if isinstance(execution_manifests, tuple | list):
+        provenance["execution_manifests"] = list(execution_manifests)
+    paper_protocol = payload.get("paper_protocol")
+    if isinstance(paper_protocol, Mapping):
+        provenance["paper_protocol"] = _copy_json_mapping(paper_protocol)
     work_dirs = payload.get("work_dirs")
     if isinstance(work_dirs, tuple | list):
         provenance["work_dirs"] = [str(path) for path in work_dirs]
@@ -692,7 +808,24 @@ def _resolve_provenance(
         provenance["status"] = payload["status"]
     if plan is not None:
         provenance["lane_plan"] = plan.to_manifest()
+        if plan.paper_protocol is not None:
+            provenance.setdefault("paper_protocol", _copy_json_mapping(plan.paper_protocol))
     return provenance
+
+
+def _copy_json_mapping(payload: Mapping[str, Any]) -> dict[str, Any]:
+    copied: dict[str, Any] = {}
+    for key, value in payload.items():
+        if isinstance(value, Mapping):
+            copied[str(key)] = _copy_json_mapping(value)
+        elif isinstance(value, tuple | list):
+            copied[str(key)] = [
+                _copy_json_mapping(item) if isinstance(item, Mapping) else item
+                for item in value
+            ]
+        else:
+            copied[str(key)] = value
+    return copied
 
 
 def _validate_runs_output_path(output_path: str | Path) -> Path:
