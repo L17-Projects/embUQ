@@ -111,8 +111,29 @@ Successful rerun:
 
 ## MES-200 Vega/platform delta
 
-Vega validation remains separate from Karolina evidence. When Vega is available,
-use the same support contract:
+Status on 2026-05-15: **blocked by Vega platform maintenance/access**.
+
+Scope: this is a scoped platform blocker for Vega NativeCuda validation only.
+It is not runtime success evidence, not a Korali correctness failure, and not a
+public production-support claim. Karolina evidence above cannot substitute for
+Vega GPU visibility, Vega build metadata, or Vega runtime output.
+
+Missing Vega evidence:
+
+- an allocated Vega GPU node with visible NVIDIA devices,
+- Vega Korali bootstrap/build metadata with `native_cuda_batch=True`,
+- exact Vega module and runtime environment logs,
+- a completed Vega `compression:full-model:production` run using
+  `--phase2-backend native-cuda` and `--phase2-cpu-ranks 1`,
+- Vega `results_phase_2/latest` output and posterior sanity summary,
+- Phase 3b consumption of the Vega Phase 2 output, or a recorded failure log if
+  that consumption fails after Phase 2 succeeds.
+
+Release-gate implication: keep `native_cuda_phase2_public_claim=false` until
+Vega produces either the successful evidence above or a newer release decision
+explicitly changes the public support scope.
+
+When Vega access returns, use the same support contract:
 
 ```bash
 export REPO_ROOT="${PWD}"
@@ -135,8 +156,35 @@ export PATH="$(dirname "${PYTHON_BIN}"):${PATH}"
   --skip-release-manifest
 ```
 
-If Vega is in maintenance, archive the scheduler or access blocker as the
-platform-delta evidence instead of treating it as a NativeCuda runtime failure.
+Required checks before MES-200 can move from blocked to passed:
+
+```bash
+nvidia-smi
+"${PYTHON_BIN}" - <<'PY'
+import korali
+print(korali.__file__)
+PY
+buildoptions="${REPO_ROOT}/_vega/korali/build/meson-info/intro-buildoptions.json"
+"${PYTHON_BIN}" - "${buildoptions}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+options = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+enabled = any(
+    option.get("name") == "native_cuda_batch" and option.get("value") is True
+    for option in options
+)
+if not enabled:
+    raise SystemExit("native_cuda_batch Meson option is not true")
+PY
+test -e "${MESOUQ_RUNS_ROOT}/native_cuda_phase2/<run-tag>/runs/compression/full-model/production/results_phase_2/latest"
+test -s "${MESOUQ_RUNS_ROOT}/native_cuda_phase2/<run-tag>/runs/compression/full-model/production/results_phase_2/native_cuda_posterior_summary.json"
+```
+
+If Vega remains in maintenance, archive the scheduler or access notice with
+this section as the platform-delta artifact instead of treating the absence of a
+Vega run as a NativeCuda runtime failure.
 
 ## MES-201 evidence bundle rules
 

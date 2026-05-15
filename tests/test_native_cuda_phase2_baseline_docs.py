@@ -50,3 +50,44 @@ def test_native_cuda_phase2_baseline_doc_tracks_current_source_and_strategy() ->
     assert "NATIVE_CUDA_PHASE2_BASELINE.md" in status_doc
     assert "NATIVE_CUDA_PHASE2_BASELINE.md" in docs_index
     assert "NATIVE_CUDA_PHASE2_VALIDATION_EVIDENCE.md" in docs_index
+
+
+def test_native_cuda_phase2_vega_blocker_keeps_public_claim_false() -> None:
+    evidence_doc = (
+        REPO_ROOT / "docs" / "NATIVE_CUDA_PHASE2_VALIDATION_EVIDENCE.md"
+    ).read_text(encoding="utf-8")
+    checklist_doc = (
+        REPO_ROOT / "docs" / "VEGA_PHASE2_NATIVE_CUDA_CHECKLIST.md"
+    ).read_text(encoding="utf-8")
+
+    section_start = evidence_doc.index("## MES-200 Vega/platform delta")
+    section_end = evidence_doc.index("## MES-201 evidence bundle rules")
+    mes200_section = evidence_doc[section_start:section_end]
+    normalized_section = " ".join(mes200_section.split())
+
+    for phrase in (
+        "Status on 2026-05-15: **blocked by Vega platform maintenance/access**",
+        "not runtime success evidence",
+        "Karolina evidence above cannot substitute for Vega GPU visibility",
+        "native_cuda_phase2_public_claim=false",
+        "nvidia-smi",
+        "intro-buildoptions.json",
+        'option.get("name") == "native_cuda_batch"',
+        'option.get("value") is True',
+        "native_cuda_batch Meson option is not true",
+        "results_phase_2/latest",
+        "native_cuda_posterior_summary.json",
+    ):
+        assert phrase in normalized_section
+
+    for missing_evidence in (
+        "an allocated Vega GPU node with visible NVIDIA devices",
+        "Vega Korali bootstrap/build metadata with `native_cuda_batch=True`",
+        "Phase 3b consumption of the Vega Phase 2 output",
+    ):
+        assert missing_evidence in mes200_section
+
+    assert "status: `passed`" not in mes200_section
+    assert "status: `passed`" in evidence_doc
+    assert '"native_cuda_batch": true|"native_cuda_batch":true' not in mes200_section
+    assert "Do **not** mark Phase 2 native-CUDA as supported" in checklist_doc
