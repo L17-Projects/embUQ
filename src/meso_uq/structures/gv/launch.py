@@ -188,6 +188,7 @@ class GVLaunchRenderedCampaign:
                     for script in self.scheduler_scripts
                 ],
                 "generated_script_paths": [script["script_path"] for script in scripts],
+                "generated_files": [str(self.manifest_path), *[script["script_path"] for script in scripts]],
                 "scheduler_scripts": scripts,
                 "output_paths": {
                     "campaign_dir": str(self.campaign_dir),
@@ -372,6 +373,7 @@ def _render_one_gv_launch_campaign(
         json.dumps(rendered.to_manifest(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    _validate_rendered_campaign_files(rendered)
     return rendered
 
 
@@ -519,6 +521,29 @@ def _write_scheduler_script(
         gpu_count=request.gpu_count,
         walltime=request.walltime,
     )
+
+
+def _validate_rendered_campaign_files(rendered: GVLaunchRenderedCampaign) -> None:
+    expected = [rendered.manifest_path, *(script.script_path for script in rendered.scheduler_scripts)]
+    seen: set[Path] = set()
+    missing: list[str] = []
+    duplicates: list[str] = []
+    for path in expected:
+        if path in seen:
+            duplicates.append(path.as_posix())
+        seen.add(path)
+        if not path.is_file():
+            missing.append(path.as_posix())
+    if duplicates:
+        raise RuntimeError("GV launch render produced duplicate generated file paths: " + ", ".join(duplicates))
+    if missing:
+        raise RuntimeError("GV launch render did not materialize expected files: " + ", ".join(missing))
+    for script in rendered.scheduler_scripts:
+        if script.array_size != len(rendered.campaign_manifest.runs):
+            raise RuntimeError(
+                "GV launch render produced inconsistent scheduler array size "
+                f"for {script.platform.value}: {script.array_size} != {len(rendered.campaign_manifest.runs)}."
+            )
 
 
 def _render_slurm_script(

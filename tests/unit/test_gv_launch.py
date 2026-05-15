@@ -27,6 +27,16 @@ _VALID_MATERIAL_PARAMETERS = {
 }
 
 
+def _assert_submission_free_script(text: str) -> None:
+    forbidden_commands = ("sbatch", "srun", "qsub", "qstat", "qdel", "scancel")
+    for line in text.splitlines():
+        stripped = line.strip().lower()
+        if not stripped or stripped.startswith("#"):
+            continue
+        command = stripped.split(maxsplit=1)[0]
+        assert command not in forbidden_commands
+
+
 def test_validate_gv_launch_request_normalizes_required_fields() -> None:
     request = validate_gv_launch_request(
         experiment="stretching",
@@ -253,6 +263,12 @@ def test_render_gv_launch_campaign_materializes_karolina_and_vega_without_submis
         "_runs/gv/launches/gv-campaign-render/scripts/karolina/gv-campaign-render.sbatch",
         "_runs/gv/launches/gv-campaign-render/scripts/vega/gv-campaign-render.sbatch",
     ]
+    assert payload["generated_files"] == [
+        "_runs/gv/launches/gv-campaign-render/gv_launch_campaign_manifest.json",
+        "_runs/gv/launches/gv-campaign-render/scripts/karolina/gv-campaign-render.sbatch",
+        "_runs/gv/launches/gv-campaign-render/scripts/vega/gv-campaign-render.sbatch",
+    ]
+    assert all(Path(path).is_file() for path in payload["generated_files"])
 
     karolina_script = Path(payload["generated_script_paths"][0]).read_text(encoding="utf-8")
     vega_script = Path(payload["generated_script_paths"][1]).read_text(encoding="utf-8")
@@ -269,14 +285,11 @@ def test_render_gv_launch_campaign_materializes_karolina_and_vega_without_submis
     assert 'export MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"' in vega_script
     assert 'export MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"' in vega_script
     for script in (karolina_script, vega_script):
-        lowered = script.lower()
-        assert "qsub" not in lowered
-        assert " sbatch " not in lowered
+        _assert_submission_free_script(script)
         assert "--control bpress=-91.0 --control tot_force=500.0" in script
         assert "--control bpress=-91.0 --control tot_force=750.0" in script
         assert "--material ka=1.1" in script
         assert "--array=0-1" in script
-
 
 def test_render_gv_launch_campaign_fails_on_existing_campaign_dir_unless_overwrite(
     tmp_path,

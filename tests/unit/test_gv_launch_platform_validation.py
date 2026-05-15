@@ -57,12 +57,26 @@ def _requests_for(platform: str):
     )
 
 
-def _non_directive_submission_lines(script: str) -> list[str]:
-    return [
-        line
-        for line in script.splitlines()
-        if "sbatch" in line.lower() and not line.startswith("#SBATCH")
+def _scheduler_submission_commands(script: str) -> list[str]:
+    commands = {"sbatch", "srun", "qsub", "qstat", "qdel", "scancel"}
+    matches: list[str] = []
+    for line in script.splitlines():
+        stripped = line.strip().lower()
+        if not stripped or stripped.startswith("#"):
+            continue
+        command = stripped.split(maxsplit=1)[0]
+        if command in commands:
+            matches.append(line)
+    return matches
+
+
+def _assert_generated_files_payload(payload: dict[str, object]) -> None:
+    generated_files = payload["generated_files"]
+    assert generated_files == [
+        payload["campaign_manifest_path"],
+        *payload["generated_script_paths"],
     ]
+    assert all(Path(path).is_file() for path in generated_files)
 
 
 def test_karolina_render_validation_covers_four_non_shear_gv_lanes(tmp_path, monkeypatch) -> None:
@@ -95,13 +109,14 @@ def test_karolina_render_validation_covers_four_non_shear_gv_lanes(tmp_path, mon
         assert script_info["runtime_script"] == "scripts/platforms/karolina/run_gv_runtime.py"
         assert script_info["gpu_resource_directives"] == ["#SBATCH --gpus=1"]
         assert script_info["operator_checks"]
+        _assert_generated_files_payload(payload)
 
         assert "#SBATCH --account=eu-26-17" in script
         assert "#SBATCH --partition=qgpu" in script
         assert "#SBATCH --gpus=1" in script
         assert 'source "${REPO_ROOT}/scripts/platforms/karolina/env_karolina.sh"' in script
         assert "scripts/platforms/karolina/run_gv_runtime.py" in script
-        assert _non_directive_submission_lines(script) == []
+        assert _scheduler_submission_commands(script) == []
 
 
 def test_vega_render_validation_covers_four_non_shear_gv_lanes(tmp_path, monkeypatch) -> None:
@@ -132,10 +147,11 @@ def test_vega_render_validation_covers_four_non_shear_gv_lanes(tmp_path, monkeyp
         assert script_info["runtime_script"] == "scripts/platforms/vega/run_gv_runtime.py"
         assert script_info["gpu_resource_directives"] == ["#SBATCH --gres=gpu:1"]
         assert any("maintenance" in check for check in script_info["operator_checks"])
+        _assert_generated_files_payload(payload)
 
         assert "#SBATCH --partition=gpu" in script
         assert "#SBATCH --gres=gpu:1" in script
         assert "module purge" in script
         assert "_vega/gv_venv/env.sh" in script
         assert "scripts/platforms/vega/run_gv_runtime.py" in script
-        assert _non_directive_submission_lines(script) == []
+        assert _scheduler_submission_commands(script) == []
