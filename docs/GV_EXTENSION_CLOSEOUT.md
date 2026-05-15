@@ -19,6 +19,9 @@ The acceptance chain for this slice is:
 The non-shear stack must demonstrate this `Mirheo -> DNN surrogate -> hierarchical inference` chain end-to-end before hard closeout.
 
 See also [GV_NUMERICAL_DATA_GENERATION.md](GV_NUMERICAL_DATA_GENERATION.md) for the full numerical-data handoff schema.
+See [GV_PAPER_REPLAY_CLOSEOUT.md](GV_PAPER_REPLAY_CLOSEOUT.md) for the later
+GV-only paper replay inventory, provenance, acceptance matrix, and qualitative
+review gates.
 
 ## Repository layout
 

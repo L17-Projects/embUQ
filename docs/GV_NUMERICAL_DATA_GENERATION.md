@@ -21,6 +21,11 @@ Current production scope is restricted to four GV experiments:
 
 `shear_flow` is deferred and remains experimental until after the core GV stack is accepted.
 
+GV paper replay closeout is tracked separately in
+[GV_PAPER_REPLAY_CLOSEOUT.md](GV_PAPER_REPLAY_CLOSEOUT.md). That page is the
+GV-only inventory for Figure 3, Figure 7, Figure 8, and the SI-backed torsion
+diagnostic. It explicitly excludes EMB figures and deferred `shear_flow`.
+
 ## Mapping from raw output to canonical channels
 
 Each experiment posts through `meso_uq.structures.gv.postprocessing.POSTPROCESSORS`.

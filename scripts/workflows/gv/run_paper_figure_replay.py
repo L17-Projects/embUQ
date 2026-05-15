@@ -152,6 +152,72 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
+def _profile_status_summary(profile: object) -> dict[str, Any]:
+    payload: dict[str, Any]
+    if hasattr(profile, "to_dict") and callable(profile.to_dict):
+        raw_payload = profile.to_dict()
+        payload = dict(raw_payload) if isinstance(raw_payload, Mapping) else {}
+    else:
+        payload = {}
+
+    provenance = payload.get("provenance")
+    if not isinstance(provenance, Mapping):
+        profile_provenance = getattr(profile, "provenance", None)
+        if hasattr(profile_provenance, "to_dict") and callable(profile_provenance.to_dict):
+            raw_provenance = profile_provenance.to_dict()
+            provenance = dict(raw_provenance) if isinstance(raw_provenance, Mapping) else {}
+        else:
+            provenance = {
+                "paper_pdf_path": getattr(profile_provenance, "paper_pdf_path", None),
+                "si_pdf_path": getattr(profile_provenance, "si_pdf_path", None),
+            }
+
+    material_parameters = payload.get("material_parameters", {})
+    geometry = payload.get("geometry", {})
+    material_statuses = _entry_statuses(material_parameters)
+    geometry_statuses = _entry_statuses(geometry)
+    return {
+        "profile_id": str(payload.get("profile_id", "unknown")),
+        "material_statuses": material_statuses,
+        "geometry_statuses": geometry_statuses,
+        "paper_pdf_path": provenance.get("paper_pdf_path") if isinstance(provenance, Mapping) else None,
+        "si_pdf_path": provenance.get("si_pdf_path") if isinstance(provenance, Mapping) else None,
+        "canonical_runtime_source": (
+            provenance.get("canonical_runtime_source") if isinstance(provenance, Mapping) else None
+        ),
+        "ambiguity_notes": list(provenance.get("ambiguity_notes", ())) if isinstance(provenance, Mapping) else [],
+    }
+
+
+def _entry_statuses(entries: object) -> list[str]:
+    if not isinstance(entries, Mapping):
+        return []
+    statuses = {
+        str(value.get("status"))
+        for value in entries.values()
+        if isinstance(value, Mapping) and value.get("status")
+    }
+    return sorted(statuses)
+
+
+def _profile_notes(profile_summary: Mapping[str, Any] | None) -> tuple[str, ...]:
+    if not profile_summary:
+        return ()
+    notes = [
+        f"GV paper replay profile: {profile_summary.get('profile_id', 'unknown')}.",
+    ]
+    material_statuses = profile_summary.get("material_statuses") or []
+    if material_statuses:
+        notes.append("Material parameter status: " + ", ".join(str(item) for item in material_statuses) + ".")
+    geometry_statuses = profile_summary.get("geometry_statuses") or []
+    if geometry_statuses:
+        notes.append("Geometry status: " + ", ".join(str(item) for item in geometry_statuses) + ".")
+    canonical_runtime_source = profile_summary.get("canonical_runtime_source")
+    if canonical_runtime_source:
+        notes.append(f"Canonical runtime source: {canonical_runtime_source}.")
+    return tuple(notes)
+
+
 def _channel_arrays(channels: Mapping[str, Any]) -> dict[str, np.ndarray]:
     arrays: dict[str, np.ndarray] = {}
     for name, values in channels.items():
@@ -329,6 +395,7 @@ def _write_lane_summary(
     result: object,
     lane_root: Path,
     plot_paths: tuple[Path, ...],
+    profile_summary: Mapping[str, Any] | None = None,
 ) -> Path:
     output_root = lane_root / "outputs"
     output_root.mkdir(parents=True, exist_ok=True)
@@ -348,6 +415,7 @@ def _write_lane_summary(
                     "runtime_ids": _lane_runtime_ids(result),
                     "slurm_job_ids": _slurm_job_ids(),
                     "plot_paths": [str(path) for path in plot_paths],
+                    "paper_replay_profile": dict(profile_summary or {}),
                 }
             ),
             indent=2,
@@ -366,6 +434,7 @@ def _build_operational_lane_record(
     lane_root: Path,
     plot_paths: tuple[Path, ...],
     runtime_command: tuple[str, ...],
+    profile_summary: Mapping[str, Any] | None = None,
 ) -> GVPaperReplayLaneRecord:
     channels = _channel_arrays(getattr(result, "channels"))
     summary_path = _write_lane_summary(
@@ -373,6 +442,7 @@ def _build_operational_lane_record(
         result=result,
         lane_root=lane_root,
         plot_paths=plot_paths,
+        profile_summary=profile_summary,
     )
     work_dirs = _lane_work_dirs(result)
     runtime_ids = _lane_runtime_ids(result)
@@ -395,7 +465,10 @@ def _build_operational_lane_record(
         finite_checks=_finite_checks(channels),
         slurm_job_ids=_slurm_job_ids(),
         runtime_ids=runtime_ids,
-        notes=("Operational GV paper replay lane generated through the public GV sampling API.",),
+        notes=(
+            "Operational GV paper replay lane generated through the public GV sampling API.",
+            *_profile_notes(profile_summary),
+        ),
     )
 
 
@@ -418,6 +491,7 @@ def _run_operational_lane(
         os.chdir(REPO_ROOT)
         profile = load_gv_paper_replay_profile()
         validate_gv_paper_replay_profile(profile, require_positive_material_parameters=False)
+        profile_summary = _profile_status_summary(profile)
         lane_material_values = getattr(profile, "material_values_for_lane", None)
         material_parameters = (
             lane_material_values(lane)
@@ -428,6 +502,7 @@ def _run_operational_lane(
         lane_root_relative = CAMPAIGN_RUN_ROOT / campaign_id / "lanes" / lane
         lane_root = campaign_root / "lanes" / lane
         raw_provenance = profile.provenance.to_dict()
+        raw_provenance["paper_replay_profile"] = profile_summary
 
         if lane == "stretching":
             plan = plan_stretching_paper_replay_lane(
@@ -510,6 +585,7 @@ def _run_operational_lane(
         lane_root=lane_root,
         plot_paths=plot_paths,
         runtime_command=runtime_command,
+        profile_summary=profile_summary,
     )
 
 

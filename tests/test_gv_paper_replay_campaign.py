@@ -731,6 +731,17 @@ def test_operational_lane_record_writes_finite_summary(tmp_path: Path, monkeypat
             si_pdf_path=str(si_pdf),
             to_dict=lambda: {"source": "fixture"},
         ),
+        to_dict=lambda: {
+            "profile_id": "gv-paper-replay",
+            "material_parameters": {"ka": {"status": "runtime_default"}},
+            "geometry": {"radGV": {"status": "runtime_default"}},
+            "provenance": {
+                "paper_pdf_path": str(source_pdf),
+                "si_pdf_path": str(si_pdf),
+                "canonical_runtime_source": "gv/stretching/src/parameters-default.gv.yaml",
+                "ambiguity_notes": ["fixture ambiguity"],
+            },
+        },
     )
     monkeypatch.setattr(module, "load_gv_paper_replay_profile", lambda: profile)
     monkeypatch.setattr(module, "validate_gv_paper_replay_profile", lambda *_args, **_kwargs: None)
@@ -784,10 +795,15 @@ def test_operational_lane_record_writes_finite_summary(tmp_path: Path, monkeypat
     assert record.runtime_ids == ()
     assert "work_dir_000" in record.output_paths
     assert record.finite_checks[0].passed is True
+    assert "GV paper replay profile: gv-paper-replay." in record.notes
+    assert "Material parameter status: runtime_default." in record.notes
+    assert "Geometry status: runtime_default." in record.notes
     assert record.output_paths["summary"].is_file()
     payload = json.loads(record.output_paths["summary"].read_text(encoding="utf-8"))
     assert payload["data_ranges"][0]["name"] == "epsilon_zz"
     assert payload["work_dirs"]
+    assert payload["paper_replay_profile"]["profile_id"] == "gv-paper-replay"
+    assert payload["paper_replay_profile"]["material_statuses"] == ["runtime_default"]
 
 
 def test_dev_partition_guard_rejects_oversized_paper_exact_stretching_shards(
