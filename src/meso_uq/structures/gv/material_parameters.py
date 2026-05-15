@@ -14,7 +14,6 @@ from .parameters import GV_MATERIAL_PARAMETER_NAMES
 _MATERIAL_ALIASES: dict[str, str] = {
     "muL": "mu_l",
 }
-_ZERO_ALLOWED_MATERIAL_PARAMETERS = frozenset({"b1", "b2", "a3", "a4"})
 
 
 def _canonicalize_name(name: str) -> str:
@@ -28,15 +27,17 @@ def _assert_finite_positive(name: str, value: object) -> float:
         raise ValueError(f"Material parameter '{name}' must be numeric.") from exc
     if not isfinite(value_f):
         raise ValueError(f"Material parameter '{name}' must be finite and > 0.")
-    if value_f < 0.0:
-        raise ValueError(f"Material parameter '{name}' must be finite and > 0.")
-    if value_f == 0.0 and name not in _ZERO_ALLOWED_MATERIAL_PARAMETERS:
+    if value_f <= 0.0:
         raise ValueError(f"Material parameter '{name}' must be finite and > 0.")
     return value_f
 
 
 def validate_material_parameter_overrides(overrides: Mapping[str, object]) -> dict[str, float]:
-    """Validate exactly the nine GV material parameters and return canonical values."""
+    """Validate exactly the nine GV material parameters and return canonical values.
+
+    Launch-facing GV material inputs require all nine calibrated parameters to be
+    finite and strictly positive.
+    """
 
     canonicalized: dict[str, float] = {}
     seen_canonical: set[str] = set()
