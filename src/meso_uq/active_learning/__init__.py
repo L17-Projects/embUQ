@@ -59,6 +59,14 @@ from meso_uq.active_learning.result_ingestion import (
     ingest_active_learning_results,
     write_result_ingestion_artifacts,
 )
+from meso_uq.active_learning.reports import (
+    ACTIVE_LEARNING_CONCISE_REPORT_SCHEMA_VERSION,
+    ACTIVE_LEARNING_REPORT_FILENAME,
+    ACTIVE_LEARNING_REPORT_MARKDOWN_FILENAME,
+    ActiveLearningConciseReportArtifacts,
+    build_active_learning_concise_report,
+    write_active_learning_concise_report,
+)
 from meso_uq.active_learning.synthetic_benchmark import (
     ACTIVE_LEARNING_SYNTHETIC_BENCHMARK_ARTIFACT_SCHEMA_VERSION,
     ACTIVE_LEARNING_SYNTHETIC_BENCHMARK_CONFIG_SCHEMA_VERSION,
@@ -131,6 +139,12 @@ __all__ = [
     "ResultIngestionRecord",
     "ingest_active_learning_results",
     "write_result_ingestion_artifacts",
+    "ACTIVE_LEARNING_CONCISE_REPORT_SCHEMA_VERSION",
+    "ACTIVE_LEARNING_REPORT_FILENAME",
+    "ACTIVE_LEARNING_REPORT_MARKDOWN_FILENAME",
+    "ActiveLearningConciseReportArtifacts",
+    "build_active_learning_concise_report",
+    "write_active_learning_concise_report",
     "ACTIVE_LEARNING_SYNTHETIC_BENCHMARK_ARTIFACT_SCHEMA_VERSION",
     "ACTIVE_LEARNING_SYNTHETIC_BENCHMARK_CONFIG_SCHEMA_VERSION",
     "ACTIVE_LEARNING_SYNTHETIC_BENCHMARK_MANIFEST_FILENAME",
