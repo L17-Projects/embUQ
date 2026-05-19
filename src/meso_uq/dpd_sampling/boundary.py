@@ -21,6 +21,11 @@ from meso_uq.structures.gv.active_learning_handoff import (
     render_gv_active_learning_launch_handoff,
 )
 from meso_uq.structures.gv.launch import build_gv_launch_campaign_manifest
+from meso_uq.active_learning.emb_34um_dpd_adapter import (
+    EMB_34UM_DPD_SCHEMA_VERSION,
+    build_emb_34um_request,
+    is_emb_34um_full_request_payload,
+)
 
 from .contracts import (
     DPD_SAMPLING_BATCH_SCHEMA_VERSION,
@@ -678,9 +683,36 @@ def _build_emb_candidate_manifests(
 ) -> tuple[DPDCandidateManifest, ...]:
     manifests: list[DPDCandidateManifest] = []
     for candidate, _, payload in selected_candidates:
+        token = _coerce_path_token(candidate.candidate_id, field_name="candidate_id")
+        if is_emb_34um_full_request_payload(payload):
+            request_artifacts = build_emb_34um_request(
+                token,
+                payload,
+                campaign_root=campaign_root,
+            )
+            normalized_payload = request_artifacts.normalized_request_payload()
+            expected_ref = DPDDataRef(
+                family=_EMB_FAMILY,
+                dataset_id=request_artifacts.expected_hdf5_dataset_id,
+                hdf5_path=request_artifacts.expected_hdf5_path,
+                manifest_path=request_artifacts.expected_request_manifest_path,
+            )
+            manifests.append(
+                DPDCandidateManifest(
+                    candidate_id=token,
+                    family=_EMB_FAMILY,
+                    platform=platform,
+                    output_root=request_artifacts.output_root,
+                    campaign_root=campaign_root,
+                    normalized_payload=normalized_payload,
+                    active_learning_metadata=dict(candidate.metadata),
+                    expected_hdf5_datasets=(expected_ref,),
+                )
+            )
+            continue
+
         normalized_payload = dict(payload)
         normalized_payload["placeholder"] = True
-        token = _coerce_path_token(candidate.candidate_id, field_name="candidate_id")
         normalized_payload.setdefault("experiment", payload.get("experiment", token))
         output_root = campaign_root / "emb" / token
         manifest_dataset_id = f"emb_{_coerce_path_token(normalized_payload['experiment'], field_name='experiment')}_{token}"
@@ -813,17 +845,31 @@ def build_dpd_sampling_batch(
 def _render_emb_manifests(request: DPDSamplingBatchRequest) -> tuple[Path, ...]:
     paths: list[Path] = []
     for manifest in request.candidate_manifests:
-        rendered_payload = {
-            "schema_version": _EMB_CANONICAL_RENDER_SCHEMA_VERSION,
-            "family": request.family,
-            "platform": request.platform,
-            "run_id": request.run_id,
-            "iteration": request.iteration,
-            "candidate_id": manifest.candidate_id,
-            "submission": _build_submission_state(request.platform),
-            "expected_hdf5_datasets": [item.as_manifest() for item in manifest.expected_hdf5_datasets],
-            "notes": "Emb placeholder rendering: no production Mirheo parity claim.",
-        }
+        is_full_request = manifest.normalized_payload.get("schema_version") == EMB_34UM_DPD_SCHEMA_VERSION
+        if is_full_request:
+            rendered_payload: dict[str, Any] = {
+                "schema_version": _EMB_CANONICAL_RENDER_SCHEMA_VERSION,
+                "family": request.family,
+                "platform": request.platform,
+                "run_id": request.run_id,
+                "iteration": request.iteration,
+                "candidate_id": manifest.candidate_id,
+                "submission": _build_submission_state(request.platform),
+                "request_payload": dict(manifest.normalized_payload),
+                "expected_hdf5_datasets": [item.as_manifest() for item in manifest.expected_hdf5_datasets],
+            }
+        else:
+            rendered_payload = {
+                "schema_version": _EMB_CANONICAL_RENDER_SCHEMA_VERSION,
+                "family": request.family,
+                "platform": request.platform,
+                "run_id": request.run_id,
+                "iteration": request.iteration,
+                "candidate_id": manifest.candidate_id,
+                "submission": _build_submission_state(request.platform),
+                "expected_hdf5_datasets": [item.as_manifest() for item in manifest.expected_hdf5_datasets],
+                "notes": "Emb placeholder rendering: no production Mirheo parity claim.",
+            }
         paths.append(_write_candidate_manifest(request, manifest, rendered_payload))
     return tuple(paths)
 

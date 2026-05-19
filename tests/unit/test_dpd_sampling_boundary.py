@@ -14,6 +14,10 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from meso_uq.active_learning import Candidate
+from meso_uq.active_learning.emb_34um_dpd_adapter import (
+    EMB_34UM_DPD_SCHEMA_VERSION,
+    EMB_34UM_RETRY_LIMIT,
+)
 from meso_uq.dpd_sampling.boundary import (
     build_dpd_sampling_batch_request,
     build_and_render_dpd_sampling_batch,
@@ -449,6 +453,107 @@ def test_render_emb_placeholder_manifesting_is_non_production_and_parseable(tmp_
     sidecar = json.loads((root / "dpd_sampling_validation_plot.png.json").read_text(encoding="utf-8"))
     assert sidecar["submission"]["submitted"] is False
     assert sidecar["platform_distribution"] == {"vega": 1}
+
+
+def test_build_and_render_emb_34um_full_request_manifest_contains_full_request_payload(tmp_path: Path) -> None:
+    root = _run_boundary_root(tmp_path, run_id="run-emb-full-01", iteration=0)
+    result = build_and_render_dpd_sampling_batch(
+        [
+            Candidate(
+                candidate_id="emb-full-01",
+                parameters={
+                    "family": "emb",
+                    "experiment": "indentation",
+                    "Yt": 1.2e6,
+                    "kb": 5000.0,
+                },
+            )
+        ],
+        run_id="run-emb-full-01",
+        iteration="0",
+        platform="karolina",
+        walltime="00:30:00",
+        gpu_count=1,
+        campaign_root=root,
+    )
+
+    candidate_root = root / "emb" / "emb-full-01"
+    candidate_payload_path = candidate_root / "dpd_sampling_candidate_manifest.json"
+    assert candidate_payload_path.is_file()
+
+    candidate_payload = json.loads(candidate_payload_path.read_text(encoding="utf-8"))
+    rendered_payload = candidate_payload["rendered_payload"]
+    request_payload = rendered_payload["request_payload"]
+    assert candidate_payload["normalized_payload"]["schema_version"] == EMB_34UM_DPD_SCHEMA_VERSION
+    assert request_payload["schema_version"] == EMB_34UM_DPD_SCHEMA_VERSION
+    assert request_payload["request_type"] == "emb_34um_full_force_sweep"
+    assert request_payload["retry_limit"] == EMB_34UM_RETRY_LIMIT
+    assert request_payload["platform"] == "karolina"
+    assert request_payload["platform_defaults"]["platform"] == "karolina"
+    assert request_payload["platform_defaults"]["walltime"] == "00:30:00"
+    assert request_payload["platform_defaults"]["gpu_count"] == 1
+    assert request_payload["fingerprint"]["radp"] == 6.8
+    assert request_payload["expected_output_paths"]["request_manifest"].endswith("emb_34um_request_manifest.json")
+    assert rendered_payload["expected_hdf5_datasets"][0]["manifest_path"].endswith("emb_34um_request_manifest.json")
+    assert result.batch_request.family == "emb"
+    assert result.rendered_manifest_paths
+
+
+def test_build_and_render_emb_34um_canary_request_is_marked(tmp_path: Path) -> None:
+    root = _run_boundary_root(tmp_path, run_id="run-emb-canary-01", iteration=0)
+    build_and_render_dpd_sampling_batch(
+        [
+            Candidate(
+                candidate_id="emb-canary-01",
+                parameters={
+                    "family": "emb",
+                    "experiment": "indentation",
+                    "Yt": 1.2e6,
+                    "kb": 5000.0,
+                    "canary": True,
+                },
+            )
+        ],
+        run_id="run-emb-canary-01",
+        iteration="0",
+        platform="karolina",
+        walltime="00:30:00",
+        gpu_count=1,
+        campaign_root=root,
+    )
+
+    candidate_payload_path = root / "emb" / "emb-canary-01" / "dpd_sampling_candidate_manifest.json"
+    payload = json.loads(candidate_payload_path.read_text(encoding="utf-8"))
+    rendered_payload = payload["rendered_payload"]["request_payload"]
+    assert "canary" in rendered_payload
+    assert rendered_payload["canary"]["enabled"] is True
+    assert rendered_payload["canary"]["point_count"] == 3
+    assert len(rendered_payload["canary"]["point_indices"]) == 3
+    assert len(rendered_payload["force_grid"]) == 3
+
+
+def test_build_and_render_emb_34um_rejects_out_of_bounds_dimensions(tmp_path: Path) -> None:
+    root = _run_boundary_root(tmp_path, run_id="run-emb-oob", iteration=0)
+    with pytest.raises(ValueError, match="outside bounds"):
+        build_and_render_dpd_sampling_batch(
+            [
+                Candidate(
+                    candidate_id="emb-oob",
+                    parameters={
+                        "family": "emb",
+                        "experiment": "indentation",
+                        "Yt": 1000.0,
+                        "kb": 5000.0,
+                    },
+                )
+            ],
+            run_id="run-emb-oob",
+            iteration="0",
+            platform="karolina",
+            walltime="00:30:00",
+            gpu_count=1,
+            campaign_root=root,
+        )
 
 
 def test_gv_relative_campaign_root_does_not_nest_rendered_artifacts(tmp_path: Path, monkeypatch) -> None:

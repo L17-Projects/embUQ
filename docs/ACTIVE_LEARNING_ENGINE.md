@@ -88,3 +88,17 @@ two-candidate GV input example and
 `configs/active_learning/gv_selected_candidates_handoff_manifest.example.json`
 for the derived, non-submitting handoff manifest with expected HDF5 dataset
 paths.
+
+## Final-gate specification
+
+The active-learning final-gate target for the current workstream is documented in
+`ACTIVE_LEARNING_FINAL_GATE.md`.
+
+That final-gate document is the single source of truth for:
+
+- run target and scope
+- AL rounds and per-round budget
+- comparator and sample-seeding rules
+- production runtime fingerprint
+- per-step plot checks and final pass/fail rules
+- Linear/vault-ready evidence sequencing

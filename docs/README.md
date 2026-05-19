@@ -63,6 +63,8 @@ Do not document new root-level EMB experiment source trees. Those EMB assets now
 - `GV_PAPER_REPLAY_CLOSEOUT.md` for the GV-only paper replay inventory, provenance, acceptance matrix, and remaining qualitative gates
 - `GV_SHEAR_FLOW_DEFERRAL.md` for the experimental `gv:shear_flow` blockers and graduation criteria
 - `VALIDATION_CONFIGS.md` for the tiny validation config bundle
+- `ACTIVE_LEARNING_ENGINE.md` for active-learning contracts and workflow boundary
+- `ACTIVE_LEARNING_FINAL_GATE.md` for the active-learning final-gate checklist, required plots, and production fingerprint
 - `WORKFLOWS.md` for workflow entrypoints and operator expectations
 - `NATIVE_CUDA_PHASE2_BASELINE.md` for the NativeCuda Phase 2 baseline and build/kernel delivery decision
 - `NATIVE_CUDA_PHASE2_VALIDATION_EVIDENCE.md` for NativeCuda Phase 2 validation evidence, remaining platform deltas, and Linear closeout paths

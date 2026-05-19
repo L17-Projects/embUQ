@@ -1,0 +1,65 @@
+schema_version: "1.0"
+kind: active_learning
+metadata:
+  id: final_gate_plan
+  name: Active Learning Final Gate Plan
+spec:
+  target:
+    modality: indentation
+    diameter_um: 3.4
+    use_prior_training_data: false
+  candidate_dimensions:
+    Yt:
+      min: 100000.0
+      max: 1000000000.0
+    kb:
+      min: 400.0
+      max: 70000.0
+  active_learning:
+    rounds: 3
+    curves_per_round: 30
+    full_force_sweep: true
+    comparator:
+      type: lhs
+      curve_count: 90
+  canary:
+    curves: 1
+    force_points: 3
+  platform:
+    name: karolina
+    concurrent_jobs: 30
+    retry_limit: 3
+  runtime_fingerprint:
+    radp: 6.80
+    L: 25
+    fscale: 0.0074
+    shell_th: 0.000000005
+    numsteps: 5000
+    numsteps_eq: 10000
+    force_grid_um_3_4:
+      - 0.0
+      - 357.14285714285717
+      - 714.2857142857143
+      - 1071.4285714285716
+      - 1428.5714285714287
+      - 1785.7142857142858
+      - 2142.857142857143
+      - 2500.0
+      - 2857.1428571428573
+      - 3214.2857142857147
+      - 3571.4285714285716
+      - 3928.571428571429
+      - 4285.714285714286
+      - 4642.857142857143
+      - 5000.0
+  required_plots:
+    - grouped_holdout_median_curve_relative_l2_primary
+    - mean_curve_relative_l2
+    - max_curve_relative_l2
+    - residuals
+    - predicted_vs_reference_curves
+    - coverage_acquisition
+    - failure_quarantine
+    - model_selection
+    - al_vs_lhs_summary
+    - final_gate_acceptance
