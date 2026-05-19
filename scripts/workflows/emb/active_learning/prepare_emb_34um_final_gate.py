@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare render-only EMB 3.4um final-gate AL manifests."""
+"""Prepare EMB 3.4um final-gate AL manifests and submission commands."""
 
 from __future__ import annotations
 
@@ -185,21 +185,30 @@ def _submission_command(
         / "sbatch"
         / "emb_34um_active_learning_array.sbatch"
     )
+    candidate_count = TOTAL_FULL if mode == "full" else 1
+    array_spec = f"0-{candidate_count - 1}"
+    if mode == "full":
+        array_spec = f"{array_spec}%{concurrent_jobs}"
     return {
         "script": str(sbatch_script),
         "command": (
-            "sbatch --parsable --export="
+            "sbatch --parsable "
+            f"--array={array_spec} "
+            "--export="
             f"TIMESTAMP={shlex.quote(timestamp)},"
             f"SCRATCH_ROOT={shlex.quote(str(scratch_root))},"
             f"VAULT_ROOT={shlex.quote(str(vault_root))},"
             f"RUN_ID_PREFIX={shlex.quote(run_id_prefix)},"
             f"CAMPAIGN_ROOT={shlex.quote(str(campaign_root))},"
             f"MODE={shlex.quote(mode)},"
+            "EXECUTION_MODE=execute,"
             f"CONCURRENT_JOBS={concurrent_jobs},"
             f"RETRY_LIMIT={retry_limit} "
             f"{shlex.quote(str(sbatch_script))}"
         ),
         "mode": mode,
+        "array": array_spec,
+        "execution_mode": "execute",
     }
 
 

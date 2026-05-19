@@ -86,8 +86,14 @@ def test_prepare_emb_34um_final_gate_manifests_full_and_canary_campaigns(tmp_pat
 
     assert manifest["commands"]["full"]["mode"] == "full"
     assert manifest["commands"]["canary"]["mode"] == "canary"
+    assert manifest["commands"]["full"]["array"] == "0-89%30"
+    assert manifest["commands"]["canary"]["array"] == "0-0"
+    assert manifest["commands"]["full"]["execution_mode"] == "execute"
+    assert "--array=0-89%30" in manifest["commands"]["full"]["command"]
+    assert "--array=0-0" in manifest["commands"]["canary"]["command"]
     assert "MODE=full" in manifest["commands"]["full"]["command"]
     assert "MODE=canary" in manifest["commands"]["canary"]["command"]
+    assert "EXECUTION_MODE=execute" in manifest["commands"]["full"]["command"]
     assert manifest["commands"]["full"]["script"].endswith("emb_34um_active_learning_array.sbatch")
     assert manifest["commands"]["canary"]["script"].endswith("emb_34um_active_learning_array.sbatch")
 
