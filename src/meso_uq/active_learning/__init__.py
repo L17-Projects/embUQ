@@ -38,6 +38,13 @@ from meso_uq.active_learning.simulation_manifest import (
     write_failed_simulation_quarantine,
 )
 from meso_uq.active_learning.engine import ActiveLearningDryRunEngine
+from meso_uq.active_learning.result_ingestion import (
+    ResultIngestionArtifacts,
+    ResultIngestionBatch,
+    ResultIngestionRecord,
+    ingest_active_learning_results,
+    write_result_ingestion_artifacts,
+)
 
 __all__ = [
     "ActiveLearningDryRunEngine",
@@ -70,4 +77,9 @@ __all__ = [
     "validate_active_learning_candidates",
     "write_failed_simulation_quarantine",
     "write_candidate_generation_artifacts",
+    "ResultIngestionArtifacts",
+    "ResultIngestionBatch",
+    "ResultIngestionRecord",
+    "ingest_active_learning_results",
+    "write_result_ingestion_artifacts",
 ]
