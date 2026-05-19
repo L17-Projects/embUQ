@@ -438,6 +438,7 @@ def test_gv_paper_figure_replay_template_uses_public_command_and_gv_runtime() ->
     assert "#SBATCH --ntasks=2" in text
     assert 'MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"' in text
     assert 'MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"' in text
+    assert 'MESOUQ_GV_EIGENMODES_DOMAIN_RANKS="${MESOUQ_GV_EIGENMODES_DOMAIN_RANKS:-1,1,1}"' in text
     assert "#SBATCH --gres=gpu:1" in text
 
 

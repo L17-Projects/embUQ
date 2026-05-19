@@ -183,6 +183,10 @@ def test_plan_eigenmodes_paper_replay_lane_exact_replay_forces_30_modes() -> Non
 
     assert plan.mode_count == 30
     assert plan.paper_exact is True
+    assert plan.runtime_profile == "paper"
+    assert plan.to_manifest()["runtime_profile"] == "paper"
+    assert plan.to_manifest()["mode_window_policy"] == "frequency-min"
+    assert plan.to_manifest()["mode_min_frequency_tau_inv"] == pytest.approx(22.5)
     assert plan.to_manifest()["paper_exact_requirements"] == {
         "first_spectrum_mode_count": 30,
         "selected_surface_mode_indices": [0, 4, 6, 7, 18, 24],
@@ -220,6 +224,99 @@ def test_postprocess_eigenmodes_paper_exact_records_review_requirements() -> Non
     ]
     assert result.selected_modes["surface_mode_indices_available"] == [0, 4, 6, 7, 18, 24]
     assert np.issubdtype(result.channels["mesh_faces"].dtype, np.integer)
+
+
+def test_plan_eigenmodes_canary_profile_is_explicit() -> None:
+    plan = plan_eigenmodes_paper_replay_lane(
+        material_parameters=_BASE_MATERIAL_PARAMETERS,
+        radGV=2.0,
+        height=14.28,
+        runtime_profile="canary",
+    )
+
+    assert plan.runtime_profile == "canary"
+    assert plan.paper_exact is False
+    assert plan.to_manifest()["runtime_profile"] == "canary"
+
+
+def test_postprocess_eigenmodes_records_figure8g_acceptance_for_runtime_window() -> None:
+    reference = np.genfromtxt(
+        eigenmodes_module._FIGURE8G_REFERENCE_CSV,
+        delimiter=",",
+        names=True,
+        dtype=float,
+    )["omega_tau_inv"]
+    eigenvalues = 1.0 / (np.asarray(reference) ** 2)
+    result = postprocess_eigenmodes_paper_replay_lane(
+        {
+            "experiment": "eigenmodes",
+            "geometry": {"radGV": 2.0, "height": 14.28},
+            "material_parameters": _BASE_MATERIAL_PARAMETERS,
+            "controls": {"bpress": -91.0},
+            "eigenmode_window_manifest": {
+                "raw_eigenpair_count": 42,
+                "final_mode_count": 30,
+                "mode_window_policy": "frequency-min",
+                "selected_paper_mode_indices": list(range(30)),
+                "selected_raw_mode_indices": list(range(10, 40)),
+            },
+            "channels": _paper_exact_channels(
+                eigenvalues=eigenvalues,
+                kBT=1.0,
+                raw_eigenpair_count=[42],
+                final_mode_count=[30],
+                final_mode_indices=np.arange(30),
+                selected_paper_mode_indices=np.arange(30),
+                selected_raw_mode_indices=np.arange(10, 40),
+                mode_window_min_frequency_tau_inv=[22.5],
+            ),
+        },
+        plan=plan_eigenmodes_paper_replay_lane(
+            material_parameters=_BASE_MATERIAL_PARAMETERS,
+            radGV=2.0,
+            height=14.28,
+            paper_exact=True,
+        ),
+    )
+
+    acceptance = result.provenance["figure8g_acceptance"]
+    assert acceptance["passed"] is True
+    assert acceptance["mean_abs_error_tau_inv"] == pytest.approx(0.0)
+    assert result.selected_modes["final_mode_indices"] == list(range(30))
+    assert result.selected_modes["selected_paper_mode_indices"] == list(range(30))
+    assert result.selected_modes["selected_raw_mode_indices"] == list(range(10, 40))
+    assert result.selected_modes["mode_window_min_frequency_tau_inv"] == pytest.approx(22.5)
+    assert result.provenance["eigenmode_window_manifest"]["mode_window_policy"] == "frequency-min"
+    assert result.provenance["eigenmode_window_manifest"]["final_mode_count"] == 30
+
+
+def test_postprocess_eigenmodes_flags_raw_head_low_frequency_modes() -> None:
+    result = postprocess_eigenmodes_paper_replay_lane(
+        {
+            "experiment": "eigenmodes",
+            "geometry": {"radGV": 2.0, "height": 14.28},
+            "material_parameters": _BASE_MATERIAL_PARAMETERS,
+            "controls": {"bpress": -91.0},
+            "channels": _paper_exact_channels(
+                eigenvalues=np.linspace(0.25, 0.01, 30),
+                kBT=1.0,
+                raw_eigenpair_count=[4211],
+                final_mode_count=[30],
+                selected_raw_mode_indices=np.arange(30),
+            ),
+        },
+        plan=plan_eigenmodes_paper_replay_lane(
+            material_parameters=_BASE_MATERIAL_PARAMETERS,
+            radGV=2.0,
+            height=14.28,
+            paper_exact=True,
+        ),
+    )
+
+    acceptance = result.provenance["figure8g_acceptance"]
+    assert acceptance["passed"] is False
+    assert acceptance["mean_abs_error_tau_inv"] > 20.0
+    assert result.selected_modes["selected_raw_mode_indices"] == list(range(30))
 
 
 @pytest.mark.parametrize(
@@ -409,6 +506,9 @@ def test_eigenmodes_paper_exact_execution_sets_runtime_flag(
     result = run_eigenmodes_paper_replay_lane(plan)
 
     assert captured["env"]["MESOUQ_GV_PAPER_EXACT"] == "1"
+    assert captured["env"]["MESOUQ_GV_EIGENMODES_PROFILE"] == "paper"
+    assert captured["env"]["MESOUQ_GV_EIGENMODES_MODE_WINDOW_POLICY"] == "frequency-min"
+    assert captured["env"]["MESOUQ_GV_EIGENMODES_MODE_MIN_FREQUENCY"] == "22.5"
     assert result.provenance["status"] == "completed"
     assert result.controls["bpress"] == pytest.approx(-91.0)
     assert result.provenance["lane_plan"]["paper_exact"] is True
@@ -692,6 +792,23 @@ def test_plan_eigenmodes_paper_replay_rejects_output_root_traversal() -> None:
         )
 
 
+def test_plan_eigenmodes_paper_replay_accepts_external_runs_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runs_root = tmp_path / "scratch" / "runs"
+    output_root = runs_root / "gv" / "figure_replay" / "campaign" / "lanes" / "eigenmodes"
+    monkeypatch.setenv("MESOUQ_RUNS_ROOT", str(runs_root))
+
+    plan = plan_eigenmodes_paper_replay_lane(
+        material_parameters=_BASE_MATERIAL_PARAMETERS,
+        radGV=2.0,
+        height=14.28,
+        output_root=output_root,
+    )
+
+    assert Path(plan.runtime_options.output_root) == output_root.resolve()
+
+
 def test_plan_eigenmodes_paper_replay_rejects_invalid_material_and_controls() -> None:
     with pytest.raises(ValueError, match="mode_count"):
         plan_eigenmodes_paper_replay_lane(
@@ -898,6 +1015,26 @@ def test_plot_eigenmodes_paper_replay_writes_selected_surface_modes_when_source_
 
     assert output.is_file()
     assert result.selected_modes["surface_mode_indices_available"] == [0, 4, 6, 7, 18, 24]
+
+
+def test_full_mode_shape_plot_requests_selected_paper_surface_modes() -> None:
+    result = postprocess_eigenmodes_paper_replay_lane(
+        {
+            "experiment": "eigenmodes",
+            "geometry": {"radGV": 2.0, "height": 14.28},
+            "material_parameters": _BASE_MATERIAL_PARAMETERS,
+            "controls": {"bpress": -91.0},
+            "channels": _paper_exact_channels(),
+        },
+        plan=plan_eigenmodes_paper_replay_lane(
+            material_parameters=_BASE_MATERIAL_PARAMETERS,
+            radGV=2.0,
+            height=14.28,
+            paper_exact=True,
+        ),
+    )
+
+    assert eigenmodes_module._requested_mode_indices(result, full_mode_shape_plot=True) == [0, 4, 6, 7, 18, 24]
 
 
 def test_plot_eigenmodes_paper_replay_writes_paper_panels_with_mesh_faces(

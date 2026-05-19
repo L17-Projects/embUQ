@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import json
 from pathlib import Path
 
 import numpy as np
@@ -436,14 +437,92 @@ def test_extract_eigenmodes_and_merge_sweep_channels(tmp_path: Path) -> None:
                 "bpress": np.asarray([-92.0]),
                 "eigenfrequencies": np.asarray([5.0]),
                 "eigenvalues": np.asarray([25.0]),
+                "final_mode_count": np.asarray([1.0]),
+                "final_mode_indices": np.asarray([0.0]),
                 "kBT": np.asarray([1.0]),
                 "mode_index": np.asarray([0.0]),
+                "raw_eigenpair_count": np.asarray([1.0]),
+                "selected_paper_mode_indices": np.asarray([0.0]),
             },
         )
     )
 
     assert np.allclose(channels["eigenfrequencies"], [0.25, 1.0 / 3.0, 0.5])
     assert merged["eigenvalues"].tolist() == [4.0, 9.0, 16.0, 25.0]
+    assert channels["raw_eigenpair_count"].tolist() == [3.0]
+    assert channels["final_mode_indices"].tolist() == [0.0, 1.0, 2.0]
+    assert channels["selected_paper_mode_indices"].tolist() == [0.0, 1.0, 2.0]
+
+
+def test_extract_eigenmodes_accepts_flat_dropped_archive_layout(tmp_path: Path) -> None:
+    work = tmp_path / "eigenmodes-flat"
+    work.mkdir()
+    (work / "eigvalues_new.txt").write_text("4\n9\n16\n", encoding="utf-8")
+    (work / "eigvectors_new.txt").write_text(
+        "1 2 3 4 5 6 7 8 9\n"
+        "10 11 12 13 14 15 16 17 18\n"
+        "19 20 21 22 23 24 25 26 27\n",
+        encoding="utf-8",
+    )
+    (work / "parameters00001.yaml").write_text("kbt: 4.0\n", encoding="utf-8")
+    points = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)]
+    _write_xyz(work / "emb_0000000.xyz", points)
+    _write_off(work / "gv00001.off", points, faces=[(0, 1, 2)])
+
+    channels = extract_sampling_channels(
+        experiment="eigenmodes",
+        work_dir=work,
+        controls={"bpress": -91.0},
+        sweep=GVSweep("bpress", (-91.0,)),
+        geometry=_geometry(),
+    )
+
+    assert channels["eigenvalues"].tolist() == [4.0, 9.0, 16.0]
+    assert np.allclose(channels["eigenfrequencies"], [0.5, 2.0 / 3.0, 1.0])
+    assert channels["raw_eigenpair_count"].tolist() == [3.0]
+    assert channels["final_mode_count"].tolist() == [3.0]
+    assert channels["final_mode_indices"].tolist() == [0.0, 1.0, 2.0]
+    assert channels["selected_paper_mode_indices"].tolist() == [0.0, 1.0, 2.0]
+    assert channels["eigenvectors"].shape == (3, 9)
+    assert channels["reference_positions"].shape == (3, 3)
+    assert channels["mesh_faces"].tolist() == [[0.0, 1.0, 2.0]]
+
+
+def test_extract_eigenmodes_records_mode_window_manifest(tmp_path: Path) -> None:
+    output = tmp_path / "eigenmodes-window" / "analysis" / "output"
+    output.mkdir(parents=True)
+    (output / "eigvalues.txt").write_text("100\n81\n64\n49\n36\n25\n", encoding="utf-8")
+    (output / "eigvalues_new.txt").write_text("64\n49\n36\n", encoding="utf-8")
+    (output / "mode_window_manifest.json").write_text(
+        json.dumps(
+            {
+                "raw_eigenpair_count": 6,
+                "final_mode_count": 3,
+                "final_mode_indices": [0, 1, 2],
+                "mode_window_policy": "frequency-min",
+                "selected_paper_mode_indices": [0, 1, 2],
+                "selected_raw_mode_indices": [2, 3, 4],
+                "min_frequency_tau_inv": 0.125,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    channels = extract_sampling_channels(
+        experiment="eigenmodes",
+        work_dir=tmp_path / "eigenmodes-window",
+        controls={"bpress": -91.0},
+        sweep=GVSweep("bpress", (-91.0,)),
+        geometry=_geometry(),
+    )
+
+    assert channels["eigenvalues"].tolist() == [64.0, 49.0, 36.0]
+    assert channels["raw_eigenpair_count"].tolist() == [6.0]
+    assert channels["final_mode_count"].tolist() == [3.0]
+    assert channels["final_mode_indices"].tolist() == [0.0, 1.0, 2.0]
+    assert channels["selected_paper_mode_indices"].tolist() == [0.0, 1.0, 2.0]
+    assert channels["selected_raw_mode_indices"].tolist() == [2.0, 3.0, 4.0]
+    assert channels["mode_window_min_frequency_tau_inv"].tolist() == [0.125]
 
 
 def test_extract_sampling_channels_rejects_unknown_experiment() -> None:

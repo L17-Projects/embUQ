@@ -515,6 +515,23 @@ def test_plan_buckling_paper_replay_rejects_output_root_traversal() -> None:
         )
 
 
+def test_plan_buckling_paper_replay_accepts_external_runs_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runs_root = tmp_path / "scratch" / "runs"
+    output_root = runs_root / "gv" / "figure_replay" / "campaign" / "lanes" / "buckling"
+    monkeypatch.setenv("MESOUQ_RUNS_ROOT", str(runs_root))
+
+    plan = plan_buckling_paper_replay_lane(
+        material_parameters=_BASE_MATERIAL_PARAMETERS,
+        radGV=2.0,
+        height=14.28,
+        output_root=output_root,
+    )
+
+    assert Path(plan.runtime_options.output_root) == output_root.resolve()
+
+
 def test_plan_buckling_paper_replay_rejects_invalid_material_and_sweep_inputs() -> None:
     with pytest.raises(ValueError, match="at least two"):
         plan_buckling_paper_replay_lane(

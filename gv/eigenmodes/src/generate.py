@@ -42,7 +42,6 @@ args = parser.parse_args()
 num_gpus = args.g
 num_nodes = args.N
 
-num_mpi_ranks = int(os.environ.get('MESOUQ_GV_EIGENMODES_MPI_RANKS', str(num_gpus + 1)))
 mem_per_gpu = 20  # Memory in GB per GPU, adjust as needed
 total_mem = mem_per_gpu * num_gpus
 
@@ -54,11 +53,17 @@ _PAPER_EXACT_DEFAULT_OVERRIDES = {
     'dt_eq': 0.0001,
     'gamma_dpd': 16.3,
     'gamma_dpd_gas': 3.0,
+    'numsteps': 40000000,
+    'numsteps_eq': 500000,
+    's_g': 0.125,
+    'stslik': 200000,
+    'stslik_eq': 100,
+}
+_CANARY_DEFAULT_OVERRIDES = {
+    **_PAPER_EXACT_DEFAULT_OVERRIDES,
     'numsteps': 4000000,
     'numsteps_eq': 50000,
-    's_g': 0.125,
     'stslik': 20000,
-    'stslik_eq': 100,
 }
 _PAPER_EXACT_ENV_OVERRIDES = {
     'numsteps': 'MESOUQ_GV_EIGENMODES_NUMSTEPS',
@@ -66,17 +71,99 @@ _PAPER_EXACT_ENV_OVERRIDES = {
     'stslik': 'MESOUQ_GV_EIGENMODES_STSLIK',
     'stslik_eq': 'MESOUQ_GV_EIGENMODES_STSLIK_EQ',
 }
+_PROFILE_DEFAULTS = {
+    'paper': {
+        'label': 'paper',
+        'parameter_overrides': _PAPER_EXACT_DEFAULT_OVERRIDES,
+        'mode_window_policy': 'frequency-min',
+        'mode_min_frequency': '22.5',
+    },
+    'canary': {
+        'label': 'canary',
+        'parameter_overrides': _CANARY_DEFAULT_OVERRIDES,
+        'mode_window_policy': 'frequency-min',
+        'mode_min_frequency': '22.5',
+    },
+}
+_DEFAULT_MODE_COUNT = 30
+
+
+def _parse_domain_ranks(raw_value):
+    text = str(raw_value).strip()
+    if not text:
+        raise ValueError('MESOUQ_GV_EIGENMODES_DOMAIN_RANKS must not be empty.')
+    tokens = text.replace('x', ',').replace('X', ',').split(',')
+    if len(tokens) == 1:
+        tokens = text.split()
+    if len(tokens) != 3:
+        raise ValueError(
+            'MESOUQ_GV_EIGENMODES_DOMAIN_RANKS must have three positive integers, '
+            "for example '1,1,1' or '2x1x1'."
+        )
+    try:
+        ranks = tuple(int(token.strip()) for token in tokens)
+    except ValueError as exc:
+        raise ValueError(
+            f'Invalid MESOUQ_GV_EIGENMODES_DOMAIN_RANKS={raw_value!r}; '
+            'expected three positive integers.'
+        ) from exc
+    if any(rank <= 0 for rank in ranks):
+        raise ValueError(
+            f'Invalid MESOUQ_GV_EIGENMODES_DOMAIN_RANKS={raw_value!r}; each rank must be positive.'
+        )
+    return ranks
+
+
+def _format_domain_ranks(raw_value):
+    return ','.join(str(rank) for rank in _parse_domain_ranks(raw_value))
+
+
+def _domain_rank_product(raw_value):
+    product = 1
+    for rank in _parse_domain_ranks(raw_value):
+        product *= rank
+    return product
+
+
+def _default_mpi_ranks(raw_domain_ranks):
+    product = _domain_rank_product(raw_domain_ranks)
+    return 2 * product
+
+
+domain_ranks = _format_domain_ranks(
+    os.environ.get('MESOUQ_GV_EIGENMODES_DOMAIN_RANKS', '1,1,1')
+)
+num_mpi_ranks = int(
+    os.environ.get('MESOUQ_GV_EIGENMODES_MPI_RANKS', str(_default_mpi_ranks(domain_ranks)))
+)
+if num_mpi_ranks <= 0:
+    raise ValueError('MESOUQ_GV_EIGENMODES_MPI_RANKS must be a positive integer.')
 
 
 def _paper_exact_enabled():
     return os.environ.get('MESOUQ_GV_PAPER_EXACT', '').lower() in {'1', 'true', 'yes'}
 
 
+def _runtime_profile_name():
+    raw_value = os.environ.get('MESOUQ_GV_EIGENMODES_PROFILE', '').strip().lower()
+    if not raw_value:
+        return 'paper' if _paper_exact_enabled() else ''
+    if raw_value not in _PROFILE_DEFAULTS:
+        raise ValueError(
+            f"Unsupported MESOUQ_GV_EIGENMODES_PROFILE={raw_value!r}; "
+            f"expected one of {sorted(_PROFILE_DEFAULTS)}."
+        )
+    return raw_value
+
+
+runtime_profile_name = _runtime_profile_name()
+
+
 def _apply_paper_exact_defaults(parameters_default):
-    if not _paper_exact_enabled():
+    if not runtime_profile_name:
         return parameters_default
     resolved = dict(parameters_default)
-    resolved.update(_PAPER_EXACT_DEFAULT_OVERRIDES)
+    resolved.update(_PROFILE_DEFAULTS[runtime_profile_name]['parameter_overrides'])
     for key, env_name in _PAPER_EXACT_ENV_OVERRIDES.items():
         raw_value = os.environ.get(env_name)
         if raw_value is None:
@@ -91,6 +178,61 @@ def _apply_paper_exact_defaults(parameters_default):
 def _write_parameters_default(filename, parameters_default):
     with open(filename, 'w') as f:
         yaml.dump(parameters_default, f)
+
+
+def _mode_window_policy():
+    explicit = os.environ.get('MESOUQ_GV_EIGENMODES_MODE_WINDOW_POLICY', '').strip()
+    if explicit:
+        return explicit
+    if runtime_profile_name:
+        return str(_PROFILE_DEFAULTS[runtime_profile_name]['mode_window_policy'])
+    return 'frequency-min'
+
+
+def _mode_min_frequency():
+    explicit = os.environ.get('MESOUQ_GV_EIGENMODES_MODE_MIN_FREQUENCY', '').strip()
+    if explicit:
+        return explicit
+    if runtime_profile_name:
+        return str(_PROFILE_DEFAULTS[runtime_profile_name]['mode_min_frequency'])
+    return '22.5'
+
+
+def _mode_count():
+    raw_value = os.environ.get('MESOUQ_GV_EIGENMODES_MODE_COUNT', str(_DEFAULT_MODE_COUNT))
+    value = int(raw_value)
+    if value <= 0:
+        raise ValueError('MESOUQ_GV_EIGENMODES_MODE_COUNT must be a positive integer.')
+    return value
+
+
+def _write_runtime_profile_manifest():
+    mode_count = _mode_count()
+    payload = {
+        'schema': 'mesouq.gv.eigenmodes.runtime_profile.v1',
+        'profile': runtime_profile_name or 'unprofiled',
+        'paper_exact_requested': _paper_exact_enabled(),
+        'parameter_profile': runtime_profile_name or 'none',
+        'numsteps': None,
+        'numsteps_eq': None,
+        'stslik': None,
+        'stslik_eq': None,
+        'mode_window_policy': _mode_window_policy(),
+        'mode_min_frequency_tau_inv': float(_mode_min_frequency()),
+        'configured_final_mode_count': mode_count,
+        'selected_paper_mode_indices': list(range(mode_count)),
+        'domain_ranks': domain_ranks,
+    }
+    filename = 'parameter/parameters-default00001.yaml'
+    if os.path.isfile(filename):
+        with open(filename, 'rb') as f:
+            parameters_default = yaml.load(f, Loader=yaml.CLoader)
+        for key in ('numsteps', 'numsteps_eq', 'stslik', 'stslik_eq'):
+            payload[key] = int(parameters_default[key])
+    with open('parameter/eigenmodes_runtime_profile.json', 'w') as f:
+        import json
+
+        json.dump(payload, f, indent=2, sort_keys=True)
 
 
 def _find_repo_root():
@@ -145,17 +287,35 @@ def _write_runtime_preamble(file_commands):
         raw_value = os.environ.get(env_name, '')
         if raw_value:
             file_commands.write(f'export {env_name}={shlex.quote(raw_value)}\n')
+    if runtime_profile_name:
+        file_commands.write(
+            'export MESOUQ_GV_EIGENMODES_PROFILE='
+            f'{shlex.quote(runtime_profile_name)}\n'
+        )
+    file_commands.write(
+        'export MESOUQ_GV_EIGENMODES_MODE_WINDOW_POLICY='
+        f'{shlex.quote(_mode_window_policy())}\n'
+    )
+    file_commands.write(
+        'export MESOUQ_GV_EIGENMODES_MODE_MIN_FREQUENCY='
+        f'{shlex.quote(_mode_min_frequency())}\n'
+    )
+    file_commands.write(
+        'export MESOUQ_GV_EIGENMODES_DOMAIN_RANKS='
+        f'{shlex.quote(domain_ranks)}\n'
+    )
     file_commands.write('\n')
 
 if(args.par == None):
     os.system('mkdir -p parameter')
     os.system('rm -r parameter/* 2>/dev/null')
     os.system(f'cp parameters-default.{args.obj}.yaml parameter/parameters-default00001.yaml')
-    if _paper_exact_enabled():
+    if runtime_profile_name:
         filename = 'parameter/parameters-default00001.yaml'
         with open(filename, 'rb') as f:
             parameters_default = yaml.load(f, Loader=yaml.CLoader)
         _write_parameters_default(filename, _apply_paper_exact_defaults(parameters_default))
+    _write_runtime_profile_manifest()
     cnt = 1
 
 else:
@@ -206,6 +366,7 @@ else:
 
     cnt = 0
     cnt = parameter_loop(depth, widths, starts, stops, names, parameters_default, cnt)
+    _write_runtime_profile_manifest()
 
 def write_commands(filename, runscript, extra = ""):
 	file_commands = open(filename, 'w')
@@ -248,7 +409,7 @@ def write_commands(filename, runscript, extra = ""):
 	file_commands.close()
 	return cnt_sim, cnt_par
 
-cnt_sim, cnt_par = write_commands('commands.txt', 'run.sh', f'{num_mpi_ranks}')
+cnt_sim, cnt_par = write_commands('commands.txt', 'run.sh', f'{num_mpi_ranks} {domain_ranks}')
 
 os.system(f'rm parameters-default.yaml')
 

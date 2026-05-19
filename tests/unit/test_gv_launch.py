@@ -284,6 +284,7 @@ def test_render_gv_launch_campaign_materializes_karolina_and_vega_without_submis
     assert "scripts/platforms/vega/run_gv_runtime.py" in vega_script
     assert 'export MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"' in vega_script
     assert 'export MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"' in vega_script
+    assert 'export MESOUQ_GV_EIGENMODES_DOMAIN_RANKS="${MESOUQ_GV_EIGENMODES_DOMAIN_RANKS:-1,1,1}"' in vega_script
     for script in (karolina_script, vega_script):
         _assert_submission_free_script(script)
         assert "--control bpress=-91.0 --control tot_force=500.0" in script

@@ -697,6 +697,7 @@ def _platform_setup(platform: Platform) -> list[str]:
             'source "${GV_ENV_SCRIPT}"',
             'export MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"',
             'export MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"',
+            'export MESOUQ_GV_EIGENMODES_DOMAIN_RANKS="${MESOUQ_GV_EIGENMODES_DOMAIN_RANKS:-1,1,1}"',
             'export MESOUQ_SITE="karolina"',
             'export HPC_SITE="karolina"',
         ]
@@ -719,6 +720,7 @@ def _platform_setup(platform: Platform) -> list[str]:
         'source "${GV_ENV_SCRIPT}"',
         'export MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"',
         'export MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"',
+        'export MESOUQ_GV_EIGENMODES_DOMAIN_RANKS="${MESOUQ_GV_EIGENMODES_DOMAIN_RANKS:-1,1,1}"',
         'export MESOUQ_SITE="vega"',
         'export HPC_SITE="vega"',
     ]

@@ -81,6 +81,7 @@ def test_eigenmodes_uses_bpress_control_and_tracks_analysis_provenance(tmp_path:
     analysis_paths = set(manifest["source_files"])
     assert any(path.endswith("analysis/all_analysis.py") for path in analysis_paths)
     assert any(path.endswith("analysis/combine.py") for path in analysis_paths)
+    assert any(path.endswith("analysis/trim_eigenmodes.py") for path in analysis_paths)
     assert any(path.endswith("analysis/trim_svd.sh") for path in analysis_paths)
     assert len(manifest["analysis_commands"]) == 4
     assert Path(manifest["source_manifest"]).is_file()

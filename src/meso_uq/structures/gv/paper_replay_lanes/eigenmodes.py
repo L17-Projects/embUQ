@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from dataclasses import dataclass
 from math import isfinite
@@ -76,6 +77,18 @@ _SPECTRUM_ANNOTATION_LABELS = (
 )
 _EXACT_MODE_COUNT = 30
 _PAPER_BOX_CENTER = 12.5
+_REFERENCE_DIR = Path(__file__).resolve().parents[1] / "references"
+_FIGURE8G_REFERENCE_CSV = _REFERENCE_DIR / "eigenmodes_fig8g_digitized.csv"
+_FIGURE8G_MEAN_ABS_TOLERANCE = 1.0
+_FIGURE8G_MAX_ABS_TOLERANCE = 5.0
+_MODE_WINDOW_METADATA_CHANNELS = (
+    "raw_eigenpair_count",
+    "final_mode_count",
+    "final_mode_indices",
+    "selected_paper_mode_indices",
+    "selected_raw_mode_indices",
+    "mode_window_min_frequency_tau_inv",
+)
 
 
 @dataclass(frozen=True)
@@ -88,6 +101,9 @@ class EigenmodesPaperReplayPlan:
     runtime_options: GVRuntimeOptions
     mode_count: int
     paper_exact: bool
+    runtime_profile: str
+    mode_window_policy: str
+    mode_min_frequency_tau_inv: float
 
     def to_manifest(self) -> dict[str, object]:
         return {
@@ -103,6 +119,9 @@ class EigenmodesPaperReplayPlan:
             },
             "mode_count": self.mode_count,
             "paper_exact": self.paper_exact,
+            "runtime_profile": self.runtime_profile,
+            "mode_window_policy": self.mode_window_policy,
+            "mode_min_frequency_tau_inv": self.mode_min_frequency_tau_inv,
             "paper_exact_requirements": _paper_exact_requirements_manifest(),
         }
 
@@ -145,6 +164,9 @@ def plan_eigenmodes_paper_replay_lane(
     bpress: float = -91.0,
     mode_count: int = 30,
     paper_exact: bool = False,
+    runtime_profile: str | None = None,
+    mode_window_policy: str = "frequency-min",
+    mode_min_frequency_tau_inv: float = 22.5,
     output_root: str | Path = _DEFAULT_OUTPUT_ROOT,
     timeout_seconds: int = 7200,
 ) -> EigenmodesPaperReplayPlan:
@@ -155,6 +177,11 @@ def plan_eigenmodes_paper_replay_lane(
     resolved_mode_count = _EXACT_MODE_COUNT if resolved_paper_exact else int(mode_count)
     if resolved_mode_count <= 0:
         raise ValueError("Eigenmodes paper replay mode_count must be positive.")
+    resolved_profile = _resolve_runtime_profile(runtime_profile, paper_exact=resolved_paper_exact)
+    if mode_window_policy not in {"frequency-min", "raw-head", "explicit-indices"}:
+        raise ValueError("Eigenmodes mode_window_policy must be frequency-min, raw-head, or explicit-indices.")
+    if float(mode_min_frequency_tau_inv) <= 0.0:
+        raise ValueError("Eigenmodes mode_min_frequency_tau_inv must be positive.")
     validated_output_root = _validate_runs_root(output_root)
     runtime_options = GVRuntimeOptions(
         controls={"bpress": pressure},
@@ -170,7 +197,17 @@ def plan_eigenmodes_paper_replay_lane(
         runtime_options=runtime_options,
         mode_count=resolved_mode_count,
         paper_exact=resolved_paper_exact,
+        runtime_profile=resolved_profile,
+        mode_window_policy=str(mode_window_policy),
+        mode_min_frequency_tau_inv=float(mode_min_frequency_tau_inv),
     )
+
+
+def _resolve_runtime_profile(runtime_profile: str | None, *, paper_exact: bool) -> str:
+    selected = (runtime_profile or ("paper" if paper_exact else "canary")).strip().lower()
+    if selected not in {"paper", "canary"}:
+        raise ValueError("Eigenmodes runtime_profile must be 'paper' or 'canary'.")
+    return selected
 
 
 def run_eigenmodes_paper_replay_lane(
@@ -220,6 +257,9 @@ def _run_eigenmodes_paper_exact_single_point(plan: EigenmodesPaperReplayPlan) ->
         timeout_seconds=plan.runtime_options.timeout_seconds,
         env={
             "MESOUQ_GV_PAPER_EXACT": "1",
+            "MESOUQ_GV_EIGENMODES_PROFILE": plan.runtime_profile,
+            "MESOUQ_GV_EIGENMODES_MODE_WINDOW_POLICY": plan.mode_window_policy,
+            "MESOUQ_GV_EIGENMODES_MODE_MIN_FREQUENCY": str(plan.mode_min_frequency_tau_inv),
             "MESOUQ_GV_MATERIAL_OVERRIDES_JSON": json.dumps(
                 dict(plan.material_parameters),
                 sort_keys=True,
@@ -234,6 +274,12 @@ def _run_eigenmodes_paper_exact_single_point(plan: EigenmodesPaperReplayPlan) ->
         controls={"bpress": bpress},
         sweep=GVSweep("bpress", (bpress,)),
         geometry=geometry_payload,
+    )
+    window_manifest_path = Path(runtime.work_dir) / "analysis" / "output" / "mode_window_manifest.json"
+    window_manifest = (
+        json.loads(window_manifest_path.read_text(encoding="utf-8"))
+        if window_manifest_path.is_file()
+        else None
     )
     return {
         "experiment": "eigenmodes",
@@ -252,6 +298,7 @@ def _run_eigenmodes_paper_exact_single_point(plan: EigenmodesPaperReplayPlan) ->
         ),
         "work_dirs": (Path(runtime.work_dir),),
         "runtime_seconds": runtime_seconds,
+        "eigenmode_window_manifest": window_manifest,
         "status": "completed",
     }
 
@@ -424,6 +471,9 @@ def _normalize_eigenmode_channels(sample_payload: Mapping[str, Any], *, mode_cou
         preserved = _extract_auxiliary_channel(payload, channel_name, mode_count=mode_count)
         if preserved is not None:
             normalized[channel_name] = preserved
+    for channel_name in _MODE_WINDOW_METADATA_CHANNELS:
+        if channel_name in payload:
+            normalized[channel_name] = np.asarray(payload[channel_name], dtype=float)
     return normalized
 
 
@@ -639,12 +689,33 @@ def _resolve_selected_modes(channels: Mapping[str, np.ndarray]) -> dict[str, Any
     available_count = int(np.asarray(channels[_EIGENMODES_AXIS]).size)
     mode_shape_count = int(np.asarray(channels.get("eigenvectors", ())).shape[0]) if "eigenvectors" in channels else 0
     available_shape_count = min(available_count, mode_shape_count) if mode_shape_count else 0
-    return {
+    selected: dict[str, Any] = {
         "surface_mode_indices": list(_SELECTED_SURFACE_MODE_INDICES),
         "surface_mode_indices_available": [index for index in _SELECTED_SURFACE_MODE_INDICES if index < available_shape_count],
         "axial_mode_indices": list(_SELECTED_AXIAL_MODE_INDICES),
         "axial_mode_indices_available": [index for index in _SELECTED_AXIAL_MODE_INDICES if index < available_shape_count],
     }
+    if "raw_eigenpair_count" in channels:
+        selected["raw_eigenpair_count"] = int(np.asarray(channels["raw_eigenpair_count"]).reshape(-1)[0])
+    if "final_mode_count" in channels:
+        selected["final_mode_count"] = int(np.asarray(channels["final_mode_count"]).reshape(-1)[0])
+    if "selected_raw_mode_indices" in channels:
+        selected["selected_raw_mode_indices"] = [
+            int(value) for value in np.asarray(channels["selected_raw_mode_indices"]).reshape(-1)
+        ]
+    if "final_mode_indices" in channels:
+        selected["final_mode_indices"] = [
+            int(value) for value in np.asarray(channels["final_mode_indices"]).reshape(-1)
+        ]
+    if "selected_paper_mode_indices" in channels:
+        selected["selected_paper_mode_indices"] = [
+            int(value) for value in np.asarray(channels["selected_paper_mode_indices"]).reshape(-1)
+        ]
+    if "mode_window_min_frequency_tau_inv" in channels:
+        selected["mode_window_min_frequency_tau_inv"] = float(
+            np.asarray(channels["mode_window_min_frequency_tau_inv"]).reshape(-1)[0]
+        )
+    return selected
 
 
 def _extract_mode_shape_source(channels: Mapping[str, np.ndarray]) -> dict[str, np.ndarray] | None:
@@ -665,6 +736,9 @@ def _requested_mode_indices(
     full_mode_shape_plot: bool,
 ) -> list[int]:
     if full_mode_shape_plot:
+        selected = list(result.selected_modes.get("surface_mode_indices_available", ()))
+        if selected:
+            return selected
         return list(range(len(result.channels["mode_index"])))
     return list(result.selected_modes.get("surface_mode_indices_available", ()))
 
@@ -1035,6 +1109,9 @@ def _resolve_provenance(
         provenance["runtime_seconds"] = payload["runtime_seconds"]
     if "status" in payload:
         provenance["status"] = payload["status"]
+    window_manifest = payload.get("eigenmode_window_manifest")
+    if isinstance(window_manifest, Mapping):
+        provenance["eigenmode_window_manifest"] = dict(window_manifest)
     provenance["protocol_references"] = {
         "dropped_scripts_role": "Protocol references only; not operational source.",
         "canonical_replay_data": "Canonical eigenmode replay data come from Mirheo reruns.",
@@ -1044,7 +1121,62 @@ def _resolve_provenance(
     if plan is not None:
         provenance["lane_plan"] = plan.to_manifest()
         provenance["paper_exact"] = plan.paper_exact
+    if plan is not None and plan.paper_exact and "raw_eigenpair_count" in selected_modes:
+        provenance["figure8g_acceptance"] = evaluate_eigenmodes_figure8g_acceptance_from_channels(
+            payload.get("channels", {}),
+            reference_csv=_FIGURE8G_REFERENCE_CSV,
+        )
     return provenance
+
+
+def evaluate_eigenmodes_figure8g_acceptance_from_channels(
+    channels_like: object,
+    *,
+    reference_csv: str | Path = _FIGURE8G_REFERENCE_CSV,
+    mean_abs_tolerance: float = _FIGURE8G_MEAN_ABS_TOLERANCE,
+    max_abs_tolerance: float = _FIGURE8G_MAX_ABS_TOLERANCE,
+) -> dict[str, Any]:
+    channels = _coerce_mapping(channels_like, context="channels")
+    frequency = _select_frequency_payload(channels)
+    if frequency is None:
+        if "eigenvalues" not in channels:
+            raise ValueError("Figure 8(g) acceptance requires frequency or eigenvalues.")
+        kbt = _resolve_kbt({"channels": channels}, channels)
+        if kbt is None:
+            raise ValueError("Figure 8(g) acceptance requires kBT when eigenvalues are used.")
+        eigenvalues = np.asarray(channels["eigenvalues"], dtype=float)
+        frequency = np.sqrt(np.sort(kbt / eigenvalues)[: eigenvalues.size])
+    reference = _load_figure8g_reference(reference_csv)
+    count = min(int(frequency.size), int(reference.size), _EXACT_MODE_COUNT)
+    if count < _EXACT_MODE_COUNT:
+        raise ValueError(
+            f"Figure 8(g) acceptance requires {_EXACT_MODE_COUNT} modes; got {count}."
+        )
+    delta = np.asarray(frequency[:count], dtype=float) - np.asarray(reference[:count], dtype=float)
+    abs_delta = np.abs(delta)
+    mean_abs = float(np.mean(abs_delta))
+    max_abs = float(np.max(abs_delta))
+    return {
+        "reference": str(reference_csv),
+        "mode_count": count,
+        "mean_abs_error_tau_inv": mean_abs,
+        "max_abs_error_tau_inv": max_abs,
+        "mean_abs_tolerance_tau_inv": float(mean_abs_tolerance),
+        "max_abs_tolerance_tau_inv": float(max_abs_tolerance),
+        "passed": bool(mean_abs <= mean_abs_tolerance and max_abs <= max_abs_tolerance),
+        "tolerance_rationale": (
+            "Archive-backed MesoUQ replay matched digitized Figure 8(g) with mean absolute error "
+            "about 0.067 tau^-1 and max absolute error about 0.143 tau^-1; operational reruns "
+            "get wider stochastic tolerance but must remain near the paper spectrum."
+        ),
+    }
+
+
+def _load_figure8g_reference(path: str | Path) -> np.ndarray:
+    rows = np.genfromtxt(path, delimiter=",", names=True, dtype=float)
+    if rows.size == 0:
+        raise ValueError(f"Figure 8(g) reference is empty: {path}")
+    return np.atleast_1d(rows["omega_tau_inv"]).astype(float)
 
 
 def _validate_runs_output_path(output_path: str | Path) -> Path:
@@ -1053,8 +1185,18 @@ def _validate_runs_output_path(output_path: str | Path) -> Path:
 
 def _validate_runs_root(output_path: str | Path, *, label: str = "outputs") -> Path:
     path = Path(output_path)
-    if path.is_absolute() or ".." in path.parts:
+    if ".." in path.parts:
         raise ValueError(f"Paper replay {label} must be written under a relative _runs/ path.")
+    if path.is_absolute():
+        resolved = path.resolve()
+        runs_root = os.environ.get("MESOUQ_RUNS_ROOT")
+        if runs_root:
+            allowed_root = Path(runs_root).expanduser().resolve()
+            if resolved == allowed_root or allowed_root in resolved.parents:
+                return resolved
+        if any(parent.name == "_runs" for parent in resolved.parents):
+            return resolved
+        raise ValueError(f"Paper replay {label} must be written under _runs/ or MESOUQ_RUNS_ROOT.")
     if path.parts[:1] != ("_runs",):
         raise ValueError(f"Paper replay {label} must be written under _runs/.")
     return path

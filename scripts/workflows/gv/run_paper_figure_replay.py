@@ -19,7 +19,6 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from meso_uq.structures import get_structure  # noqa: E402
 from meso_uq.structures.gv.paper_replay import (  # noqa: E402
     CAMPAIGN_MANIFEST_FILENAME,
-    CAMPAIGN_RUN_ROOT,
     MANIFEST_SCHEMA_VERSION,
     GVPaperReplayCampaignManifest,
     GVPaperReplayDataRange,
@@ -112,6 +111,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="Optional executor timeout for long buckling paper sweeps.",
+    )
+    parser.add_argument(
+        "--eigenmodes-profile",
+        choices=("paper", "canary"),
+        default=None,
+        help="Optional GV eigenmodes runtime profile. Paper profile is full 40M; canary is short scaling-only.",
     )
     return parser
 
@@ -485,6 +490,7 @@ def _run_operational_lane(
     buckling_buck_max: float | None = None,
     buckling_point_count: int | None = None,
     buckling_timeout_seconds: int | None = None,
+    eigenmodes_profile: str | None = None,
 ) -> GVPaperReplayLaneRecord:
     try:
         previous_cwd = Path.cwd()
@@ -499,7 +505,6 @@ def _run_operational_lane(
             else profile.material_values()
         )
         geometry = profile.geometry.values()
-        lane_root_relative = CAMPAIGN_RUN_ROOT / campaign_id / "lanes" / lane
         lane_root = campaign_root / "lanes" / lane
         raw_provenance = profile.provenance.to_dict()
         raw_provenance["paper_replay_profile"] = profile_summary
@@ -511,7 +516,7 @@ def _run_operational_lane(
                 geometry_height=geometry["height"],
                 material_parameters=material_parameters,
                 paper_exact=paper_exact,
-                output_root=lane_root_relative,
+                output_root=lane_root,
                 raw_provenance=raw_provenance,
                 point_start=stretching_point_start,
                 point_stop=stretching_point_stop,
@@ -530,7 +535,7 @@ def _run_operational_lane(
                 geometry_height=geometry["height"],
                 material_parameters=material_parameters,
                 paper_exact=paper_exact,
-                output_root=lane_root_relative,
+                output_root=lane_root,
                 raw_provenance=raw_provenance,
             )
             result = run_torsion_paper_replay_lane(plan)
@@ -543,7 +548,7 @@ def _run_operational_lane(
                 buck=0.75 if buckling_buck_max is None else float(buckling_buck_max),
                 buck_point_count=buckling_point_count,
                 paper_exact=paper_exact,
-                output_root=lane_root_relative,
+                output_root=lane_root,
                 timeout_seconds=int(
                     buckling_timeout_seconds
                     if buckling_timeout_seconds is not None
@@ -553,7 +558,7 @@ def _run_operational_lane(
             result = run_buckling_paper_replay_lane(plan)
             plot_path = plot_buckling_paper_replay(
                 result,
-                output_path=lane_root_relative / "plots" / "buckling_relative_volume.png",
+                output_path=lane_root / "plots" / "buckling_relative_volume.png",
             )
             plot_paths = (plot_path.resolve(),)
         elif lane == "eigenmodes":
@@ -564,13 +569,14 @@ def _run_operational_lane(
                 bpress=-91.0,
                 mode_count=30,
                 paper_exact=paper_exact,
-                output_root=lane_root_relative,
+                runtime_profile=eigenmodes_profile,
+                output_root=lane_root,
                 timeout_seconds=int(os.environ.get("MESOUQ_GV_EIGENMODES_TIMEOUT_SECONDS", "7200")),
             )
             result = run_eigenmodes_paper_replay_lane(plan)
             plot_path = plot_eigenmodes_paper_replay(
                 result,
-                output_path=lane_root_relative / "plots" / "eigenmode_spectrum.png",
+                output_path=lane_root / "plots" / "eigenmode_spectrum.png",
             )
             plot_paths = (plot_path.resolve(),)
         else:
@@ -644,6 +650,7 @@ def main(argv: list[str] | None = None) -> int:
                         buckling_buck_max=args.buckling_buck_max,
                         buckling_point_count=args.buckling_point_count,
                         buckling_timeout_seconds=args.buckling_timeout_seconds,
+                        eigenmodes_profile=args.eigenmodes_profile,
                     )
                 )
 

@@ -23,6 +23,32 @@ import trimesh
 import yaml
 import argparse
 
+
+def _parse_domain_ranks(raw_value):
+    text = str(raw_value).strip()
+    if not text:
+        raise ValueError("Mirheo domain ranks must not be empty.")
+    tokens = text.replace("x", ",").replace("X", ",").split(",")
+    if len(tokens) == 1:
+        tokens = text.split()
+    if len(tokens) != 3:
+        raise ValueError(
+            "Mirheo domain ranks must have three positive integers, "
+            "for example '1,1,1' or '2x1x1'."
+        )
+    try:
+        ranks = tuple(int(token.strip()) for token in tokens)
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid Mirheo domain ranks {raw_value!r}; expected three positive integers."
+        ) from exc
+    if any(rank <= 0 for rank in ranks):
+        raise ValueError(
+            f"Invalid Mirheo domain ranks {raw_value!r}; each rank must be positive."
+        )
+    return ranks
+
+
 ######################################################
 # set-up simulation type: equilibration or restart
 
@@ -31,8 +57,16 @@ group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument('--equil', action = 'store_true', default = None)
 group.add_argument('--restart', action = 'store_true', default = None)
 parser.add_argument('--simnum', dest = 'simnum', default = '00001')
+parser.add_argument(
+    '--domain-ranks',
+    dest='domain_ranks',
+    default=os.environ.get("MESOUQ_GV_EIGENMODES_DOMAIN_RANKS", "1,1,1"),
+    help="Mirheo domain decomposition as X,Y,Z or XxYxZ.",
+)
 
 args = parser.parse_args()
+ranks = _parse_domain_ranks(args.domain_ranks)
+print(f"Mirheo domain ranks: {ranks}")
 
 dir_name = 'restart'
 if(args.restart):
@@ -92,7 +126,6 @@ mg = parameters["mg"]
 
 pos_q = np.reshape(np.loadtxt('posq.txt'), (-1, 7))
 
-ranks = (1, 1, 1)
 domain = (Lx, Ly, Lz)
 
 ######################################################

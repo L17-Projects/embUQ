@@ -33,6 +33,7 @@ _SOURCE_FILES = tuple(
         _ANALYSIS_ROOT / "run.sh",
         _ANALYSIS_ROOT / "run_an.sh",
         _ANALYSIS_ROOT / "run_eig.sh",
+        _ANALYSIS_ROOT / "trim_eigenmodes.py",
         _ANALYSIS_ROOT / "trim.sh",
         _ANALYSIS_ROOT / "trim_svd.sh",
     )
@@ -75,7 +76,7 @@ EIGENMODES_RUNTIME_DESCRIPTOR = RuntimeDescriptor(
         DryRunCommand(
             argv=("bash", "trim_svd.sh", "30"),
             cwd="{work_dir}/analysis",
-            description="Trim the staged eigenpairs to the default reported mode count.",
+            description="Trim raw eigenpairs to the configured paper-mode window and write mode_window_manifest.json.",
         ),
     ),
     generate_script="generate.py",
@@ -83,6 +84,8 @@ EIGENMODES_RUNTIME_DESCRIPTOR = RuntimeDescriptor(
         "Imported from `run_all.sh`: `python3 generate.py -p bpress -91.0 -91.0 1 --object gv --forward --first`.",
         "Background pressure remains a runtime control and is excluded from calibrated GV parameters.",
         f"Default geometry provenance remains `{DEFAULT_GV_GEOMETRY.source}`.",
+        "Mirheo domain decomposition is configured through `MESOUQ_GV_EIGENMODES_DOMAIN_RANKS`, `run.sh` argument 4, or `equil.py --domain-ranks`.",
+        "Eigenmode paper-window trimming is configured through `MESOUQ_GV_EIGENMODES_MODE_WINDOW_POLICY` and recorded in `analysis/output/mode_window_manifest.json`.",
         "Analysis provenance is recorded through `source_files` and `analysis_commands`; no MDAnalysis or plotting dependency is imported at module load.",
     ),
 )

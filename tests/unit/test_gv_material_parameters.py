@@ -258,6 +258,8 @@ def test_gv_eigenmodes_run_script_applies_material_hook_with_postprocess_rank_de
     text = run_script.read_text(encoding="utf-8")
 
     assert "nranks=${3:-${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}}" in text
+    assert "domain_ranks=${4:-${MESOUQ_GV_EIGENMODES_DOMAIN_RANKS:-1,1,1}}" in text
+    assert '--domain-ranks "${domain_ranks}"' in text
     assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in text
     assert "python3 -m meso_uq.structures.gv.material_parameters" in text
     assert "parameters.prms${simnum}.yaml" in text
@@ -304,17 +306,26 @@ def test_gv_buckling_can_route_bpress_membrane_load_modes() -> None:
     assert "ODPD" in text
 
 
-def test_gv_eigenmodes_generator_allocates_postprocess_rank() -> None:
+def test_gv_eigenmodes_generator_uses_domain_aware_mpi_rank_default() -> None:
     generate_script = Path("gv/eigenmodes/src/generate.py")
     text = generate_script.read_text(encoding="utf-8")
 
     assert "MESOUQ_GV_EIGENMODES_MPI_RANKS" in text
     assert "MESOUQ_GV_EIGENMODES_NUMSTEPS" in text
     assert "MESOUQ_GV_EIGENMODES_NUMSTEPS_EQ" in text
+    assert "MESOUQ_GV_EIGENMODES_DOMAIN_RANKS" in text
+    assert "MESOUQ_GV_EIGENMODES_PROFILE" in text
+    assert "MESOUQ_GV_EIGENMODES_MODE_WINDOW_POLICY" in text
+    assert "MESOUQ_GV_EIGENMODES_MODE_MIN_FREQUENCY" in text
+    assert "MESOUQ_GV_EIGENMODES_MODE_COUNT" in text
+    assert "configured_final_mode_count" in text
+    assert "selected_paper_mode_indices" in text
     assert "MESOUQ_GV_MIRHEO_MODULE" in text
     assert "MESOUQ_GV_MPI_RANKS" not in text
-    assert "str(num_gpus + 1)" in text
-    assert "write_commands('commands.txt', 'run.sh', f'{num_mpi_ranks}')" in text
+    assert "def _default_mpi_ranks" in text
+    assert "return 2 * product" in text
+    assert "str(_default_mpi_ranks(domain_ranks))" in text
+    assert "write_commands('commands.txt', 'run.sh', f'{num_mpi_ranks} {domain_ranks}')" in text
     assert "#SBATCH --ntasks-per-node={num_mpi_ranks}" in text
 
 

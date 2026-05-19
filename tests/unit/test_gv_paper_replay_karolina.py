@@ -35,6 +35,7 @@ def test_gv_paper_figure_replay_karolina_template_uses_public_command_and_karoli
     assert "#SBATCH --ntasks=2" in text
     assert 'MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"' in text
     assert 'MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"' in text
+    assert 'MESOUQ_GV_EIGENMODES_DOMAIN_RANKS="${MESOUQ_GV_EIGENMODES_DOMAIN_RANKS:-1,1,1}"' in text
 
 
 def test_gv_paper_figure_replay_karolina_submitter_sets_lane_aware_walltime() -> None:

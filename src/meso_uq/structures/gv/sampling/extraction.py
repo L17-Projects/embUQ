@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 from typing import Mapping
 
@@ -371,17 +372,28 @@ def _extract_torsion_forward_sweep(
 
 def _extract_eigenmodes(root: Path, *, mode_count: int = 30) -> dict[str, np.ndarray]:
     output_dir = root / "analysis" / "output"
+    raw_eigenvalue_path = _optional_existing(output_dir / "eigvalues.txt", root / "eigvalues.txt")
+    mode_window_manifest_path = _optional_existing(output_dir / "mode_window_manifest.json", root / "mode_window_manifest.json")
+    mode_window_manifest = _read_json_mapping(mode_window_manifest_path) if mode_window_manifest_path is not None else {}
     eigenvalue_path = _first_existing(
         output_dir / "eigvalues_new.txt",
         output_dir / "eigvalues.txt",
+        root / "eigvalues_new.txt",
+        root / "eigvalues.txt",
     )
     if not eigenvalue_path.read_text(encoding="utf-8").strip():
         raise GVSamplingExtractionError(f"Eigenmodes file contains no eigenvalues: {eigenvalue_path}")
     eigenvalues = np.atleast_1d(np.loadtxt(eigenvalue_path, dtype=float))
     if eigenvalues.size == 0:
         raise GVSamplingExtractionError(f"Eigenmodes file contains no eigenvalues: {eigenvalue_path}")
+    raw_eigenvalues = (
+        np.atleast_1d(np.loadtxt(raw_eigenvalue_path, dtype=float))
+        if raw_eigenvalue_path is not None
+        else eigenvalues
+    )
     count = min(int(mode_count), int(eigenvalues.size))
-    kbt = _read_yaml_scalar(root / "parameter" / "parameters00001.yaml", "kbt", default=1.0)
+    parameter_path = _optional_existing(root / "parameter" / "parameters00001.yaml", root / "parameters00001.yaml")
+    kbt = _read_yaml_scalar(parameter_path, "kbt", default=1.0) if parameter_path is not None else 1.0
     selected_eigenvalues = np.asarray(eigenvalues[:count], dtype=float)
     if np.any(selected_eigenvalues <= 0.0):
         raise GVSamplingExtractionError(f"Eigenmodes eigenvalues must be positive: {eigenvalue_path}")
@@ -390,23 +402,93 @@ def _extract_eigenmodes(root: Path, *, mode_count: int = 30) -> dict[str, np.nda
         "eigenvalues": selected_eigenvalues,
         "kBT": np.asarray([kbt], dtype=float),
         "eigenfrequencies": np.sqrt(np.sort(kbt / selected_eigenvalues)[:count]),
+        "raw_eigenpair_count": np.asarray([float(raw_eigenvalues.size)], dtype=float),
+        "final_mode_count": np.asarray([float(count)], dtype=float),
+        "final_mode_indices": _mode_window_indices(
+            mode_window_manifest,
+            key="final_mode_indices",
+            count=count,
+            default=np.arange(count, dtype=int),
+        ).astype(float),
+        "selected_paper_mode_indices": _mode_window_indices(
+            mode_window_manifest,
+            key="selected_paper_mode_indices",
+            count=count,
+            default=np.arange(count, dtype=int),
+        ).astype(float),
     }
-    vector_path = _optional_existing(output_dir / "eigvectors_new.txt", output_dir / "eigvectors.txt")
+    selected_raw_indices = _mode_window_indices(
+        mode_window_manifest,
+        key="selected_raw_mode_indices",
+        count=count,
+        default=None,
+    )
+    if selected_raw_indices is not None:
+        channels["selected_raw_mode_indices"] = selected_raw_indices.astype(float)
+    mode_min_frequency = mode_window_manifest.get("min_frequency_tau_inv")
+    if mode_min_frequency is not None:
+        channels["mode_window_min_frequency_tau_inv"] = np.asarray([float(mode_min_frequency)], dtype=float)
+    vector_path = _optional_existing(
+        output_dir / "eigvectors_new.txt",
+        output_dir / "eigvectors.txt",
+        root / "eigvectors_new.txt",
+        root / "eigvectors.txt",
+    )
     if vector_path is not None:
         vectors = np.atleast_1d(np.loadtxt(vector_path, dtype=float))
         if vectors.ndim == 1:
             channels["eigenvectors"] = vectors[:count]
         else:
             channels["eigenvectors"] = vectors[:count, ...]
-    reference_path = _optional_existing(root / "analysis" / "emb_0000000.xyz", output_dir / "ref1.xyz")
+    reference_path = _optional_existing(
+        root / "analysis" / "emb_0000000.xyz",
+        output_dir / "ref1.xyz",
+        root / "emb_0000000.xyz",
+        root / "ref1.xyz",
+    )
     if reference_path is not None:
         channels["reference_positions"] = _read_xyz_positions(reference_path)
-    mesh_path = _optional_existing(root / "mesh" / "gv00001.off", root / "gas_vesicle" / "gv.off")
+    mesh_path = _optional_existing(
+        root / "mesh" / "gv00001.off",
+        root / "gas_vesicle" / "gv.off",
+        root / "gv00001.off",
+        root / "gv.off",
+    )
     if mesh_path is not None:
         _, faces = _read_off_mesh(mesh_path)
         if faces.size:
             channels["mesh_faces"] = faces.astype(float)
     return channels
+
+
+def _read_json_mapping(path: Path) -> dict[str, object]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise GVSamplingExtractionError(f"Invalid JSON mode-window manifest: {path}") from exc
+    if not isinstance(payload, dict):
+        raise GVSamplingExtractionError(f"Mode-window manifest must be a JSON object: {path}")
+    return payload
+
+
+def _mode_window_indices(
+    manifest: Mapping[str, object],
+    *,
+    key: str,
+    count: int,
+    default: np.ndarray | None,
+) -> np.ndarray | None:
+    raw_indices = manifest.get(key)
+    if raw_indices is None:
+        return None if default is None else np.asarray(default, dtype=int)
+    indices = np.asarray(raw_indices, dtype=float)
+    if indices.ndim != 1 or indices.size < count:
+        raise GVSamplingExtractionError(f"Mode-window manifest {key} has invalid shape.")
+    if not np.all(np.isfinite(indices)) or not np.all(np.equal(indices, np.floor(indices))):
+        raise GVSamplingExtractionError(f"Mode-window manifest {key} must contain finite integer indices.")
+    if np.any(indices < 0):
+        raise GVSamplingExtractionError(f"Mode-window manifest {key} must contain non-negative indices.")
+    return indices[:count].astype(int)
 
 
 def _stretching_paper_metrics(root: Path, *, geometry: GVMaterialGeometry) -> dict[str, float]:

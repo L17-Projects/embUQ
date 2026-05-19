@@ -98,6 +98,9 @@ package-dir = {"" = "src"}
 where = ["src"]
 include = ["meso_uq*", "learning*"]
 
+[tool.setuptools.package-data]
+"meso_uq.structures.gv" = ["references/*.csv"]
+
 [tool.pytest.ini_options]
 addopts = ["-ra", "--tb=short"]
 markers = [

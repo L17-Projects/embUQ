@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+import os
+from dataclasses import dataclass
 from math import isfinite
 from pathlib import Path
 import time
@@ -834,8 +835,18 @@ def _validate_runs_output_path(output_path: str | Path) -> Path:
 
 def _validate_runs_root(output_path: str | Path, *, label: str = "outputs") -> Path:
     path = Path(output_path)
-    if path.is_absolute() or ".." in path.parts:
+    if ".." in path.parts:
         raise ValueError(f"Paper replay {label} must be written under a relative _runs/ path.")
+    if path.is_absolute():
+        resolved = path.resolve()
+        runs_root = os.environ.get("MESOUQ_RUNS_ROOT")
+        if runs_root:
+            allowed_root = Path(runs_root).expanduser().resolve()
+            if resolved == allowed_root or allowed_root in resolved.parents:
+                return resolved
+        if any(parent.name == "_runs" for parent in resolved.parents):
+            return resolved
+        raise ValueError(f"Paper replay {label} must be written under _runs/ or MESOUQ_RUNS_ROOT.")
     if path.parts[:1] != ("_runs",):
         raise ValueError(f"Paper replay {label} must be written under _runs/.")
     return path

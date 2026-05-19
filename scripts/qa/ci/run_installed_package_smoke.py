@@ -73,6 +73,9 @@ SMOKE_MODULES = (
     "meso_uq.site_runtime",
     "meso_uq.workflows.legacy",
 )
+PACKAGE_DATA_FILES = (
+    ("meso_uq.structures.gv", "references/eigenmodes_fig8g_digitized.csv"),
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -226,7 +229,7 @@ def _dependency_path_entries(repo_root: Path) -> tuple[str, ...]:
 
 def _install_wheel(python_bin: Path, wheel_path: Path) -> None:
     _run_logged_command(
-        [str(python_bin), "-m", "pip", "install", "--no-deps", str(wheel_path)],
+        [str(python_bin), "-m", "pip", "install", "--force-reinstall", "--no-deps", str(wheel_path)],
         cwd=wheel_path.parent,
     )
 
@@ -236,6 +239,7 @@ def _render_smoke_probe(
     repo_root: Path,
     modules: Sequence[str] = SMOKE_MODULES,
     heavy_modules: Sequence[str] = HEAVY_OPTIONAL_MODULES,
+    package_data_files: Sequence[tuple[str, str]] = PACKAGE_DATA_FILES,
     dependency_paths: Sequence[str] = (),
 ) -> str:
     return textwrap.dedent(
@@ -243,6 +247,7 @@ def _render_smoke_probe(
         from __future__ import annotations
 
         import importlib
+        import importlib.resources
         import json
         import pathlib
         import sys
@@ -251,6 +256,7 @@ def _render_smoke_probe(
         SRC_ROOT = (REPO_ROOT / "src").resolve()
         MODULES = {tuple(modules)!r}
         HEAVY_MODULES = {tuple(heavy_modules)!r}
+        PACKAGE_DATA_FILES = {tuple(package_data_files)!r}
         DEPENDENCY_PATHS = {tuple(dependency_paths)!r}
 
         def _is_repo_path(entry: str) -> bool:
@@ -318,6 +324,13 @@ def _render_smoke_probe(
                 raise RuntimeError("lightweight smoke loaded optional heavy modules: " + ", ".join(loaded_heavy))
             if leaked_origins:
                 raise RuntimeError("repository-root import leakage detected: " + "; ".join(leaked_origins))
+            missing_data = []
+            for package_name, relative_path in PACKAGE_DATA_FILES:
+                resource = importlib.resources.files(package_name).joinpath(relative_path)
+                if not resource.is_file():
+                    missing_data.append(f"{{package_name}}/{{relative_path}}")
+            if missing_data:
+                raise RuntimeError("installed package missing data files: " + ", ".join(missing_data))
         except Exception as exc:
             raise RuntimeError(
                 "installed-package smoke failed; pruned repo-root sys.path entries: "
@@ -341,6 +354,7 @@ def _run_smoke_probe(
         repo_root=repo_root,
         modules=modules,
         heavy_modules=heavy_modules,
+        package_data_files=PACKAGE_DATA_FILES,
         dependency_paths=_dependency_path_entries(repo_root),
     )
     env = {key: value for key, value in os.environ.items() if key not in {"PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV", "CONDA_PREFIX"}}

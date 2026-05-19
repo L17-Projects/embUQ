@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -62,6 +63,30 @@ def _ensure_under_root(path: Path, root: Path, *, field_name: str) -> Path:
     if resolved != base and base not in resolved.parents:
         raise ValueError(f"{field_name} must live under {base}.")
     return resolved
+
+
+def _allowed_campaign_parents(repo_root: Path) -> tuple[Path, ...]:
+    parents = [(repo_root.resolve() / CAMPAIGN_RUN_ROOT).resolve()]
+    runs_root = os.environ.get("MESOUQ_RUNS_ROOT")
+    if runs_root:
+        parents.append((_resolve_path(runs_root) / "gv" / "figure_replay").resolve())
+    extra_roots = os.environ.get("MESOUQ_GV_PAPER_REPLAY_RUN_ROOTS", "")
+    for raw_root in extra_roots.split(os.pathsep):
+        root = raw_root.strip()
+        if root:
+            parents.append(_resolve_path(root).resolve())
+    return tuple(dict.fromkeys(parents))
+
+
+def _campaign_artifact_root(campaign_root: Path) -> Path:
+    resolved = campaign_root.resolve()
+    if (
+        len(resolved.parents) >= 3
+        and resolved.parent.name == "figure_replay"
+        and resolved.parent.parent.name == "gv"
+    ):
+        return resolved.parents[2]
+    return resolved.parent
 
 
 def _manifest_safe(value: Any) -> Any:
@@ -345,8 +370,10 @@ def resolve_campaign_root(
     if output_root is None:
         return expected_root
     resolved = _resolve_path(output_root)
-    allowed_parent = (repo_root.resolve() / CAMPAIGN_RUN_ROOT).resolve()
-    _ensure_under_root(resolved, allowed_parent, field_name="output_root")
+    allowed_parents = _allowed_campaign_parents(repo_root)
+    if not any(resolved.parent == parent for parent in allowed_parents):
+        allowed = ", ".join(str(parent) for parent in allowed_parents)
+        raise ValueError(f"output_root must live under one of: {allowed}.")
     if resolved.name != normalized_id:
         raise ValueError("output_root leaf directory must match campaign_id.")
     return resolved
@@ -377,9 +404,8 @@ def validate_campaign_manifest(
     *,
     write_safe: bool = False,
 ) -> dict[str, Any]:
-    repo_root = manifest.campaign_root.resolve().parents[3]
-    expected_parent = (repo_root / CAMPAIGN_RUN_ROOT).resolve()
-    campaign_root = _ensure_under_root(manifest.campaign_root, expected_parent, field_name="campaign_root")
+    campaign_root = manifest.campaign_root.resolve()
+    artifact_root = _campaign_artifact_root(campaign_root)
     if campaign_root.name != manifest.campaign_id:
         raise ValueError("campaign_root leaf directory must match campaign_id.")
     source_pdfs = _validate_source_pdf_paths(manifest.source_pdfs)
@@ -390,9 +416,9 @@ def validate_campaign_manifest(
             raise ValueError(f"Duplicate lane record {lane.lane!r} in campaign manifest.")
         lane_ids.add(lane.lane)
         for path in lane.output_paths.values():
-            _ensure_under_root(path, repo_root / "_runs", field_name=f"lane[{lane.lane}].output_path")
+            _ensure_under_root(path, artifact_root, field_name=f"lane[{lane.lane}].output_path")
         for path in lane.plot_paths:
-            _ensure_under_root(path, repo_root / "_runs", field_name=f"lane[{lane.lane}].plot_path")
+            _ensure_under_root(path, artifact_root, field_name=f"lane[{lane.lane}].plot_path")
         for check in lane.finite_checks:
             if not check.passed:
                 finite_failures += 1

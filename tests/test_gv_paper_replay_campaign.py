@@ -420,7 +420,10 @@ def test_comparison_packet_skeleton_marks_qualitative_review_ready(tmp_path: Pat
     assert packet.to_manifest()["metrics"] == {"qualitative": None}
 
 
-def test_resolve_campaign_root_restricts_output_location(tmp_path: Path) -> None:
+def test_resolve_campaign_root_restricts_output_location(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("MESOUQ_RUNS_ROOT", raising=False)
+    monkeypatch.delenv("MESOUQ_GV_PAPER_REPLAY_RUN_ROOTS", raising=False)
+
     resolved = resolve_campaign_root(repo_root=tmp_path, campaign_id="campaign-001")
     assert resolved == tmp_path / "_runs" / "gv" / "figure_replay" / "campaign-001"
     explicit = resolve_campaign_root(
@@ -443,6 +446,70 @@ def test_resolve_campaign_root_restricts_output_location(tmp_path: Path) -> None
             campaign_id="campaign-001",
             output_root=tmp_path / "_runs" / "gv" / "figure_replay" / "other",
         )
+
+
+def test_resolve_campaign_root_accepts_external_runs_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runs_root = tmp_path / "scratch" / "runs"
+    campaign_root = runs_root / "gv" / "figure_replay" / "campaign-001"
+    monkeypatch.setenv("MESOUQ_RUNS_ROOT", str(runs_root))
+
+    resolved = resolve_campaign_root(
+        repo_root=tmp_path,
+        campaign_id="campaign-001",
+        output_root=campaign_root,
+    )
+
+    assert resolved == campaign_root.resolve()
+
+
+def test_campaign_manifest_validation_accepts_external_runs_root(tmp_path: Path) -> None:
+    campaign_root = tmp_path / "scratch" / "runs" / "gv" / "figure_replay" / "paper-fixture"
+    lane = build_fixture_lane_record(
+        repo_root=tmp_path,
+        campaign_root=campaign_root,
+        lane="stretching",
+        source_pdfs=(_source_pdf(tmp_path),),
+        fixture_mode=True,
+    )
+    manifest = GVPaperReplayCampaignManifest(
+        campaign_id="paper-fixture",
+        campaign_root=campaign_root,
+        generated_at_utc="2026-05-05T12:00:00+00:00",
+        schema_version=MANIFEST_SCHEMA_VERSION,
+        git_head=GVPaperReplayGitHead(commit="deadbeef", branch="feature/test", dirty_worktree=False),
+        dry_run=False,
+        fixture_mode=True,
+        source_pdfs=lane.source_pdfs,
+        lanes=(lane,),
+        comparison_packets=build_comparison_packet_skeletons((lane,)),
+    )
+
+    assert validate_campaign_manifest(manifest)["status"] == "passed"
+
+
+def test_campaign_manifest_validation_accepts_custom_campaign_parent(tmp_path: Path) -> None:
+    campaign_root = tmp_path / "scratch" / "paper-replay-campaigns" / "paper-fixture"
+    lane = build_fixture_lane_record(
+        repo_root=tmp_path,
+        campaign_root=campaign_root,
+        lane="stretching",
+        source_pdfs=(_source_pdf(tmp_path),),
+        fixture_mode=True,
+    )
+    manifest = GVPaperReplayCampaignManifest(
+        campaign_id="paper-fixture",
+        campaign_root=campaign_root,
+        generated_at_utc="2026-05-05T12:00:00+00:00",
+        schema_version=MANIFEST_SCHEMA_VERSION,
+        git_head=GVPaperReplayGitHead(commit="deadbeef", branch="feature/test", dirty_worktree=False),
+        dry_run=False,
+        fixture_mode=True,
+        source_pdfs=lane.source_pdfs,
+        lanes=(lane,),
+        comparison_packets=build_comparison_packet_skeletons((lane,)),
+    )
+
+    assert validate_campaign_manifest(manifest)["status"] == "passed"
 
 
 def test_load_lane_record_fixture_round_trips_json_payload(tmp_path: Path) -> None:
@@ -750,6 +817,7 @@ def test_operational_lane_record_writes_finite_summary(tmp_path: Path, monkeypat
         assert kwargs["paper_exact"] is True
         assert kwargs["point_start"] == 3
         assert kwargs["point_stop"] == 8
+        assert kwargs["output_root"] == tmp_path / "_runs" / "gv" / "figure_replay" / "op" / "lanes" / "stretching"
         return SimpleNamespace(
             campaign_id=kwargs["campaign_id"],
             geometry_radius=kwargs["geometry_radius"],
@@ -914,6 +982,7 @@ def test_operational_lane_dispatch_covers_all_non_stretching_lanes(
 
     def fake_plan(**kwargs):
         plan_kwargs.append(dict(kwargs))
+        assert kwargs["output_root"] == tmp_path / "_runs" / "gv" / "figure_replay" / "op" / "lanes" / lane
         return SimpleNamespace(
             experiment=lane,
             figure_id=f"fixture-{lane}",

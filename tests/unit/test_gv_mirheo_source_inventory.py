@@ -76,6 +76,7 @@ REQUIRED_FILES = {
         "analysis/run.sh",
         "analysis/run_an.sh",
         "analysis/run_eig.sh",
+        "analysis/trim_eigenmodes.py",
         "analysis/trim.sh",
         "analysis/trim_svd.sh",
     ),

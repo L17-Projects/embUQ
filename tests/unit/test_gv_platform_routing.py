@@ -328,16 +328,35 @@ def test_gv_eigenmodes_runtime_allocates_postprocess_rank_by_default() -> None:
     assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in generate_contents
     assert "MESOUQ_GV_MIRHEO_MODULE" in generate_contents
     assert "MESOUQ_GV_EIGENMODES_MPI_RANKS" in generate_contents
-    assert "num_mpi_ranks = int(os.environ.get('MESOUQ_GV_EIGENMODES_MPI_RANKS', str(num_gpus + 1)))" in generate_contents
+    assert "def _default_mpi_ranks" in generate_contents
+    assert "return 2 * product" in generate_contents
+    assert "str(_default_mpi_ranks(domain_ranks))" in generate_contents
     assert "MESOUQ_GV_PAPER_EXACT" in generate_contents
+    assert "'numsteps': 40000000" in generate_contents
+    assert "'numsteps_eq': 500000" in generate_contents
+    assert "'stslik': 200000" in generate_contents
     assert "'numsteps': 4000000" in generate_contents
     assert "'stslik': 20000" in generate_contents
+    assert "MESOUQ_GV_EIGENMODES_PROFILE" in generate_contents
+    assert "MESOUQ_GV_EIGENMODES_MODE_WINDOW_POLICY" in generate_contents
+    assert "MESOUQ_GV_EIGENMODES_MODE_MIN_FREQUENCY" in generate_contents
+    assert "MESOUQ_GV_EIGENMODES_MODE_COUNT" in generate_contents
+    assert "'configured_final_mode_count': mode_count" in generate_contents
+    assert "'selected_paper_mode_indices': list(range(mode_count))" in generate_contents
     assert "MESOUQ_GV_EIGENMODES_NUMSTEPS" in generate_contents
     assert "MESOUQ_GV_EIGENMODES_STSLIK" in generate_contents
+    assert "MESOUQ_GV_EIGENMODES_DOMAIN_RANKS" in generate_contents
+    assert "domain_ranks = _format_domain_ranks(" in generate_contents
     assert "'gamma_dpd_gas': 3.0" in generate_contents
     assert "MESOUQ_GV_MPI_RANKS" not in generate_contents
     assert "nranks=${3:-${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}}" in run_contents
-    assert "mpirun --bind-to none -np ${nranks}" in run_contents
+    assert "domain_ranks=${4:-${MESOUQ_GV_EIGENMODES_DOMAIN_RANKS:-1,1,1}}" in run_contents
+    assert '--domain-ranks "${domain_ranks}"' in run_contents
+    assert 'mpirun --bind-to none -np "${nranks}"' in run_contents
+    equil_contents = Path("gv/eigenmodes/src/equil.py").read_text(encoding="utf-8")
+    assert "def _parse_domain_ranks" in equil_contents
+    assert "MESOUQ_GV_EIGENMODES_DOMAIN_RANKS" in equil_contents
+    assert "parser.add_argument(\n    '--domain-ranks'" in equil_contents
 
 
 @pytest.mark.parametrize("experiment_name", ("stretching", "buckling", "torsion"))

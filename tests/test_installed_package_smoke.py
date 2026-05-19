@@ -53,6 +53,10 @@ def test_parser_defaults_and_smoke_surface_modules():
     assert "meso_uq.plotting.contracts" in module.SMOKE_MODULES
     assert "meso_uq.reporting.contracts" in module.SMOKE_MODULES
     assert module.HEAVY_OPTIONAL_MODULES == ("torch", "pyro", "matplotlib", "mpi4py", "mirheo", "korali", "slurm")
+    assert (
+        "meso_uq.structures.gv",
+        "references/eigenmodes_fig8g_digitized.csv",
+    ) in module.PACKAGE_DATA_FILES
 
 
 def test_wheel_resolution_prefers_the_latest_candidate(tmp_path):
@@ -109,6 +113,8 @@ def test_rendered_probe_reports_repo_root_and_heavy_module_guards(tmp_path):
 
     assert "repository-root import leakage detected" in probe
     assert "lightweight smoke loaded optional heavy modules" in probe
+    assert "installed package missing data files" in probe
+    assert "references/eigenmodes_fig8g_digitized.csv" in probe
     assert "_is_site_packages_path" in probe
     assert "meso_uq.public_api" in probe
     assert "torch" in probe
