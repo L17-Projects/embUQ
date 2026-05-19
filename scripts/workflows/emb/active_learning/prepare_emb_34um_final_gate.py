@@ -203,7 +203,8 @@ def _submission_command(
             f"MODE={shlex.quote(mode)},"
             "EXECUTION_MODE=execute,"
             f"CONCURRENT_JOBS={concurrent_jobs},"
-            f"RETRY_LIMIT={retry_limit} "
+            f"RETRY_LIMIT={retry_limit},"
+            f"PYTHON_EXECUTABLE={shlex.quote(sys.executable)} "
             f"{shlex.quote(str(sbatch_script))}"
         ),
         "mode": mode,

@@ -33,7 +33,19 @@ RUN_ID_PREFIX="${RUN_ID_PREFIX:-emb-34um-final-gate}"
 CAMPAIGN_ROOT="${CAMPAIGN_ROOT:-}"
 CONCURRENT_JOBS="${CONCURRENT_JOBS:-30}"
 RETRY_LIMIT="${RETRY_LIMIT:-3}"
-PYTHON_EXECUTABLE="${PYTHON_EXECUTABLE:-python}"
+if [[ -z "${PYTHON_EXECUTABLE:-}" ]]; then
+  PYTHON_EXECUTABLE="$(command -v python || true)"
+else
+  PYTHON_EXECUTABLE_RESOLVED="$(command -v "${PYTHON_EXECUTABLE}" || true)"
+  if [[ -n "${PYTHON_EXECUTABLE_RESOLVED}" ]]; then
+    PYTHON_EXECUTABLE="${PYTHON_EXECUTABLE_RESOLVED}"
+  fi
+fi
+if [[ -z "${PYTHON_EXECUTABLE}" || ! -x "${PYTHON_EXECUTABLE}" ]]; then
+  echo "Unable to resolve an executable Python interpreter after loading the MesoUQ environment." >&2
+  exit 2
+fi
+export PYTHON_EXECUTABLE
 RUNNER_SCRIPT="${RUNNER_SCRIPT:-${REPO_ROOT}/scripts/workflows/emb/active_learning/run_emb_34um_final_gate_candidate.py}"
 
 if [[ -z "${TIMESTAMP}" ]]; then
@@ -72,6 +84,7 @@ echo "Campaign root: ${CAMPAIGN_ROOT}"
 echo "Run-id prefix: ${RUN_ID_PREFIX}"
 echo "Concurrent jobs: ${CONCURRENT_JOBS}"
 echo "Retry limit: ${RETRY_LIMIT}"
+echo "Python executable: ${PYTHON_EXECUTABLE}"
 echo "Vault root: ${VAULT_ROOT}"
 
 if [[ "${MODE}" == "full" ]]; then
@@ -136,10 +149,18 @@ if [[ "${EXECUTION_MODE}" == "dry-run" ]]; then
   DRY_RUN_FLAG=(--dry-run)
 fi
 
+SRUN_ENV=(
+  "PATH=${PATH}"
+  "PYTHONPATH=${PYTHONPATH:-}"
+  "LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}"
+  "PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}"
+  "REPO_ROOT=${REPO_ROOT}"
+)
+
 attempt=0
 while [[ "${attempt}" -le "${RETRY_LIMIT}" ]]; do
   echo "Running candidate attempt ${attempt}/${RETRY_LIMIT}"
-  if srun --ntasks=2 "${PYTHON_EXECUTABLE}" "${RUNNER_SCRIPT}" \
+  if srun --ntasks=2 /usr/bin/env "${SRUN_ENV[@]}" "${PYTHON_EXECUTABLE}" "${RUNNER_SCRIPT}" \
     --candidate-manifest "${CANDIDATE_MANIFEST}" \
     --retry-attempt "${attempt}" \
     "${DRY_RUN_FLAG[@]}"; then
