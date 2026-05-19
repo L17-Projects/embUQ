@@ -87,6 +87,9 @@ dev = [
   "mpi4py>=4.1.1",
 ]
 
+[project.scripts]
+mesouq-al = "meso_uq.active_learning.cli:main"
+
 [project.urls]
 Repository = "https://github.com/BrieucB/MesoUQ"
 Issues = "https://github.com/BrieucB/MesoUQ/issues"
