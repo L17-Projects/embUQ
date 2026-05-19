@@ -30,6 +30,13 @@ from meso_uq.active_learning.constraints import (
     ActiveLearningCandidateConstraintReport,
     validate_active_learning_candidates,
 )
+from meso_uq.active_learning.simulation_manifest import (
+    FailedSimulationQuarantineArtifacts,
+    SimulationBatchManifest,
+    SimulationManifestRecord,
+    SubmissionBoundaryState,
+    write_failed_simulation_quarantine,
+)
 from meso_uq.active_learning.engine import ActiveLearningDryRunEngine
 
 __all__ = [
@@ -52,10 +59,15 @@ __all__ = [
     "LoopState",
     "RetrainingRequest",
     "RetrainingResult",
+    "FailedSimulationQuarantineArtifacts",
+    "SimulationBatchManifest",
+    "SimulationManifestRecord",
+    "SubmissionBoundaryState",
     "SimulationRequest",
     "SimulationResult",
     "StoppingCriteria",
     "generate_candidate_batch",
     "validate_active_learning_candidates",
+    "write_failed_simulation_quarantine",
     "write_candidate_generation_artifacts",
 ]
