@@ -80,6 +80,27 @@ def _gv_tagged_candidate() -> Candidate:
     )
 
 
+def _metadata_candidate(candidate_id: str) -> tuple[Candidate, dict[str, object]]:
+    metadata = {
+        "acquisition_score": 0.93,
+        "selection_batch_id": "al-batch-007",
+        "selection_timestamp": "2026-05-19T13:00:00Z",
+    }
+    return (
+        Candidate(
+            candidate_id=candidate_id,
+            parameters={
+                "gv_launch": {
+                    "experiment": "stretching",
+                    "controls": {"tot_force": [500.0, 750.0]},
+                }
+            },
+            metadata=metadata,
+        ),
+        metadata,
+    )
+
+
 def test_build_and_render_gv_batch_writes_deterministic_manifests_and_plots(tmp_path: Path) -> None:
     root = _run_boundary_root(tmp_path, run_id="run-gv-01", iteration=0)
     result = build_and_render_dpd_sampling_batch(
@@ -221,6 +242,31 @@ def test_build_and_render_gv_batch_supports_tagged_material_parameters_with_defa
     assert result.batch_request.family == "gv"
 
 
+def test_build_and_render_gv_batch_preserves_candidate_metadata_in_manifests_and_sidecars(tmp_path: Path) -> None:
+    candidate, metadata = _metadata_candidate("gv-meta")
+    root = _run_boundary_root(tmp_path, run_id="run-gv-metadata", iteration=0)
+    build_and_render_dpd_sampling_batch(
+        [candidate],
+        run_id="run-gv-metadata",
+        iteration="0",
+        platform="karolina",
+        walltime="00:30:00",
+        gpu_count=1,
+        defaults=_gv_defaults(),
+        campaign_root=root,
+        batch_id="batch-gv-metadata",
+    )
+
+    candidate_manifest = json.loads((root / "gv-meta" / "dpd_sampling_candidate_manifest.json").read_text(encoding="utf-8"))
+    assert candidate_manifest["active_learning_metadata"] == metadata
+    batch_manifest = json.loads((root / "dpd_sampling_batch_manifest.json").read_text(encoding="utf-8"))
+    assert batch_manifest["candidate_manifests"][0]["active_learning_metadata"] == metadata
+    sidecar = json.loads((root / "dpd_sampling_validation_plot.png.json").read_text(encoding="utf-8"))
+    assert sidecar["candidate_lineage"] == [{"candidate_id": "gv-meta", "active_learning_metadata": metadata}]
+    validation_payload = json.loads((root / "dpd_sampling_validation_report.json").read_text(encoding="utf-8"))
+    assert validation_payload["candidate_lineage"] == [{"candidate_id": "gv-meta", "active_learning_metadata": metadata}]
+
+
 def test_build_and_render_gv_batch_supports_dpd_family_material_parameters_with_defaults(tmp_path: Path) -> None:
     root = _run_boundary_root(tmp_path, run_id="run-gv-dpd-family-material", iteration=0)
     defaults = {
@@ -256,6 +302,87 @@ def test_build_and_render_gv_batch_supports_dpd_family_material_parameters_with_
     normalized_payload = candidate_payload["normalized_payload"]
     assert "dpd_family" not in normalized_payload
     assert normalized_payload["material_parameters"] == _VALID_MATERIAL_PARAMETERS
+
+
+def test_reject_reduced_emb_payload_and_emit_no_artifacts(tmp_path: Path) -> None:
+    root = _run_boundary_root(tmp_path, run_id="run-emb-reduced", iteration=0)
+    reduced_cases = [
+        (
+            "emb-reduced-vector",
+            {
+                "family": "emb",
+                "experiment": "stretching",
+                "material_parameters": [1.0, 2.0],
+            },
+        ),
+        (
+            "emb-parameter-vector",
+            {
+                "family": "emb",
+                "experiment": "stretching",
+                "parameter_vector": [1.0, 2.0, 3.0],
+            },
+        ),
+    ]
+    for candidate_id, parameters in reduced_cases:
+        with pytest.raises(ValueError, match="full expanded EMB payload is required"):
+            build_and_render_dpd_sampling_batch(
+                [Candidate(candidate_id=candidate_id, parameters=parameters)],
+                run_id="run-emb-reduced",
+                iteration="0",
+                platform="vega",
+                walltime="00:30:00",
+                gpu_count=1,
+                campaign_root=root,
+            )
+    assert not root.exists()
+
+
+@pytest.mark.parametrize(
+    ("candidate_id", "parameters"),
+    [
+        (
+            "emb-tagged-envelope-root-vector",
+            {
+                "family": "emb",
+                "parameter_vector": [1.0, 2.0, 3.0],
+                "emb_launch": {
+                    "experiment": "stretching",
+                    "notes": "expanded launch payload",
+                },
+            },
+        ),
+        (
+            "emb-untagged-envelope-root-vector",
+            {
+                "reduced_parameter_vector": [1.0, 2.0, 3.0],
+                "emb_launch": {
+                    "experiment": "stretching",
+                    "notes": "expanded launch payload",
+                },
+            },
+        ),
+    ],
+)
+def test_reject_emb_launch_envelope_with_root_reduced_vectors(
+    tmp_path: Path,
+    candidate_id: str,
+    parameters: dict[str, object],
+) -> None:
+    root = _run_boundary_root(tmp_path, run_id=f"run-{candidate_id}", iteration=0)
+
+    with pytest.raises(ValueError, match="full expanded EMB payload is required"):
+        build_and_render_dpd_sampling_batch(
+            [Candidate(candidate_id=candidate_id, parameters=parameters)],
+            run_id=f"run-{candidate_id}",
+            iteration="0",
+            platform="vega",
+            walltime="00:30:00",
+            gpu_count=1,
+            campaign_root=root,
+        )
+
+    assert not root.exists()
 
 
 def test_build_and_render_gv_preserves_candidate_controls_without_default_controls(tmp_path: Path) -> None:

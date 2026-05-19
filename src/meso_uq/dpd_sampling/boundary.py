@@ -41,6 +41,7 @@ _GV_PAYLOAD_KEYS = ("gv_launch",)
 _EMB_PAYLOAD_KEYS = ("emb_launch",)
 _ALLOWED_FAMILIES = {_GV_FAMILY, _EMB_FAMILY}
 _FAMILY_MARKER_FIELDS = frozenset({"family", "dpd_family"})
+_EMB_REDUCED_PAYLOAD_KEYS = frozenset({"reduced_parameter_vector", "parameter_vector"})
 _GV_FORBIDDEN_OUTPUT_DIR_NAMES = frozenset({"gv", "gv_simulation_files", "scripts", "src", "tests"})
 _BATCH_DEFAULT_PREFIX = "dpd-sampling"
 _GV_CANONICAL_RENDER_SCHEMA_VERSION = "meso_uq.dpd_sampling.gv_render.v1"
@@ -160,6 +161,21 @@ def _coerce_family(value: object, *, candidate_id: str) -> str:
     return family
 
 
+def _reject_reduced_emb_payload(payload: Mapping[str, Any], *, candidate_id: str) -> None:
+    if "material_parameters" in payload and not isinstance(payload["material_parameters"], Mapping):
+        raise ValueError(
+            f"Candidate {candidate_id!r} uses reduced-vector style EMB payload; "
+            "full expanded EMB payload is required."
+        )
+    reduced_payload_fields = sorted(_EMB_REDUCED_PAYLOAD_KEYS.intersection(payload))
+    if reduced_payload_fields:
+        joined = ", ".join(reduced_payload_fields)
+        raise ValueError(
+            f"Candidate {candidate_id!r} uses reduced-vector style EMB payload ({joined}); "
+            "full expanded EMB payload is required."
+        )
+
+
 def _reject_scheduler_owned_fields(payload: Mapping[str, Any], *, context: str) -> list[str]:
     rejected = sorted(_ADAPTER_OWNED_FIELDS.intersection(payload.keys()))
     if rejected:
@@ -192,7 +208,11 @@ def _extract_candidate_payload(candidate: Candidate) -> tuple[str, dict[str, Any
         if family == _EMB_FAMILY:
             for key in _EMB_PAYLOAD_KEYS:
                 if key in payload:
-                    return family, _coerce_mapping(payload[key], field_name=f"candidate {candidate.candidate_id} {key}")
+                    _reject_reduced_emb_payload(payload, candidate_id=candidate.candidate_id)
+                    expanded_payload = _coerce_mapping(payload[key], field_name=f"candidate {candidate.candidate_id} {key}")
+                    _reject_reduced_emb_payload(expanded_payload, candidate_id=candidate.candidate_id)
+                    return family, expanded_payload
+            _reject_reduced_emb_payload(payload, candidate_id=candidate.candidate_id)
             if "experiment" in payload:
                 return family, payload
             raise ValueError(
@@ -206,7 +226,10 @@ def _extract_candidate_payload(candidate: Candidate) -> tuple[str, dict[str, Any
 
     for key in _EMB_PAYLOAD_KEYS:
         if key in payload:
-            return _EMB_FAMILY, _coerce_mapping(payload[key], field_name=f"candidate {candidate.candidate_id} {key}")
+            _reject_reduced_emb_payload(payload, candidate_id=candidate.candidate_id)
+            expanded_payload = _coerce_mapping(payload[key], field_name=f"candidate {candidate.candidate_id} {key}")
+            _reject_reduced_emb_payload(expanded_payload, candidate_id=candidate.candidate_id)
+            return _EMB_FAMILY, expanded_payload
 
     # GV legacy-compatible fallback.
     if {"experiment", "controls"}.issubset(payload) or "material_parameters" in payload:
@@ -247,7 +270,7 @@ def _extract_family_payloads(
         )
         _reject_scheduler_owned_fields(root_payload, context=f"Candidate {candidate.candidate_id!r} payload")
         _reject_scheduler_owned_fields(payload, context=f"Candidate {candidate.candidate_id!r} family payload")
-        normalized_candidate = Candidate(candidate_id=normalized_id, parameters=payload)
+        normalized_candidate = Candidate(candidate_id=normalized_id, parameters=payload, metadata=candidate.metadata)
         payloads.append((normalized_candidate, candidate_family, payload))
 
     if mixed_candidate_ids:
@@ -348,6 +371,7 @@ def _coerce_plot_paths(
             "submission_state": report.submission,
         },
         "expected_hdf5_refs": [item.as_manifest() for item in report.expected_hdf5_refs],
+        "candidate_lineage": [dict(item) for item in report.candidate_lineage],
     }
     _write_json_payload(sidecar_payload, sidecar_path)
     return plot_path, sidecar_path
@@ -585,6 +609,7 @@ def _manifest_from_gv_launch(
                 output_root=output_root,
                 campaign_root=campaign_root,
                 normalized_payload=normalized_payload,
+                active_learning_metadata=dict(item.candidate.metadata),
                 expected_hdf5_datasets=tuple(refs),
             )
         )
@@ -615,7 +640,11 @@ def _build_gv_candidate_manifests(
             )
 
     gv_candidates: list[Candidate] = [
-        Candidate(candidate_id=candidate.candidate_id, parameters={_GV_PAYLOAD_KEYS[0]: payload})
+        Candidate(
+            candidate_id=candidate.candidate_id,
+            parameters={_GV_PAYLOAD_KEYS[0]: payload},
+            metadata=candidate.metadata,
+        )
         for candidate, _, payload in selected_candidates
     ]
     handoff_campaign_root = Path(".") if campaign_root.is_absolute() else campaign_root
@@ -664,6 +693,7 @@ def _build_emb_candidate_manifests(
                 output_root=output_root,
                 campaign_root=campaign_root,
                 normalized_payload=normalized_payload,
+                active_learning_metadata=dict(candidate.metadata),
                 expected_hdf5_datasets=(
                     DPDDataRef(
                         family=_EMB_FAMILY,
@@ -858,6 +888,13 @@ def _build_validation_report(
     expected_refs = tuple(
         ref for manifest in request.candidate_manifests for ref in manifest.expected_hdf5_datasets
     )
+    candidate_lineage = tuple(
+        {
+            "candidate_id": manifest.candidate_id,
+            "active_learning_metadata": dict(manifest.active_learning_metadata),
+        }
+        for manifest in request.candidate_manifests
+    )
     return DPDValidationReport(
         batch_id=request.batch_id,
         run_id=request.run_id,
@@ -870,6 +907,7 @@ def _build_validation_report(
         mixed_family_rejections=tuple(mixed_family_rejections or ()),
         scheduler_owned_field_rejections=tuple(),
         rejected_candidates=tuple(),
+        candidate_lineage=candidate_lineage,
         expected_hdf5_refs=expected_refs,
         submission=_build_submission_state(request.platform),
     )

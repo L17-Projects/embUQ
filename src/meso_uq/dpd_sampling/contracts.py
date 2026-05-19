@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -76,6 +76,7 @@ class DPDCandidateManifest:
     campaign_root: Path
     normalized_payload: dict[str, Any]
     expected_hdf5_datasets: tuple[DPDDataRef, ...]
+    active_learning_metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "candidate_id", str(self.candidate_id).strip())
@@ -95,6 +96,11 @@ class DPDCandidateManifest:
         object.__setattr__(self, "campaign_root", _coerce_path(self.campaign_root, field_name="campaign_root"))
 
         object.__setattr__(self, "normalized_payload", _coerce_jsonable_payload(self.normalized_payload, field_name="normalized_payload"))
+        object.__setattr__(
+            self,
+            "active_learning_metadata",
+            _coerce_jsonable_payload(self.active_learning_metadata, field_name="active_learning_metadata"),
+        )
         object.__setattr__(self, "expected_hdf5_datasets", tuple(self.expected_hdf5_datasets))
         if not self.expected_hdf5_datasets:
             raise ValueError("DPD candidate manifest must include at least one expected_hdf5 dataset.")
@@ -111,6 +117,7 @@ class DPDCandidateManifest:
             "campaign_root": str(self.campaign_root),
             "output_root": str(self.output_root),
             "normalized_payload": self.normalized_payload,
+            "active_learning_metadata": dict(self.active_learning_metadata),
             "expected_hdf5_datasets": [item.as_manifest() for item in self.expected_hdf5_datasets],
         }
 
@@ -226,6 +233,7 @@ class DPDValidationReport:
     rejected_candidates: tuple[str, ...]
     expected_hdf5_refs: tuple[DPDDataRef, ...]
     submission: dict[str, Any]
+    candidate_lineage: tuple[dict[str, Any], ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -250,6 +258,11 @@ class DPDValidationReport:
             tuple(self.scheduler_owned_field_rejections),
         )
         object.__setattr__(self, "rejected_candidates", tuple(self.rejected_candidates))
+        object.__setattr__(
+            self,
+            "candidate_lineage",
+            tuple(_coerce_jsonable_payload(item, field_name="candidate_lineage item") for item in self.candidate_lineage),
+        )
         object.__setattr__(self, "expected_hdf5_refs", tuple(self.expected_hdf5_refs))
         object.__setattr__(self, "batch_id", str(self.batch_id).strip())
         object.__setattr__(self, "run_id", str(self.run_id).strip())
@@ -282,6 +295,7 @@ class DPDValidationReport:
             "mixed_family_rejections": list(self.mixed_family_rejections),
             "scheduler_owned_field_rejections": list(self.scheduler_owned_field_rejections),
             "rejected_candidates": list(self.rejected_candidates),
+            "candidate_lineage": [dict(item) for item in self.candidate_lineage],
             "expected_hdf5_refs": [item.as_manifest() for item in self.expected_hdf5_refs],
             "submission": dict(self.submission),
         }
