@@ -102,6 +102,26 @@ def test_build_handoff_converts_selected_candidates_to_launch_requests() -> None
     )
 
 
+def test_handoff_preserves_candidate_controls_without_default_controls() -> None:
+    defaults = dict(_defaults())
+    defaults.pop("controls")
+    handoff = build_gv_active_learning_launch_handoff(
+        _selected_candidates()[:1],
+        campaign_root="_runs/gv/active_learning/iter-000",
+        platform="karolina",
+        walltime="00:30:00",
+        gpu_count=1,
+        provenance_tags={"linear_issue": "MES-185"},
+        defaults=defaults,
+        batch_id="iter-000",
+    )
+
+    request = handoff.launch_requests[0]
+    assert request.sweep.axis == "tot_force"
+    assert request.sweep.values == (500.0, 750.0)
+    assert request.fixed_controls == {}
+
+
 def test_render_handoff_uses_launch_renderer_without_submission(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     handoff = build_gv_active_learning_launch_handoff(

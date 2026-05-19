@@ -267,16 +267,19 @@ def _merge_launch_fields(
     candidate_payload: Mapping[str, object],
 ) -> dict[str, object]:
     merged = dict(default_launch_fields)
-    if "controls" in default_launch_fields and "controls" in candidate_payload:
-        default_controls = _expect_mapping(
-            default_launch_fields["controls"],
-            context="defaults controls",
-        )
+    if "controls" in candidate_payload:
         candidate_controls = _expect_mapping(
             candidate_payload["controls"],
             context="candidate controls",
         )
-        merged["controls"] = {**default_controls, **candidate_controls}
+        if "controls" in default_launch_fields:
+            default_controls = _expect_mapping(
+                default_launch_fields["controls"],
+                context="defaults controls",
+            )
+            merged["controls"] = {**default_controls, **candidate_controls}
+        else:
+            merged["controls"] = dict(candidate_controls)
     merged.update({key: value for key, value in candidate_payload.items() if key != "controls"})
     return merged
 
