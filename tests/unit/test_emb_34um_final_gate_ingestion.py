@@ -186,6 +186,73 @@ def test_emb_34um_final_gate_ingestion_quarantines_failed_after_retry_limit(tmp_
     assert report["quarantine_count"] == 1
 
 
+def test_ingestion_uses_adaptive_rounds_instead_of_unsubmitted_static_tail(tmp_path: Path) -> None:
+    force_grid = [0.0, 10.0]
+    static_paths = [
+        _candidate_manifest(
+            root=tmp_path,
+            candidate_id=f"emb-34um-final-gate-full-r0{round_index}-c001",
+            gate="full_gate",
+            round_index=round_index,
+            yt=100.0 + round_index,
+            kb=200.0 + round_index,
+            force_grid=force_grid,
+        )
+        for round_index in (1, 2, 3)
+    ]
+    adaptive_paths = []
+    for round_index in (2, 3):
+        path = _candidate_manifest(
+            root=tmp_path,
+            candidate_id=f"emb-34um-final-gate-adaptive-r0{round_index}-c001",
+            gate=f"adaptive_round_0{round_index}",
+            round_index=round_index,
+            yt=300.0 + round_index,
+            kb=400.0 + round_index,
+            force_grid=force_grid,
+        )
+        adaptive_paths.append(path)
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        params = payload["normalized_payload"]["parameters"]
+        _write_f_delta(
+            Path(payload["normalized_payload"]["output_root"]) / "F_Delta.dat",
+            yt=float(params["Yt"]),
+            ka=float(params["ka"]),
+            kb=float(params["kb"]),
+            outputs=[1.0, 2.0],
+            forces=force_grid,
+        )
+        _write_json(
+            tmp_path / f"adaptive_round_0{round_index}" / "emb_34um_batch_summary.json",
+            {"rendered_candidate_manifests": [str(path)]},
+        )
+
+    first_payload = json.loads(static_paths[0].read_text(encoding="utf-8"))
+    first_params = first_payload["normalized_payload"]["parameters"]
+    _write_f_delta(
+        Path(first_payload["normalized_payload"]["output_root"]) / "F_Delta.dat",
+        yt=float(first_params["Yt"]),
+        ka=float(first_params["ka"]),
+        kb=float(first_params["kb"]),
+        outputs=[1.0, 2.0],
+        forces=force_grid,
+    )
+    campaign_path = _campaign_manifest(tmp_path, {"full_gate": static_paths})
+
+    _, report = build_emb_34um_final_gate_ingestion_report(
+        campaign_manifest_path=campaign_path,
+        expected_full_count=3,
+        expected_canary_count=0,
+    )
+
+    assert report["passed"] is True
+    assert report["status_counts"] == {"completed": 3, "failed": 0, "missing": 0, "partial": 0}
+    ids = {record["candidate_id"] for record in report["records"]}
+    assert "emb-34um-final-gate-full-r02-c001" not in ids
+    assert "emb-34um-final-gate-adaptive-r02-c001" in ids
+    assert "emb-34um-final-gate-adaptive-r03-c001" in ids
+
+
 def test_write_emb_34um_final_gate_ingestion_artifacts_reports_missing_outputs(tmp_path: Path) -> None:
     candidate_path = _candidate_manifest(
         root=tmp_path,

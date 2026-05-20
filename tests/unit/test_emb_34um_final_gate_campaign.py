@@ -123,6 +123,8 @@ def test_prepare_emb_34um_final_gate_manifests_full_lhs_benchmark_validation_cam
     for value in manifest["commands"].values():
         assert value["script"].endswith("emb_34um_active_learning_array.sbatch")
         assert "EXECUTION_MODE=render-only" in value["command"]
+        assert "--time=00:30:00" in value["command"]
+        assert "REPO_ROOT=" in value["command"]
 
     assert manifest["policy"]["candidate_pool_size"] == 100
     assert manifest["policy"]["accepted_curves"]["rounds"] == 3
@@ -135,7 +137,7 @@ def test_prepare_emb_34um_final_gate_manifests_full_lhs_benchmark_validation_cam
     assert manifest["policy"]["sampling"]["parameter_space"] == "log10"
     assert manifest["policy"]["sampling"]["bounds"]["ka"] == [1e2, 6e5]
     assert manifest["policy"]["sampling"]["bounds"]["kb"] == [400.0, 70000.0]
-    assert manifest["policy"]["failure_policy"]["replacement_mode"] == "next_candidate"
+    assert manifest["policy"]["failure_policy"]["replacement_mode"] == "quarantine_then_gate_shortfall"
     assert manifest["policy"]["adaptive_selection"]["round_1_source"] == "initial_sobol_maximin"
     assert manifest["policy"]["adaptive_selection"]["exploration_count"] == 6
     assert manifest["policy"]["adaptive_selection"]["acquisition_count"] == 24

@@ -36,18 +36,6 @@ from meso_uq.active_learning import (
     EMB_34UM_FINAL_GATE_INGESTION_SUMMARY_CSV_FILENAME,
     EMB_34UM_FINAL_GATE_QUARANTINE_FILENAME,
 )
-from meso_uq.active_learning.emb_34um_al_vs_lhs_validation import (
-    EMB_34UM_AL_VS_LHS_VALIDATION_DISAGREEMENT_PLOT_FILENAME,
-    EMB_34UM_AL_VS_LHS_VALIDATION_FAILURE_PLOT_FILENAME,
-    EMB_34UM_AL_VS_LHS_VALIDATION_FORCE_OVERLAY_PLOT_FILENAME,
-    EMB_34UM_AL_VS_LHS_VALIDATION_ROUND1_SAMPLES_PLOT_FILENAME,
-    EMB_34UM_AL_VS_LHS_VALIDATION_ROUND_ADDITIONS_PLOT_FILENAME,
-    EMB_34UM_AL_VS_LHS_VALIDATION_RUNTIME_PLOT_FILENAME,
-    EMB_34UM_AL_VS_LHS_VALIDATION_SAMPLES_PLOT_FILENAME,
-    EMB_34UM_AL_VS_LHS_VALIDATION_SOURCE_PLOT_FILENAME,
-)
-
-
 CONTROLLER_SCHEMA_VERSION = "meso_uq.active_learning.emb_34um_active_learning_controller.v1"
 
 
@@ -265,6 +253,9 @@ def _build_validation_command(curve_rows: Path, output_root: Path, *, execution_
             shlex.quote(str(output_root)),
             "--prefix-counts",
             "30,60,90",
+            "--acquisition-engine",
+            "dnn_ensemble_disagreement_diversity",
+            "--adaptive-acquisition-available",
         ]
     )
 
@@ -275,14 +266,6 @@ def _validation_output_paths(root: Path) -> list[Path]:
         root / EMB_34UM_AL_VS_LHS_VALIDATION_PLOT_FILENAME,
         root / EMB_34UM_AL_VS_LHS_VALIDATION_PLOT_SIDECAR_FILENAME,
         root / EMB_34UM_AL_VS_LHS_VALIDATION_SUMMARY_CSV_FILENAME,
-        root / EMB_34UM_AL_VS_LHS_VALIDATION_SAMPLES_PLOT_FILENAME,
-        root / EMB_34UM_AL_VS_LHS_VALIDATION_ROUND1_SAMPLES_PLOT_FILENAME,
-        root / EMB_34UM_AL_VS_LHS_VALIDATION_ROUND_ADDITIONS_PLOT_FILENAME,
-        root / EMB_34UM_AL_VS_LHS_VALIDATION_SOURCE_PLOT_FILENAME,
-        root / EMB_34UM_AL_VS_LHS_VALIDATION_DISAGREEMENT_PLOT_FILENAME,
-        root / EMB_34UM_AL_VS_LHS_VALIDATION_FORCE_OVERLAY_PLOT_FILENAME,
-        root / EMB_34UM_AL_VS_LHS_VALIDATION_FAILURE_PLOT_FILENAME,
-        root / EMB_34UM_AL_VS_LHS_VALIDATION_RUNTIME_PLOT_FILENAME,
     ]
 
 
@@ -382,6 +365,7 @@ def build_emb_34um_active_learning_controller(
     final_validation_root = campaign_root / "al_vs_lhs_validation"
     final_validation_rows = campaign_root / "al_vs_lhs_rows.json"
     round_payloads_path = campaign_root / "round_payloads.json"
+    runtime_rows_path = campaign_root / "runtime_rows.json"
     final_report_root = campaign_root / "final_gate_report"
     ingestion_root = campaign_root / "ingestion_report"
     round_2_batch_root = campaign_root / "adaptive_round_02"
@@ -525,7 +509,7 @@ def build_emb_34um_active_learning_controller(
                     execution_mode=execution_mode,
                 )
             ],
-            expected_output_roots=[final_validation_rows, round_payloads_path],
+            expected_output_roots=[final_validation_rows, round_payloads_path, runtime_rows_path],
             command_type="analysis",
             acceptance_criteria={"al_vs_lhs_evidence_builder_implemented": True},
         )
@@ -572,7 +556,9 @@ def build_emb_34um_active_learning_controller(
         "lhs_submit_stage_present": any(stage["name"] == "lhs_submit" for stage in stages),
         "validation_submit_stage_present": any(stage["name"] == "validation_submit" for stage in stages),
         "retries_before_quarantine_is_3": campaign_manifest["policy"]["failure_policy"]["retries_before_quarantine"] == 3,
-        "replacement_mode_next_candidate": campaign_manifest["policy"]["failure_policy"]["replacement_mode"] == "next_candidate",
+        "replacement_mode_quarantines_shortfall": (
+            campaign_manifest["policy"]["failure_policy"]["replacement_mode"] == "quarantine_then_gate_shortfall"
+        ),
     }
 
     controller_manifest = {
@@ -603,7 +589,7 @@ def build_emb_34um_active_learning_controller(
             "al_round_2": [str(round_2_batch_root)],
             "al_round_3": [str(round_3_batch_root)],
             "final_ingestion": [str(path) for path in ingestion_outputs],
-            "al_vs_lhs_rows": [str(final_validation_rows), str(round_payloads_path)],
+            "al_vs_lhs_rows": [str(final_validation_rows), str(round_payloads_path), str(runtime_rows_path)],
             "al_vs_lhs_validation": [str(path) for path in final_validation_outputs],
             "final_gate_report": [str(path) for path in final_report_outputs],
         },
@@ -679,12 +665,47 @@ def _batch_output_roots(batch_summary_path: Path) -> tuple[Path, ...]:
     return tuple(Path(str(path)) for path in roots)
 
 
+def _runtime_status(root: Path) -> dict[str, Any]:
+    path = root / "emb_34um_runtime_status.json"
+    if path.is_file():
+        payload = _read_json(path)
+        payload["status_path"] = str(path)
+        return payload
+    return {}
+
+
+def _selection_manifest_path(campaign_root: Path, round_index: int) -> Path:
+    return campaign_root / f"adaptive_round_{round_index:02d}" / "selection_manifest.json"
+
+
+def _load_selection_rows(campaign_root: Path, round_index: int) -> tuple[dict[str, Any], ...]:
+    if round_index == 1:
+        return tuple()
+    path = _selection_manifest_path(campaign_root, round_index)
+    if not path.is_file():
+        return tuple()
+    payload = _read_json(path)
+    rows = payload.get("selected_candidates", ())
+    if not isinstance(rows, list):
+        raise ValueError(f"{path} selected_candidates must be a list.")
+    return tuple(dict(item) for item in rows if isinstance(item, dict))
+
+
+def _selection_metadata_by_candidate(campaign_root: Path, round_index: int) -> dict[str, dict[str, Any]]:
+    return {
+        str(row["candidate_id"]): row
+        for row in _load_selection_rows(campaign_root, round_index)
+        if row.get("candidate_id")
+    }
+
+
 def _load_result_records(
     *,
     output_roots: list[Path],
     strategy: str,
     round_index: int,
     required: bool,
+    selected_metadata: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], ...]:
     records: list[dict[str, Any]] = []
     missing: list[str] = []
@@ -703,10 +724,19 @@ def _load_result_records(
         reference_curve = tuple(float(item) for item in result.get("vertical_diameter", ()))
         if not force_grid or not reference_curve:
             raise ValueError(f"{result_path} is missing force_grid or vertical_diameter.")
+        candidate_id = str(result.get("candidate_id") or root.name)
+        status = _runtime_status(root)
+        metadata = dict((selected_metadata or {}).get(candidate_id, {}))
+        if strategy == "al" and round_index == 1:
+            metadata.setdefault("source", "initial_sobol_maximin")
+        elif strategy == "lhs":
+            metadata.setdefault("source", "lhs")
+        elif strategy == "validation":
+            metadata.setdefault("source", "validation")
         records.append(
             {
-                "curve_id": str(result.get("candidate_id") or root.name),
-                "candidate_id": str(result.get("candidate_id") or root.name),
+                "curve_id": candidate_id,
+                "candidate_id": candidate_id,
                 "strategy": strategy,
                 "round": round_index,
                 "order": order,
@@ -714,6 +744,13 @@ def _load_result_records(
                 "kb": float(params["kb"]),
                 "force_grid": force_grid,
                 "reference_curve": reference_curve,
+                "source": str(metadata.get("source", metadata.get("selection_source", strategy))),
+                "acquisition_score": float(metadata.get("acquisition_score", 0.0)),
+                "ensemble_disagreement": float(metadata.get("ensemble_disagreement", 0.0)),
+                "runtime_seconds": float(status.get("runtime_seconds", result.get("runtime_seconds", 0.0)) or 0.0),
+                "runtime_status": str(status.get("status", "completed")),
+                "retry_count": int(status.get("retry_count", result.get("retry_attempt", 0)) or 0),
+                "runtime_status_path": str(status.get("status_path", "")),
             }
         )
     if required and missing:
@@ -735,7 +772,15 @@ def _load_al_records(campaign_manifest: dict[str, Any], *, up_to_round: int, req
     for round_index in range(2, up_to_round + 1):
         summary = _adaptive_batch_summary(campaign_root, round_index)
         roots = list(_batch_output_roots(summary)) if summary.is_file() else []
-        records.extend(_load_result_records(output_roots=roots, strategy="al", round_index=round_index, required=required))
+        records.extend(
+            _load_result_records(
+                output_roots=roots,
+                strategy="al",
+                round_index=round_index,
+                required=required,
+                selected_metadata=_selection_metadata_by_candidate(campaign_root, round_index),
+            )
+        )
     return tuple(records)
 
 
@@ -747,6 +792,26 @@ def _load_lhs_records(campaign_manifest: dict[str, Any], *, required: bool) -> t
 def _load_validation_records(campaign_manifest: dict[str, Any], *, required: bool) -> tuple[dict[str, Any], ...]:
     roots = [Path(path) for path in campaign_manifest["validation_gate"]["expected_output_roots"]]
     return _load_result_records(output_roots=roots, strategy="validation", round_index=0, required=required)
+
+
+def _runtime_rows(*record_groups: tuple[dict[str, Any], ...]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for records in record_groups:
+        for record in records:
+            rows.append(
+                {
+                    "curve_id": record["curve_id"],
+                    "candidate_id": record["candidate_id"],
+                    "strategy": record["strategy"],
+                    "round": record["round"],
+                    "order": record["order"],
+                    "runtime_seconds": float(record.get("runtime_seconds", 0.0)),
+                    "status": record.get("runtime_status", "completed"),
+                    "retry_count": int(record.get("retry_count", 0)),
+                    "runtime_status_path": record.get("runtime_status_path", ""),
+                }
+            )
+    return rows
 
 
 def select_and_render_adaptive_round(
@@ -897,6 +962,28 @@ def write_final_ingestion(*, campaign_manifest_path: Path) -> dict[str, Any]:
     return artifacts.report
 
 
+def _round_status_counts_from_ingestion(campaign_root: Path) -> dict[int, dict[str, dict[str, int]]]:
+    report_path = campaign_root / "ingestion_report" / EMB_34UM_FINAL_GATE_INGESTION_REPORT_FILENAME
+    if not report_path.is_file():
+        return {}
+    report = _read_json(report_path)
+    counts: dict[int, dict[str, dict[str, int]]] = {}
+    for record in report.get("records", ()):
+        if not isinstance(record, dict) or record.get("gate") != "full_gate":
+            continue
+        try:
+            round_index = int(record.get("round"))
+        except (TypeError, ValueError):
+            continue
+        bucket = counts.setdefault(round_index, {"failure_counts": {}, "quarantine_counts": {}})
+        status = str(record.get("status", "unknown"))
+        if status != "completed":
+            bucket["failure_counts"][status] = bucket["failure_counts"].get(status, 0) + 1
+        if record.get("quarantined"):
+            bucket["quarantine_counts"][status] = bucket["quarantine_counts"].get(status, 0) + 1
+    return counts
+
+
 def _curve_metric_rows(
     *,
     strategy: str,
@@ -946,6 +1033,7 @@ def build_final_evidence(*, campaign_manifest_path: Path) -> dict[str, Any]:
 
     rows: list[dict[str, Any]] = []
     round_payloads: list[dict[str, Any]] = []
+    ingestion_counts = _round_status_counts_from_ingestion(campaign_root)
     for round_index, prefix in ((1, 30), (2, 60), (3, 90)):
         al_prefix = al_records[:prefix]
         lhs_prefix = lhs_records[:prefix]
@@ -962,6 +1050,12 @@ def build_final_evidence(*, campaign_manifest_path: Path) -> dict[str, Any]:
             architecture_names=EMB_34UM_FINAL_GATE_SURROGATE_ARCHITECTURES,
         )
         selected_rows = tuple(al_records[(round_index - 1) * 30 : round_index * 30])
+        selected_scores = [
+            float(item.get("acquisition_score", 0.0))
+            for item in selected_rows
+            if float(item.get("acquisition_score", 0.0)) > 0.0
+        ]
+        round_counts = ingestion_counts.get(round_index, {"failure_counts": {}, "quarantine_counts": {}})
         rows.extend(
             _curve_metric_rows(
                 strategy="al",
@@ -985,11 +1079,11 @@ def build_final_evidence(*, campaign_manifest_path: Path) -> dict[str, Any]:
                 "al_curve_count": 30,
                 "lhs_curve_count": 90,
                 "ka_kb_coverage": [[float(item["ka"]), float(item["kb"])] for item in selected_rows],
-                "acquisition_scores": [],
-                "selected_candidate_scores": [],
+                "acquisition_scores": selected_scores,
+                "selected_candidate_scores": selected_scores,
                 "model_selection": al_report["model_selection"],
-                "failure_counts": {"runtime": 0},
-                "quarantine_counts": {"runtime": 0},
+                "failure_counts": round_counts["failure_counts"],
+                "quarantine_counts": round_counts["quarantine_counts"],
                 "al": {key: al_report[key] for key in ("median_curve_rel_l2_pct", "mean_curve_rel_l2_pct", "max_curve_rel_l2_pct", "residuals", "predicted_curves", "reference_curves")},
                 "lhs": {key: lhs_report[key] for key in ("median_curve_rel_l2_pct", "mean_curve_rel_l2_pct", "max_curve_rel_l2_pct", "residuals", "predicted_curves", "reference_curves")},
             }
@@ -997,11 +1091,26 @@ def build_final_evidence(*, campaign_manifest_path: Path) -> dict[str, Any]:
 
     rows_path = campaign_root / "al_vs_lhs_rows.json"
     rounds_path = campaign_root / "round_payloads.json"
+    runtime_rows_path = campaign_root / "runtime_rows.json"
     rows_path.write_text(json.dumps({"curve_rows": rows}, indent=2, sort_keys=True, default=str), encoding="utf-8")
     rounds_path.write_text(json.dumps({"rounds": round_payloads}, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    runtime_rows_path.write_text(
+        json.dumps(
+            {"runtime_rows": _runtime_rows(al_records, lhs_records, validation_records)},
+            indent=2,
+            sort_keys=True,
+            default=str,
+        ),
+        encoding="utf-8",
+    )
     print(f"al_vs_lhs_rows={rows_path}")
     print(f"round_payloads={rounds_path}")
-    return {"rows_path": str(rows_path), "round_payloads_path": str(rounds_path)}
+    print(f"runtime_rows={runtime_rows_path}")
+    return {
+        "rows_path": str(rows_path),
+        "round_payloads_path": str(rounds_path),
+        "runtime_rows_path": str(runtime_rows_path),
+    }
 
 
 def write_final_report(*, campaign_manifest_path: Path, round_payloads: Path, run_id_prefix: str) -> dict[str, Any]:

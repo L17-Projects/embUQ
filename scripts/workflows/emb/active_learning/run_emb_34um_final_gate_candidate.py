@@ -9,6 +9,7 @@ import math
 import os
 import shutil
 import sys
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -431,7 +432,13 @@ def _setup_indentation_init_dir(
     return init_dir
 
 
-def _write_outputs(request: Emb34umCandidateRequest, sample: Mapping[str, Any], *, retry_attempt: int) -> None:
+def _write_outputs(
+    request: Emb34umCandidateRequest,
+    sample: Mapping[str, Any],
+    *,
+    retry_attempt: int,
+    runtime_seconds: float | None = None,
+) -> None:
     import h5py
     import numpy as np
 
@@ -453,6 +460,8 @@ def _write_outputs(request: Emb34umCandidateRequest, sample: Mapping[str, Any], 
         "retry_attempt": retry_attempt,
         "evaluation_mode": "mirheo_emb_34um_final_gate",
     }
+    if runtime_seconds is not None:
+        result_payload["runtime_seconds"] = float(runtime_seconds)
     (request.output_root / "emb_34um_result.json").write_text(
         json.dumps(result_payload, indent=2, sort_keys=True), encoding="utf-8"
     )
@@ -484,6 +493,7 @@ def run_candidate_once(
     _configure_python_path(repo_root)
     from emb.indentation.evalkit.posterior_indentation import compute_indentation
 
+    runtime_start = time.time()
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
@@ -523,7 +533,9 @@ def run_candidate_once(
         os.chdir(previous_cwd)
 
     if rank == 0:
-        _write_outputs(request, sample, retry_attempt=retry_attempt)
+        runtime_end = time.time()
+        runtime_seconds = max(0.0, runtime_end - runtime_start)
+        _write_outputs(request, sample, retry_attempt=retry_attempt, runtime_seconds=runtime_seconds)
         _write_status_manifest(
             request,
             status="completed",
@@ -532,6 +544,9 @@ def run_candidate_once(
                 "result_json": str(request.output_root / "emb_34um_result.json"),
                 "hdf5": str(request.expected_hdf5_path),
                 "f_delta": str(request.output_root / "F_Delta.dat"),
+                "runtime_started_epoch": runtime_start,
+                "runtime_finished_epoch": runtime_end,
+                "runtime_seconds": runtime_seconds,
             },
         )
         if init_dir.exists():

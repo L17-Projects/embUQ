@@ -92,14 +92,42 @@ def _close_series(left: Sequence[float], right: Sequence[float], *, tolerance: f
     return all(math.isclose(float(a), float(b), rel_tol=tolerance, abs_tol=tolerance) for a, b in zip(left, right))
 
 
+def _adaptive_candidate_manifest_paths(campaign_root: Path) -> tuple[Path, ...]:
+    paths: list[Path] = []
+    for round_index in _FULL_ROUNDS[1:]:
+        summary_path = campaign_root / f"adaptive_round_{round_index:02d}" / "emb_34um_batch_summary.json"
+        if not summary_path.is_file():
+            continue
+        payload = _read_json(summary_path)
+        rendered = payload.get("rendered_candidate_manifests", ())
+        if not isinstance(rendered, Sequence) or isinstance(rendered, (str, bytes, bytearray)):
+            raise ValueError(f"{summary_path!s} rendered_candidate_manifests must be a sequence.")
+        paths.extend(Path(str(item)) for item in rendered)
+    return tuple(paths)
+
+
+def _is_round_one_full_candidate(path: Path) -> bool:
+    candidate = _read_json(path)
+    candidate_id = str(candidate.get("candidate_id", "")).strip()
+    metadata = _as_mapping(candidate.get("active_learning_metadata", {}), label=f"{candidate_id} active_learning_metadata")
+    return _candidate_round(candidate_id, metadata, "full_gate") == 1
+
+
 def _candidate_manifest_paths(campaign: Mapping[str, Any]) -> tuple[tuple[str, Path], ...]:
+    campaign_root = _coerce_path(campaign.get("campaign_root"), label="campaign_root")
+    adaptive_paths = _adaptive_candidate_manifest_paths(campaign_root)
+    adaptive_rounds_available = bool(adaptive_paths)
     paths: list[tuple[str, Path]] = []
-    for gate_key in ("canary_gate", "full_gate", "lhs_gate"):
+    for gate_key in ("canary_gate", "full_gate", "lhs_gate", "benchmark_gate", "validation_gate"):
         gate = campaign.get(gate_key)
         if not isinstance(gate, Mapping):
             continue
-        for item in gate.get("rendered_candidate_manifests", ()):
+        rendered = list(gate.get("rendered_candidate_manifests", ()))
+        if gate_key == "full_gate" and adaptive_rounds_available:
+            rendered = [item for item in rendered if _is_round_one_full_candidate(Path(str(item)))]
+        for item in rendered:
             paths.append((gate_key, Path(str(item))))
+    paths.extend(("full_gate", path) for path in adaptive_paths)
     if not paths:
         raise ValueError("Campaign manifest does not include rendered_candidate_manifests.")
     return tuple(paths)

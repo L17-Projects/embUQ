@@ -110,6 +110,8 @@ def test_emb_34um_active_learning_controller_dry_run_manifest_stage_order_and_tr
 
     assert stage_names == expected_stage_order
     assert any("validate_emb_34um_al_vs_lhs.py" in item for item in command_texts)
+    assert any("--adaptive-acquisition-available" in item for item in command_texts)
+    assert any("--acquisition-engine dnn_ensemble_disagreement_diversity" in item for item in command_texts)
     assert any("--stage-action final-report" in item for item in command_texts)
     assert any("--stage-action select-render-round" in item for item in command_texts)
 

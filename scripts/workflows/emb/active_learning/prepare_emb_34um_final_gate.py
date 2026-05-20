@@ -468,6 +468,7 @@ def _submission_command(
     vault_root: Path,
     campaign_root: Path,
     run_id_prefix: str,
+    walltime: str,
     concurrent_jobs: int,
     retry_limit: int,
 ) -> dict[str, Any]:
@@ -499,6 +500,7 @@ def _submission_command(
         "script": str(sbatch_script),
         "command": (
             "sbatch --parsable "
+            f"--time={shlex.quote(walltime)} "
             f"--array={array_spec} "
             "--export="
             f"TIMESTAMP={shlex.quote(timestamp)},"
@@ -506,6 +508,7 @@ def _submission_command(
             f"VAULT_ROOT={shlex.quote(str(vault_root))},"
             f"RUN_ID_PREFIX={shlex.quote(run_id_prefix)},"
             f"CAMPAIGN_ROOT={shlex.quote(str(campaign_root))},"
+            f"REPO_ROOT={shlex.quote(str(_script_root()))},"
             f"MODE={shlex.quote(mode)},"
             f"EXECUTION_MODE={shlex.quote(EXECUTION_MODE_RENDER_ONLY)},"
             f"CONCURRENT_JOBS={concurrent_jobs},"
@@ -830,6 +833,7 @@ def prepare_emb_34um_final_gate(
             "platform": "karolina",
             "concurrent_jobs": concurrent_jobs,
             "retry_limit": retry_limit,
+            "walltime": walltime,
             "gpu_count": 1,
             "python_executable": sys.executable,
         },
@@ -863,7 +867,7 @@ def prepare_emb_34um_final_gate(
             "failure_policy": {
                 "retry_limit": retry_limit,
                 "retries_before_quarantine": 3,
-                "replacement_mode": "next_candidate",
+                "replacement_mode": "quarantine_then_gate_shortfall",
             },
             "sampling": {
                 "parameter_space": PARAMETER_SPACE,
@@ -915,6 +919,7 @@ def prepare_emb_34um_final_gate(
                 vault_root=vault_root,
                 campaign_root=campaign_root,
                 run_id_prefix=run_id_prefix,
+                walltime=walltime,
                 concurrent_jobs=concurrent_jobs,
                 retry_limit=retry_limit,
             ),
@@ -925,6 +930,7 @@ def prepare_emb_34um_final_gate(
                 vault_root=vault_root,
                 campaign_root=campaign_root,
                 run_id_prefix=run_id_prefix,
+                walltime=walltime,
                 concurrent_jobs=concurrent_jobs,
                 retry_limit=retry_limit,
             ),
@@ -935,6 +941,7 @@ def prepare_emb_34um_final_gate(
                 vault_root=vault_root,
                 campaign_root=campaign_root,
                 run_id_prefix=run_id_prefix,
+                walltime=walltime,
                 concurrent_jobs=concurrent_jobs,
                 retry_limit=retry_limit,
             ),
@@ -945,6 +952,7 @@ def prepare_emb_34um_final_gate(
                 vault_root=vault_root,
                 campaign_root=campaign_root,
                 run_id_prefix=run_id_prefix,
+                walltime=walltime,
                 concurrent_jobs=concurrent_jobs,
                 retry_limit=retry_limit,
             ),
@@ -955,6 +963,7 @@ def prepare_emb_34um_final_gate(
                 vault_root=vault_root,
                 campaign_root=campaign_root,
                 run_id_prefix=run_id_prefix,
+                walltime=walltime,
                 concurrent_jobs=concurrent_jobs,
                 retry_limit=retry_limit,
             ),

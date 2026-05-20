@@ -173,11 +173,12 @@ def test_write_outputs_records_ka_kb_parameter_vector(tmp_path: Path) -> None:
     fake_module = types.SimpleNamespace(File=lambda *a, **k: _FakeH5File())
     sys.modules["h5py"] = fake_module
 
-    module._write_outputs(request, sample, retry_attempt=1)
+    module._write_outputs(request, sample, retry_attempt=1, runtime_seconds=12.5)
 
     result = json.loads((request.output_root / "emb_34um_result.json").read_text(encoding="utf-8"))
     assert result["parameter_names"] == ["ka", "kb", "b1", "b2", "a3", "a4"]
     assert result["parameters"] == list(request.parameter_vector)
+    assert result["runtime_seconds"] == 12.5
     assert "d0" not in result["parameter_names"]
     assert "sigma" not in result["parameter_names"]
 
