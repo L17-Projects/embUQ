@@ -1,14 +1,18 @@
-schema_version: 1
-name: legacy
-family: noise_hierarchy
-milestone: M1 Legacy Compatibility
-likelihood:
-  stage: M1
-  components:
-    - legacy
-  legacy_mode: emb_legacy
-backward_compatibility:
-  default_behavior: preserved
-  notes: M1 preserves existing EMB/GV likelihood wrappers before richer covariance terms are enabled.
-artifacts:
-  policy: docs/NOISE_MODEL_POLICY.md
+schema_version: "1.0"
+kind: noise
+metadata:
+  id: legacy
+  name: Legacy Noise Compatibility
+spec:
+  family: noise_hierarchy
+  milestone: M1 Legacy Compatibility
+  likelihood:
+    stage: M1
+    components:
+      - legacy
+    legacy_mode: emb_legacy
+  backward_compatibility:
+    default_behavior: preserved
+    notes: M1 preserves existing EMB/GV likelihood wrappers before richer covariance terms are enabled.
+  artifacts:
+    policy: docs/NOISE_MODEL_POLICY.md
