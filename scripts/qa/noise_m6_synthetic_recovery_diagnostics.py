@@ -30,6 +30,10 @@ def _write_json(path: Path, payload: MappingLike) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _artifact_ref(output_root: Path, path: Path) -> str:
+    return path.relative_to(output_root).as_posix()
+
+
 def _git_output(*args: str) -> str | None:
     try:
         completed = subprocess.run(
@@ -444,11 +448,13 @@ def main() -> None:
         "thresholds": thresholds.as_dict(),
         "required_scenarios": [record["scenario_id"] for record in records],
         "scenario_artifacts": {item["result"].scenario_id: item["artifacts"] for item in summaries},
+        "configs": {"primary": "configs/noise/synthetic_recovery.example.yaml"},
         "artifacts": {
-            "metrics": metrics_path.as_posix(),
-            "summary_csv": summary_csv.as_posix(),
-            **plots,
+            "metrics": _artifact_ref(output_root, metrics_path),
+            "summary_csv": _artifact_ref(output_root, summary_csv),
+            **{name: _artifact_ref(output_root, Path(plot_path)) for name, plot_path in plots.items()},
         },
+        "residual_risk": _residual_risk_notes(),
         "residual_risk_notes": _residual_risk_notes(),
     }
     _write_json(output_root / "synthetic_manifest.json", manifest)

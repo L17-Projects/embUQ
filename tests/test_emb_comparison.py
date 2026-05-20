@@ -127,11 +127,11 @@ def test_emb_comparison_diagnostics_script_writes_required_artifacts(tmp_path):
     assert manifest["required_scenarios"] == ["emb_compression_reference", "emb_indentation_reference"]
     assert metrics["all_scenarios_passed"] is True
     assert set(metrics["scenario_gate_statuses"].values()) == {"pass"}
-    assert Path(manifest["artifacts"]["report_md"]).exists()
+    assert (output_root / manifest["artifacts"]["report_md"]).exists()
     for scenario_id in manifest["required_scenarios"]:
         for path in manifest["scenario_artifacts"][scenario_id].values():
             assert Path(path).exists()
     for key in ("posterior_intervals", "predictive_bands", "residual_diagnostics", "metrics_table"):
-        path = Path(manifest["artifacts"][key])
+        path = output_root / manifest["artifacts"][key]
         assert path.exists()
         assert path.stat().st_size > 0

@@ -42,10 +42,26 @@ def _write_evidence(root: Path, label: str, *, clean: bool = True) -> Path:
                 "evidence_class": "validation_fixture",
                 "production_claim": False,
                 "required_scenarios": ["fixture"],
+                "configs": {"primary": "configs/noise/full_hierarchy.example.yaml"},
                 "artifacts": {
                     "metrics": metrics_path.as_posix(),
+                    "summary_csv": report_path.as_posix(),
+                    "calibration_summary": report_path.as_posix(),
+                    "covariance_heatmap": report_path.as_posix(),
+                    "gate06_summary": report_path.as_posix(),
+                    "metrics_table": report_path.as_posix(),
+                    "posterior_intervals": report_path.as_posix(),
+                    "ppc_observable_overlay": report_path.as_posix(),
+                    "ppc_summary_intervals": report_path.as_posix(),
+                    "predictive_bands": report_path.as_posix(),
+                    "recovery_parameter_intervals": report_path.as_posix(),
                     "report_md": report_path.as_posix(),
+                    "residual_diagnostics": report_path.as_posix(),
+                    "residual_whitened_hist": report_path.as_posix(),
+                    "sbc_rank_histogram": report_path.as_posix(),
+                    "synthetic_observable_overlay": report_path.as_posix(),
                 },
+                "residual_risk": "fixture residual risk",
             }
         ),
         encoding="utf-8",
@@ -105,6 +121,27 @@ def test_noise_config_validation_rejects_invalid_likelihood_components():
 
     assert invalid.passed is False
     assert any("spec.likelihood" in error and "not available for stage M2" in error for error in invalid.errors)
+
+
+def test_noise_config_validation_rejects_family_stage_mismatch():
+    invalid = validate_noise_config_document(
+        {
+            "schema_version": 1,
+            "kind": "noise",
+            "metadata": {"id": "bad_family_stage", "name": "Bad Family Stage"},
+            "spec": {
+                "family": "gaussian",
+                "likelihood": {
+                    "stage": "M5",
+                    "components": ["additive_noise", "relative_noise", "total_covariance"],
+                },
+            },
+        },
+        source="bad_family_stage.yaml",
+    )
+
+    assert invalid.passed is False
+    assert any("must be M2 for family 'gaussian'" in error for error in invalid.errors)
 
 
 

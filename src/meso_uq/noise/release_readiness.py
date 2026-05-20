@@ -92,6 +92,61 @@ _MODE_TO_CONFIG = {
     },
 }
 _VALIDATION_CONFIGS = {"synthetic_recovery", "predictive_checks", "emb_comparison"}
+_KIND_FAMILY_LIKELIHOOD_RULES = {
+    "gaussian": {
+        "stage": "M2",
+        "allowed_components": {"additive_noise", "relative_noise", "correlated_curve_noise", "heavy_tail"},
+        "required_components": {"additive_noise", "relative_noise"},
+    },
+    "measurement_uncertainty": {
+        "stage": "M3",
+        "allowed_components": {"additive_noise", "relative_noise", "contact_alignment", "geometry"},
+        "required_any_components": {"contact_alignment", "geometry"},
+    },
+    "surrogate_uncertainty": {
+        "stage": "M4",
+        "allowed_components": {"additive_noise", "relative_noise", "contact_alignment", "geometry", "surrogate_covariance"},
+        "required_components": {"surrogate_covariance"},
+    },
+    "model_discrepancy": {
+        "stage": "M5",
+        "allowed_components": {"model_discrepancy", "total_covariance"},
+        "required_components": {"model_discrepancy", "total_covariance"},
+    },
+    "full_hierarchy": {
+        "stage": "M5",
+        "allowed_components": set(_MODE_TO_CONFIG["full_hierarchy"]["components"]),
+        "required_components": set(_MODE_TO_CONFIG["full_hierarchy"]["components"]),
+    },
+}
+_REQUIRED_ARTIFACT_KEYS = {
+    "synthetic_recovery": {
+        "metrics",
+        "summary_csv",
+        "covariance_heatmap",
+        "recovery_parameter_intervals",
+        "residual_whitened_hist",
+        "synthetic_observable_overlay",
+    },
+    "predictive_checks": {
+        "metrics",
+        "summary_csv",
+        "calibration_summary",
+        "ppc_observable_overlay",
+        "ppc_summary_intervals",
+        "sbc_rank_histogram",
+    },
+    "emb_comparison": {
+        "metrics",
+        "summary_csv",
+        "gate06_summary",
+        "report_md",
+        "metrics_table",
+        "posterior_intervals",
+        "predictive_bands",
+        "residual_diagnostics",
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -172,6 +227,27 @@ def _compare_likelihood_to_mode(label: str, mode: str, spec: Any, errors: list[s
         errors.append(f"{label}: likelihood must resolve mode {mode!r} as stage={expected.stage}, components={list(expected.components)}, legacy_mode={expected.legacy_mode!r}.")
 
 
+def _validate_kind_family_likelihood(label: str, family: str, spec: Any, errors: list[str]) -> None:
+    rule = _KIND_FAMILY_LIKELIHOOD_RULES.get(family)
+    if rule is None:
+        return
+    stage = spec.stage.value
+    if stage != rule["stage"]:
+        errors.append(f"{label}: spec.likelihood.stage must be {rule['stage']} for family {family!r}, got {stage}.")
+    components = {component.value for component in spec.components}
+    unsupported = sorted(components - rule["allowed_components"])
+    if unsupported:
+        errors.append(f"{label}: spec.likelihood.components {unsupported} are not allowed for family {family!r}.")
+    missing = sorted(rule.get("required_components", set()) - components)
+    if missing:
+        errors.append(f"{label}: spec.likelihood.components is missing required components for family {family!r}: {missing}.")
+    required_any = rule.get("required_any_components", set())
+    if required_any and not (components & required_any):
+        errors.append(
+            f"{label}: spec.likelihood.components must include at least one of {sorted(required_any)} for family {family!r}."
+        )
+
+
 def validate_noise_config_document(document: Mapping[str, Any], *, source: str | Path = "<config>") -> NoiseConfigValidationResult:
     label = str(source)
     errors: list[str] = []
@@ -208,6 +284,8 @@ def validate_noise_config_document(document: Mapping[str, Any], *, source: str |
             errors.append(f"{label}: spec.likelihood is required for family {spec_family!r}.")
         elif likelihood is not None:
             likelihood_spec = _validate_likelihood_config(label, "spec.likelihood", likelihood, errors)
+            if likelihood_spec is not None and isinstance(spec_family, str):
+                _validate_kind_family_likelihood(label, spec_family, likelihood_spec, errors)
     else:
         name = document.get("name")
         if not isinstance(name, str) or not name.strip():
@@ -308,10 +386,13 @@ def build_noise_artifact_index(manifests: Mapping[str, str | Path]) -> dict[str,
             "scenario_gate_statuses": metrics.get("scenario_gate_statuses"),
             "commands": payload.get("commands", {}),
             "configs": payload.get("configs", payload.get("config", {})),
-            "residual_risk": payload.get("residual_risk", metrics.get("residual_risk_notes", metrics.get("known_limitations"))),
+            "residual_risk": payload.get(
+                "residual_risk",
+                payload.get("residual_risk_notes", metrics.get("residual_risk_notes", metrics.get("known_limitations"))),
+            ),
             "metric_summary": _summarize_metrics(metrics),
             "artifacts": artifacts,
-            "artifact_existence": _artifact_existence(artifacts),
+            "artifact_existence": _artifact_existence(path, artifacts),
         }
     return {"schema_version": 1, "entries": entries}
 
@@ -351,7 +432,18 @@ def evaluate_release_gate(
             failures.append(f"Evidence entry {label} does not record a git commit.")
         if not entry.get("commands"):
             failures.append(f"Evidence entry {label} does not record regeneration commands.")
-        missing_artifacts = [name for name, exists in entry.get("artifact_existence", {}).items() if exists is not True]
+        if not entry.get("configs"):
+            failures.append(f"Evidence entry {label} does not record config references.")
+        if not entry.get("residual_risk"):
+            failures.append(f"Evidence entry {label} does not record residual risk or limitations.")
+        artifact_existence = entry.get("artifact_existence")
+        if not isinstance(artifact_existence, dict) or not artifact_existence:
+            failures.append(f"Evidence entry {label} does not record artifact sidecar existence.")
+            artifact_existence = {}
+        missing_required = sorted(_REQUIRED_ARTIFACT_KEYS[label] - set(artifact_existence))
+        if missing_required:
+            failures.append(f"Evidence entry {label} is missing required artifact sidecars: {missing_required}.")
+        missing_artifacts = [name for name, exists in artifact_existence.items() if exists is not True]
         if missing_artifacts:
             failures.append(f"Evidence entry {label} has missing artifact sidecars: {missing_artifacts}.")
     if gate06_manifest.get("pass") is not True:
@@ -385,11 +477,12 @@ def _summarize_metrics(metrics: Mapping[str, Any]) -> dict[str, Any]:
     return summary
 
 
-def _artifact_existence(artifacts: Mapping[str, Any]) -> dict[str, bool]:
+def _artifact_existence(manifest_path: Path, artifacts: Mapping[str, Any]) -> dict[str, bool]:
     existence: dict[str, bool] = {}
     for key, value in artifacts.items():
-        if isinstance(value, str) and value:
-            existence[key] = Path(value).exists()
+        artifact_path = _resolve_artifact(manifest_path, value)
+        if artifact_path is not None:
+            existence[key] = artifact_path.exists()
     return existence
 
 
@@ -397,7 +490,7 @@ def _resolve_artifact(manifest_path: Path, value: Any) -> Path | None:
     if not isinstance(value, str) or not value:
         return None
     path = Path(value)
-    if path.is_absolute() or path.exists():
+    if path.is_absolute():
         return path
     return manifest_path.parent / path
 
