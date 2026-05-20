@@ -25,7 +25,7 @@ def _load_json(path: Path, label: str) -> MappingLike:
 
 def _resolve_artifact(manifest_path: Path, artifact: str) -> Path:
     candidate = Path(artifact)
-    if candidate.is_absolute() or candidate.exists():
+    if candidate.is_absolute():
         return candidate
     return manifest_path.parent / candidate
 

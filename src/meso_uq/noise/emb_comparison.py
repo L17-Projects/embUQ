@@ -167,6 +167,8 @@ class EmbComparisonInputs:
             for name, matrix in self.covariance_components.items()
         }
         parameter_names = tuple(str(name).strip() for name in self.parameter_names)
+        if not parameter_names:
+            raise ValueError("parameter_names must contain at least one parameter.")
         if any(not name for name in parameter_names):
             raise ValueError("parameter_names must be non-empty.")
         if len(set(parameter_names)) != len(parameter_names):

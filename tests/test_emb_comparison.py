@@ -65,6 +65,29 @@ def test_emb_comparison_fails_when_upgraded_uncertainty_is_narrower():
     assert any("narrower" in failure for failure in result.failures)
 
 
+def test_emb_comparison_rejects_empty_parameter_names():
+    inputs = _inputs()
+    with pytest.raises(ValueError, match="parameter_names must contain at least one"):
+        EmbComparisonInputs(
+            scenario_id=inputs.scenario_id,
+            modality=inputs.modality,
+            dataset_path=inputs.dataset_path,
+            config_id=inputs.config_id,
+            axis_name=inputs.axis_name,
+            axis_values=inputs.axis_values,
+            observable_name=inputs.observable_name,
+            observations=inputs.observations,
+            legacy_predictions=inputs.legacy_predictions,
+            legacy_standard_deviation=inputs.legacy_standard_deviation,
+            upgraded_predictions=inputs.upgraded_predictions,
+            upgraded_covariance=inputs.upgraded_covariance,
+            covariance_components=inputs.covariance_components,
+            parameter_names=(),
+            legacy_posterior_samples=((), (), ()),
+            upgraded_posterior_samples=((), (), ()),
+        )
+
+
 def test_emb_comparison_validation_errors_are_explicit():
     with pytest.raises(ValueError, match="covariance_components"):
         base = _inputs()
