@@ -234,6 +234,26 @@ def test_emb_34um_al_vs_lhs_validation_preserves_input_order_without_order_metad
     assert math.isclose(summary_rows[0]["al_median_curve_rel_l2_pct"], 20.0)
 
 
+def test_emb_34um_al_vs_lhs_validation_uses_f_delta_row_index_as_explicit_order() -> None:
+    rows = [
+        {"strategy": "al", "curve_id": "al-second", "round": 1, "f_delta_row_index": 2, "curve_rel_l2_pct": 2.0},
+        {"strategy": "al", "curve_id": "al-first", "round": 1, "f_delta_row_index": 1, "curve_rel_l2_pct": 1.0},
+        {"strategy": "lhs", "curve_id": "lhs-second", "f_delta_row_index": 2, "curve_rel_l2_pct": 5.0},
+        {"strategy": "lhs", "curve_id": "lhs-first", "f_delta_row_index": 1, "curve_rel_l2_pct": 4.0},
+    ]
+
+    manifest, summary_rows = build_emb_34um_al_vs_lhs_validation_report(curve_rows=rows)
+
+    assert [item["curve_id"] for item in manifest["curve_records"]] == [
+        "al-first",
+        "al-second",
+        "lhs-first",
+        "lhs-second",
+    ]
+    assert len(summary_rows) == 1
+    assert math.isclose(summary_rows[0]["al_median_curve_rel_l2_pct"], 1.5)
+
+
 def test_emb_34um_al_vs_lhs_validation_supports_runtime_rows_from_json_and_csv(tmp_path: Path) -> None:
     runtime_rows = (
         {
@@ -478,3 +498,26 @@ def test_emb_34um_al_vs_lhs_validation_groups_round_local_point_curve_ids() -> N
     assert manifest["prefix_curve_counts"] == [1, 2]
     assert len(summary_rows) == 2
     assert summary_rows[1]["al_curve_count"] == 2
+
+
+def test_emb_34um_al_vs_lhs_validation_accepts_legacy_pred_truth_point_aliases() -> None:
+    rows: list[dict[str, object]] = [
+        {
+            "strategy": "al",
+            "curve_id": "legacy-point",
+            "round": 1,
+            "force": force,
+            "pred": 1.01,
+            "truth": 1.0,
+        }
+        for force in (0.0, 1.0)
+    ]
+    rows.append(_curve_row(strategy="lhs", curve_id="lhs-c001", order=1, rel_l2_pct=5.0))
+
+    manifest, summary_rows = build_emb_34um_al_vs_lhs_validation_report(curve_rows=rows)
+
+    assert manifest["status"] == "ready"
+    assert manifest["curve_records"][0]["curve_id"] == "legacy-point"
+    assert manifest["curve_records"][0]["predicted_curve"] == (1.01, 1.01)
+    assert manifest["curve_records"][0]["reference_curve"] == (1.0, 1.0)
+    assert len(summary_rows) == 1

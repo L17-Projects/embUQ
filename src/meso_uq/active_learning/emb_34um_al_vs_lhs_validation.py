@@ -53,8 +53,8 @@ _REFERENCE_ALIASES = (
     "y_true",
     "truth",
 )
-_POINT_PREDICTED_ALIASES = ("predicted", "prediction", "y_pred", "y", "force_prediction")
-_POINT_REFERENCE_ALIASES = ("reference", "target", "y_true", "true", "force_reference")
+_POINT_PREDICTED_ALIASES = ("predicted", "prediction", "pred", "y_pred", "y", "force_prediction")
+_POINT_REFERENCE_ALIASES = ("reference", "target", "truth", "y_true", "true", "force_reference")
 _POINT_AXIS_ALIASES = ("force", "axis", "force_axis", "axis_point", "force_position")
 _KA_ALIASES = ("ka", "Yt", "yt", "YT")
 _KB_ALIASES = ("kb",)
@@ -72,7 +72,7 @@ _SAMPLE_SOURCE_ALIASES = ("sample_source", "source", "acquisition_source", "sele
 _ACQUISITION_SCORE_ALIASES = ("acquisition_score", "acq_score", "selected_candidate_score")
 _DISAGREEMENT_ALIASES = ("ensemble_disagreement", "disagreement", "acq_uncertainty", "uncertainty")
 _ROUND_SOURCE_ALIASES = ("round", "round_index", "iteration", "al_round")
-_ORDER_SOURCE_ALIASES = ("order", "index", "candidate_index", "curve_index", "row_index")
+_ORDER_SOURCE_ALIASES = ("order", "index", "candidate_index", "curve_index", "row_index", "f_delta_row_index")
 _SELECTED_ALIASES = (
     "selected",
     "selected_for_training",
