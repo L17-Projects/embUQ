@@ -834,6 +834,7 @@ def _runtime_rows(*record_groups: tuple[dict[str, Any], ...]) -> list[dict[str, 
                 {
                     "curve_id": record["curve_id"],
                     "candidate_id": record["candidate_id"],
+                    "runtime_join_key": record["candidate_id"],
                     "strategy": record["strategy"],
                     "round": record["round"],
                     "order": record["order"],
@@ -1031,12 +1032,14 @@ def _curve_metric_rows(
     for index, validation in enumerate(validation_records, start=1):
         selected = selected_rows[(index - 1) % len(selected_rows)] if selected_rows else validation
         candidate_id = str(selected.get("candidate_id", "") or validation.get("candidate_id", ""))
+        runtime_join_key = str(selected.get("candidate_id", "") or validation.get("candidate_id", ""))
         rows.append(
             {
                 "strategy": strategy,
                 "round": round_index,
                 "curve_id": f"{strategy}-r{round_index:02d}-v{index:03d}",
                 "candidate_id": candidate_id,
+                "runtime_join_key": runtime_join_key,
                 "order": index + (round_index - 1) * len(validation_records),
                 "ka": float(selected.get("ka", validation["ka"])),
                 "kb": float(selected.get("kb", validation["kb"])),

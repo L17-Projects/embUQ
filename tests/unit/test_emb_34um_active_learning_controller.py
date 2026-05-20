@@ -487,17 +487,15 @@ def test_emb_34um_active_learning_controller_builds_final_evidence_from_complete
     assert all(row["status"] == "completed" for row in runtime_rows)
     assert all(row["runtime_status_path"] for row in runtime_rows)
     assert all(row["candidate_id"] for row in curve_rows if row["strategy"] in {"al", "lhs"})
+    assert all(row["runtime_join_key"] == row["candidate_id"] for row in runtime_rows)
+    assert all(row["runtime_join_key"] for row in curve_rows if row["strategy"] in {"al", "lhs"})
 
-    runtime_map = {
-        (row["strategy"], int(row["round"]), row["candidate_id"]): row["runtime_seconds"]
-        for row in runtime_rows
-    }
+    runtime_map = {row["runtime_join_key"]: row["runtime_seconds"] for row in runtime_rows}
     for row in curve_rows:
         if row["strategy"] == "al":
-            expected = (row["strategy"], int(row["round"]), row["candidate_id"])
-            assert expected in runtime_map
+            assert row["runtime_join_key"] in runtime_map
         if row["strategy"] == "lhs":
-            assert ("lhs", 0, row["candidate_id"]) in runtime_map
+            assert row["runtime_join_key"] in runtime_map
     for round_index in (1, 2, 3):
         lhs_ids = [
             row["candidate_id"]
@@ -517,3 +515,12 @@ def test_emb_34um_active_learning_controller_builds_final_evidence_from_complete
         runtime_rows=runtime_rows,
     )
     assert validation_manifest["runtime_curve_count"] == len(curve_rows)
+    assert {
+        row["runtime_join_key"]: row.get("runtime_seconds")
+        for row in validation_manifest["curve_records"]
+        if row["strategy"] in {"al", "lhs"}
+    } == {
+        row["runtime_join_key"]: runtime_map[row["runtime_join_key"]]
+        for row in curve_rows
+        if row["strategy"] in {"al", "lhs"}
+    }
