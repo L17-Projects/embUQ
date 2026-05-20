@@ -58,6 +58,26 @@ def test_synthetic_recovery_thresholds_fail_biased_fixture():
     assert any("parameter bias" in failure for failure in result.failures)
 
 
+def test_synthetic_recovery_accepts_signed_child_covariance_components():
+    signed_cross = ((0.0, 0.2), (0.2, 0.0))
+
+    inputs = SyntheticRecoveryInputs(
+        scenario_id="signed_components",
+        seed=1,
+        design_matrix=((1.0,), (2.0,)),
+        observations=(1.0, 2.0),
+        true_parameters=(1.0,),
+        parameter_names=("slope",),
+        total_covariance=((1.0, 0.0), (0.0, 1.0)),
+        covariance_components={
+            "observation:additive": ((1.0, 0.0), (0.0, 1.0)),
+            "model_discrepancy_cross:signed": signed_cross,
+        },
+    )
+
+    assert inputs.covariance_components["model_discrepancy_cross:signed"] == signed_cross
+
+
 def test_synthetic_recovery_validation_errors_are_explicit():
     with pytest.raises(ValueError, match="row count"):
         SyntheticRecoveryInputs(

@@ -55,13 +55,19 @@ def _coerce_matrix(value: Sequence[Sequence[float]], label: str, *, rows: int | 
     return matrix
 
 
-def _coerce_square_matrix(value: Sequence[Sequence[float]], label: str, *, size: int) -> np.ndarray:
+def _coerce_square_matrix(
+    value: Sequence[Sequence[float]],
+    label: str,
+    *,
+    size: int,
+    require_psd: bool = True,
+) -> np.ndarray:
     matrix = _coerce_matrix(value, label)
     if matrix.shape != (size, size):
         raise ValueError(f"{label} shape {matrix.shape} does not match expected {(size, size)}.")
     if not np.allclose(matrix, matrix.T, rtol=0.0, atol=1e-10):
         raise ValueError(f"{label} must be symmetric.")
-    if np.min(np.linalg.eigvalsh(0.5 * matrix + 0.5 * matrix.T)) < -1e-10:
+    if require_psd and np.min(np.linalg.eigvalsh(0.5 * matrix + 0.5 * matrix.T)) < -1e-10:
         raise ValueError(f"{label} must be positive semidefinite.")
     return matrix
 
@@ -149,7 +155,9 @@ class SyntheticRecoveryInputs:
         if not self.covariance_components:
             raise ValueError("covariance_components must contain at least one named component.")
         components = {
-            str(name): _as_tuple_matrix(_coerce_square_matrix(matrix, f"covariance_components[{name}]", size=point_count))
+            str(name): _as_tuple_matrix(
+                _coerce_square_matrix(matrix, f"covariance_components[{name}]", size=point_count, require_psd=False)
+            )
             for name, matrix in self.covariance_components.items()
         }
         expected = None
