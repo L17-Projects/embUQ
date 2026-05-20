@@ -171,6 +171,7 @@ def test_emb_34um_al_vs_lhs_validation_parses_string_selected_and_quarantined_fl
     rows = [
         _curve_row(strategy="al", curve_id="al-not-selected", round_index=1, order=1, rel_l2_pct=2.0),
         _curve_row(strategy="al", curve_id="al-selected", round_index=1, order=2, rel_l2_pct=1.0),
+        _curve_row(strategy="al", curve_id="al-quarantined", round_index=1, order=3, rel_l2_pct=9.0),
         _curve_row(strategy="lhs", curve_id="lhs-active", order=1, rel_l2_pct=5.0),
         _curve_row(strategy="lhs", curve_id="lhs-active-2", order=2, rel_l2_pct=6.0),
         _curve_row(strategy="lhs", curve_id="lhs-quarantined", order=3, rel_l2_pct=4.0),
@@ -178,20 +179,23 @@ def test_emb_34um_al_vs_lhs_validation_parses_string_selected_and_quarantined_fl
     rows[0]["selected"] = "False"
     rows[0]["quarantined"] = "False"
     rows[1]["selected"] = "True"
-    rows[2]["selected"] = "False"
-    rows[2]["quarantined"] = "False"
+    rows[2]["quarantined"] = "True"
+    rows[3]["selected"] = "False"
     rows[3]["quarantined"] = "False"
-    rows[4]["quarantined"] = "True"
+    rows[4]["quarantined"] = "False"
+    rows[5]["quarantined"] = "True"
 
     manifest, summary_rows = build_emb_34um_al_vs_lhs_validation_report(curve_rows=rows)
 
     assert manifest["status"] == "ready"
-    assert manifest["skipped_row_reasons"] == {"quarantined": 1}
+    assert manifest["skipped_row_reasons"] == {}
     assert manifest["al_curve_count"] == 2
     assert manifest["lhs_curve_count"] == 2
     assert [item["curve_id"] for item in manifest["selected_samples"]] == ["al-selected"]
     assert manifest["curve_records"][0]["selected"] is False
-    assert manifest["curve_records"][2]["quarantined"] is False
+    assert any(item["curve_id"] == "al-quarantined" and item["quarantined"] for item in manifest["curve_records"])
+    assert any(item["curve_id"] == "lhs-quarantined" and item["quarantined"] for item in manifest["curve_records"])
+    assert manifest["round_evidence"][0]["al_quarantine_count"] == 1
     assert len(summary_rows) == 1
 
 
@@ -349,6 +353,9 @@ def test_emb_34um_al_vs_lhs_validation_attaches_runtime_by_explicit_join_key() -
     attached = {row["curve_id"]: row.get("runtime_seconds") for row in manifest["curve_records"]}
     assert attached["al-r01-v001"] == 9.5
     assert manifest["runtime_curve_count"] == 1
+    assert manifest["runtime_missing_curve_count"] == 1
+    assert manifest["status"] == "blocked"
+    assert any("Runtime evidence is missing" in item for item in manifest["blockers"])
 
 
 def test_emb_34um_al_vs_lhs_validation_uses_json_null_without_runtime_values() -> None:

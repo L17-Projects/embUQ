@@ -449,9 +449,6 @@ def _extract_curve_records(rows: Sequence[Mapping[str, Any]]) -> tuple[tuple[dic
             else:
                 skip("invalid_selected_flag")
             continue
-        if quarantined:
-            skip("quarantined")
-            continue
         ka, kb = _coerce_ka_kb(row)
         force_axis = _coerce_force_axis(row)
         failure_reason = _first_text(row, aliases=("reason", "reason_code", "failure_reason"))
@@ -662,13 +659,21 @@ def _derive_prefix_counts(
     )
 
 
+def _is_metric_eligible(record: Mapping[str, Any]) -> bool:
+    return not (
+        bool(record.get("failed"))
+        or bool(record.get("quarantined"))
+        or bool(record.get("replacement"))
+    )
+
+
 def _build_summary_rows(
     *,
     curve_records: Sequence[Mapping[str, Any]],
     prefix_curve_counts: Sequence[int] | None,
 ) -> tuple[dict[str, Any], ...]:
-    al_records = [item for item in curve_records if item["strategy"] == "al"]
-    lhs_records = [item for item in curve_records if item["strategy"] == "lhs"]
+    al_records = [item for item in curve_records if item["strategy"] == "al" and _is_metric_eligible(item)]
+    lhs_records = [item for item in curve_records if item["strategy"] == "lhs" and _is_metric_eligible(item)]
     counts = _derive_prefix_counts(al_records, lhs_records, explicit_prefix_curve_counts=prefix_curve_counts)
     rows: list[dict[str, Any]] = []
     for count in counts:
@@ -1260,16 +1265,20 @@ def build_emb_34um_al_vs_lhs_validation_report(
             skipped[reason] = skipped.get(reason, 0) + count
     summary_rows = _build_summary_rows(curve_records=curve_records, prefix_curve_counts=prefix_curve_counts)
     round_rows = _build_round_evidence(curve_records)
-    al_count = sum(1 for item in curve_records if item["strategy"] == "al")
-    lhs_count = sum(1 for item in curve_records if item["strategy"] == "lhs")
+    eligible_curve_records = tuple(item for item in curve_records if _is_metric_eligible(item))
+    al_count = sum(1 for item in eligible_curve_records if item["strategy"] == "al")
+    lhs_count = sum(1 for item in eligible_curve_records if item["strategy"] == "lhs")
     runtime_rows_payload = _coerce_plot_records(
         [
             item
-            for item in curve_records
+            for item in eligible_curve_records
             if item.get("runtime_seconds") is not None
         ]
     )
     runtime_values = [float(item["runtime_seconds"]) for item in runtime_rows_payload]
+    runtime_coverage_required = runtime_rows is not None
+    runtime_expected_count = len(eligible_curve_records)
+    runtime_missing_count = max(runtime_expected_count - len(runtime_rows_payload), 0)
 
     blockers: list[str] = []
     limitations: list[str] = []
@@ -1281,6 +1290,10 @@ def build_emb_34um_al_vs_lhs_validation_report(
         blockers.append("No LHS comparator curve rows with curve metrics were available.")
     if not summary_rows:
         blockers.append("No paired AL/LHS prefix summary could be computed.")
+    if runtime_coverage_required and runtime_missing_count:
+        blockers.append(
+            f"Runtime evidence is missing for {runtime_missing_count} of {runtime_expected_count} usable curve rows."
+        )
     if not adaptive_acquisition_available:
         limitations.append(
             "Adaptive acquisition engine was not supplied; AL prefixes are evaluated from provided rows only."
@@ -1303,6 +1316,14 @@ def build_emb_34um_al_vs_lhs_validation_report(
         "runtime_seconds_count": len(runtime_values),
         "runtime_seconds_total": float(sum(runtime_values)) if runtime_values else 0.0,
         "runtime_seconds_median": statistics.median(runtime_values) if runtime_values else None,
+        "runtime_coverage_required": bool(runtime_coverage_required),
+        "runtime_expected_curve_count": runtime_expected_count,
+        "runtime_missing_curve_count": runtime_missing_count,
+        "runtime_coverage_fraction": (
+            float(len(runtime_rows_payload) / runtime_expected_count)
+            if runtime_expected_count
+            else 1.0
+        ),
         "skipped_row_reasons": skipped,
         "prefix_curve_counts": [int(item["prefix_curve_count"]) for item in summary_rows],
         "adaptive_acquisition": {
@@ -1328,7 +1349,7 @@ def build_emb_34um_al_vs_lhs_validation_report(
         "selected_samples": [item for item in curve_records if bool(item.get("selected"))],
         "blockers": blockers,
         "limitations": limitations,
-        "status": "ready" if summary_rows else "blocked",
+        "status": "ready" if not blockers else "blocked",
         "metadata": dict(metadata or {}),
     }
     return manifest, summary_rows
