@@ -16,10 +16,8 @@ def _as_float_tuple(values: NumberSequence) -> tuple[float, ...]:
 def _as_float_rows(values: NumberMatrix) -> tuple[tuple[float, ...], ...]:
     rows = tuple(tuple(float(item) for item in row) for row in values)
     if not rows:
-        raise ValueError("Legacy likelihood batch inputs must contain at least one row.")
+        return rows
     width = len(rows[0])
-    if width == 0:
-        raise ValueError("Legacy likelihood batch rows must contain at least one value.")
     for row in rows:
         if len(row) != width:
             raise ValueError("Legacy likelihood batch rows must all have the same width.")

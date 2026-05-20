@@ -22,7 +22,9 @@ from meso_uq.noise import (
     compose_toy_likelihood,
     get_model_support,
     legacy_compression_direct_likelihood,
+    legacy_compression_surrogate_batch_likelihood,
     legacy_compression_surrogate_likelihood,
+    legacy_indentation_adjusted_batch_likelihood,
     legacy_indentation_direct_standard_deviation,
     legacy_indentation_surrogate_likelihood,
     legacy_multiplicative_likelihood,
@@ -164,6 +166,20 @@ def test_posterior_none_never_contributes_uncertainty_even_with_sigma_value():
 
     assert composed.posterior_variance == (0.0, 0.0)
     assert composed.total_variance == composed.measurement_variance
+
+
+def test_legacy_batch_likelihood_allows_empty_batch_edges():
+    empty = legacy_compression_surrogate_batch_likelihood([], 0.1)
+    assert empty.reference_evaluations == ()
+    assert empty.standard_deviation == ()
+    sample: dict[str, object] = {}
+    empty.assign_to_sample(sample)
+    assert sample["Batch Reference Evaluations"] == []
+    assert sample["Batch Standard Deviation"] == []
+
+    zero_width = legacy_indentation_adjusted_batch_likelihood([[], []], [0.1, 0.2])
+    assert zero_width.reference_evaluations == ((), ())
+    assert zero_width.standard_deviation == ((), ())
 
 
 def test_legacy_likelihood_wrapper_preserves_emb_and_gv_golden_values():
