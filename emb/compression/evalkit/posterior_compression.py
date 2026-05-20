@@ -43,6 +43,11 @@ here = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(here, "../.."))
 sys.path.insert(0, os.path.join(here, "../../src"))
 
+from meso_uq.noise.legacy import (
+    legacy_compression_direct_likelihood,
+    legacy_compression_surrogate_batch_likelihood,
+    legacy_compression_surrogate_likelihood,
+)
 from meso_uq.workflow_acceleration import (
     expand_parameter_vector,
     expand_reduced_parameters,
@@ -154,8 +159,7 @@ def compute_compression_surrogate(
     displ_corrected = [max(0.0, d - d0) for d in displ]
     if backend == "dnn":
         forces = surrogate.evaluate_compression(x=[Yt, kb, b1, b2, a3, a4], disp=displ_corrected)
-        sample["Reference Evaluations"] = forces
-        sample["Standard Deviation"] = [sigma * val for val in forces]
+        legacy_compression_surrogate_likelihood(forces, sigma).assign_to_sample(sample)
         return
 
     force_mean, force_std = surrogate.evaluate_compression(
@@ -166,10 +170,11 @@ def compute_compression_surrogate(
     )
     force_mean_arr = np.asarray(force_mean, dtype=np.float64)
     force_std_arr = np.asarray(force_std, dtype=np.float64)
-    obs_std_arr = sigma * np.abs(force_mean_arr)
-    total_std_arr = np.sqrt(np.square(force_std_arr) + np.square(obs_std_arr))
-    sample["Reference Evaluations"] = force_mean_arr.tolist()
-    sample["Standard Deviation"] = total_std_arr.tolist()
+    legacy_compression_surrogate_likelihood(
+        force_mean_arr,
+        sigma,
+        surrogate_standard_deviation=force_std_arr,
+    ).assign_to_sample(sample)
 
 
 def compute_compression_surrogate_batch(
@@ -203,8 +208,7 @@ def compute_compression_surrogate_batch(
         forces = surrogate.evaluate_compression_batch(
             theta, disp=displ, d0=d0, chunk_size=particle_batch_size
         )
-        sample["Batch Reference Evaluations"] = forces.tolist()
-        sample["Batch Standard Deviation"] = (sigma[:, None] * forces).tolist()
+        legacy_compression_surrogate_batch_likelihood(forces, sigma).assign_to_sample(sample)
         return
 
     force_mean, force_std = surrogate.evaluate_compression_batch(
@@ -215,10 +219,11 @@ def compute_compression_surrogate_batch(
         predictive_mc_samples=predictive_mc_samples,
         predictive_mc_chunk_size=predictive_mc_chunk_size,
     )
-    obs_std = sigma[:, None] * np.abs(force_mean)
-    total_std = np.sqrt(np.square(force_std) + np.square(obs_std))
-    sample["Batch Reference Evaluations"] = force_mean.tolist()
-    sample["Batch Standard Deviation"] = total_std.tolist()
+    legacy_compression_surrogate_batch_likelihood(
+        force_mean,
+        sigma,
+        surrogate_standard_deviation=force_std,
+    ).assign_to_sample(sample)
 
 
 def compute_compression(
@@ -302,8 +307,7 @@ def compute_compression(
         measured_forces.append(np.mean(forces_num))
         last_d = d
         n_ref += 1
-    sample["Reference Evaluations"] = measured_forces
-    sample["Standard Deviation"] = [sig for _ in measured_forces]
+    legacy_compression_direct_likelihood(measured_forces, sig).assign_to_sample(sample)
 
 
 def adjust_simu_params(

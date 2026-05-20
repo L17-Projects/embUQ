@@ -9,6 +9,7 @@ from typing import Any, Iterable, Mapping, MutableMapping, Sequence
 import numpy as np
 
 from meso_uq.experiments import ExperimentSpec
+from meso_uq.noise.legacy import legacy_multiplicative_likelihood
 from meso_uq.structures import get_structure
 from meso_uq.workflow_acceleration import (
     active_hierarchical_variable_names,
@@ -547,7 +548,14 @@ def _evaluate_gv_dnn_reference(sample_data: MutableMapping[str, Any], context: M
     predictions = _predict_gv_dnn(context["model_state"], x_raw)
     if "d0" in parameter_values:
         predictions = predictions + float(parameter_values["d0"])
-    sample_data["Reference Evaluations"] = predictions.tolist()
+    if "sigma" in parameter_values:
+        legacy_multiplicative_likelihood(
+            predictions,
+            float(parameter_values["sigma"]),
+            absolute_reference=True,
+        ).assign_to_sample(sample_data)
+    else:
+        sample_data["Reference Evaluations"] = predictions.tolist()
 
 
 def _gv_dataset_entries(

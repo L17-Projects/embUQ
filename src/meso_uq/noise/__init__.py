@@ -1,3 +1,9 @@
+from meso_uq.noise.composite import (
+    CompositeLikelihoodSpec,
+    LikelihoodComponent,
+    LikelihoodStage,
+    build_composite_likelihood_spec,
+)
 from meso_uq.noise.contracts import (
     DiscrepancyConfig,
     DiscrepancyKind,
@@ -12,6 +18,18 @@ from meso_uq.noise.contracts import (
     ToyLikelihood,
     compose_toy_likelihood,
 )
+from meso_uq.noise.legacy import (
+    LegacyBatchLikelihoodResult,
+    LegacyLikelihoodResult,
+    legacy_compression_direct_likelihood,
+    legacy_compression_surrogate_batch_likelihood,
+    legacy_compression_surrogate_likelihood,
+    legacy_indentation_adjusted_batch_likelihood,
+    legacy_indentation_adjusted_likelihood,
+    legacy_indentation_direct_standard_deviation,
+    legacy_indentation_surrogate_likelihood,
+    legacy_multiplicative_likelihood,
+)
 from meso_uq.noise.registry import (
     NoiseModelSpec,
     build_model_config,
@@ -22,8 +40,13 @@ from meso_uq.noise.registry import (
 )
 
 __all__ = [
+    "CompositeLikelihoodSpec",
     "DiscrepancyConfig",
     "DiscrepancyKind",
+    "LegacyBatchLikelihoodResult",
+    "LegacyLikelihoodResult",
+    "LikelihoodComponent",
+    "LikelihoodStage",
     "MeasurementErrorConfig",
     "MeasurementErrorKind",
     "NoiseModelConfig",
@@ -34,9 +57,18 @@ __all__ = [
     "SurrogateErrorConfig",
     "SurrogateUncertaintyKind",
     "ToyLikelihood",
+    "build_composite_likelihood_spec",
     "build_model_config",
     "compose_toy_likelihood",
     "get_model_support",
+    "legacy_compression_direct_likelihood",
+    "legacy_compression_surrogate_batch_likelihood",
+    "legacy_compression_surrogate_likelihood",
+    "legacy_indentation_adjusted_batch_likelihood",
+    "legacy_indentation_adjusted_likelihood",
+    "legacy_indentation_direct_standard_deviation",
+    "legacy_indentation_surrogate_likelihood",
+    "legacy_multiplicative_likelihood",
     "list_model_ids",
     "list_model_support_metadata",
     "supports_for_observable",

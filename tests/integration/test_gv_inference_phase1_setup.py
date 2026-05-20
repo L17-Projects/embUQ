@@ -690,6 +690,7 @@ def test_gv_phase1_execution_runs_single_lane_dnn_korali_manifest(
     assert experiment["Problem"]["Type"] == "Bayesian/Reference"
     assert experiment["Problem"]["Reference Data"] == [0.0]
     assert fake_korali.created_engines[-1].sample_data["Reference Evaluations"] == [1.0]
+    assert fake_korali.created_engines[-1].sample_data["Standard Deviation"] == [0.5]
 
 
 def test_gv_phase1_execution_consumes_smoke_dnn_artifact(
@@ -745,8 +746,12 @@ def test_gv_phase1_execution_consumes_smoke_dnn_artifact(
     )
     experiment = fake_korali.created_experiments[0]
     reference_data = experiment["Problem"]["Reference Data"]
-    reference_evaluations = fake_korali.created_engines[-1].sample_data["Reference Evaluations"]
+    sample_data = fake_korali.created_engines[-1].sample_data
+    reference_evaluations = sample_data["Reference Evaluations"]
+    standard_deviation = sample_data["Standard Deviation"]
     assert manifest["status"] == "phase1_korali_completed"
     assert manifest["runtime"]["korali_invoked"] is True
     assert manifest["provenance"]["surrogate_artifact"].endswith("gv_surrogate_dnn_smoke.pkl")
     assert len(reference_evaluations) == len(reference_data) == 3
+    assert len(standard_deviation) == len(reference_data)
+    assert all(value >= 0.0 for value in standard_deviation)

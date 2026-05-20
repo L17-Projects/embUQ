@@ -426,6 +426,63 @@ def test_compute_indentation_surrogate_dnn_applies_positive_shift(monkeypatch: p
     assert sample["Standard Deviation"] == pytest.approx([0.0, 0.1])
 
 
+def test_compute_compression_surrogate_bnn_preserves_legacy_quadrature(monkeypatch: pytest.MonkeyPatch) -> None:
+    stub = _CompressionBnnStub()
+    monkeypatch.setattr(posterior_compression, "_resolve_project_root", lambda: "/repo")
+    monkeypatch.setattr(posterior_compression, "_load_config", lambda _root: {"surrogate": {"backend": "bnn"}})
+    monkeypatch.setattr(posterior_compression, "_resolve_surrogate_runtime", lambda _config: ("bnn", 7, 3))
+    monkeypatch.setattr(
+        posterior_compression,
+        "expand_parameter_vector",
+        lambda params, fixed_params=None: np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 0.25, 0.5]),
+    )
+    monkeypatch.setattr(posterior_compression, "get_fixed_parameters", lambda _config: {})
+    monkeypatch.setattr(posterior_compression, "_get_surrogate", lambda *args, **kwargs: stub)
+
+    sample = {"Parameters": [0.0] * 8}
+    posterior_compression.compute_compression_surrogate(sample, displ=[0.0, 1.0], diameter_um=2.1)
+
+    assert stub.single_call == {
+        "x": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        "disp": [0.0, 0.75],
+        "predictive_mc_samples": 7,
+        "predictive_mc_chunk_size": 3,
+    }
+    assert sample["Reference Evaluations"] == [2.0, 4.0]
+    assert sample["Standard Deviation"] == pytest.approx(
+        [np.sqrt(0.3**2 + 1.0**2), np.sqrt(0.4**2 + 2.0**2)]
+    )
+
+
+def test_compute_indentation_surrogate_bnn_preserves_legacy_shifted_quadrature(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stub = _IndentationBnnStub()
+    monkeypatch.setattr(posterior_indentation, "_resolve_project_root", lambda: "/repo")
+    monkeypatch.setattr(posterior_indentation, "_load_config", lambda _root: {"dump": False, "surrogate": {"backend": "bnn"}})
+    monkeypatch.setattr(posterior_indentation, "_get_dump_flag", lambda: False)
+    monkeypatch.setattr(posterior_indentation, "_resolve_surrogate_runtime", lambda _config: ("bnn", 11, 5))
+    monkeypatch.setattr(
+        posterior_indentation,
+        "expand_parameter_vector",
+        lambda params, fixed_params=None: np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, -2.0, 0.1]),
+    )
+    monkeypatch.setattr(posterior_indentation, "get_fixed_parameters", lambda _config: {})
+    monkeypatch.setattr(posterior_indentation, "_get_surrogate", lambda *args, **kwargs: stub)
+
+    sample = {"Parameters": [0.0] * 8}
+    posterior_indentation.compute_indentation_surrogate(sample, forces=[-1.0, 2.0], diameter_um=3.2)
+
+    assert stub.single_call == {
+        "x": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        "forces": [-1.0, 2.0],
+        "predictive_mc_samples": 11,
+        "predictive_mc_chunk_size": 5,
+    }
+    assert sample["Reference Evaluations"] == [0.0, 1.0]
+    assert sample["Standard Deviation"] == pytest.approx([0.2, np.sqrt(0.5**2 + 0.1**2)])
+
+
 def test_compute_compression_surrogate_batch_supports_all_parameter_layouts(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(posterior_compression, "_resolve_project_root", lambda: "/repo")
     monkeypatch.setattr(

@@ -38,6 +38,11 @@ except ModuleNotFoundError:  # pragma: no cover - optional in lightweight test e
     MPI = _FallbackMPI()
 
 from emb.indentation.evalkit.tools import dated_print
+from meso_uq.noise.legacy import (
+    legacy_indentation_adjusted_batch_likelihood,
+    legacy_indentation_direct_standard_deviation,
+    legacy_indentation_surrogate_likelihood,
+)
 from meso_uq.workflow_acceleration import (
     expand_parameter_vector,
     expand_reduced_parameters,
@@ -149,9 +154,7 @@ def compute_indentation_surrogate(
     surrogate = _get_surrogate(project_root, diameter_um, device=device, backend=backend)
     if backend == "dnn":
         displacements = surrogate.evaluate_indentation(x=[Yt, kb, b1, b2, a3, a4], forces=forces)
-        displacements = np.maximum(0.0, np.asarray(displacements) + d0)
-        sample["Reference Evaluations"] = displacements.tolist()
-        sample["Standard Deviation"] = (sigma * displacements).tolist()
+        legacy_indentation_surrogate_likelihood(displacements, sigma, d0=d0).assign_to_sample(sample)
         return
 
     disp_mean, disp_std = surrogate.evaluate_indentation(
@@ -160,17 +163,20 @@ def compute_indentation_surrogate(
         predictive_mc_samples=predictive_mc_samples,
         predictive_mc_chunk_size=predictive_mc_chunk_size,
     )
-    disp_mean_arr = np.maximum(0.0, np.asarray(disp_mean, dtype=np.float64) + d0)
+    disp_mean_arr = np.asarray(disp_mean, dtype=np.float64)
     disp_std_arr = np.asarray(disp_std, dtype=np.float64)
-    obs_std_arr = sigma * np.abs(disp_mean_arr)
-    total_std_arr = np.sqrt(np.square(disp_std_arr) + np.square(obs_std_arr))
+    likelihood = legacy_indentation_surrogate_likelihood(
+        disp_mean_arr,
+        sigma,
+        d0=d0,
+        surrogate_standard_deviation=disp_std_arr,
+    )
     comm = _get_worker_comm()
     if dump and comm.Get_rank() == 0:
         print(
             f"[Korali] Indentation surrogate [D={diameter_um}um] | Yt={Yt:.0f}, kb={kb:.0f}, b1={b1:.2f}, b2={b2:.2f}, a3={a3:.2f}, a4={a4:.2f}, d0={d0:.4f}"
         )
-    sample["Reference Evaluations"] = disp_mean_arr.tolist()
-    sample["Standard Deviation"] = total_std_arr.tolist()
+    likelihood.assign_to_sample(sample)
 
 
 def compute_indentation_surrogate_batch(
@@ -204,8 +210,7 @@ def compute_indentation_surrogate_batch(
         displacements = surrogate.evaluate_indentation_batch(
             theta, forces=forces, d0=d0, chunk_size=particle_batch_size
         )
-        sample["Batch Reference Evaluations"] = displacements.tolist()
-        sample["Batch Standard Deviation"] = (sigma[:, None] * displacements).tolist()
+        legacy_indentation_adjusted_batch_likelihood(displacements, sigma).assign_to_sample(sample)
         return
 
     disp_mean, disp_std = surrogate.evaluate_indentation_batch(
@@ -216,10 +221,11 @@ def compute_indentation_surrogate_batch(
         predictive_mc_samples=predictive_mc_samples,
         predictive_mc_chunk_size=predictive_mc_chunk_size,
     )
-    obs_std = sigma[:, None] * np.abs(disp_mean)
-    total_std = np.sqrt(np.square(disp_std) + np.square(obs_std))
-    sample["Batch Reference Evaluations"] = disp_mean.tolist()
-    sample["Batch Standard Deviation"] = total_std.tolist()
+    legacy_indentation_adjusted_batch_likelihood(
+        disp_mean,
+        sigma,
+        surrogate_standard_deviation=disp_std,
+    ).assign_to_sample(sample)
 
 
 def adjust_simu_params(sample_param, filename_1_simu, filename_2_simu):
@@ -460,7 +466,7 @@ def compute_indentation(  # pragma: no cover
         diam_vert.append(final_dist)
         std_diam_vert.append(std_dist)
         sample["Reference Evaluations"] += [final_dist]
-        sample["Standard Deviation"] += [sig * final_dist]
+        sample["Standard Deviation"] += [legacy_indentation_direct_standard_deviation(final_dist, sig)]
         n_ref += 1
 
         if dump and rank == 0:
