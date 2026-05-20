@@ -329,6 +329,36 @@ def test_emb_34um_al_vs_lhs_validation_attaches_runtime_by_candidate_id() -> Non
     assert manifest["runtime_curve_count"] == 2
 
 
+def test_emb_34um_al_vs_lhs_validation_attaches_runtime_by_explicit_join_key() -> None:
+    rows = [
+        {
+            **_curve_row(strategy="al", curve_id="al-r01-v001", round_index=1, order=1, rel_l2_pct=1.0),
+            "runtime_join_key": "candidate-source-001",
+        },
+        _curve_row(strategy="lhs", curve_id="lhs-c001", order=1, rel_l2_pct=3.0),
+    ]
+    runtime_rows = [
+        {"candidate_id": "candidate-source-001", "runtime_seconds": 9.5, "round": 1},
+    ]
+
+    manifest, _ = build_emb_34um_al_vs_lhs_validation_report(
+        curve_rows=rows,
+        runtime_rows=runtime_rows,
+    )
+
+    attached = {row["curve_id"]: row.get("runtime_seconds") for row in manifest["curve_records"]}
+    assert attached["al-r01-v001"] == 9.5
+    assert manifest["runtime_curve_count"] == 1
+
+
+def test_emb_34um_al_vs_lhs_validation_uses_json_null_without_runtime_values() -> None:
+    manifest, _ = build_emb_34um_al_vs_lhs_validation_report(curve_rows=_validation_rows())
+
+    assert manifest["runtime_seconds_count"] == 0
+    assert manifest["runtime_seconds_median"] is None
+    json.dumps(manifest, allow_nan=False)
+
+
 def test_emb_34um_al_vs_lhs_validation_marks_ingestion_only_rows_blocked(tmp_path: Path) -> None:
     ingestion_only = {
         "records": [

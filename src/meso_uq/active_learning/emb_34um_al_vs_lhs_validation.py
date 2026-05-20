@@ -73,6 +73,15 @@ _ACQUISITION_SCORE_ALIASES = ("acquisition_score", "acq_score", "selected_candid
 _DISAGREEMENT_ALIASES = ("ensemble_disagreement", "disagreement", "acq_uncertainty", "uncertainty")
 _ROUND_SOURCE_ALIASES = ("round", "round_index", "iteration", "al_round")
 _ORDER_SOURCE_ALIASES = ("order", "index", "candidate_index", "curve_index", "row_index", "f_delta_row_index")
+_RUNTIME_JOIN_KEY_ALIASES = (
+    "runtime_join_key",
+    "join_key",
+    "selected_candidate_id",
+    "sample_candidate_id",
+    "source_candidate_id",
+    "training_candidate_id",
+    "validation_candidate_id",
+)
 _SELECTED_ALIASES = (
     "selected",
     "selected_for_training",
@@ -247,6 +256,15 @@ def _first_text(row: Mapping[str, Any], aliases: Sequence[str]) -> str | None:
     return None
 
 
+def _runtime_join_keys(row: Mapping[str, Any]) -> tuple[str, ...]:
+    keys: list[str] = []
+    for alias in (*_RUNTIME_JOIN_KEY_ALIASES, "candidate_id", "curve_id", "sample_id", "sample", "id"):
+        value = str(row.get(alias) or "").strip()
+        if value and value not in keys:
+            keys.append(value)
+    return tuple(keys)
+
+
 def _curve_rel_l2_pct(predicted: Sequence[float], reference: Sequence[float]) -> float:
     if len(predicted) != len(reference) or not predicted:
         raise ValueError("predicted and reference curves must have the same non-zero length.")
@@ -410,6 +428,7 @@ def _extract_curve_records(rows: Sequence[Mapping[str, Any]]) -> tuple[tuple[dic
             continue
 
         source = _coerce_sample_source(row)
+        runtime_join_key = _first_text(row, aliases=_RUNTIME_JOIN_KEY_ALIASES)
         try:
             acquisition_score = _first_scalar(row, _ACQUISITION_SCORE_ALIASES)
             disagreement = _first_scalar(row, _DISAGREEMENT_ALIASES)
@@ -445,6 +464,7 @@ def _extract_curve_records(rows: Sequence[Mapping[str, Any]]) -> tuple[tuple[dic
                     "curve_id": curve_id,
                     "order": order,
                     "candidate_id": _first_text(row, aliases=("candidate_id",)) or curve_id,
+                    "runtime_join_key": runtime_join_key,
                     "curve_rel_l2_pct": metric_value,
                     "ka": ka,
                     "kb": kb,
@@ -488,6 +508,7 @@ def _extract_curve_records(rows: Sequence[Mapping[str, Any]]) -> tuple[tuple[dic
                     "curve_id": curve_id,
                     "order": order,
                     "candidate_id": _first_text(row, aliases=("candidate_id",)) or curve_id,
+                    "runtime_join_key": runtime_join_key,
                     "curve_rel_l2_pct": metric_value,
                     "ka": ka,
                     "kb": kb,
@@ -534,6 +555,7 @@ def _extract_curve_records(rows: Sequence[Mapping[str, Any]]) -> tuple[tuple[dic
                 "curve_id": curve_id,
                 "order": order,
                 "candidate_id": _first_text(row, aliases=("candidate_id",)) or curve_id,
+                "runtime_join_key": runtime_join_key,
                 "points": [],
                 "ka": ka,
                 "kb": kb,
@@ -573,6 +595,7 @@ def _extract_curve_records(rows: Sequence[Mapping[str, Any]]) -> tuple[tuple[dic
                 "curve_id": group["curve_id"],
                 "order": group["order"],
                 "candidate_id": group["candidate_id"],
+                "runtime_join_key": group["runtime_join_key"],
                 "curve_rel_l2_pct": metric_value,
                 "ka": group["ka"],
                 "kb": group["kb"],
@@ -710,7 +733,7 @@ def _build_round_evidence(records: Sequence[Mapping[str, Any]]) -> tuple[dict[st
                 "al_quarantine_count": sum(1 for item in al_records if bool(item.get("quarantined"))),
                 "al_replacement_count": sum(1 for item in al_records if bool(item.get("replacement"))),
                 "runtime_curves": len(run_times),
-                "runtime_seconds_median": statistics.median(run_times) if run_times else float("nan"),
+                "runtime_seconds_median": statistics.median(run_times) if run_times else None,
             }
         )
     return tuple(rows)
@@ -725,6 +748,7 @@ def _attach_runtime_rows(
 
     by_curve_id: dict[str, float] = {}
     by_candidate_id: dict[str, float] = {}
+    by_join_key: dict[str, float] = {}
     by_round_curve: dict[tuple[int, str], float] = {}
     skipped: dict[str, int] = {}
 
@@ -751,6 +775,8 @@ def _attach_runtime_rows(
                 by_round_curve[(round_index, curve_id)] = runtime
         if candidate_id:
             by_candidate_id[candidate_id] = runtime
+        for key in _runtime_join_keys(row):
+            by_join_key[key] = runtime
 
     attached: list[dict[str, Any]] = []
     for row in records:
@@ -765,6 +791,11 @@ def _attach_runtime_rows(
             runtime = by_curve_id[curve_id]
         if runtime is None and candidate_id and candidate_id in by_candidate_id:
             runtime = by_candidate_id[candidate_id]
+        if runtime is None:
+            for key in _runtime_join_keys(row):
+                if key in by_join_key:
+                    runtime = by_join_key[key]
+                    break
         if runtime is not None:
             updated["runtime_seconds"] = runtime
         attached.append(updated)
@@ -1271,7 +1302,7 @@ def build_emb_34um_al_vs_lhs_validation_report(
         "runtime_curve_count": len(runtime_rows_payload),
         "runtime_seconds_count": len(runtime_values),
         "runtime_seconds_total": float(sum(runtime_values)) if runtime_values else 0.0,
-        "runtime_seconds_median": statistics.median(runtime_values) if runtime_values else float("nan"),
+        "runtime_seconds_median": statistics.median(runtime_values) if runtime_values else None,
         "skipped_row_reasons": skipped,
         "prefix_curve_counts": [int(item["prefix_curve_count"]) for item in summary_rows],
         "adaptive_acquisition": {
