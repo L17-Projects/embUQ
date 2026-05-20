@@ -56,6 +56,33 @@ def test_contact_alignment_disabled_has_no_numerical_effect_even_with_sigmas():
     assert result.standard_deviation == pytest.approx((0.0, 0.0))
 
 
+
+def test_contact_alignment_disabled_ignores_force_scale_without_sensitivity():
+    inputs = ContactAlignmentInputs(controls=(0.0, 1.0), predictions=(2.0, 3.0))
+    config = ContactAlignmentUncertaintyConfig(enabled=False, force_scale_sigma=0.5)
+
+    result = build_contact_alignment_covariance(inputs, config)
+
+    assert result.summary["enabled"] is False
+    assert np.allclose(result.covariance.covariance, np.zeros((2, 2)))
+    assert result.standard_deviation == pytest.approx((0.0, 0.0))
+
+
+def test_contact_alignment_enabled_broadens_prediction_band_against_disabled():
+    inputs = ContactAlignmentInputs(controls=(0.0, 1.0, 2.0), predictions=(1.0, 2.0, 4.0))
+    disabled = build_contact_alignment_covariance(
+        inputs,
+        ContactAlignmentUncertaintyConfig(enabled=False, contact_offset_sigma=0.2, minimum_variance=0.01),
+    )
+    enabled = build_contact_alignment_covariance(
+        inputs,
+        ContactAlignmentUncertaintyConfig(contact_offset_sigma=0.2, minimum_variance=0.01),
+    )
+
+    assert disabled.standard_deviation == pytest.approx((0.0, 0.0, 0.0))
+    assert enabled.standard_deviation == pytest.approx((0.2236068, 0.2236068, 0.2236068), rel=1e-6)
+    assert np.all(np.asarray(enabled.standard_deviation) > np.asarray(disabled.standard_deviation))
+
 def test_contact_alignment_zero_enabled_config_is_named_but_inactive():
     inputs = ContactAlignmentInputs(controls=(0.0, 1.0), predictions=(2.0, 3.0))
     config = ContactAlignmentUncertaintyConfig(enabled=True)

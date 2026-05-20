@@ -56,6 +56,12 @@ def test_geometry_uncertainty_accepts_explicit_parameter_covariance():
     jacobian = np.asarray([[1.0, 0.0], [0.0, 2.0]])
     expected = jacobian @ np.asarray([[0.04, 0.01], [0.01, 0.09]]) @ jacobian.T
     assert np.allclose(result.covariance.covariance, expected)
+    assert np.allclose(
+        result.covariance_components["geometry_cross:diameter_um:thickness_um"],
+        np.asarray([[0.0, 0.02], [0.02, 0.0]]),
+    )
+    reconstructed = sum(result.covariance_components[name] for name in result.summary["component_names"] if name != "geometry_jacobian")
+    assert np.allclose(reconstructed, result.covariance.covariance)
     assert result.summary["active"] is True
 
 

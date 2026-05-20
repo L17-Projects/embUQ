@@ -226,6 +226,17 @@ def build_geometry_uncertainty_covariance(
         variance = parameter_covariance[index, index]
         column = jacobian[:, index]
         components[f"geometry:{parameter.name}"] = variance * np.outer(column, column)
+    for left_index, left_parameter in enumerate(config.parameters):
+        left_column = jacobian[:, left_index]
+        for right_index in range(left_index + 1, len(config.parameters)):
+            covariance = parameter_covariance[left_index, right_index]
+            if covariance == 0.0:
+                continue
+            right_parameter = config.parameters[right_index]
+            right_column = jacobian[:, right_index]
+            components[f"geometry_cross:{left_parameter.name}:{right_parameter.name}"] = covariance * (
+                np.outer(left_column, right_column) + np.outer(right_column, left_column)
+            )
     return _build_result(inputs.curve_id, config, total, components, enabled=True, active=config.active)
 
 
@@ -256,6 +267,7 @@ def _build_result(
         "model": "geometry_jacobian_covariance",
         "parameter_names": list(config.parameter_names),
         "parameter_units": {parameter.name: parameter.units for parameter in config.parameters},
+        "component_names": list(covariance_components.keys()),
         "shape": list(covariance.shape),
         "diagonal_min": _finite_or_none(np.min(np.diag(covariance))),
         "diagonal_max": _finite_or_none(np.max(np.diag(covariance))),

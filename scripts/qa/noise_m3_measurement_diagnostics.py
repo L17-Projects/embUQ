@@ -59,49 +59,62 @@ def _diagnostic_inputs() -> dict[str, Any]:
     }
 
 
-def _build_diagnostics() -> tuple[dict[str, Any], Any, Any, np.ndarray]:
+def _build_diagnostics() -> tuple[dict[str, Any], Any, Any, Any, Any, np.ndarray, np.ndarray]:
     inputs = _diagnostic_inputs()
-    contact = build_contact_alignment_covariance(
-        ContactAlignmentInputs(
-            controls=tuple(float(value) for value in inputs["controls"]),
-            predictions=tuple(float(value) for value in inputs["predictions"]),
-            force_sensitivity=tuple(float(value) for value in inputs["force_sensitivity"]),
-            curve_id="m3/contact_alignment_diagnostic",
-        ),
-        ContactAlignmentUncertaintyConfig(
-            contact_offset_sigma=0.015,
-            alignment_slope_sigma=0.02,
-            displacement_scale_sigma=0.03,
-            force_scale_sigma=0.01,
-            minimum_variance=2.5e-5,
-            jitter=1.0e-12,
-            max_jitter=1.0e-8,
-        ),
+    contact_inputs = ContactAlignmentInputs(
+        controls=tuple(float(value) for value in inputs["controls"]),
+        predictions=tuple(float(value) for value in inputs["predictions"]),
+        force_sensitivity=tuple(float(value) for value in inputs["force_sensitivity"]),
+        curve_id="m3/contact_alignment_diagnostic",
     )
-    geometry = build_geometry_uncertainty_covariance(
-        GeometrySensitivityInputs(
-            predictions=tuple(float(value) for value in inputs["predictions"]),
-            sensitivities={
-                name: tuple(float(value) for value in values)
-                for name, values in inputs["geometry_sensitivities"].items()
-            },
-            curve_id="m3/geometry_diagnostic",
-        ),
-        GeometryUncertaintyConfig(
-            parameters=(
-                GeometryParameterUncertainty("radius_um", sigma=0.012, units="micrometer", nominal=2.0),
-                GeometryParameterUncertainty("height_um", sigma=0.04, units="micrometer", nominal=14.28),
-            ),
-            covariance=((1.44e-4, 1.2e-5), (1.2e-5, 1.6e-3)),
-            jitter=1.0e-12,
-            max_jitter=1.0e-8,
-        ),
+    geometry_inputs = GeometrySensitivityInputs(
+        predictions=tuple(float(value) for value in inputs["predictions"]),
+        sensitivities={name: tuple(float(value) for value in values) for name, values in inputs["geometry_sensitivities"].items()},
+        curve_id="m3/geometry_diagnostic",
     )
+    contact_config = ContactAlignmentUncertaintyConfig(
+        contact_offset_sigma=0.015,
+        alignment_slope_sigma=0.02,
+        displacement_scale_sigma=0.03,
+        force_scale_sigma=0.01,
+        minimum_variance=2.5e-5,
+        jitter=1.0e-12,
+        max_jitter=1.0e-8,
+    )
+    geometry_config = GeometryUncertaintyConfig(
+        parameters=(
+            GeometryParameterUncertainty("radius_um", sigma=0.012, units="micrometer", nominal=2.0),
+            GeometryParameterUncertainty("height_um", sigma=0.04, units="micrometer", nominal=14.28),
+        ),
+        covariance=((1.44e-4, 1.2e-5), (1.2e-5, 1.6e-3)),
+        jitter=1.0e-12,
+        max_jitter=1.0e-8,
+    )
+    contact_disabled = build_contact_alignment_covariance(
+        contact_inputs,
+        ContactAlignmentUncertaintyConfig(enabled=False, force_scale_sigma=contact_config.force_scale_sigma),
+    )
+    geometry_disabled = build_geometry_uncertainty_covariance(
+        GeometrySensitivityInputs(predictions=geometry_inputs.predictions, sensitivities={}, curve_id=geometry_inputs.curve_id),
+        GeometryUncertaintyConfig(enabled=False),
+    )
+    contact = build_contact_alignment_covariance(contact_inputs, contact_config)
+    geometry = build_geometry_uncertainty_covariance(geometry_inputs, geometry_config)
+    disabled_combined = contact_disabled.covariance.covariance + geometry_disabled.covariance.covariance
     combined = contact.covariance.covariance + geometry.covariance.covariance
-    return inputs, contact, geometry, combined
+    return inputs, contact_disabled, geometry_disabled, contact, geometry, disabled_combined, combined
 
 
-def _write_component_table(output_root: Path, inputs: dict[str, Any], contact: Any, geometry: Any, combined: np.ndarray) -> Path:
+def _write_component_table(
+    output_root: Path,
+    inputs: dict[str, Any],
+    contact_disabled: Any,
+    geometry_disabled: Any,
+    contact: Any,
+    geometry: Any,
+    disabled_combined: np.ndarray,
+    combined: np.ndarray,
+) -> Path:
     path = output_root / "measurement_variance_components.csv"
     fieldnames = [
         "index",
@@ -115,13 +128,18 @@ def _write_component_table(output_root: Path, inputs: dict[str, Any], contact: A
         "contact_alignment_total_variance",
         "geometry_radius_um_variance",
         "geometry_height_um_variance",
+        "geometry_cross_radius_um_height_um_variance",
         "geometry_jacobian_variance",
-        "combined_measurement_sigma",
+        "combined_disabled_sigma",
+        "combined_enabled_sigma",
+        "enabled_minus_disabled_sigma",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         for index, (control, prediction) in enumerate(zip(inputs["controls"], inputs["predictions"])):
+            disabled_sigma = float(np.sqrt(max(disabled_combined[index, index], 0.0)))
+            enabled_sigma = float(np.sqrt(max(combined[index, index], 0.0)))
             writer.writerow(
                 {
                     "index": index,
@@ -137,14 +155,28 @@ def _write_component_table(output_root: Path, inputs: dict[str, Any], contact: A
                     "contact_alignment_total_variance": contact.variance_components["contact_alignment_total"][index],
                     "geometry_radius_um_variance": geometry.variance_components["geometry:radius_um"][index],
                     "geometry_height_um_variance": geometry.variance_components["geometry:height_um"][index],
+                    "geometry_cross_radius_um_height_um_variance": geometry.variance_components[
+                        "geometry_cross:radius_um:height_um"
+                    ][index],
                     "geometry_jacobian_variance": geometry.variance_components["geometry_jacobian"][index],
-                    "combined_measurement_sigma": float(np.sqrt(max(combined[index, index], 0.0))),
+                    "combined_disabled_sigma": disabled_sigma,
+                    "combined_enabled_sigma": enabled_sigma,
+                    "enabled_minus_disabled_sigma": enabled_sigma - disabled_sigma,
                 }
             )
     return path
 
 
-def _write_plots(output_root: Path, inputs: dict[str, Any], contact: Any, geometry: Any, combined: np.ndarray) -> dict[str, str]:
+def _write_plots(
+    output_root: Path,
+    inputs: dict[str, Any],
+    contact_disabled: Any,
+    geometry_disabled: Any,
+    contact: Any,
+    geometry: Any,
+    disabled_combined: np.ndarray,
+    combined: np.ndarray,
+) -> dict[str, str]:
     import matplotlib
 
     matplotlib.use("Agg")
@@ -169,11 +201,13 @@ def _write_plots(output_root: Path, inputs: dict[str, Any], contact: Any, geomet
     plt.close(fig)
 
     band_path = output_root / "measurement_sigma_band.png"
+    disabled_sigma = np.sqrt(np.maximum(np.diag(disabled_combined), 0.0))
     contact_sigma = np.asarray(contact.standard_deviation, dtype=float)
     geometry_sigma = np.asarray(geometry.standard_deviation, dtype=float)
     combined_sigma = np.sqrt(np.maximum(np.diag(combined), 0.0))
     fig, ax = plt.subplots(figsize=(7.0, 4.0))
-    ax.plot(controls, predictions, color="black", linewidth=2.0, label="prediction")
+    ax.plot(controls, predictions, color="black", linewidth=2.0, label="disabled/no-measurement baseline")
+    ax.plot(controls, predictions + disabled_sigma, color="gray", linestyle=":", label="disabled sigma bound")
     ax.fill_between(
         controls,
         predictions - contact_sigma,
@@ -186,7 +220,7 @@ def _write_plots(output_root: Path, inputs: dict[str, Any], contact: Any, geomet
         predictions - combined_sigma,
         predictions + combined_sigma,
         alpha=0.18,
-        label="combined measurement sigma",
+        label="enabled combined measurement sigma",
     )
     ax.plot(controls, geometry_sigma, linestyle="--", label="geometry sigma")
     ax.set_xlabel("normalized control")
@@ -209,22 +243,29 @@ def main() -> None:
     output_root = args.output_root
     output_root.mkdir(parents=True, exist_ok=True)
 
-    inputs, contact, geometry, combined = _build_diagnostics()
-    table_path = _write_component_table(output_root, inputs, contact, geometry, combined)
-    plot_artifacts = _write_plots(output_root, inputs, contact, geometry, combined)
+    inputs, contact_disabled, geometry_disabled, contact, geometry, disabled_combined, combined = _build_diagnostics()
+    table_path = _write_component_table(output_root, inputs, contact_disabled, geometry_disabled, contact, geometry, disabled_combined, combined)
+    plot_artifacts = _write_plots(output_root, inputs, contact_disabled, geometry_disabled, contact, geometry, disabled_combined, combined)
     summary_path = output_root / "measurement_covariance_summary.json"
     _write_json(
         summary_path,
         {
             "schema_version": 1,
-            "contact_alignment": dict(contact.summary),
-            "geometry": dict(geometry.summary),
-            "combined_measurement_covariance": _matrix_summary(combined),
+            "disabled_contact_alignment": dict(contact_disabled.summary),
+            "disabled_geometry": dict(geometry_disabled.summary),
+            "enabled_contact_alignment": dict(contact.summary),
+            "enabled_geometry": dict(geometry.summary),
+            "disabled_measurement_covariance": _matrix_summary(disabled_combined),
+            "enabled_measurement_covariance": _matrix_summary(combined),
+            "enabled_broadens_all_points": bool(
+                np.all(np.diag(combined) >= np.diag(disabled_combined))
+                and np.any(np.diag(combined) > np.diag(disabled_combined))
+            ),
         },
     )
     manifest = {
         "schema_version": 1,
-        "description": "M3 contact/alignment and geometry measurement-uncertainty diagnostics.",
+        "description": "M3 enabled-versus-disabled contact/alignment and geometry measurement-uncertainty diagnostics.",
         "artifacts": {
             "component_table": table_path.as_posix(),
             "covariance_summary": summary_path.as_posix(),

@@ -206,12 +206,12 @@ def build_contact_alignment_covariance(
     size = controls.size
     zero = np.zeros((size, size), dtype=float)
 
-    if config.force_scale_sigma > 0.0 and inputs.force_sensitivity is None:
-        raise ValueError("force_scale_sigma requires force_sensitivity.")
-
     if not config.enabled:
         components = {name: zero.copy() for name in _COMPONENT_NAMES}
         return _build_result(inputs.curve_id, config, components, enabled=False, active=False)
+
+    if config.force_scale_sigma > 0.0 and inputs.force_sensitivity is None:
+        raise ValueError("force_scale_sigma requires force_sensitivity.")
 
     centered_controls = controls - float(np.mean(controls))
     force_vector = np.zeros(size, dtype=float)
