@@ -60,8 +60,8 @@ if [[ -z "${VAULT_ROOT}" ]]; then
   echo "VAULT_ROOT is required." >&2
   exit 2
 fi
-if [[ "${MODE}" != "full" && "${MODE}" != "canary" ]]; then
-  echo "MODE must be 'full' or 'canary'." >&2
+if [[ "${MODE}" != "full" && "${MODE}" != "canary" && "${MODE}" != "lhs" && "${MODE}" != "benchmark" && "${MODE}" != "validation" ]]; then
+  echo "MODE must be 'full', 'canary', 'lhs', 'benchmark', or 'validation'." >&2
   exit 2
 fi
 if [[ "${EXECUTION_MODE}" != "execute" && "${EXECUTION_MODE}" != "render-only" && "${EXECUTION_MODE}" != "dry-run" ]]; then
@@ -89,6 +89,12 @@ echo "Vault root: ${VAULT_ROOT}"
 
 if [[ "${MODE}" == "full" ]]; then
   BATCH_DIR="${CAMPAIGN_ROOT}/full_gate"
+elif [[ "${MODE}" == "lhs" ]]; then
+  BATCH_DIR="${CAMPAIGN_ROOT}/lhs_gate"
+elif [[ "${MODE}" == "benchmark" ]]; then
+  BATCH_DIR="${CAMPAIGN_ROOT}/benchmark"
+elif [[ "${MODE}" == "validation" ]]; then
+  BATCH_DIR="${CAMPAIGN_ROOT}/validation"
 else
   BATCH_DIR="${CAMPAIGN_ROOT}/canary"
 fi
@@ -117,7 +123,7 @@ fi
 
 if [[ -n "${SLURM_ARRAY_TASK_ID:-}" ]]; then
   TASK_INDEX="${SLURM_ARRAY_TASK_ID}"
-elif [[ "${MODE}" == "canary" ]]; then
+elif [[ "${MODE}" == "canary" || "${MODE}" == "lhs" || "${MODE}" == "benchmark" || "${MODE}" == "validation" ]]; then
   TASK_INDEX=0
 else
   echo "MODE=full requires submission with an sbatch --array range." >&2

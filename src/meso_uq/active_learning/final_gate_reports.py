@@ -29,7 +29,8 @@ ACTIVE_LEARNING_FINAL_GATE_CURVE_METRICS_PLOT_FILENAME = "final_gate_curve_metri
 ACTIVE_LEARNING_FINAL_GATE_RESIDUALS_PLOT_FILENAME = "final_gate_residuals.png"
 ACTIVE_LEARNING_FINAL_GATE_PREDICTION_PLOT_FILENAME = "final_gate_predicted_vs_reference.png"
 ACTIVE_LEARNING_FINAL_GATE_ACQUISITION_PLOT_FILENAME = "final_gate_acquisition_scores.png"
-ACTIVE_LEARNING_FINAL_GATE_YT_KB_PLOT_FILENAME = "final_gate_yt_kb_coverage.png"
+ACTIVE_LEARNING_FINAL_GATE_KA_KB_PLOT_FILENAME = "final_gate_ka_kb_coverage.png"
+ACTIVE_LEARNING_FINAL_GATE_YT_KB_PLOT_FILENAME = ACTIVE_LEARNING_FINAL_GATE_KA_KB_PLOT_FILENAME
 ACTIVE_LEARNING_FINAL_GATE_FAILURE_PLOT_FILENAME = "final_gate_failure_quarantine.png"
 ACTIVE_LEARNING_FINAL_GATE_MODEL_SELECTION_PLOT_FILENAME = "final_gate_model_selection_by_round.png"
 ACTIVE_LEARNING_FINAL_GATE_SUMMARY_PLOT_FILENAME = "final_gate_al_vs_lhs_summary.png"
@@ -258,7 +259,14 @@ def _coerce_round(record: Mapping[str, Any], *, index_fallback: int) -> dict[str
     )
     acquisition_curve_pairs = _coerce_path_list(record.get("acquisition_scores_paths"), label=f"round {round_index} acquisition plot paths")
 
-    yt_kb_coverage = tuple(_coerce_float_series(item, label=f"round {round_index} yt_kb_coverage entry") for item in _coerce_sequence(record.get("yt_kb_coverage"), label=f"round {round_index} yt_kb_coverage"))
+    coverage_key = "ka_kb_coverage"
+    if coverage_key not in record:
+        coverage_key = "yt_kb_coverage"
+    coverage_rows = record.get(coverage_key, ())
+    yt_kb_coverage = tuple(
+        _coerce_float_series(item, label=f"round {round_index} {coverage_key} entry")
+        for item in _coerce_sequence(coverage_rows, label=f"round {round_index} {coverage_key}")
+    )
 
     model_selection = _coerce_mapping(record.get("model_selection", {}), label=f"round {round_index} model_selection")
     failure_counts = _coerce_mapping(record.get("failure_counts", {}), label=f"round {round_index} failure_counts")
@@ -274,6 +282,7 @@ def _coerce_round(record: Mapping[str, Any], *, index_fallback: int) -> dict[str
         "selected_candidate_scores": selected_candidate_scores,
         "acquisition_plot_paths": acquisition_curve_pairs,
         "yt_kb_coverage": yt_kb_coverage,
+        "ka_kb_coverage": yt_kb_coverage,
         "model_selection": model_selection,
         "failure_counts": failure_counts,
         "quarantine_counts": quarantine_counts,
@@ -523,17 +532,17 @@ def _plot_coverage(path: Path, rounds_payload: Sequence[Mapping[str, Any]], *, i
 
     fig, axis = plt.subplots(1, 1, figsize=(7, 5))
     for row in rounds_payload:
-        yk = row["yt_kb_coverage"]
-        if not yk:
+        coverage = row.get("ka_kb_coverage") or row.get("yt_kb_coverage") or ()
+        if not coverage:
             continue
         axis.scatter(
-            [item[0] if len(item) >= 1 else 0.0 for item in yk],
-            [item[1] if len(item) >= 2 else 0.0 for item in yk],
+            [item[0] if len(item) >= 1 else 0.0 for item in coverage],
+            [item[1] if len(item) >= 2 else 0.0 for item in coverage],
             alpha=0.5,
             label=f"round {int(row['round'])}",
         )
-    axis.set_title("Yt-kb coverage")
-    axis.set_xlabel("Yt")
+    axis.set_title("ka-kb coverage")
+    axis.set_xlabel("ka")
     axis.set_ylabel("kb")
     axis.legend(fontsize=8)
     fig.tight_layout()
@@ -848,6 +857,7 @@ def write_active_learning_final_gate_artifacts(
         "residuals": str(plot_dir / ACTIVE_LEARNING_FINAL_GATE_RESIDUALS_PLOT_FILENAME),
         "prediction_vs_reference": str(plot_dir / ACTIVE_LEARNING_FINAL_GATE_PREDICTION_PLOT_FILENAME),
         "acquisition_scores": str(plot_dir / ACTIVE_LEARNING_FINAL_GATE_ACQUISITION_PLOT_FILENAME),
+        "ka_kb_coverage": str(plot_dir / ACTIVE_LEARNING_FINAL_GATE_KA_KB_PLOT_FILENAME),
         "yt_kb_coverage": str(plot_dir / ACTIVE_LEARNING_FINAL_GATE_YT_KB_PLOT_FILENAME),
         "failure_quarantine": str(plot_dir / ACTIVE_LEARNING_FINAL_GATE_FAILURE_PLOT_FILENAME),
         "model_selection": str(plot_dir / ACTIVE_LEARNING_FINAL_GATE_MODEL_SELECTION_PLOT_FILENAME),
@@ -908,6 +918,7 @@ __all__ = [
     "ACTIVE_LEARNING_FINAL_GATE_PREDICTION_PLOT_FILENAME",
     "ACTIVE_LEARNING_FINAL_GATE_RESIDUALS_PLOT_FILENAME",
     "ACTIVE_LEARNING_FINAL_GATE_ACQUISITION_PLOT_FILENAME",
+    "ACTIVE_LEARNING_FINAL_GATE_KA_KB_PLOT_FILENAME",
     "ACTIVE_LEARNING_FINAL_GATE_YT_KB_PLOT_FILENAME",
     "ACTIVE_LEARNING_FINAL_GATE_FAILURE_PLOT_FILENAME",
     "ACTIVE_LEARNING_FINAL_GATE_MODEL_SELECTION_PLOT_FILENAME",

@@ -6,12 +6,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import random
 import shlex
 import shutil
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 DEFAULT_SCRATCH_ROOT = Path(
     "/scratch/project/eu-26-17/eubrieucb/mesouq/runs/active_learning/emb_indentation_3p4_final_gate"
@@ -23,8 +24,8 @@ DEFAULT_FORCE_GRID_DATA = Path("emb/indentation/surrogate/diameters/3.4um/data/s
 FULL_GATE_SCHEMA_VERSION = "meso_uq.active_learning.emb_34um_final_gate.v1"
 EXPECTED_REQUEST_PAYLOAD_SCHEMA_VERSION = "meso_uq.dpd_sampling.emb_34um_request.v1"
 
-YT_MIN = 1e5
-YT_MAX = 1e9
+KA_MIN = 1e2
+KA_MAX = 6e5
 KB_MIN = 400.0
 KB_MAX = 70000.0
 
@@ -32,9 +33,68 @@ FULL_ROUNDS = 3
 PER_ROUND = 30
 CANARY_FORCE_COUNT = 3
 TOTAL_FULL = FULL_ROUNDS * PER_ROUND
+LHS_GATE_NAME = "lhs"
+VALIDATION_GATE_NAME = "validation"
+BENCHMARK_GATE_NAME = "benchmark"
+LHS_CANDIDATE_COUNT = 90
+BENCHMARK_TARGET_COUNT = 3
+BENCHMARK_LABELS = ("low", "center", "high")
+VALIDATION_TARGET_COUNT = 30
+CANARY_CANDIDATE_COUNT = 1
+CANDIDATE_POOL_SIZE = 100
 FULL_SEED = 2026
-CANARY_YT = 3.0e7
+LHS_SEED = 3034
+BENCHMARK_SEED = 4044
+VALIDATION_SEED = 5055
 CANARY_KB = 4.5e3
+DNN_ENSEMBLE_TARGET_SIZE = 10
+EXECUTION_MODE_RENDER_ONLY = "render-only"
+LINEAR_TRACE_PROJECT = "Active Learning Engine"
+LINEAR_TRACE_ISSUE = "MES-210"
+LINEAR_TRACE_ENGINE = "Active Learning Engine"
+PARAMETER_SPACE = "log10"
+
+
+def _legacy_yt_to_ka(yt: float) -> float:
+    """Compatibility helper for legacy Yt-based AL controls."""
+    import yaml
+
+    current = Path(__file__).resolve()
+    defaults_path = None
+    for parent in current.parents:
+        if (parent / "pyproject.toml").is_file():
+            defaults_path = parent / "emb" / "indentation" / "src" / "parameters-default.emb.yaml"
+            break
+    if defaults_path is None:
+        raise RuntimeError("Unable to resolve repository root for legacy Yt->ka mapping.")
+    if not defaults_path.exists():
+        raise RuntimeError(f"Unable to load EMB defaults from {defaults_path!s} for legacy mapping.")
+    with defaults_path.open("r", encoding="utf-8") as stream:
+        defaults = yaml.safe_load(stream) or {}
+    if not isinstance(defaults, dict):
+        raise RuntimeError(f"Unexpected EMB defaults payload at {defaults_path!s}.")
+
+    required = ("ul", "kbol", "t0", "shell_th", "nu", "fscale")
+    for key in required:
+        if key not in defaults:
+            raise RuntimeError(f"Missing EMB default key {key!r} needed for legacy Yt->ka mapping.")
+
+    ul = float(defaults["ul"])
+    kbol = float(defaults["kbol"])
+    t0 = float(defaults["t0"])
+    shell_th = float(defaults["shell_th"])
+    nu = float(defaults["nu"])
+    fscale = float(defaults["fscale"])
+    if any(not math.isfinite(value) or math.isclose(value, 0.0) for value in (ul, kbol, t0, shell_th, fscale)):
+        raise RuntimeError("Invalid EMB defaults for legacy Yt->ka mapping.")
+    if nu == 1.0:
+        raise RuntimeError("Invalid EMB defaults for legacy Yt->ka mapping.")
+
+    ka_per_yt = fscale * shell_th / (2.0 * (1.0 - nu)) / ((kbol * t0) / ul**2)
+    return float(yt) * ka_per_yt
+
+
+CANARY_KA = _legacy_yt_to_ka(3.0e7)
 
 
 def _script_root() -> Path:
@@ -55,6 +115,17 @@ if str(_REPO_ROOT) not in sys.path:
 from meso_uq.active_learning import Candidate  # noqa: E402
 from meso_uq.active_learning.contracts import candidate_hash  # noqa: E402
 from meso_uq.active_learning.dpd_sampling_gate import build_and_render_active_learning_dpd_sampling_gate  # noqa: E402
+from meso_uq.active_learning.emb_34um_final_gate_design import (  # noqa: E402
+    EMB_34UM_FINAL_GATE_ACQUISITION_COUNT,
+    EMB_34UM_FINAL_GATE_BATCH_SIZE,
+    EMB_34UM_FINAL_GATE_EXPLORATION_COUNT,
+    EMB_34UM_FINAL_GATE_LHS_COMPARATOR_PREFIXES,
+    EMB_34UM_FINAL_GATE_SOURCE_ACQUISITION,
+    EMB_34UM_FINAL_GATE_SOURCE_EXPLORATION,
+    EMB_34UM_FINAL_GATE_SOURCE_INITIAL,
+    build_emb_34um_final_gate_design_round,
+    build_emb_34um_final_gate_validation_design,
+)
 
 
 def _load_force_grid(path: Path) -> tuple[float, ...]:
@@ -82,14 +153,86 @@ def _load_force_grid(path: Path) -> tuple[float, ...]:
     return force_points
 
 
-def _lhs_1d(count: int, lower: float, upper: float, seed: int) -> tuple[float, ...]:
+def _lhs_1d(
+    count: int,
+    lower: float,
+    upper: float,
+    seed: int,
+    *,
+    log_scale: bool = False,
+) -> tuple[float, ...]:
     if count <= 0:
         raise ValueError("count must be positive")
     rng = random.Random(seed)
     bins = list(range(count))
     rng.shuffle(bins)
+    if log_scale:
+        if lower <= 0.0 or upper <= 0.0:
+            raise ValueError("log-space bounds must be positive.")
+        lower = math.log10(lower)
+        upper = math.log10(upper)
     width = upper - lower
     return tuple(lower + (index + rng.random()) * width / count for index in bins)
+
+
+def _scale_samples(
+    *,
+    samples: tuple[float, ...],
+    log_scale: bool,
+) -> tuple[float, ...]:
+    if not log_scale:
+        return samples
+    scaled: list[float] = []
+    for sample in samples:
+        scaled.append(10.0 ** sample)
+    return tuple(scaled)
+
+
+def _lhs_2d(
+    count: int,
+    ka_lower: float,
+    ka_upper: float,
+    kb_lower: float,
+    kb_upper: float,
+    seed: int,
+    *,
+    log_scale: bool = False,
+) -> tuple[tuple[float, float], ...]:
+    return tuple(
+        zip(
+            _scale_samples(
+                samples=_lhs_1d(count, ka_lower, ka_upper, seed, log_scale=log_scale),
+                log_scale=log_scale,
+            ),
+            _scale_samples(
+                samples=_lhs_1d(count, kb_lower, kb_upper, seed + 1, log_scale=log_scale),
+                log_scale=log_scale,
+            ),
+        )
+    )
+
+
+def _stiffness_points(
+    *,
+    ka_lower: float,
+    ka_upper: float,
+    kb_lower: float,
+    kb_upper: float,
+    log_scale: bool,
+) -> tuple[tuple[str, float, float], ...]:
+    if ka_lower <= 0.0 or ka_upper <= 0.0 or kb_lower <= 0.0 or kb_upper <= 0.0:
+        raise ValueError("log-space bounds must be positive.")
+    if log_scale:
+        ka_mid = 10.0 ** ((math.log10(ka_lower) + math.log10(ka_upper)) / 2.0)
+        kb_mid = 10.0 ** ((math.log10(kb_lower) + math.log10(kb_upper)) / 2.0)
+    else:
+        ka_mid = (ka_lower + ka_upper) / 2.0
+        kb_mid = (kb_lower + kb_upper) / 2.0
+    return (
+        ("low", ka_lower, kb_lower),
+        ("center", ka_mid, kb_mid),
+        ("high", ka_upper, kb_upper),
+    )
 
 
 def _canonical_canary_force_points(force_grid: tuple[float, ...], count: int) -> tuple[float, ...]:
@@ -102,35 +245,71 @@ def _canonical_canary_force_points(force_grid: tuple[float, ...], count: int) ->
     return tuple(force_grid[round((len(force_grid) - 1) * index / (count - 1))] for index in range(count))
 
 
-def _build_full_candidates(run_id: str, *, force_grid: tuple[float, ...]) -> tuple[Candidate, ...]:
-    ys = _lhs_1d(TOTAL_FULL, YT_MIN, YT_MAX, FULL_SEED)
-    ks = _lhs_1d(TOTAL_FULL, KB_MIN, KB_MAX, FULL_SEED + 1)
+def _attach_force_grid(
+    candidate: Candidate,
+    *,
+    force_grid: tuple[float, ...],
+    campaign: str,
+    extra_metadata: Mapping[str, Any] | None = None,
+) -> Candidate:
     force_grid_payload = [float(item) for item in force_grid]
-    candidates: list[Candidate] = []
+    metadata = {
+        **dict(candidate.metadata),
+        "campaign": campaign,
+        "parameter_space": PARAMETER_SPACE,
+        "bounds": {
+            "ka": [KA_MIN, KA_MAX],
+            "kb": [KB_MIN, KB_MAX],
+        },
+    }
+    if extra_metadata:
+        metadata.update(dict(extra_metadata))
+    return Candidate(
+        candidate_id=candidate.candidate_id,
+        parameters={**dict(candidate.parameters), "force_grid": list(force_grid_payload)},
+        metadata=metadata,
+    )
 
-    for index in range(TOTAL_FULL):
-        batch_round = index // PER_ROUND + 1
-        step = index % PER_ROUND + 1
-        candidates.append(
-            Candidate(
-                candidate_id=f"{run_id}-full-r{batch_round:02d}-c{step:03d}",
-                parameters={
-                    "family": "emb",
-                    "experiment": "indentation",
-                    "Yt": float(f"{ys[index]:.6g}"),
-                    "kb": float(f"{ks[index]:.6g}"),
-                    "force_grid": list(force_grid_payload),
-                },
-                metadata={
-                    "campaign": "full",
-                    "round": batch_round,
-                    "position": step,
-                    "lhs_rounds": FULL_ROUNDS,
-                    "lhs_per_round": PER_ROUND,
-                },
-            )
+
+def _build_full_candidates(
+    run_id: str,
+    *,
+    force_grid: tuple[float, ...],
+) -> tuple[tuple[Candidate, ...], tuple[dict[str, Any], ...]]:
+    candidates: list[Candidate] = []
+    design_manifests: list[dict[str, Any]] = []
+
+    for round_index in range(1, FULL_ROUNDS + 1):
+        round_result = build_emb_34um_final_gate_design_round(
+            run_id=run_id,
+            round_index=round_index,
+            seed=FULL_SEED + round_index - 1,
+            existing_points=tuple(candidates),
+            ensemble_disagreement=None,
+            candidate_pool_size=CANDIDATE_POOL_SIZE,
+            batch_size=PER_ROUND,
+            exploration_count=EMB_34UM_FINAL_GATE_EXPLORATION_COUNT,
+            acquisition_count=EMB_34UM_FINAL_GATE_ACQUISITION_COUNT,
+            candidate_prefix="full",
+            use_log_space=PARAMETER_SPACE == "log10",
         )
-    return tuple(candidates)
+        design_manifests.append(dict(round_result.manifest))
+        for candidate in round_result.candidates:
+            candidates.append(
+                _attach_force_grid(
+                    candidate,
+                    force_grid=force_grid,
+                    campaign="full",
+                    extra_metadata={
+                        "position": int(candidate.metadata["order"]),
+                        "round_target": PER_ROUND,
+                        "candidate_pool_size": CANDIDATE_POOL_SIZE,
+                        "lhs_comparator_prefixes": list(EMB_34UM_FINAL_GATE_LHS_COMPARATOR_PREFIXES),
+                    },
+                )
+            )
+
+    return tuple(candidates), tuple(design_manifests)
 
 
 def _build_canary_candidates(run_id: str, *, force_grid: tuple[float, ...]) -> tuple[Candidate, ...]:
@@ -141,14 +320,129 @@ def _build_canary_candidates(run_id: str, *, force_grid: tuple[float, ...]) -> t
             parameters={
                 "family": "emb",
                 "experiment": "indentation",
-                "Yt": CANARY_YT,
+                "ka": float(f"{CANARY_KA:.6g}"),
                 "kb": CANARY_KB,
                 "canary": True,
                 "force_grid": list(force_grid_payload),
             },
-            metadata={"campaign": "canary", "purpose": "smoke"},
+            metadata={
+                "campaign": "canary",
+                "purpose": "smoke",
+                "parameter_space": PARAMETER_SPACE,
+                "bounds": {
+                    "ka": [KA_MIN, KA_MAX],
+                    "kb": [KB_MIN, KB_MAX],
+                },
+            },
         ),
     )
+
+
+def _build_lhs_candidates(run_id: str, *, force_grid: tuple[float, ...]) -> tuple[Candidate, ...]:
+    points = _lhs_2d(
+        LHS_CANDIDATE_COUNT,
+        KA_MIN,
+        KA_MAX,
+        KB_MIN,
+        KB_MAX,
+        LHS_SEED,
+        log_scale=PARAMETER_SPACE == "log10",
+    )
+    force_grid_payload = [float(item) for item in force_grid]
+    candidates: list[Candidate] = []
+    for step, (ka, kb) in enumerate(points, start=1):
+        candidates.append(
+            Candidate(
+                candidate_id=f"{run_id}-lhs-c{step:03d}",
+                parameters={
+                    "family": "emb",
+                    "experiment": "indentation",
+                    "ka": float(f"{ka:.6g}"),
+                    "kb": float(f"{kb:.6g}"),
+                    "force_grid": list(force_grid_payload),
+                },
+                metadata={
+                    "campaign": "lhs",
+                    "step": step,
+                    "target_count": LHS_CANDIDATE_COUNT,
+                    "candidate_pool_size": CANDIDATE_POOL_SIZE,
+                    "parameter_space": PARAMETER_SPACE,
+                    "bounds": {
+                        "ka": [KA_MIN, KA_MAX],
+                        "kb": [KB_MIN, KB_MAX],
+                    },
+                    "purpose": "comparator",
+                },
+            )
+        )
+    return tuple(candidates)
+
+
+def _build_validation_candidates(run_id: str, *, force_grid: tuple[float, ...]) -> tuple[Candidate, ...]:
+    validation_result = build_emb_34um_final_gate_validation_design(
+        run_id=run_id,
+        seed=VALIDATION_SEED,
+        design_size=VALIDATION_TARGET_COUNT,
+        candidate_prefix="validation",
+        use_log_space=PARAMETER_SPACE == "log10",
+    )
+    candidates: list[Candidate] = []
+    for step, candidate in enumerate(validation_result.candidates, start=1):
+        candidates.append(
+            _attach_force_grid(
+                candidate,
+                force_grid=force_grid,
+                campaign="validation",
+                extra_metadata={
+                    "campaign": "validation",
+                    "step": step,
+                    "position": step,
+                    "target_count": VALIDATION_TARGET_COUNT,
+                    "candidate_pool_size": CANDIDATE_POOL_SIZE,
+                    "purpose": "validation",
+                },
+            )
+        )
+    return tuple(candidates)
+
+
+def _build_benchmark_candidates(run_id: str, *, force_grid: tuple[float, ...]) -> tuple[Candidate, ...]:
+    points = _stiffness_points(
+        ka_lower=KA_MIN,
+        ka_upper=KA_MAX,
+        kb_lower=KB_MIN,
+        kb_upper=KB_MAX,
+        log_scale=PARAMETER_SPACE == "log10",
+    )
+    force_grid_payload = [float(item) for item in force_grid]
+    candidates: list[Candidate] = []
+    for step, (label, ka, kb) in enumerate(points, start=1):
+        candidates.append(
+            Candidate(
+                candidate_id=f"{run_id}-benchmark-{label}",
+                parameters={
+                    "family": "emb",
+                    "experiment": "indentation",
+                    "ka": float(f"{ka:.6g}"),
+                    "kb": float(f"{kb:.6g}"),
+                    "force_grid": list(force_grid_payload),
+                },
+                metadata={
+                    "campaign": "benchmark",
+                    "label": label,
+                    "step": step,
+                    "position": step,
+                    "purpose": "runtime_benchmark",
+                    "parameter_space": PARAMETER_SPACE,
+                    "bounds": {
+                        "ka": [KA_MIN, KA_MAX],
+                        "kb": [KB_MIN, KB_MAX],
+                    },
+                    "dnn_ensemble_target_size": DNN_ENSEMBLE_TARGET_SIZE,
+                },
+            )
+        )
+    return tuple(candidates)
 
 
 def _lineage_payload(candidates: tuple[Candidate, ...]) -> dict[str, Any]:
@@ -185,9 +479,21 @@ def _submission_command(
         / "sbatch"
         / "emb_34um_active_learning_array.sbatch"
     )
-    candidate_count = TOTAL_FULL if mode == "full" else 1
+    if mode in {"full", LHS_GATE_NAME, VALIDATION_GATE_NAME, BENCHMARK_GATE_NAME}:
+        candidate_count = {
+            "full": TOTAL_FULL,
+            LHS_GATE_NAME: LHS_CANDIDATE_COUNT,
+            VALIDATION_GATE_NAME: VALIDATION_TARGET_COUNT,
+            BENCHMARK_GATE_NAME: BENCHMARK_TARGET_COUNT,
+        }[mode]
+    else:
+        candidate_count = CANARY_CANDIDATE_COUNT
+    if candidate_count <= 0:
+        raise ValueError(f"Unable to determine candidate_count for mode {mode!r}.")
     array_spec = f"0-{candidate_count - 1}"
     if mode == "full":
+        array_spec = f"{array_spec}%{concurrent_jobs}"
+    elif mode in {LHS_GATE_NAME, VALIDATION_GATE_NAME, BENCHMARK_GATE_NAME} and concurrent_jobs > 1:
         array_spec = f"{array_spec}%{concurrent_jobs}"
     return {
         "script": str(sbatch_script),
@@ -201,7 +507,7 @@ def _submission_command(
             f"RUN_ID_PREFIX={shlex.quote(run_id_prefix)},"
             f"CAMPAIGN_ROOT={shlex.quote(str(campaign_root))},"
             f"MODE={shlex.quote(mode)},"
-            "EXECUTION_MODE=execute,"
+            f"EXECUTION_MODE={shlex.quote(EXECUTION_MODE_RENDER_ONLY)},"
             f"CONCURRENT_JOBS={concurrent_jobs},"
             f"RETRY_LIMIT={retry_limit},"
             f"PYTHON_EXECUTABLE={shlex.quote(sys.executable)} "
@@ -209,7 +515,7 @@ def _submission_command(
         ),
         "mode": mode,
         "array": array_spec,
-        "execution_mode": "execute",
+        "execution_mode": EXECUTION_MODE_RENDER_ONLY,
     }
 
 
@@ -242,18 +548,49 @@ def _render_batch(
     concurrent_jobs: int,
     retry_limit: int,
 ) -> dict[str, Any]:
-    result = build_and_render_active_learning_dpd_sampling_gate(
-        candidates,
-        run_id=run_id,
-        iteration="0",
-        platform="karolina",
-        walltime=walltime,
-        gpu_count=1,
-        campaign_root=batch_root,
-        batch_id=batch_id,
-        overwrite=True,
-        provenance_tags={"source_issue": "MESOUQ-AL-34UM"},
-    )
+    try:
+        result = build_and_render_active_learning_dpd_sampling_gate(
+            candidates,
+            run_id=run_id,
+            iteration="0",
+            platform="karolina",
+            walltime=walltime,
+            gpu_count=1,
+            campaign_root=batch_root,
+            batch_id=batch_id,
+            overwrite=True,
+            provenance_tags={"source_issue": "MESOUQ-AL-34UM"},
+        )
+    except ModuleNotFoundError as exc:
+        if "matplotlib" not in str(exc):
+            raise
+        from meso_uq.dpd_sampling import boundary as _dpd_boundary
+
+        original_render_validation_plot = _dpd_boundary._render_validation_plot
+
+        def _fallback_render_validation_plot(request, report) -> tuple[Path, Path]:
+            plot_path = request.campaign_root / "dpd_sampling_validation_plot.png"
+            sidecar_path = request.campaign_root / "dpd_sampling_validation_plot.png.json"
+            plot_path.write_text("", encoding="utf-8")
+            sidecar_path.write_text("{}", encoding="utf-8")
+            return plot_path, sidecar_path
+
+        _dpd_boundary._render_validation_plot = _fallback_render_validation_plot
+        try:
+            result = build_and_render_active_learning_dpd_sampling_gate(
+                candidates,
+                run_id=run_id,
+                iteration="0",
+                platform="karolina",
+                walltime=walltime,
+                gpu_count=1,
+                campaign_root=batch_root,
+                batch_id=batch_id,
+                overwrite=True,
+                provenance_tags={"source_issue": "MESOUQ-AL-34UM"},
+            )
+        finally:
+            _dpd_boundary._render_validation_plot = original_render_validation_plot
 
     lineage = _lineage_payload(candidates)
     rendered_candidate_manifests = tuple(
@@ -275,11 +612,19 @@ def _render_batch(
         "report_path": str(result.report_path),
         "candidate_count": len(candidates),
         "expected_request_payload_schema_version": EXPECTED_REQUEST_PAYLOAD_SCHEMA_VERSION,
+        "parameter_space": PARAMETER_SPACE,
+        "bounds": {
+            "ka": [KA_MIN, KA_MAX],
+            "kb": [KB_MIN, KB_MAX],
+        },
         "request_payload_schema_versions": [
             _ensure_request_payload_schema_version(manifest_path)
             for manifest_path in rendered_candidate_manifests[: len(candidates)]
         ],
         "rendered_candidate_manifests": [str(item) for item in rendered_candidate_manifests[: len(candidates)]],
+        "expected_output_roots": [
+            record["output_root"] for record in result.manifest.get("candidate_records", []) if isinstance(record, dict)
+        ],
         "scheduler_boundary": result.manifest["scheduler_boundary"],
         "candidate_lineage": lineage["candidate_lineage"],
         "lineage_fingerprint": lineage["lineage_fingerprint"],
@@ -334,6 +679,10 @@ def prepare_emb_34um_final_gate(
     retry_limit: int,
     run_id_prefix: str,
     canary_force_count: int,
+    lhs_candidate_count: int,
+    validation_target_count: int,
+    dnn_ensemble_target_size: int,
+    candidate_pool_size: int,
     skip_vault_copy: bool,
 ) -> dict[str, Any]:
     if canary_force_count <= 0:
@@ -341,6 +690,30 @@ def prepare_emb_34um_final_gate(
     if canary_force_count != CANARY_FORCE_COUNT:
         raise ValueError(
             f"canary_force_count is fixed at {CANARY_FORCE_COUNT} for the EMB 3.4um final gate."
+        )
+    if lhs_candidate_count <= 0:
+        raise ValueError("lhs_candidate_count must be positive.")
+    if validation_target_count <= 0:
+        raise ValueError("validation_target_count must be positive.")
+    if dnn_ensemble_target_size <= 0:
+        raise ValueError("dnn_ensemble_target_size must be positive.")
+    if candidate_pool_size <= 0:
+        raise ValueError("candidate_pool_size must be positive.")
+    if lhs_candidate_count != LHS_CANDIDATE_COUNT:
+        raise ValueError(
+            f"lhs_candidate_count is fixed at {LHS_CANDIDATE_COUNT} for the EMB 3.4um final gate."
+        )
+    if validation_target_count != VALIDATION_TARGET_COUNT:
+        raise ValueError(
+            f"validation_target_count is fixed at {VALIDATION_TARGET_COUNT} for the EMB 3.4um final gate."
+        )
+    if dnn_ensemble_target_size != DNN_ENSEMBLE_TARGET_SIZE:
+        raise ValueError(
+            f"dnn_ensemble_target_size is fixed at {DNN_ENSEMBLE_TARGET_SIZE} for the EMB 3.4um final gate."
+        )
+    if candidate_pool_size != CANDIDATE_POOL_SIZE:
+        raise ValueError(
+            f"candidate_pool_size is fixed at {CANDIDATE_POOL_SIZE} for the EMB 3.4um final gate."
         )
     if concurrent_jobs < 1:
         raise ValueError("concurrent_jobs must be positive.")
@@ -355,14 +728,26 @@ def prepare_emb_34um_final_gate(
     canary_forces = _canonical_canary_force_points(force_grid, canary_force_count)
     full_force_points = force_grid
 
-    full_candidates = _build_full_candidates(run_id=run_id_prefix, force_grid=full_force_points)
+    full_candidates, full_design_manifests = _build_full_candidates(run_id=run_id_prefix, force_grid=full_force_points)
     canary_candidates = _build_canary_candidates(run_id=run_id_prefix, force_grid=canary_forces)
+    lhs_candidates = _build_lhs_candidates(run_id=run_id_prefix, force_grid=full_force_points)
+    benchmark_candidates = _build_benchmark_candidates(run_id=run_id_prefix, force_grid=full_force_points)
+    validation_candidates = _build_validation_candidates(run_id=run_id_prefix, force_grid=full_force_points)
 
     if len(full_candidates) != TOTAL_FULL:
         raise RuntimeError("Unexpected full-gate candidate count")
+    if len(lhs_candidates) != LHS_CANDIDATE_COUNT:
+        raise RuntimeError("Unexpected lhs candidate count.")
+    if len(benchmark_candidates) != BENCHMARK_TARGET_COUNT:
+        raise RuntimeError("Unexpected benchmark candidate count.")
+    if len(validation_candidates) != VALIDATION_TARGET_COUNT:
+        raise RuntimeError("Unexpected validation candidate count.")
 
     full_root = campaign_root / "full_gate"
     canary_root = campaign_root / "canary"
+    lhs_root = campaign_root / "lhs_gate"
+    benchmark_root = campaign_root / "benchmark"
+    validation_root = campaign_root / "validation"
 
     full_payload = _render_batch(
         candidates=full_candidates,
@@ -382,18 +767,54 @@ def prepare_emb_34um_final_gate(
         concurrent_jobs=concurrent_jobs,
         retry_limit=retry_limit,
     )
+    lhs_payload = _render_batch(
+        candidates=lhs_candidates,
+        batch_root=lhs_root,
+        run_id=f"{run_id_prefix}-lhs",
+        batch_id="lhs-90",
+        walltime=walltime,
+        concurrent_jobs=concurrent_jobs,
+        retry_limit=retry_limit,
+    )
+    benchmark_payload = _render_batch(
+        candidates=benchmark_candidates,
+        batch_root=benchmark_root,
+        run_id=f"{run_id_prefix}-benchmark",
+        batch_id="benchmark-3",
+        walltime=walltime,
+        concurrent_jobs=concurrent_jobs,
+        retry_limit=retry_limit,
+    )
+    validation_payload = _render_batch(
+        candidates=validation_candidates,
+        batch_root=validation_root,
+        run_id=f"{run_id_prefix}-validation",
+        batch_id="validation-30",
+        walltime=walltime,
+        concurrent_jobs=concurrent_jobs,
+        retry_limit=retry_limit,
+    )
 
     manifest_path = campaign_root / "emb_34um_final_gate_campaign_manifest.json"
     campaign_root.mkdir(parents=True, exist_ok=True)
 
     acceptance = {
         "full_count_is_90": len(full_candidates) == TOTAL_FULL,
-        "canary_count_is_1": len(canary_candidates) == 1,
+        "canary_count_is_1": len(canary_candidates) == CANARY_CANDIDATE_COUNT,
+        "lhs_count_is_90": len(lhs_candidates) == LHS_CANDIDATE_COUNT,
+        "benchmark_count_is_3": len(benchmark_candidates) == BENCHMARK_TARGET_COUNT,
+        "validation_count_is_30": len(validation_candidates) == VALIDATION_TARGET_COUNT,
         "canary_points_is_3": len(canary_forces) == canary_force_count == CANARY_FORCE_COUNT,
         "full_render_only": full_payload["submission_expected"]["submission_commands"] == [],
         "canary_render_only": canary_payload["submission_expected"]["submission_commands"] == [],
+        "lhs_render_only": lhs_payload["submission_expected"]["submission_commands"] == [],
+        "benchmark_render_only": benchmark_payload["submission_expected"]["submission_commands"] == [],
+        "validation_render_only": validation_payload["submission_expected"]["submission_commands"] == [],
         "full_submitted": full_payload["submission_expected"]["submitted"] is False,
         "canary_submitted": canary_payload["submission_expected"]["submitted"] is False,
+        "lhs_submitted": lhs_payload["submission_expected"]["submitted"] is False,
+        "benchmark_submitted": benchmark_payload["submission_expected"]["submitted"] is False,
+        "validation_submitted": validation_payload["submission_expected"]["submitted"] is False,
     }
 
     manifest = {
@@ -410,14 +831,78 @@ def prepare_emb_34um_final_gate(
             "concurrent_jobs": concurrent_jobs,
             "retry_limit": retry_limit,
             "gpu_count": 1,
+            "python_executable": sys.executable,
+        },
+        "linear_traceability": {
+            "project": LINEAR_TRACE_PROJECT,
+            "issue": LINEAR_TRACE_ISSUE,
+            "engine": LINEAR_TRACE_ENGINE,
+        },
+        "policy": {
+            "candidate_pool_size": candidate_pool_size,
+            "adaptive_selection": {
+                "engine": "dnn_ensemble_disagreement_diversity",
+                "round_1_source": EMB_34UM_FINAL_GATE_SOURCE_INITIAL,
+                "later_round_exploration_source": EMB_34UM_FINAL_GATE_SOURCE_EXPLORATION,
+                "later_round_acquisition_source": EMB_34UM_FINAL_GATE_SOURCE_ACQUISITION,
+                "exploration_count": EMB_34UM_FINAL_GATE_EXPLORATION_COUNT,
+                "acquisition_count": EMB_34UM_FINAL_GATE_ACQUISITION_COUNT,
+                "batch_size": EMB_34UM_FINAL_GATE_BATCH_SIZE,
+                "lhs_comparator_prefixes": list(EMB_34UM_FINAL_GATE_LHS_COMPARATOR_PREFIXES),
+                "posterior_aware": False,
+            },
+            "accepted_curves": {
+                "rounds": FULL_ROUNDS,
+                "per_round": PER_ROUND,
+                "total": TOTAL_FULL,
+            },
+            "lhs_comparator_curves": LHS_CANDIDATE_COUNT,
+            "validation_target_curves": VALIDATION_TARGET_COUNT,
+            "benchmark_curves": BENCHMARK_TARGET_COUNT,
+            "dnn_ensemble_target_size": dnn_ensemble_target_size,
+            "failure_policy": {
+                "retry_limit": retry_limit,
+                "retries_before_quarantine": 3,
+                "replacement_mode": "next_candidate",
+            },
+            "sampling": {
+                "parameter_space": PARAMETER_SPACE,
+                "bounds": {
+                    "ka": [KA_MIN, KA_MAX],
+                    "kb": [KB_MIN, KB_MAX],
+                },
+            },
+            "seeds": {
+                "full": FULL_SEED,
+                "lhs": LHS_SEED,
+                "benchmark": BENCHMARK_SEED,
+                "validation": VALIDATION_SEED,
+            },
+        },
+        "runtime_artifacts": {
+            "full": [str(Path(root) / "emb_34um_runtime_status.json") for root in full_payload.get("expected_output_roots", [])],
+            "canary": [str(Path(root) / "emb_34um_runtime_status.json") for root in canary_payload.get("expected_output_roots", [])],
+            "lhs": [str(Path(root) / "emb_34um_runtime_status.json") for root in lhs_payload.get("expected_output_roots", [])],
+            "benchmark": [str(Path(root) / "emb_34um_runtime_status.json") for root in benchmark_payload.get("expected_output_roots", [])],
+            "validation": [str(Path(root) / "emb_34um_runtime_status.json") for root in validation_payload.get("expected_output_roots", [])],
         },
         "canary": {
             "force_point_count": len(canary_forces),
             "force_points": list(canary_forces),
         },
         "full_force_points": len(full_force_points),
+        "full_design": {
+            "round_manifests": list(full_design_manifests),
+            "selection_note": (
+                "Round 1 uses Sobol/maximin from no prior data; later rounds reserve 6 exploratory "
+                "curves and 24 acquisition-driven curves using ensemble disagreement plus diversity."
+            ),
+        },
         "full_gate": full_payload,
         "canary_gate": canary_payload,
+        "lhs_gate": lhs_payload,
+        "benchmark_gate": benchmark_payload,
+        "validation_gate": validation_payload,
         "acceptance": {
             "pass": all(acceptance.values()),
             "criteria": acceptance,
@@ -435,6 +920,36 @@ def prepare_emb_34um_final_gate(
             ),
             "canary": _submission_command(
                 mode="canary",
+                timestamp=timestamp,
+                scratch_root=scratch_root,
+                vault_root=vault_root,
+                campaign_root=campaign_root,
+                run_id_prefix=run_id_prefix,
+                concurrent_jobs=concurrent_jobs,
+                retry_limit=retry_limit,
+            ),
+            "lhs": _submission_command(
+                mode=LHS_GATE_NAME,
+                timestamp=timestamp,
+                scratch_root=scratch_root,
+                vault_root=vault_root,
+                campaign_root=campaign_root,
+                run_id_prefix=run_id_prefix,
+                concurrent_jobs=concurrent_jobs,
+                retry_limit=retry_limit,
+            ),
+            "benchmark": _submission_command(
+                mode=BENCHMARK_GATE_NAME,
+                timestamp=timestamp,
+                scratch_root=scratch_root,
+                vault_root=vault_root,
+                campaign_root=campaign_root,
+                run_id_prefix=run_id_prefix,
+                concurrent_jobs=concurrent_jobs,
+                retry_limit=retry_limit,
+            ),
+            "validation": _submission_command(
+                mode=VALIDATION_GATE_NAME,
                 timestamp=timestamp,
                 scratch_root=scratch_root,
                 vault_root=vault_root,
@@ -461,6 +976,9 @@ def prepare_emb_34um_final_gate(
         "manifest": manifest,
         "full_gate": full_payload,
         "canary_gate": canary_payload,
+        "lhs_gate": lhs_payload,
+        "benchmark_gate": benchmark_payload,
+        "validation_gate": validation_payload,
     }
 
 
@@ -487,6 +1005,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--retry-limit", type=int, default=3)
     parser.add_argument("--run-id-prefix", default="emb-34um-final-gate")
     parser.add_argument("--canary-force-count", type=int, default=CANARY_FORCE_COUNT)
+    parser.add_argument("--candidate-pool-size", type=int, default=CANDIDATE_POOL_SIZE)
+    parser.add_argument("--lhs-candidate-count", type=int, default=LHS_CANDIDATE_COUNT)
+    parser.add_argument("--validation-target-count", type=int, default=VALIDATION_TARGET_COUNT)
+    parser.add_argument("--dnn-target-size", type=int, default=DNN_ENSEMBLE_TARGET_SIZE)
     parser.add_argument("--skip-vault-copy", action="store_true")
     return parser
 
@@ -504,6 +1026,10 @@ def main(argv: list[str] | None = None) -> int:
         retry_limit=args.retry_limit,
         run_id_prefix=args.run_id_prefix,
         canary_force_count=args.canary_force_count,
+        lhs_candidate_count=args.lhs_candidate_count,
+        validation_target_count=args.validation_target_count,
+        dnn_ensemble_target_size=args.dnn_target_size,
+        candidate_pool_size=args.candidate_pool_size,
         skip_vault_copy=args.skip_vault_copy,
     )
     print(f"manifest_path={result['manifest_path']}")
