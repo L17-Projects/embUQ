@@ -175,8 +175,6 @@ class CompositeLikelihood:
         return results
 
 
-
-
 def build_composite_likelihood_spec(config: Mapping[str, Any]) -> CompositeLikelihoodSpec:
     return CompositeLikelihoodSpec.from_mapping(config)
 
