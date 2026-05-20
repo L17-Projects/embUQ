@@ -73,6 +73,16 @@ _ACQUISITION_SCORE_ALIASES = ("acquisition_score", "acq_score", "selected_candid
 _DISAGREEMENT_ALIASES = ("ensemble_disagreement", "disagreement", "acq_uncertainty", "uncertainty")
 _ROUND_SOURCE_ALIASES = ("round", "round_index", "iteration", "al_round")
 _ORDER_SOURCE_ALIASES = ("order", "index", "candidate_index", "curve_index", "row_index")
+_SELECTED_ALIASES = (
+    "selected",
+    "selected_for_training",
+    "selected_for_validation",
+    "is_selected",
+    "active_learning_selected",
+)
+_QUARANTINED_ALIASES = ("quarantined", "is_quarantined", "quarantine", "quarantined_flag")
+_TRUE_STRINGS = {"1", "true", "t", "yes", "y", "on"}
+_FALSE_STRINGS = {"0", "false", "f", "no", "n", "off"}
 
 _FAILED_STATUSES = {"failed", "error", "rejected", "invalid", "crashed"}
 _REPLACEMENT_STATUS = {"replaced", "retry", "requeued", "superseded"}
@@ -146,6 +156,33 @@ def _optional_int(value: object) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _optional_bool(value: object, *, label: str) -> bool | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        if value in (0, 1):
+            return bool(value)
+        raise ValueError(f"{label} must be a boolean.")
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if not normalized:
+            return None
+        if normalized in _TRUE_STRINGS:
+            return True
+        if normalized in _FALSE_STRINGS:
+            return False
+    raise ValueError(f"{label} must be a boolean.")
+
+
+def _first_bool(row: Mapping[str, Any], aliases: Sequence[str], *, label: str) -> bool | None:
+    for alias in aliases:
+        if alias in row:
+            return _optional_bool(row.get(alias), label=label)
+    return None
 
 
 def _finite_float(value: object, *, label: str) -> float:
@@ -242,6 +279,10 @@ def _row_order(row: Mapping[str, Any]) -> int:
     return 0
 
 
+def _has_explicit_order(row: Mapping[str, Any]) -> bool:
+    return any(_optional_int(row.get(key)) is not None for key in _ORDER_SOURCE_ALIASES)
+
+
 def _row_round(row: Mapping[str, Any]) -> int | None:
     for key in _ROUND_SOURCE_ALIASES:
         value = _optional_int(row.get(key))
@@ -278,9 +319,18 @@ def _coerce_failure_flags(row: Mapping[str, Any]) -> tuple[bool, bool, bool]:
     reason = _first_text(row, aliases=("reason", "reason_code", "reason_codes", "failure_reason"))
     reason_text = str(reason or "").lower()
     failed = bool(status in _FAILED_STATUSES or "fail" in status or "error" in reason_text)
-    quarantined = "quarantine" in status or "quarantine" in reason_text or bool(row.get("quarantined"))
+    quarantine_flag = _first_bool(row, _QUARANTINED_ALIASES, label="quarantined")
+    quarantined = "quarantine" in status or "quarantine" in reason_text or bool(quarantine_flag)
     replaced = status in _REPLACEMENT_STATUS or "replac" in status or "retry" in reason_text
     return failed, quarantined, replaced
+
+
+def _coerce_selected_flag(row: Mapping[str, Any]) -> bool:
+    return bool(_first_bool(row, _SELECTED_ALIASES, label="selected"))
+
+
+def _public_curve_record(record: Mapping[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in record.items() if not key.startswith("_")}
 
 
 def _coerce_float_optional(row: Mapping[str, Any], aliases: Sequence[str]) -> float | None:
@@ -290,6 +340,13 @@ def _coerce_float_optional(row: Mapping[str, Any], aliases: Sequence[str]) -> fl
                 return _finite_float(row.get(alias), label=alias)
             except ValueError:
                 return None
+    return None
+
+
+def _coerce_float_optional_strict(row: Mapping[str, Any], aliases: Sequence[str]) -> float | None:
+    for alias in aliases:
+        if alias in row and row.get(alias) not in (None, ""):
+            return _finite_float(row.get(alias), label=alias)
     return None
 
 
@@ -338,6 +395,7 @@ def _extract_curve_records(rows: Sequence[Mapping[str, Any]]) -> tuple[tuple[dic
         curve_id = _curve_id(row, index=index)
         round_index = _row_round(row)
         order = _row_order(row)
+        has_explicit_order = _has_explicit_order(row)
         metric_value = None
         invalid_curve_metric = False
         for alias in _CURVE_METRIC_ALIASES:
@@ -358,11 +416,25 @@ def _extract_curve_records(rows: Sequence[Mapping[str, Any]]) -> tuple[tuple[dic
         except ValueError:
             skip("invalid_acquisition_or_disagreement")
             continue
-        runtime_seconds = _first_scalar(row, _RUN_TIME_ALIASES)
-        failed, quarantined, replaced = _coerce_failure_flags(row)
+        try:
+            runtime_seconds = _coerce_float_optional_strict(row, _RUN_TIME_ALIASES)
+        except ValueError:
+            skip("invalid_runtime_seconds")
+            continue
+        try:
+            failed, quarantined, replaced = _coerce_failure_flags(row)
+            selected = _coerce_selected_flag(row)
+        except ValueError as exc:
+            if "quarantined" in str(exc):
+                skip("invalid_quarantined_flag")
+            else:
+                skip("invalid_selected_flag")
+            continue
+        if quarantined:
+            skip("quarantined")
+            continue
         ka, kb = _coerce_ka_kb(row)
         force_axis = _coerce_force_axis(row)
-        selected = bool(row.get("selected") or row.get("selected_for_training") or row.get("is_selected"))
         failure_reason = _first_text(row, aliases=("reason", "reason_code", "failure_reason"))
 
         if metric_value is not None:
@@ -388,6 +460,8 @@ def _extract_curve_records(rows: Sequence[Mapping[str, Any]]) -> tuple[tuple[dic
                     "force_axis": force_axis,
                     "predicted_curve": None,
                     "reference_curve": None,
+                    "_input_index": index,
+                    "_has_explicit_order": has_explicit_order,
                 }
             )
             continue
@@ -429,6 +503,8 @@ def _extract_curve_records(rows: Sequence[Mapping[str, Any]]) -> tuple[tuple[dic
                     "force_axis": force_axis,
                     "predicted_curve": tuple(float(item) for item in predicted),
                     "reference_curve": tuple(float(item) for item in reference),
+                    "_input_index": index,
+                    "_has_explicit_order": has_explicit_order,
                 }
             )
             continue
@@ -471,6 +547,8 @@ def _extract_curve_records(rows: Sequence[Mapping[str, Any]]) -> tuple[tuple[dic
                 "replacement": bool(replaced),
                 "failure_reason": failure_reason,
                 "force_axis": force_axis,
+                "_input_index": index,
+                "_has_explicit_order": has_explicit_order,
             },
         )
         group["points"].append((point_axis, predicted_point, reference_point))
@@ -510,15 +588,24 @@ def _extract_curve_records(rows: Sequence[Mapping[str, Any]]) -> tuple[tuple[dic
                 "force_axis": tuple(float(item[0]) for item in points),
                 "predicted_curve": tuple(float(item[1]) for item in points),
                 "reference_curve": tuple(float(item[2]) for item in points),
+                "_input_index": group["_input_index"],
+                "_has_explicit_order": group["_has_explicit_order"],
             }
         )
 
-    records = tuple(
-        sorted(
+    if direct_records and all(bool(item.get("_has_explicit_order")) for item in direct_records):
+        ordered_records = sorted(
             direct_records,
-            key=lambda item: (item["strategy"], item["round"] if item["round"] is not None else 999999, int(item["order"]), item["curve_id"]),
+            key=lambda item: (
+                item["strategy"],
+                item["round"] if item["round"] is not None else 999999,
+                int(item["order"]),
+                item["curve_id"],
+            ),
         )
-    )
+    else:
+        ordered_records = sorted(direct_records, key=lambda item: int(item["_input_index"]))
+    records = tuple(_public_curve_record(item) for item in ordered_records)
     return records, skipped
 
 
@@ -632,18 +719,27 @@ def _build_round_evidence(records: Sequence[Mapping[str, Any]]) -> tuple[dict[st
 def _attach_runtime_rows(
     records: Sequence[dict[str, Any]],
     runtime_rows: Sequence[Mapping[str, Any]],
-) -> tuple[dict[str, Any], ...]:
+) -> tuple[tuple[dict[str, Any], ...], dict[str, int]]:
     if not runtime_rows:
-        return tuple(dict(item) for item in records)
+        return tuple(dict(item) for item in records), {}
 
     by_curve_id: dict[str, float] = {}
     by_candidate_id: dict[str, float] = {}
     by_round_curve: dict[tuple[int, str], float] = {}
+    skipped: dict[str, int] = {}
+
+    def skip(reason: str) -> None:
+        skipped[reason] = skipped.get(reason, 0) + 1
+
     for row in runtime_rows:
-        runtime = _coerce_float_optional(
-            row,
-            aliases=("runtime", "runtime_seconds", "wall_time", "seconds", "elapsed_seconds"),
-        )
+        try:
+            runtime = _coerce_float_optional_strict(
+                row,
+                aliases=("runtime", "runtime_seconds", "wall_time", "seconds", "elapsed_seconds"),
+            )
+        except ValueError:
+            skip("invalid_runtime_seconds")
+            continue
         if runtime is None:
             continue
         curve_id = _first_text(row, aliases=("curve_id", "sample_id", "id"))
@@ -672,7 +768,7 @@ def _attach_runtime_rows(
         if runtime is not None:
             updated["runtime_seconds"] = runtime
         attached.append(updated)
-    return tuple(attached)
+    return tuple(attached), skipped
 
 
 def _coerce_bounds(value: Any, *, default: tuple[float, float]) -> tuple[float, float]:
@@ -1128,7 +1224,9 @@ def build_emb_34um_al_vs_lhs_validation_report(
             runtime_rows,
             record_keys=("runtime_rows", "rows", "records"),
         )
-        curve_records = _attach_runtime_rows(curve_records, parsed_runtime_rows)
+        curve_records, runtime_skipped = _attach_runtime_rows(curve_records, parsed_runtime_rows)
+        for reason, count in runtime_skipped.items():
+            skipped[reason] = skipped.get(reason, 0) + count
     summary_rows = _build_summary_rows(curve_records=curve_records, prefix_curve_counts=prefix_curve_counts)
     round_rows = _build_round_evidence(curve_records)
     al_count = sum(1 for item in curve_records if item["strategy"] == "al")

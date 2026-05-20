@@ -167,6 +167,73 @@ def test_emb_34um_al_vs_lhs_validation_disagreement_map_prefers_selected_points(
     assert manifest["selected_samples"][0]["curve_id"] == "al-r01-selected"
 
 
+def test_emb_34um_al_vs_lhs_validation_parses_string_selected_and_quarantined_flags() -> None:
+    rows = [
+        _curve_row(strategy="al", curve_id="al-not-selected", round_index=1, order=1, rel_l2_pct=2.0),
+        _curve_row(strategy="al", curve_id="al-selected", round_index=1, order=2, rel_l2_pct=1.0),
+        _curve_row(strategy="lhs", curve_id="lhs-active", order=1, rel_l2_pct=5.0),
+        _curve_row(strategy="lhs", curve_id="lhs-active-2", order=2, rel_l2_pct=6.0),
+        _curve_row(strategy="lhs", curve_id="lhs-quarantined", order=3, rel_l2_pct=4.0),
+    ]
+    rows[0]["selected"] = "False"
+    rows[0]["quarantined"] = "False"
+    rows[1]["selected"] = "True"
+    rows[2]["selected"] = "False"
+    rows[2]["quarantined"] = "False"
+    rows[3]["quarantined"] = "False"
+    rows[4]["quarantined"] = "True"
+
+    manifest, summary_rows = build_emb_34um_al_vs_lhs_validation_report(curve_rows=rows)
+
+    assert manifest["status"] == "ready"
+    assert manifest["skipped_row_reasons"] == {"quarantined": 1}
+    assert manifest["al_curve_count"] == 2
+    assert manifest["lhs_curve_count"] == 2
+    assert [item["curve_id"] for item in manifest["selected_samples"]] == ["al-selected"]
+    assert manifest["curve_records"][0]["selected"] is False
+    assert manifest["curve_records"][2]["quarantined"] is False
+    assert len(summary_rows) == 1
+
+
+def test_emb_34um_al_vs_lhs_validation_skips_nonnumeric_runtime_with_manifest_evidence() -> None:
+    rows = [
+        _curve_row(strategy="al", curve_id="al-bad-runtime", round_index=1, order=1, rel_l2_pct=2.0),
+        _curve_row(strategy="al", curve_id="al-good", round_index=1, order=2, rel_l2_pct=1.0),
+        _curve_row(strategy="lhs", curve_id="lhs-good", order=1, rel_l2_pct=5.0),
+    ]
+    rows[0]["runtime_seconds"] = "not-a-number"
+    rows[1]["runtime_seconds"] = "12.5"
+
+    manifest, summary_rows = build_emb_34um_al_vs_lhs_validation_report(curve_rows=rows)
+
+    assert manifest["status"] == "ready"
+    assert manifest["skipped_row_reasons"] == {"invalid_runtime_seconds": 1}
+    assert manifest["runtime_seconds_count"] == 1
+    assert manifest["runtime_rows"][0]["curve_id"] == "al-good"
+    assert len(summary_rows) == 1
+    assert math.isclose(summary_rows[0]["al_median_curve_rel_l2_pct"], 1.0)
+
+
+def test_emb_34um_al_vs_lhs_validation_preserves_input_order_without_order_metadata() -> None:
+    rows = [
+        {"strategy": "al", "curve_id": "al-input-first", "round": 2, "curve_rel_l2_pct": 20.0},
+        {"strategy": "lhs", "curve_id": "lhs-input-first", "curve_rel_l2_pct": 10.0},
+        {"strategy": "al", "curve_id": "al-input-second", "round": 1, "curve_rel_l2_pct": 1.0},
+        {"strategy": "lhs", "curve_id": "lhs-input-second", "curve_rel_l2_pct": 11.0},
+    ]
+
+    manifest, summary_rows = build_emb_34um_al_vs_lhs_validation_report(curve_rows=rows)
+
+    assert [item["curve_id"] for item in manifest["curve_records"]] == [
+        "al-input-first",
+        "lhs-input-first",
+        "al-input-second",
+        "lhs-input-second",
+    ]
+    assert summary_rows[0]["al_round_prefix"] == 2
+    assert math.isclose(summary_rows[0]["al_median_curve_rel_l2_pct"], 20.0)
+
+
 def test_emb_34um_al_vs_lhs_validation_supports_runtime_rows_from_json_and_csv(tmp_path: Path) -> None:
     runtime_rows = (
         {
@@ -206,6 +273,13 @@ def test_emb_34um_al_vs_lhs_validation_supports_runtime_rows_from_json_and_csv(t
     assert csv_manifest["runtime_curve_count"] == 2
     assert csv_manifest["runtime_rows"][0]["curve_id"] == "al-r01-c001"
     assert csv_manifest["runtime_rows"][1]["runtime_seconds"] == 15.0
+
+    invalid_runtime_manifest, _ = build_emb_34um_al_vs_lhs_validation_report(
+        curve_rows=_validation_rows(),
+        runtime_rows=[{"curve_id": "al-r01-c001", "runtime_seconds": "not-a-number"}],
+    )
+    assert invalid_runtime_manifest["skipped_row_reasons"] == {"invalid_runtime_seconds": 1}
+    assert invalid_runtime_manifest["runtime_seconds_count"] == 0
 
 
 def test_emb_34um_al_vs_lhs_validation_marks_ingestion_only_rows_blocked(tmp_path: Path) -> None:
