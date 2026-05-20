@@ -201,7 +201,7 @@ def _find_matching_f_delta_row(
 ) -> tuple[dict[str, Any] | None, tuple[str, ...]]:
     normalized = _as_mapping(candidate.get("normalized_payload", {}), label="normalized_payload")
     parameters = _as_mapping(normalized.get("parameters", {}), label="normalized_payload.parameters")
-    yt = float(parameters["Yt"])
+    ka = float(parameters["ka"])
     kb = float(parameters["kb"])
     reasons: list[str] = []
     readable_files = [path for path in expected_paths if path.is_file()]
@@ -217,7 +217,7 @@ def _find_matching_f_delta_row(
             continue
         for row in rows:
             params = row["parameters"]
-            if not math.isclose(float(params[0]), yt, rel_tol=_FLOAT_TOLERANCE, abs_tol=_FLOAT_TOLERANCE):
+            if not math.isclose(float(params[1]), ka, rel_tol=_FLOAT_TOLERANCE, abs_tol=_FLOAT_TOLERANCE):
                 continue
             if not math.isclose(float(params[2]), kb, rel_tol=_FLOAT_TOLERANCE, abs_tol=_FLOAT_TOLERANCE):
                 continue
@@ -561,7 +561,7 @@ def build_emb_34um_final_gate_ingestion_report(
             "file": "F_Delta.dat",
             "producer": "emb.indentation.evalkit.posterior_indentation.compute_indentation",
             "row_layout": "Yt ka kb b1 b2 a3 a4 radp, followed by one output per force, followed by the force grid",
-            "matching_columns": {"Yt": 0, "kb": 2},
+            "matching_columns": {"ka": 1, "kb": 2},
         },
     }
     return manifest, report

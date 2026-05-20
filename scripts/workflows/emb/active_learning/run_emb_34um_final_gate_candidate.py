@@ -52,11 +52,36 @@ class Emb34umCandidateRequest:
     retry_limit: int
     fingerprint: Mapping[str, Any]
     request_payload: Mapping[str, Any]
+    compatibility_yt: float | None = None
 
     @property
     def parameter_vector(self) -> tuple[float, ...]:
         return (
-            float(self.parameters["Yt"]),
+            float(self.parameters["ka"]),
+            float(self.parameters["kb"]),
+            float(self.parameters.get("b1", 0.0)),
+            float(self.parameters.get("b2", 0.0)),
+            float(self.parameters.get("a3", 0.0)),
+            float(self.parameters.get("a4", 0.0)),
+        )
+
+    @property
+    def compute_parameter_vector(self) -> tuple[float, ...]:
+        yt = self.compatibility_yt
+        if yt is None:
+            defaults = _load_emb_default_parameters()
+            defaults.update(self.fingerprint)
+            runtime_params = {
+                "fscale": defaults.get("fscale", _DEFAULT_EMB_FINGERPRINT["fscale"]),
+                "shell_th": defaults.get("shell_th", _DEFAULT_EMB_FINGERPRINT["shell_th"]),
+                "ul": defaults.get("ul"),
+                "kbol": defaults.get("kbol"),
+                "t0": defaults.get("t0"),
+                "nu": defaults.get("nu"),
+            }
+            yt = _ka_to_yt(float(self.parameters["ka"]), defaults=runtime_params)
+        return (
+            float(yt),
             float(self.parameters["kb"]),
             float(self.parameters.get("b1", 0.0)),
             float(self.parameters.get("b2", 0.0)),
@@ -65,6 +90,62 @@ class Emb34umCandidateRequest:
             0.0,
             0.0,
         )
+
+
+_EMB_DEFAULTS_PATH = (
+    _repo_root()
+    / "emb"
+    / "indentation"
+    / "src"
+    / "parameters-default.emb.yaml"
+)
+_DEFAULT_EMB_FINGERPRINT = {
+    "fscale": 0.0074,
+    "shell_th": 5.0e-9,
+}
+
+
+def _load_emb_default_parameters() -> dict[str, Any]:
+    import yaml
+
+    if not _EMB_DEFAULTS_PATH.exists():
+        raise FileNotFoundError(f"Missing EMB defaults at {_EMB_DEFAULTS_PATH}")
+    with _EMB_DEFAULTS_PATH.open("r", encoding="utf-8") as stream:
+        payload = yaml.safe_load(stream) or {}
+    if not isinstance(payload, dict):
+        raise ValueError("Invalid EMB defaults payload; expected mapping.")
+    return dict(payload)
+
+
+def _coerce_ka_yt_scale(*, defaults: Mapping[str, Any], candidate_id: str) -> float:
+    required = ("ul", "kbol", "t0", "shell_th", "nu", "fscale")
+    for key in required:
+        if key not in defaults:
+            raise ValueError(f"Candidate {candidate_id!r} is missing {key!r} for ka<->Yt conversion.")
+
+    ul = float(defaults["ul"])
+    kbol = float(defaults["kbol"])
+    t0 = float(defaults["t0"])
+    shell_th = float(defaults["shell_th"])
+    nu = float(defaults["nu"])
+    fscale = float(defaults["fscale"])
+    if not all(math.isfinite(value) for value in (ul, kbol, t0, shell_th, nu, fscale)):
+        raise ValueError(f"Candidate {candidate_id!r} has invalid material constants for ka<->Yt conversion.")
+    if math.isclose(ul, 0.0) or math.isclose(kbol, 0.0) or math.isclose(t0, 0.0) or math.isclose(shell_th, 0.0):
+        raise ValueError(f"Candidate {candidate_id!r} has invalid material constants for ka<->Yt conversion.")
+    if nu == 1.0:
+        raise ValueError(f"Candidate {candidate_id!r} has invalid Poisson ratio for ka<->Yt conversion.")
+
+    return fscale * shell_th / (2.0 * (1.0 - nu)) / ((kbol * t0) / ul**2)
+
+
+def _legacy_yt_to_ka(yt: float, *, defaults: Mapping[str, Any], candidate_id: str) -> float:
+    return float(yt) * _coerce_ka_yt_scale(defaults=defaults, candidate_id=candidate_id)
+
+
+def _ka_to_yt(ka: float, *, defaults: Mapping[str, Any], candidate_id: str | None = None) -> float:
+    scale = _coerce_ka_yt_scale(defaults=defaults, candidate_id=candidate_id or "candidate")
+    return float(ka) / scale
 
 
 def _coerce_mapping(value: Any, *, field_name: str) -> Mapping[str, Any]:
@@ -94,15 +175,61 @@ def _coerce_force_grid(values: Any, *, candidate_id: str) -> tuple[float, ...]:
     return grid
 
 
-def _coerce_parameters(values: Any, *, candidate_id: str) -> dict[str, float]:
+def _coerce_parameters(values: Any, *, candidate_id: str) -> tuple[dict[str, float], float | None]:
     payload = _coerce_mapping(values, field_name=f"candidate {candidate_id} parameters")
-    missing = [name for name in ("Yt", "kb") if name not in payload]
+    if "ka" in payload:
+        missing = [name for name in ("ka", "kb") if name not in payload]
+        if missing:
+            raise ValueError(f"Candidate {candidate_id!r} is missing parameters: {missing}.")
+        return (
+            {
+                "ka": _coerce_float(payload["ka"], field_name="parameters.ka"),
+                "kb": _coerce_float(payload["kb"], field_name="parameters.kb"),
+                "b1": 0.0,
+                "b2": 0.0,
+                "a3": 0.0,
+                "a4": 0.0,
+            },
+            None,
+        )
+    if "Yt" in payload:
+        missing = [name for name in ("kb",) if name not in payload]
+        if missing:
+            raise ValueError(f"Candidate {candidate_id!r} is missing parameters: {missing}.")
+        yt = _coerce_float(payload["Yt"], field_name="parameters.Yt")
+        ka = _legacy_yt_to_ka(
+            yt,
+            defaults={**_load_emb_default_parameters(), **payload},
+            candidate_id=candidate_id,
+        )
+        return (
+            {
+                "ka": ka,
+                "kb": _coerce_float(payload["kb"], field_name="parameters.kb"),
+                "b1": 0.0,
+                "b2": 0.0,
+                "a3": 0.0,
+                "a4": 0.0,
+            },
+            yt,
+        )
+
+    missing = [name for name in ("ka", "kb") if name not in payload]
     if missing:
         raise ValueError(f"Candidate {candidate_id!r} is missing parameters: {missing}.")
-    return {
-        name: _coerce_float(payload.get(name, 0.0), field_name=f"parameters.{name}")
-        for name in ("Yt", "kb", "b1", "b2", "a3", "a4")
-    }
+
+    # Defensive fallback; this branch should only occur when legacy names were not provided.
+    return (
+        {
+            "ka": _coerce_float(payload["ka"], field_name="parameters.ka"),
+            "kb": _coerce_float(payload["kb"], field_name="parameters.kb"),
+            "b1": 0.0,
+            "b2": 0.0,
+            "a3": 0.0,
+            "a4": 0.0,
+        },
+        None,
+    )
 
 
 def load_candidate_request(candidate_manifest_path: str | Path) -> Emb34umCandidateRequest:
@@ -141,16 +268,22 @@ def load_candidate_request(candidate_manifest_path: str | Path) -> Emb34umCandid
     if retry_limit < 0:
         raise ValueError("request_payload.retry_limit must be non-negative.")
 
+    parameters, compatibility_yt = _coerce_parameters(
+        request_payload.get("parameters"),
+        candidate_id=candidate_id,
+    )
+
     return Emb34umCandidateRequest(
         candidate_manifest_path=path,
         candidate_id=candidate_id,
         output_root=Path(output_root_text),
         expected_hdf5_path=Path(hdf5_text),
         expected_request_manifest_path=Path(request_manifest_text),
-        parameters=_coerce_parameters(request_payload.get("parameters"), candidate_id=candidate_id),
+        parameters=parameters,
         force_grid=_coerce_force_grid(request_payload.get("force_grid"), candidate_id=candidate_id),
         retry_limit=retry_limit,
         fingerprint=dict(_coerce_mapping(request_payload.get("fingerprint", {}), field_name="fingerprint")),
+        compatibility_yt=compatibility_yt,
         request_payload=dict(request_payload),
     )
 
@@ -312,7 +445,7 @@ def _write_outputs(request: Emb34umCandidateRequest, sample: Mapping[str, Any], 
     result_payload = {
         "candidate_id": request.candidate_id,
         "diameter_um": EMB_34UM_DIAMETER_UM,
-        "parameter_names": ["Yt", "kb", "b1", "b2", "a3", "a4", "d0", "sigma"],
+        "parameter_names": ["ka", "kb", "b1", "b2", "a3", "a4"],
         "parameters": params.tolist(),
         "force_grid": forces.tolist(),
         "vertical_diameter": diameters.tolist(),
@@ -377,7 +510,7 @@ def run_candidate_once(
     os.chdir(request.output_root)
     try:
         sample: dict[str, Any] = {
-            "Parameters": list(request.parameter_vector),
+            "Parameters": list(request.compute_parameter_vector),
             "Sample Id": request.candidate_id,
         }
         compute_indentation(

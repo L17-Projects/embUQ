@@ -54,9 +54,10 @@ def test_load_emb_34um_force_grid_rejects_inconsistent_rows(tmp_path: Path) -> N
 
 def test_build_emb_34um_request_builds_payload_and_rejects_bad_dimensions(tmp_path: Path) -> None:
     root = tmp_path / "campaign"
+    expected_ka = adapter._legacy_yt_to_ka(3.0e7, defaults=adapter._load_default_parameters(), candidate_id="candidate-emb")
     artifacts = adapter.build_emb_34um_request(
         candidate_id="candidate-emb",
-        payload={"Yt": 1.2e6, "kb": 1000.0, "experiment": "indentation"},
+        payload={"ka": expected_ka, "kb": 1000.0, "experiment": "indentation"},
         campaign_root=root,
     )
     request_payload = artifacts.normalized_request_payload()
@@ -64,8 +65,12 @@ def test_build_emb_34um_request_builds_payload_and_rejects_bad_dimensions(tmp_pa
     assert request_payload["schema_version"] == adapter.EMB_34UM_DPD_SCHEMA_VERSION
     assert request_payload["request_type"] == "emb_34um_full_force_sweep"
     assert request_payload["candidate_id"] == "candidate-emb"
-    assert request_payload["parameters"]["Yt"] == 1.2e6
+    assert request_payload["parameters"]["ka"] == expected_ka
     assert request_payload["parameters"]["kb"] == 1000.0
+    assert request_payload["parameters"]["b1"] == 0.0
+    assert request_payload["parameters"]["b2"] == 0.0
+    assert request_payload["parameters"]["a3"] == 0.0
+    assert request_payload["parameters"]["a4"] == 0.0
     assert request_payload["retry_limit"] == adapter.EMB_34UM_RETRY_LIMIT
     assert request_payload["force_grid_count"] == 15
     assert request_payload["fingerprint"]["radp"] == adapter.EMB_34UM_RUNTIME_FINGERPRINT["radp"]
@@ -81,15 +86,29 @@ def test_build_emb_34um_request_builds_payload_and_rejects_bad_dimensions(tmp_pa
     with pytest.raises(ValueError, match="outside bounds"):
         adapter.build_emb_34um_request(
             candidate_id="too-high-kb",
-            payload={"Yt": 1.2e6, "kb": 1234567.0, "experiment": "indentation"},
+            payload={"ka": 1.2e6, "kb": 1234567.0, "experiment": "indentation"},
             campaign_root=root,
         )
     with pytest.raises(ValueError, match="missing required EMB 3.4um dimensions"):
         adapter.build_emb_34um_request(
             candidate_id="missing-kb",
-            payload={"Yt": 1.2e6, "experiment": "indentation"},
+            payload={"ka": 1.2e6, "experiment": "indentation"},
             campaign_root=root,
         )
+
+
+def test_build_emb_34um_request_compatibility_allows_legacy_yt_input(tmp_path: Path) -> None:
+    root = tmp_path / "campaign"
+    expected_ka = adapter._legacy_yt_to_ka(2.5e7, defaults=adapter._load_default_parameters(), candidate_id="legacy")
+    artifacts = adapter.build_emb_34um_request(
+        candidate_id="candidate-legacy",
+        payload={"Yt": 2.5e7, "kb": 1000.0, "experiment": "indentation"},
+        campaign_root=root,
+    )
+
+    request_payload = artifacts.normalized_request_payload()
+    assert request_payload["parameters"]["ka"] == expected_ka
+    assert request_payload["parameters"]["kb"] == 1000.0
 
 
 def test_build_emb_34um_request_rejects_wrong_fingerprint_defaults(monkeypatch, tmp_path: Path) -> None:
@@ -106,6 +125,6 @@ def test_build_emb_34um_request_rejects_wrong_fingerprint_defaults(monkeypatch, 
     with pytest.raises(ValueError, match="expected fscale"):
         adapter.build_emb_34um_request(
             candidate_id="bad-fingerprint",
-            payload={"Yt": 1.2e6, "kb": 1000.0, "experiment": "indentation"},
+            payload={"ka": 1e3, "kb": 1000.0, "experiment": "indentation"},
             campaign_root=tmp_path,
         )

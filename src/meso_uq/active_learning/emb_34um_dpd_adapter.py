@@ -15,10 +15,10 @@ _EMB_TRAINING_DATA_PATH = _REPO_ROOT / "emb" / "indentation" / "surrogate" / "di
 
 EMB_34UM_DPD_SCHEMA_VERSION = "meso_uq.dpd_sampling.emb_34um_request.v1"
 EMB_34UM_DIMENSION_BOUNDS: Mapping[str, tuple[float, float]] = {
-    "Yt": (1e5, 1e9),
+    "ka": (1e2, 6e5),
     "kb": (400.0, 70000.0),
 }
-EMB_34UM_PARAMETER_NAMES = ("Yt", "kb")
+EMB_34UM_PARAMETER_NAMES = ("ka", "kb")
 EMB_34UM_RETRY_LIMIT = 3
 EMB_34UM_CANARY_FORCE_POINT_COUNT = 3
 EMB_34UM_PLATFORM_DEFAULTS: Mapping[str, Any] = {
@@ -122,23 +122,56 @@ def _coerce_parameter(value: Any, *, name: str, candidate_id: str) -> float:
     return float(numeric)
 
 
-def _validate_emb_34um_parameters(payload: Mapping[str, Any], *, candidate_id: str) -> tuple[float, float]:
-    if "Yt" not in payload or "kb" not in payload:
+def _legacy_yt_to_ka(yt: float, *, defaults: Mapping[str, Any], candidate_id: str) -> float:
+    # Compatibility-only path: old campaign controls emit Yt for legacy active-learning workflows.
+    required = ("ul", "kbol", "t0", "shell_th", "nu", "fscale")
+    for key in required:
+        if key not in defaults:
+            raise ValueError(f"Candidate {candidate_id!r} defaults are missing {key!r} for Yt-to-ka compatibility conversion.")
+    try:
+        ul = float(defaults["ul"])
+        kbol = float(defaults["kbol"])
+        t0 = float(defaults["t0"])
+        shell_th = float(defaults["shell_th"])
+        nu = float(defaults["nu"])
+        fscale = float(defaults["fscale"])
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Candidate {candidate_id!r} has invalid default constants for compatibility conversion.") from exc
+
+    if any(math.isclose(value, 0.0) or not math.isfinite(value) for value in (ul, kbol, t0, shell_th, fscale, nu, 1.0 - nu)):
+        raise ValueError(f"Candidate {candidate_id!r} has invalid default constants for compatibility conversion.")
+    if nu == 1.0:
+        raise ValueError(f"Candidate {candidate_id!r} has invalid Poisson ratio (nu == 1.0) for compatibility conversion.")
+
+    ue = kbol * t0
+    ka_per_yt = fscale * shell_th / (2.0 * (1.0 - nu)) / (ue / ul**2)
+    return yt * ka_per_yt
+
+
+def _validate_emb_34um_parameters(
+    payload: Mapping[str, Any], *, candidate_id: str, defaults: Mapping[str, Any]
+) -> tuple[float, float]:
+    has_legacy_yt = "Yt" in payload and "ka" not in payload
+    if not ("kb" in payload and ("ka" in payload or has_legacy_yt)):
         raise ValueError(
-            f"Candidate {candidate_id!r} is missing required EMB 3.4um dimensions; expected 'Yt' and 'kb'."
+            f"Candidate {candidate_id!r} is missing required EMB 3.4um dimensions; expected 'ka' and 'kb'."
         )
 
-    yt = _coerce_parameter(payload["Yt"], name="Yt", candidate_id=candidate_id)
+    if "ka" in payload:
+        ka = _coerce_parameter(payload["ka"], name="ka", candidate_id=candidate_id)
+    else:
+        yt = _coerce_parameter(payload["Yt"], name="Yt", candidate_id=candidate_id)
+        ka = _legacy_yt_to_ka(yt, defaults=defaults, candidate_id=candidate_id)
     kb = _coerce_parameter(payload["kb"], name="kb", candidate_id=candidate_id)
 
-    yt_min, yt_max = EMB_34UM_DIMENSION_BOUNDS["Yt"]
+    ka_min, ka_max = EMB_34UM_DIMENSION_BOUNDS["ka"]
     kb_min, kb_max = EMB_34UM_DIMENSION_BOUNDS["kb"]
-    if not (yt_min <= yt <= yt_max):
-        raise ValueError(f"Candidate {candidate_id!r} has Yt={yt} outside bounds [{yt_min}, {yt_max}].")
+    if not (ka_min <= ka <= ka_max):
+        raise ValueError(f"Candidate {candidate_id!r} has ka={ka} outside bounds [{ka_min}, {ka_max}].")
     if not (kb_min <= kb <= kb_max):
         raise ValueError(f"Candidate {candidate_id!r} has kb={kb} outside bounds [{kb_min}, {kb_max}].")
 
-    return yt, kb
+    return ka, kb
 
 
 def _coerce_sequence(values: Sequence[float], *, candidate_id: str, field_name: str) -> tuple[float, ...]:
@@ -260,7 +293,7 @@ def derive_emb_34um_force_grid(
 
 
 def is_emb_34um_full_request_payload(payload: Mapping[str, Any]) -> bool:
-    return all(key in payload for key in EMB_34UM_PARAMETER_NAMES)
+    return "kb" in payload and ("ka" in payload or "Yt" in payload)
 
 
 def _resolve_runtime_fingerprint(
@@ -322,17 +355,16 @@ def _resolve_runtime_fingerprint(
 
 def _build_parameter_payload(
     *,
-    yt: float,
+    ka: float,
     kb: float,
-    defaults: Mapping[str, Any],
 ) -> dict[str, float]:
     payload = {
-        "Yt": yt,
+        "ka": ka,
         "kb": kb,
-        "b1": float(defaults.get("b1", 0.0)),
-        "b2": float(defaults.get("b2", 0.0)),
-        "a3": float(defaults.get("a3", 0.0)),
-        "a4": float(defaults.get("a4", 0.0)),
+        "b1": 0.0,
+        "b2": 0.0,
+        "a3": 0.0,
+        "a4": 0.0,
     }
     return payload
 
@@ -348,9 +380,9 @@ def build_emb_34um_request(
     candidate_id = _coerce_candidate_id(candidate_id, field_name="candidate_id")
     base_root = Path(campaign_root)
     experiment = _coerce_experiment(payload, candidate_id=candidate_id)
-    yt, kb = _validate_emb_34um_parameters(payload, candidate_id=candidate_id)
-
     defaults = _load_default_parameters()
+    ka, kb = _validate_emb_34um_parameters(payload, candidate_id=candidate_id, defaults=defaults)
+
     payload_force_grid = payload.get("force_grid")
     if force_grid is not None:
         requested_grid = _coerce_sequence(force_grid, candidate_id=candidate_id, field_name="force_grid")
@@ -378,7 +410,7 @@ def build_emb_34um_request(
         campaign_root=base_root,
         force_grid=tuple(requested_grid),
         force_grid_is_canary=_coerce_canary(payload, candidate_id=candidate_id),
-        parameters=_build_parameter_payload(yt=yt, kb=kb, defaults=defaults),
+        parameters=_build_parameter_payload(ka=ka, kb=kb),
         runtime_fingerprint=runtime_fingerprint,
         expected_hdf5_dataset_id=dataset_id,
         expected_hdf5_path=expected_hdf5_path,

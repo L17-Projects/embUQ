@@ -140,8 +140,10 @@ def test_prepare_emb_34um_final_gate_manifests_full_and_canary_campaigns(tmp_pat
         assert rendered["family"] == "emb"
         assert rendered["rendered_payload"]["family"] == "emb"
         assert rendered["normalized_payload"]["experiment"] == "indentation"
-        assert "Yt" in rendered["normalized_payload"]["parameters"]
-        assert "kb" in rendered["normalized_payload"]["parameters"]
+        normalized_parameters = rendered["normalized_payload"]["parameters"]
+        assert "ka" in normalized_parameters
+        assert "kb" in normalized_parameters
+        assert "Yt" not in normalized_parameters
     for rendered_path in canary_rendered_candidate_manifests:
         rendered = json.loads(Path(rendered_path).read_text(encoding="utf-8"))
         request_payload = rendered["rendered_payload"]["request_payload"]

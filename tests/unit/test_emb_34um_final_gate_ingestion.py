@@ -33,6 +33,7 @@ def _candidate_manifest(
     yt: float,
     kb: float,
     force_grid: list[float],
+    ka: float = 1.0,
 ) -> Path:
     output_root = root / gate / "emb" / candidate_id
     manifest_path = output_root / "dpd_sampling_candidate_manifest.json"
@@ -51,7 +52,7 @@ def _candidate_manifest(
                 "experiment": "indentation",
                 "campaign_root": str(root / gate),
                 "output_root": str(output_root),
-                "parameters": {"Yt": yt, "ka": 1.0, "kb": kb, "b1": 0.0, "b2": 0.0, "a3": 0.0, "a4": 0.0},
+                "parameters": {"Yt": yt, "ka": ka, "kb": kb, "b1": 0.0, "b2": 0.0, "a3": 0.0, "a4": 0.0},
                 "force_grid": force_grid,
             },
             "rendered_payload": {
@@ -66,9 +67,17 @@ def _candidate_manifest(
     return manifest_path
 
 
-def _write_f_delta(path: Path, *, yt: float, kb: float, outputs: list[float], forces: list[float]) -> None:
+def _write_f_delta(
+    path: Path,
+    *,
+    yt: float,
+    ka: float,
+    kb: float,
+    outputs: list[float],
+    forces: list[float],
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    row = [yt, 2.0, kb, 0.0, 0.0, 0.0, 0.0, 6.8] + outputs + forces
+    row = [yt, ka, kb, 0.0, 0.0, 0.0, 0.0, 6.8] + outputs + forces
     path.write_text(" ".join(str(item) for item in row) + "\n", encoding="utf-8")
 
 
@@ -127,6 +136,7 @@ def test_emb_34um_final_gate_ingestion_accepts_completed_f_delta_rows(tmp_path: 
         _write_f_delta(
             Path(payload["normalized_payload"]["output_root"]) / "F_Delta.dat",
             yt=float(params["Yt"]),
+            ka=float(params["ka"]),
             kb=float(params["kb"]),
             outputs=outputs,
             forces=[float(item) for item in forces],
@@ -241,6 +251,7 @@ def test_ingestion_does_not_read_cwd_when_candidate_output_root_is_missing(
     _write_f_delta(
         tmp_path / "F_Delta.dat",
         yt=100.0,
+        ka=1.0,
         kb=200.0,
         outputs=[1.0, 2.0],
         forces=[0.0, 10.0],
