@@ -98,7 +98,9 @@ def test_emb_34um_al_vs_lhs_validation_writes_png_json_and_csv_sidecars(tmp_path
     assert "plot_paths" in manifest
     required_plot_keys = {
         "al_vs_lhs_l2",
+        "al_vs_lhs_relative_l2",
         "samples_ka_kb",
+        "initial_round1_samples",
         "per_round_additions",
         "exploration_vs_acquisition",
         "disagreement_acquisition_map",
@@ -117,6 +119,52 @@ def test_emb_34um_al_vs_lhs_validation_writes_png_json_and_csv_sidecars(tmp_path
     assert len(csv_rows) == 2
     assert csv_rows[0]["al_round_prefix"] == "1"
     assert math.isclose(float(csv_rows[1]["lhs_median_curve_rel_l2_pct"]), 5.5)
+
+
+def test_emb_34um_al_vs_lhs_validation_disagreement_map_prefers_selected_points(tmp_path: Path) -> None:
+    rows = [
+        {
+            "strategy": "al",
+            "curve_id": "al-r01-selected",
+            "round": 1,
+            "ka": 100.0,
+            "kb": 500.0,
+            "selected": True,
+            "ensemble_disagreement": 0.9,
+            "acquisition_score": 0.9,
+            "curve_rel_l2_pct": 1.0,
+        },
+        {
+            "strategy": "al",
+            "curve_id": "al-r01-noise",
+            "round": 1,
+            "ka": 101.0,
+            "kb": 501.0,
+            "selected": False,
+            "sample_source": "acquisition",
+            "ensemble_disagreement": 0.2,
+            "acquisition_score": 0.1,
+            "curve_rel_l2_pct": 1.1,
+        },
+        {
+            "strategy": "lhs",
+            "curve_id": "lhs-c001",
+            "round": 1,
+            "ka": 120.0,
+            "kb": 520.0,
+            "curve_rel_l2_pct": 4.0,
+        },
+    ]
+    artifacts = write_emb_34um_al_vs_lhs_validation_artifacts(
+        curve_rows=rows,
+        output_root=tmp_path / "selected-only-disagreement",
+        include_plot=False,
+    )
+    manifest = artifacts.manifest
+    assert manifest["plot_paths"]["disagreement_acquisition_map"] == str(artifacts.plot_paths["disagreement_acquisition_map"])
+    assert manifest["al_curve_count"] == 2
+    assert len(manifest["selected_samples"]) == 1
+    assert manifest["selected_samples"][0]["curve_id"] == "al-r01-selected"
 
 
 def test_emb_34um_al_vs_lhs_validation_supports_runtime_rows_from_json_and_csv(tmp_path: Path) -> None:

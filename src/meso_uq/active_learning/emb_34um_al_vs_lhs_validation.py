@@ -19,6 +19,7 @@ EMB_34UM_AL_VS_LHS_VALIDATION_SUMMARY_CSV_FILENAME = "emb_34um_al_vs_lhs_validat
 EMB_34UM_AL_VS_LHS_VALIDATION_PLOT_FILENAME = "emb_34um_al_vs_lhs_validation.png"
 EMB_34UM_AL_VS_LHS_VALIDATION_PLOT_SIDECAR_FILENAME = "emb_34um_al_vs_lhs_validation.png.json"
 EMB_34UM_AL_VS_LHS_VALIDATION_SAMPLES_PLOT_FILENAME = "emb_34um_al_vs_lhs_validation_samples_ka_kb.png"
+EMB_34UM_AL_VS_LHS_VALIDATION_ROUND1_SAMPLES_PLOT_FILENAME = "emb_34um_al_vs_lhs_validation_round1_samples_ka_kb.png"
 EMB_34UM_AL_VS_LHS_VALIDATION_ROUND_ADDITIONS_PLOT_FILENAME = "emb_34um_al_vs_lhs_validation_round_additions.png"
 EMB_34UM_AL_VS_LHS_VALIDATION_SOURCE_PLOT_FILENAME = "emb_34um_al_vs_lhs_validation_source_mix.png"
 EMB_34UM_AL_VS_LHS_VALIDATION_DISAGREEMENT_PLOT_FILENAME = "emb_34um_al_vs_lhs_validation_disagreement_acquisition_ka_kb.png"
@@ -820,6 +821,78 @@ def _plot_sample_scatter(path: Path, records: Sequence[Mapping[str, Any]], *, in
     plt.close(fig)
 
 
+def _plot_round1_sample_scatter(path: Path, records: Sequence[Mapping[str, Any]], *, include_plot: bool) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not include_plot:
+        path.write_bytes(_fallback_png())
+        return
+    try:
+        import matplotlib.pyplot as plt  # type: ignore
+    except Exception:
+        path.write_bytes(_fallback_png())
+        return
+
+    round_one_records = [
+        item
+        for item in records
+        if item.get("strategy") == "al" and _optional_int(item.get("round")) == 1
+    ]
+    if not round_one_records:
+        path.write_bytes(_fallback_png())
+        return
+
+    ka_kb = [
+        (float(item["ka"]), float(item["kb"]))
+        for item in round_one_records
+        if item.get("ka") is not None and item.get("kb") is not None
+    ]
+    if not ka_kb:
+        path.write_bytes(_fallback_png())
+        return
+    ka_values = [item[0] for item in ka_kb]
+    kb_values = [item[1] for item in ka_kb]
+    selected_kb = [
+        (float(item["ka"]), float(item["kb"]))
+        for item in round_one_records
+        if item.get("ka") is not None and item.get("kb") is not None and bool(item.get("selected"))
+    ]
+    candidate_records = [
+        (float(item["ka"]), float(item["kb"]))
+        for item in round_one_records
+        if item.get("ka") is not None and item.get("kb") is not None and not bool(item.get("selected"))
+    ]
+
+    fig, axis = plt.subplots(1, 1, figsize=(7, 5))
+    if candidate_records:
+        axis.scatter(
+            [item[0] for item in candidate_records],
+            [item[1] for item in candidate_records],
+            alpha=0.65,
+            label="Initial round-1 candidates",
+            marker="o",
+            color="#1f77b4",
+        )
+    if selected_kb:
+        axis.scatter(
+            [item[0] for item in selected_kb],
+            [item[1] for item in selected_kb],
+            marker="*",
+            s=64,
+            alpha=0.85,
+            label="Initial round-1 selected",
+            color="black",
+        )
+    axis.set_xlabel("ka")
+    axis.set_ylabel("kb")
+    axis.set_title("Round-1 initial samples over ka, kb")
+    axis.set_xlim(min(ka_values), max(ka_values))
+    axis.set_ylim(min(kb_values), max(kb_values))
+    axis.legend(loc="best")
+    fig.tight_layout()
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+
+
 def _plot_round_additions(path: Path, round_rows: Sequence[Mapping[str, Any]], *, include_plot: bool) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if not include_plot or not round_rows:
@@ -880,11 +953,22 @@ def _plot_disagreement_map(path: Path, records: Sequence[Mapping[str, Any]], *, 
         return
 
     al_records = [item for item in records if item["strategy"] == "al"]
+    selected_records = [item for item in al_records if bool(item.get("selected"))]
+    source_records = [item for item in al_records if "acquis" in str(item.get("sample_source", "")).lower()]
+    candidate_records = selected_records if selected_records else source_records or al_records
     valid = [
         item
-        for item in al_records
+        for item in candidate_records
         if item.get("ka") is not None and item.get("kb") is not None and item.get("ensemble_disagreement") is not None
     ]
+    if not valid:
+        if selected_records and candidate_records is not source_records:
+            candidate_records = source_records or al_records
+            valid = [
+                item
+                for item in candidate_records
+                if item.get("ka") is not None and item.get("kb") is not None and item.get("ensemble_disagreement") is not None
+            ]
     if not valid:
         path.write_bytes(_fallback_png())
         return
@@ -1139,6 +1223,7 @@ def write_emb_34um_al_vs_lhs_validation_artifacts(
     plot_sidecar_path = artifact_dir / EMB_34UM_AL_VS_LHS_VALIDATION_PLOT_SIDECAR_FILENAME
 
     sample_plot_path = artifact_dir / EMB_34UM_AL_VS_LHS_VALIDATION_SAMPLES_PLOT_FILENAME
+    round1_sample_plot_path = artifact_dir / EMB_34UM_AL_VS_LHS_VALIDATION_ROUND1_SAMPLES_PLOT_FILENAME
     round_additions_plot_path = artifact_dir / EMB_34UM_AL_VS_LHS_VALIDATION_ROUND_ADDITIONS_PLOT_FILENAME
     source_plot_path = artifact_dir / EMB_34UM_AL_VS_LHS_VALIDATION_SOURCE_PLOT_FILENAME
     disagreement_plot_path = artifact_dir / EMB_34UM_AL_VS_LHS_VALIDATION_DISAGREEMENT_PLOT_FILENAME
@@ -1161,6 +1246,7 @@ def write_emb_34um_al_vs_lhs_validation_artifacts(
     _write_summary_csv(summary_csv_path, summary_rows)
     _write_plot(plot_path, summary_rows, include_plot=include_plot)
     _plot_sample_scatter(sample_plot_path, curve_records, include_plot=include_plot)
+    _plot_round1_sample_scatter(round1_sample_plot_path, curve_records, include_plot=include_plot)
     _plot_round_additions(round_additions_plot_path, round_rows, include_plot=include_plot)
     _plot_exploration_vs_acquisition(source_plot_path, round_rows, include_plot=include_plot)
     _plot_disagreement_map(disagreement_plot_path, curve_records, include_plot=include_plot)
@@ -1171,7 +1257,9 @@ def write_emb_34um_al_vs_lhs_validation_artifacts(
     plot_paths = {
         "al_vs_lhs_l2": str(plot_path),
         "al_vs_lhs_validation": str(plot_path),
+        "al_vs_lhs_relative_l2": str(plot_path),
         "samples_ka_kb": str(sample_plot_path),
+        "initial_round1_samples": str(round1_sample_plot_path),
         "per_round_additions": str(round_additions_plot_path),
         "exploration_vs_acquisition": str(source_plot_path),
         "disagreement_acquisition_map": str(disagreement_plot_path),
@@ -1202,6 +1290,7 @@ __all__ = [
     "EMB_34UM_AL_VS_LHS_VALIDATION_SCHEMA_VERSION",
     "EMB_34UM_AL_VS_LHS_VALIDATION_SUMMARY_CSV_FILENAME",
     "EMB_34UM_AL_VS_LHS_VALIDATION_SAMPLES_PLOT_FILENAME",
+    "EMB_34UM_AL_VS_LHS_VALIDATION_ROUND1_SAMPLES_PLOT_FILENAME",
     "EMB_34UM_AL_VS_LHS_VALIDATION_ROUND_ADDITIONS_PLOT_FILENAME",
     "EMB_34UM_AL_VS_LHS_VALIDATION_SOURCE_PLOT_FILENAME",
     "EMB_34UM_AL_VS_LHS_VALIDATION_DISAGREEMENT_PLOT_FILENAME",

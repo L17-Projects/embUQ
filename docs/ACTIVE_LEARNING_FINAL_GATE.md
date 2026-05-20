@@ -29,6 +29,7 @@ This document is the final-gate contract for the active-learning production slic
 
 At every active-learning step, the workflow must produce and record:
 
+- initial round-1 candidate/selected sample coverage (`initial_round1_samples`),
 - runtime-per-curve
 - selected samples ka/kb overlays
 - per-round additions
