@@ -27,12 +27,15 @@ from meso_uq.noise import (
     PosteriorUncertaintyConfig,
     PosteriorUncertaintyKind,
     RobustLikelihoodConfig,
+    SurrogateCovarianceConfig,
+    SurrogateCovarianceInputs,
     SurrogateErrorConfig,
     build_additive_relative_observation_noise,
     build_contact_alignment_covariance,
     build_correlated_curve_covariance,
     build_geometry_uncertainty_covariance,
     build_model_config,
+    build_surrogate_covariance,
     compose_toy_likelihood,
     compose_total_covariance,
     evaluate_observation_likelihood,
@@ -413,6 +416,35 @@ def test_m3_composite_likelihood_dispatches_measurement_uncertainty_components()
     assert geometry.variance_components["geometry_jacobian"] == pytest.approx((0.02, 0.08))
     assert contact.covariance.covariance.shape == (2, 2)
     assert geometry.covariance.covariance.shape == (2, 2)
+
+
+def test_m4_composite_likelihood_dispatches_surrogate_covariance_component():
+    likelihood = build_composite_likelihood(
+        {"stage": "M4", "components": ["surrogate_covariance"]},
+        {
+            "surrogate_covariance": lambda payload: build_surrogate_covariance(
+                SurrogateCovarianceInputs(
+                    predictions=tuple(payload["predictions"]),
+                    predictive_standard_deviation=tuple(payload["surrogate_std"]),
+                    curve_grid=tuple(payload["grid"]),
+                    curve_id="emb/compression",
+                ),
+                SurrogateCovarianceConfig(kind="diagonal"),
+            ),
+        },
+    )
+
+    result = likelihood.evaluate(
+        {
+            "predictions": [2.0, 4.0],
+            "surrogate_std": [0.3, 0.4],
+            "grid": [0.0, 1.0],
+        }
+    )
+
+    surrogate = result["surrogate_covariance"]
+    assert surrogate.summary["kind"] == "diagonal"
+    assert surrogate.variance_components["surrogate_covariance_total"] == pytest.approx((0.09, 0.16))
 
 
 def test_supported_observables_and_units_contract():

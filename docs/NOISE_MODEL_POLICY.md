@@ -98,3 +98,21 @@ Geometry uncertainty uses a Jacobian covariance model:
 where `J_geometry[i, k]` is the sensitivity of prediction point `i` to geometry parameter `k`. Parameters carry names, units, optional nominal values, and either diagonal sigmas or an explicit positive semidefinite parameter covariance matrix. The resulting contribution is reported as `geometry_jacobian` plus per-parameter diagonal covariance components such as `geometry:radius` or `geometry:diameter_um`. Explicit off-diagonal parameter covariance is reported as signed cross components named `geometry_cross:<left>:<right>` so named components reconstruct the total geometry covariance instead of hiding covariance terms in the aggregate.
 
 Disabled geometry uncertainty returns a named zero covariance. Enabled geometry uncertainty requires declared parameters, matching sensitivity vectors, finite values, and valid units. It remains distinct from M2 additive/relative observation noise and correlated curve noise to avoid double counting. Diagnostics must include an enabled-versus-disabled measurement-uncertainty comparison, not only component heatmaps.
+
+## M4 surrogate covariance propagation
+
+M4 adds a stable covariance interface for surrogate predictive uncertainty. It keeps the existing legacy BNN standard-deviation path recoverable while allowing richer covariance payloads for later runtime adapters.
+
+Supported representations:
+
+- `diagonal`: pointwise surrogate predictive standard deviations, stored as `surrogate_predictive_diagonal`.
+- `full`: a dense positive-semidefinite predictive covariance, stored as `surrogate_predictive_full`.
+- `low_rank`: a point-by-rank factor matrix `F` with covariance `F * F.T`, optionally plus a diagonal residual, stored as `surrogate_predictive_low_rank` and `surrogate_predictive_diagonal`.
+
+All forms also report `surrogate_covariance_total`. Disabled surrogate covariance returns a named zero contribution and preserves deterministic DNN/direct-simulation behavior. Enabled surrogate covariance fails early when the selected representation is missing, has the wrong shape, contains nonfinite values, is asymmetric, or is not positive semidefinite.
+
+Legacy EMB BNN predictive standard deviation remains a diagonal surrogate covariance term. Composing M2 relative observation variance with the M4 diagonal surrogate covariance must reproduce the M1 legacy BNN quadrature rule:
+
+`total_std_i = sqrt((relative_sigma * abs(prediction_i))^2 + surrogate_std_i^2)`
+
+M4 does not introduce a general full-hierarchy assembler. Full observation, measurement, surrogate, and discrepancy assembly remains the M5 total-covariance milestone.

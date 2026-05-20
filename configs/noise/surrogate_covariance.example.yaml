@@ -1,0 +1,23 @@
+schema_version: "1.0"
+kind: noise
+metadata:
+  id: surrogate_covariance
+  name: Surrogate Covariance Propagation
+spec:
+  family: surrogate_uncertainty
+  likelihood:
+    stage: M4
+    components:
+      - additive_noise
+      - relative_noise
+      - contact_alignment
+      - geometry
+      - surrogate_covariance
+  surrogate_covariance:
+    enabled: true
+    kind: diagonal
+    predictive_standard_deviation_source: legacy_bnn_predictive_std
+    full_covariance_source: null
+    low_rank_factor_source: null
+    jitter: 1.0e-10
+    max_jitter: 1.0e-6
