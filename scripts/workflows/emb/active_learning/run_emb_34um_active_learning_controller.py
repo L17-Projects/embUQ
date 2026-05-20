@@ -731,6 +731,23 @@ def _selection_metadata_by_candidate(campaign_root: Path, round_index: int) -> d
     }
 
 
+def _attempted_round_rows(
+    *,
+    campaign_root: Path,
+    round_index: int,
+    completed_records: tuple[dict[str, Any], ...],
+) -> tuple[dict[str, Any], ...]:
+    if round_index == 1:
+        return tuple(completed_records)
+    selection_rows = sorted(
+        _load_selection_rows(campaign_root, round_index),
+        key=lambda item: int(item.get("order", 0)),
+    )
+    if selection_rows:
+        return tuple(selection_rows)
+    return tuple(completed_records)
+
+
 def _load_result_records(
     *,
     output_roots: list[Path],
@@ -1064,16 +1081,22 @@ def build_final_evidence(*, campaign_manifest_path: Path) -> dict[str, Any]:
     campaign_root = Path(str(campaign_manifest["campaign_root"]))
     validation_records = _load_validation_records(campaign_manifest, required=True)
     lhs_records = _load_lhs_records(campaign_manifest, required=True)
-    al_records = _load_al_records(campaign_manifest, up_to_round=3, required=True)
-    if len(al_records) < 90 or len(lhs_records) < 90 or len(validation_records) < 1:
-        raise ValueError("Final evidence requires 90 AL curves, 90 LHS curves, and validation curves.")
+    al_records = _load_al_records(campaign_manifest, up_to_round=3, required=False)
+    if len(al_records) < 30 or len(lhs_records) < 90 or len(validation_records) < 1:
+        raise ValueError("Final evidence requires AL curves, 90 LHS curves, and validation curves.")
 
     rows: list[dict[str, Any]] = []
     round_payloads: list[dict[str, Any]] = []
     ingestion_counts = _round_status_counts_from_ingestion(campaign_root)
-    for round_index, prefix in ((1, 30), (2, 60), (3, 90)):
-        al_prefix = al_records[:prefix]
-        lhs_prefix = lhs_records[:prefix]
+    for round_index, target_prefix in ((1, 30), (2, 60), (3, 90)):
+        al_prefix = tuple(
+            item for item in al_records if item.get("round") is not None and int(item["round"]) <= round_index
+        )
+        if not al_prefix:
+            raise ValueError(f"Final evidence has no completed AL records through round {round_index}.")
+        lhs_prefix = lhs_records[: min(len(lhs_records), len(al_prefix))]
+        if not lhs_prefix:
+            raise ValueError(f"Final evidence has no LHS comparator records for round {round_index}.")
         al_report = train_emb_34um_surrogate_ensemble(
             al_prefix,
             validation_records=validation_records,
@@ -1086,11 +1109,18 @@ def build_final_evidence(*, campaign_manifest_path: Path) -> dict[str, Any]:
             seeds=EMB_34UM_FINAL_GATE_SURROGATE_ENSEMBLE_SEEDS,
             architecture_names=EMB_34UM_FINAL_GATE_SURROGATE_ARCHITECTURES,
         )
-        selected_rows = tuple(al_records[(round_index - 1) * 30 : round_index * 30])
+        selected_rows = tuple(
+            item for item in al_records if item.get("round") is not None and int(item["round"]) == round_index
+        )
+        attempted_rows = _attempted_round_rows(
+            campaign_root=campaign_root,
+            round_index=round_index,
+            completed_records=selected_rows,
+        )
         lhs_selected_rows = tuple(lhs_records[(round_index - 1) * 30 : round_index * 30])
         selected_scores = [
             float(item.get("acquisition_score", 0.0))
-            for item in selected_rows
+            for item in attempted_rows
             if float(item.get("acquisition_score", 0.0)) > 0.0
         ]
         round_counts = ingestion_counts.get(round_index, {"failure_counts": {}, "quarantine_counts": {}})
@@ -1116,8 +1146,12 @@ def build_final_evidence(*, campaign_manifest_path: Path) -> dict[str, Any]:
             {
                 "round": round_index,
                 "al_curve_count": 30,
+                "al_completed_curve_count": len(selected_rows),
+                "al_training_curve_count": len(al_prefix),
+                "al_target_prefix_curve_count": target_prefix,
                 "lhs_curve_count": 90,
-                "ka_kb_coverage": [[float(item["ka"]), float(item["kb"])] for item in selected_rows],
+                "lhs_training_curve_count": len(lhs_prefix),
+                "ka_kb_coverage": [[float(item["ka"]), float(item["kb"])] for item in attempted_rows],
                 "acquisition_scores": selected_scores,
                 "selected_candidate_scores": selected_scores,
                 "model_selection": al_report["model_selection"],

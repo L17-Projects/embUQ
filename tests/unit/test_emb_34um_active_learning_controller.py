@@ -188,6 +188,30 @@ def _write_adaptive_round(
     )
 
 
+def _write_ingestion_report(
+    *,
+    campaign_root: Path,
+    completed_round3_count: int,
+) -> None:
+    records: list[dict[str, object]] = []
+    for round_index in (1, 2, 3):
+        completed_count = 30 if round_index < 3 else completed_round3_count
+        for order in range(1, 31):
+            completed = order <= completed_count
+            records.append(
+                {
+                    "gate": "full_gate",
+                    "round": round_index,
+                    "candidate_id": f"emb-34um-final-gate-full-r0{round_index}-c{order:03d}",
+                    "status": "completed" if completed else "failed",
+                    "quarantined": bool(round_index == 3 and not completed),
+                }
+            )
+    report_path = campaign_root / "ingestion_report" / "emb_34um_final_gate_ingestion_report.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps({"records": records}, indent=2, sort_keys=True), encoding="utf-8")
+
+
 def _fake_surrogate_report(
     records: object,
     *,
@@ -434,6 +458,16 @@ def test_emb_34um_active_learning_controller_builds_final_evidence_from_complete
     )
     _write_adaptive_round(campaign_root=campaign_root, round_index=2, force_grid=synthetic_force_grid)
     _write_adaptive_round(campaign_root=campaign_root, round_index=3, force_grid=synthetic_force_grid)
+    round3_summary_path = campaign_root / "adaptive_round_03" / "emb_34um_batch_summary.json"
+    round3_summary = json.loads(round3_summary_path.read_text(encoding="utf-8"))
+    round3_summary["expected_output_roots"] = round3_summary["expected_output_roots"][:-1]
+    round3_summary["rendered_candidate_manifests"] = round3_summary["rendered_candidate_manifests"][:-1]
+    round3_summary_path.write_text(json.dumps(round3_summary, indent=2, sort_keys=True), encoding="utf-8")
+    quarantined_root = campaign_root / "adaptive_round_03" / "adaptive-r03-c030"
+    for filename in ("emb_34um_result.json", "emb_34um_runtime_status.json"):
+        path = quarantined_root / filename
+        if path.is_file():
+            path.unlink()
     _write_completed_roots(
         [Path(path) for path in campaign_manifest["lhs_gate"]["expected_output_roots"]],
         prefix="lhs",
@@ -483,7 +517,7 @@ def test_emb_34um_active_learning_controller_builds_final_evidence_from_complete
         assert payload["selected_candidate_scores"] == payload["acquisition_scores"]
         assert all(float(score) > 0.0 for score in payload["acquisition_scores"])
 
-    assert len(runtime_rows) == 90 + 90 + validation_count
+    assert len(runtime_rows) == 89 + 90 + validation_count
     assert all(row["status"] == "completed" for row in runtime_rows)
     assert all(row["runtime_status_path"] for row in runtime_rows)
     assert all(row["candidate_id"] for row in curve_rows if row["strategy"] in {"al", "lhs"})
@@ -524,3 +558,110 @@ def test_emb_34um_active_learning_controller_builds_final_evidence_from_complete
         for row in curve_rows
         if row["strategy"] in {"al", "lhs"}
     }
+
+
+def test_emb_34um_active_learning_controller_builds_final_evidence_with_quarantined_curve(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_controller_module()
+    _disable_plot_generation(monkeypatch, plot_root=tmp_path / "plots")
+    force_grid = tmp_path / "samples_all_custom.dat"
+    _write_custom_force_grid(force_grid)
+
+    result = module.build_emb_34um_active_learning_controller(
+        timestamp="20260501_140005",
+        scratch_root=tmp_path / "scratch",
+        vault_root=tmp_path / "vault",
+        force_grid_path=force_grid,
+        walltime="00:30:00",
+        concurrent_jobs=30,
+        retry_limit=3,
+        run_id_prefix="emb-34um-final-gate-test",
+        skip_vault_copy=True,
+        dry_run=True,
+    )
+    controller_manifest = result["manifest"]
+    campaign_manifest_path = Path(controller_manifest["prepare_manifest_path"])
+    campaign_manifest = json.loads(campaign_manifest_path.read_text(encoding="utf-8"))
+    campaign_root = Path(campaign_manifest["campaign_root"])
+    synthetic_force_grid = (0.0, 0.5, 1.0)
+
+    _write_completed_roots(
+        [Path(path) for path in campaign_manifest["full_gate"]["expected_output_roots"][:30]],
+        prefix="al-r01",
+        ka_base=1000.0,
+        kb_base=500.0,
+        force_grid=synthetic_force_grid,
+    )
+    _write_adaptive_round(campaign_root=campaign_root, round_index=2, force_grid=synthetic_force_grid)
+    _write_adaptive_round(campaign_root=campaign_root, round_index=3, force_grid=synthetic_force_grid)
+    failed_root = campaign_root / "adaptive_round_03" / "adaptive-r03-c005"
+    (failed_root / "emb_34um_result.json").unlink()
+    (failed_root / "emb_34um_runtime_status.json").write_text(
+        json.dumps(
+            {
+                "status": "failed",
+                "retry_count": 3,
+                "retry_limit": 3,
+                "runtime_seconds": 7200.0,
+            },
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    ingestion_dir = campaign_root / "ingestion_report"
+    ingestion_dir.mkdir(parents=True, exist_ok=True)
+    (ingestion_dir / module.EMB_34UM_FINAL_GATE_INGESTION_REPORT_FILENAME).write_text(
+        json.dumps(
+            {
+                "records": [
+                    {
+                        "candidate_id": "adaptive-r03-c005",
+                        "gate": "full_gate",
+                        "round": 3,
+                        "status": "failed",
+                        "quarantined": True,
+                    }
+                ]
+            },
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    _write_completed_roots(
+        [Path(path) for path in campaign_manifest["lhs_gate"]["expected_output_roots"]],
+        prefix="lhs",
+        ka_base=2000.0,
+        kb_base=800.0,
+        force_grid=synthetic_force_grid,
+    )
+    _write_completed_roots(
+        [Path(path) for path in campaign_manifest["validation_gate"]["expected_output_roots"]],
+        prefix="validation",
+        ka_base=4000.0,
+        kb_base=1200.0,
+        force_grid=synthetic_force_grid,
+    )
+
+    import meso_uq.active_learning.emb_34um_final_gate_surrogate as surrogate
+
+    monkeypatch.setattr(surrogate, "train_emb_34um_surrogate_ensemble", _fake_surrogate_report)
+
+    exit_code = module.main(["--stage-action", "build-evidence", "--campaign-manifest", str(campaign_manifest_path)])
+
+    assert exit_code == 0
+    round_payloads = json.loads((campaign_root / "round_payloads.json").read_text(encoding="utf-8"))["rounds"]
+    runtime_rows = json.loads((campaign_root / "runtime_rows.json").read_text(encoding="utf-8"))["runtime_rows"]
+
+    round_three = round_payloads[2]
+    assert round_three["al_curve_count"] == 30
+    assert round_three["al_completed_curve_count"] == 29
+    assert round_three["al_training_curve_count"] == 89
+    assert round_three["lhs_training_curve_count"] == 89
+    assert len(round_three["ka_kb_coverage"]) == 30
+    assert round_three["failure_counts"] == {"failed": 1}
+    assert round_three["quarantine_counts"] == {"failed": 1}
+    assert len(runtime_rows) == 89 + 90 + len(campaign_manifest["validation_gate"]["expected_output_roots"])

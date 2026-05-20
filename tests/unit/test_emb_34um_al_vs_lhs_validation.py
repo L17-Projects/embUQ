@@ -16,6 +16,7 @@ if str(SRC_ROOT) not in sys.path:
 
 from meso_uq.active_learning.emb_34um_al_vs_lhs_validation import (  # noqa: E402
     EMB_34UM_AL_VS_LHS_VALIDATION_MANIFEST_FILENAME,
+    EMB_34UM_AL_VS_LHS_VALIDATION_BASELINE_NORMALIZED_PLOT_FILENAME,
     EMB_34UM_AL_VS_LHS_VALIDATION_SCHEMA_VERSION,
     build_emb_34um_al_vs_lhs_validation_report,
     write_emb_34um_al_vs_lhs_validation_artifacts,
@@ -58,6 +59,55 @@ def _validation_rows() -> list[dict[str, object]]:
     ]
 
 
+def _baseline_normalized_rows() -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for index in range(1, 31):
+        rows.append(
+            _curve_row(
+                strategy="al",
+                curve_id=f"al-r01-c{index:03d}",
+                round_index=1,
+                order=index,
+                rel_l2_pct=10.0,
+                ka=1000 + index,
+                kb=1000.0 + index,
+            )
+        )
+        rows.append(
+            _curve_row(
+                strategy="lhs",
+                curve_id=f"lhs-c{index:03d}",
+                order=index,
+                rel_l2_pct=20.0,
+                ka=2000 + index,
+                kb=2000.0 + index,
+            )
+        )
+    for index in range(31, 61):
+        rows.append(
+            _curve_row(
+                strategy="al",
+                curve_id=f"al-r02-c{index:03d}",
+                round_index=2,
+                order=index,
+                rel_l2_pct=6.0,
+                ka=1100 + index,
+                kb=1100.0 + index,
+            )
+        )
+        rows.append(
+            _curve_row(
+                strategy="lhs",
+                curve_id=f"lhs-r02-c{index:03d}",
+                order=index + 100,
+                rel_l2_pct=16.0,
+                ka=2100 + index,
+                kb=2100.0 + index,
+            )
+        )
+    return rows
+
+
 def test_emb_34um_al_vs_lhs_validation_computes_round_prefix_medians() -> None:
     manifest, rows = build_emb_34um_al_vs_lhs_validation_report(curve_rows=_validation_rows())
 
@@ -79,6 +129,28 @@ def test_emb_34um_al_vs_lhs_validation_computes_round_prefix_medians() -> None:
     assert rows[1]["prefix_curve_count"] == 4
     assert math.isclose(rows[1]["al_median_curve_rel_l2_pct"], 1.25)
     assert math.isclose(rows[1]["lhs_median_curve_rel_l2_pct"], 5.5)
+
+
+def test_emb_34um_al_vs_lhs_validation_reports_baseline_normalized_learning() -> None:
+    manifest, summary_rows = build_emb_34um_al_vs_lhs_validation_report(
+        curve_rows=_baseline_normalized_rows(),
+        prefix_curve_counts=[30, 60],
+    )
+
+    assert manifest["status"] == "ready"
+    assert [row["prefix"] for row in summary_rows] == [30, 60]
+    assert math.isclose(summary_rows[0]["al_baseline_median_curve_rel_l2_pct"], 10.0)
+    assert math.isclose(summary_rows[0]["lhs_baseline_median_curve_rel_l2_pct"], 20.0)
+    assert math.isclose(summary_rows[0]["al_learning_from_baseline_curve_rel_l2_pct"], 0.0)
+    assert math.isclose(summary_rows[0]["lhs_learning_from_baseline_curve_rel_l2_pct"], 0.0)
+    assert math.isclose(summary_rows[0]["al_learning_from_baseline_pct"], 0.0)
+    assert math.isclose(summary_rows[0]["lhs_learning_from_baseline_pct"], 0.0)
+    assert math.isclose(summary_rows[1]["al_learning_from_baseline_curve_rel_l2_pct"], 2.0)
+    assert math.isclose(summary_rows[1]["lhs_learning_from_baseline_curve_rel_l2_pct"], 2.0)
+    assert math.isclose(summary_rows[1]["al_learning_from_baseline_pct"], 20.0)
+    assert math.isclose(summary_rows[1]["lhs_learning_from_baseline_pct"], 10.0)
+    assert math.isclose(summary_rows[1]["al_minus_lhs_delta"], -10.0)
+    assert math.isclose(summary_rows[1]["al_advantage_over_lhs_curve_rel_l2_pct"], 10.0)
 
 
 def test_emb_34um_al_vs_lhs_validation_writes_png_json_and_csv_sidecars(tmp_path: Path) -> None:
@@ -103,6 +175,7 @@ def test_emb_34um_al_vs_lhs_validation_writes_png_json_and_csv_sidecars(tmp_path
         "al_vs_lhs_relative_l2",
         "samples_ka_kb",
         "initial_round1_samples",
+        "baseline_normalized_learning",
         "per_round_additions",
         "exploration_vs_acquisition",
         "disagreement_acquisition_map",
@@ -111,6 +184,9 @@ def test_emb_34um_al_vs_lhs_validation_writes_png_json_and_csv_sidecars(tmp_path
         "runtime_per_curve",
     }
     assert required_plot_keys.issubset(set(manifest["plot_paths"]))
+    assert manifest["plot_paths"]["baseline_normalized_learning"] == str(
+        tmp_path / "validation" / EMB_34UM_AL_VS_LHS_VALIDATION_BASELINE_NORMALIZED_PLOT_FILENAME
+    )
     for plot_path in manifest["plot_paths"].values():
         resolved = Path(plot_path)
         assert resolved.is_file()
@@ -120,6 +196,8 @@ def test_emb_34um_al_vs_lhs_validation_writes_png_json_and_csv_sidecars(tmp_path
         csv_rows = list(csv.DictReader(handle))
     assert len(csv_rows) == 2
     assert csv_rows[0]["al_round_prefix"] == "1"
+    assert csv_rows[0]["al_learning_from_baseline_curve_rel_l2_pct"] == ""
+    assert csv_rows[0]["lhs_learning_from_baseline_curve_rel_l2_pct"] == ""
     assert math.isclose(float(csv_rows[1]["lhs_median_curve_rel_l2_pct"]), 5.5)
 
 
@@ -199,6 +277,35 @@ def test_emb_34um_al_vs_lhs_validation_parses_string_selected_and_quarantined_fl
     assert any(item["curve_id"] == "lhs-quarantined" and item["quarantined"] for item in manifest["curve_records"])
     assert manifest["round_evidence"][0]["al_quarantine_count"] == 1
     assert len(summary_rows) == 1
+
+
+def test_emb_34um_al_vs_lhs_validation_buckets_ensemble_disagreement_as_acquisition() -> None:
+    rows = [
+        {
+            **_curve_row(strategy="al", curve_id="al-initial", round_index=1, order=1, rel_l2_pct=1.0),
+            "sample_source": "initial_sobol_maximin",
+        },
+        {
+            **_curve_row(strategy="al", curve_id="al-exploration", round_index=1, order=2, rel_l2_pct=1.1),
+            "sample_source": "exploration",
+        },
+        {
+            **_curve_row(strategy="al", curve_id="al-acquisition", round_index=1, order=3, rel_l2_pct=1.2),
+            "sample_source": "ensemble_disagreement_diversity",
+        },
+        _curve_row(strategy="lhs", curve_id="lhs-c001", order=1, rel_l2_pct=5.0),
+        _curve_row(strategy="lhs", curve_id="lhs-c002", order=2, rel_l2_pct=5.1),
+        _curve_row(strategy="lhs", curve_id="lhs-c003", order=3, rel_l2_pct=5.2),
+    ]
+
+    manifest, _ = build_emb_34um_al_vs_lhs_validation_report(curve_rows=rows)
+
+    round_evidence = manifest["round_evidence"][0]
+    assert round_evidence["al_candidate_count"] == 1
+    assert round_evidence["al_exploration_count"] == 1
+    assert round_evidence["al_acquisition_count"] == 1
+    assert [item["curve_id"] for item in manifest["exploration_samples"]] == ["al-exploration"]
+    assert [item["curve_id"] for item in manifest["acquisition_samples"]] == ["al-acquisition"]
 
 
 def test_emb_34um_al_vs_lhs_validation_skips_nonnumeric_runtime_with_manifest_evidence() -> None:
@@ -451,6 +558,30 @@ def test_emb_34um_al_vs_lhs_validation_prefers_30_60_90_prefixes_when_available(
     assert summary_rows[2]["prefix"] == 90
     assert len(summary_rows) == 3
     assert manifest["prefix_targets"] == [30, 60, 90]
+
+
+def test_emb_34um_al_vs_lhs_validation_accepts_explicit_30_60_89_prefix_counts() -> None:
+    rows = []
+    for index in range(1, 31):
+        rows.append(_curve_row(strategy="al", curve_id=f"al-r01-c{index:03d}", round_index=1, order=index, rel_l2_pct=1.0 + 0.01 * index))
+    for index in range(31, 61):
+        rows.append(_curve_row(strategy="al", curve_id=f"al-r02-c{index:03d}", round_index=2, order=index, rel_l2_pct=1.1 + 0.01 * index))
+    for index in range(61, 90):
+        rows.append(_curve_row(strategy="al", curve_id=f"al-r03-c{index:03d}", round_index=3, order=index, rel_l2_pct=1.2 + 0.01 * index))
+    rows.extend(
+        _curve_row(strategy="lhs", curve_id=f"lhs-c{index:03d}", order=index, rel_l2_pct=2.0 + 0.01 * index)
+        for index in range(1, 91)
+    )
+
+    manifest, summary_rows = build_emb_34um_al_vs_lhs_validation_report(
+        curve_rows=rows,
+        prefix_curve_counts=[30, 60, 89],
+    )
+
+    assert manifest["prefix_curve_counts"] == [30, 60, 89]
+    assert [row["prefix"] for row in summary_rows] == [30, 60, 89]
+    assert summary_rows[2]["al_curve_count"] == 89
+    assert summary_rows[2]["lhs_curve_count"] == 89
 
 
 def test_emb_34um_al_vs_lhs_validation_skips_bad_point_axis_without_aborting() -> None:

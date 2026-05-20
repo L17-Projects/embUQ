@@ -23,6 +23,9 @@ EMB_34UM_AL_VS_LHS_VALIDATION_ROUND1_SAMPLES_PLOT_FILENAME = "emb_34um_al_vs_lhs
 EMB_34UM_AL_VS_LHS_VALIDATION_ROUND_ADDITIONS_PLOT_FILENAME = "emb_34um_al_vs_lhs_validation_round_additions.png"
 EMB_34UM_AL_VS_LHS_VALIDATION_SOURCE_PLOT_FILENAME = "emb_34um_al_vs_lhs_validation_source_mix.png"
 EMB_34UM_AL_VS_LHS_VALIDATION_DISAGREEMENT_PLOT_FILENAME = "emb_34um_al_vs_lhs_validation_disagreement_acquisition_ka_kb.png"
+EMB_34UM_AL_VS_LHS_VALIDATION_BASELINE_NORMALIZED_PLOT_FILENAME = (
+    "emb_34um_al_vs_lhs_validation_baseline_normalized_learning.png"
+)
 EMB_34UM_AL_VS_LHS_VALIDATION_FORCE_OVERLAY_PLOT_FILENAME = "emb_34um_al_vs_lhs_validation_force_overlays.png"
 EMB_34UM_AL_VS_LHS_VALIDATION_FAILURE_PLOT_FILENAME = "emb_34um_al_vs_lhs_validation_failures.png"
 EMB_34UM_AL_VS_LHS_VALIDATION_RUNTIME_PLOT_FILENAME = "emb_34um_al_vs_lhs_validation_runtime_per_curve.png"
@@ -96,6 +99,7 @@ _FALSE_STRINGS = {"0", "false", "f", "no", "n", "off"}
 _FAILED_STATUSES = {"failed", "error", "rejected", "invalid", "crashed"}
 _REPLACEMENT_STATUS = {"replaced", "retry", "requeued", "superseded"}
 _DEFAULT_PREFIX_COUNTS = (30, 60, 90)
+_BASELINE_NORMALIZATION_CURVE_COUNT = 30
 
 
 @dataclass(frozen=True)
@@ -277,6 +281,28 @@ def _median(values: Sequence[float]) -> float:
     if not values:
         raise ValueError("cannot compute median of an empty sequence.")
     return float(statistics.median(float(item) for item in values))
+
+
+def _method_baseline(
+    records: Sequence[Mapping[str, Any]],
+    *,
+    baseline_curve_count: int,
+) -> float | None:
+    if len(records) < baseline_curve_count:
+        return None
+    return _median([float(item["curve_rel_l2_pct"]) for item in records[:baseline_curve_count]])
+
+
+def _method_learning_metrics(
+    *,
+    current_median: float,
+    baseline_median: float | None,
+) -> tuple[float | None, float | None]:
+    if baseline_median is None:
+        return None, None
+    raw_delta = float(baseline_median - current_median)
+    normalized_delta = None if baseline_median == 0.0 else float(100.0 * raw_delta / baseline_median)
+    return raw_delta, normalized_delta
 
 
 def _curve_id(row: Mapping[str, Any], *, index: int) -> str:
@@ -665,6 +691,15 @@ def _is_metric_eligible(record: Mapping[str, Any]) -> bool:
     )
 
 
+def _selection_source_bucket(source: object) -> str:
+    normalized = str(source or "candidate").strip().lower()
+    if "explor" in normalized:
+        return "exploration"
+    if any(token in normalized for token in ("acquis", "ensemble", "disagreement", "diversity", "uncertainty")):
+        return "acquisition"
+    return "candidate"
+
+
 def _build_summary_rows(
     *,
     curve_records: Sequence[Mapping[str, Any]],
@@ -672,6 +707,8 @@ def _build_summary_rows(
 ) -> tuple[dict[str, Any], ...]:
     al_records = [item for item in curve_records if item["strategy"] == "al" and _is_metric_eligible(item)]
     lhs_records = [item for item in curve_records if item["strategy"] == "lhs" and _is_metric_eligible(item)]
+    al_baseline = _method_baseline(al_records, baseline_curve_count=_BASELINE_NORMALIZATION_CURVE_COUNT)
+    lhs_baseline = _method_baseline(lhs_records, baseline_curve_count=_BASELINE_NORMALIZATION_CURVE_COUNT)
     counts = _derive_prefix_counts(al_records, lhs_records, explicit_prefix_curve_counts=prefix_curve_counts)
     rows: list[dict[str, Any]] = []
     for count in counts:
@@ -683,6 +720,15 @@ def _build_summary_rows(
             continue
         al_median = _median([float(item["curve_rel_l2_pct"]) for item in al_prefix])
         lhs_median = _median([float(item["curve_rel_l2_pct"]) for item in lhs_prefix])
+        al_learning_raw, al_learning_pct = _method_learning_metrics(
+            current_median=al_median,
+            baseline_median=al_baseline,
+        )
+        lhs_learning_raw, lhs_learning_pct = _method_learning_metrics(
+            current_median=lhs_median,
+            baseline_median=lhs_baseline,
+        )
+        al_minus_lhs_delta = float(al_median - lhs_median)
         max_al_round = max((int(item["round"]) for item in al_prefix if item.get("round") is not None), default=1)
         rows.append(
             {
@@ -693,6 +739,20 @@ def _build_summary_rows(
                 "lhs_curve_count": len(lhs_prefix),
                 "al_median_curve_rel_l2_pct": al_median,
                 "lhs_median_curve_rel_l2_pct": lhs_median,
+                "baseline_reference_curve_count": (
+                    _BASELINE_NORMALIZATION_CURVE_COUNT
+                    if al_baseline is not None and lhs_baseline is not None
+                    else None
+                ),
+                "al_baseline_median_curve_rel_l2_pct": al_baseline,
+                "lhs_baseline_median_curve_rel_l2_pct": lhs_baseline,
+                "al_learning_from_baseline_curve_rel_l2_pct": al_learning_raw,
+                "lhs_learning_from_baseline_curve_rel_l2_pct": lhs_learning_raw,
+                "al_learning_from_baseline_pct": al_learning_pct,
+                "lhs_learning_from_baseline_pct": lhs_learning_pct,
+                "al_minus_lhs_delta": al_minus_lhs_delta,
+                "al_minus_lhs_absolute_delta": abs(al_minus_lhs_delta),
+                "al_advantage_over_lhs_curve_rel_l2_pct": float(-al_minus_lhs_delta),
                 "median_delta": float(al_median - lhs_median),
                 "median_improved": bool(al_median < lhs_median),
             }
@@ -713,13 +773,7 @@ def _build_round_evidence(records: Sequence[Mapping[str, Any]]) -> tuple[dict[st
         lhs_records = [item for item in round_records if item["strategy"] == "lhs"]
         source_counts = {"candidate": 0, "exploration": 0, "acquisition": 0, "selected": 0}
         for item in al_records:
-            source = str(item.get("sample_source") or "candidate").lower()
-            if "explor" in source:
-                source_counts["exploration"] += 1
-            elif "acquis" in source:
-                source_counts["acquisition"] += 1
-            else:
-                source_counts["candidate"] += 1
+            source_counts[_selection_source_bucket(item.get("sample_source"))] += 1
             if bool(item.get("selected")):
                 source_counts["selected"] += 1
         run_times = [float(item["runtime_seconds"]) for item in al_records if item.get("runtime_seconds") is not None]
@@ -853,6 +907,87 @@ def _write_plot(path: Path, summary_rows: Sequence[Mapping[str, Any]], *, includ
     axis.set_ylabel("Median relative curve L2 %")
     axis.grid(True, alpha=0.25)
     axis.legend()
+    fig.tight_layout()
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+
+
+def _plot_baseline_normalized_learning(
+    path: Path,
+    summary_rows: Sequence[Mapping[str, Any]],
+    *,
+    include_plot: bool,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not include_plot or not summary_rows:
+        path.write_bytes(_fallback_png())
+        return
+    try:
+        import matplotlib.pyplot as plt  # type: ignore
+    except Exception:
+        path.write_bytes(_fallback_png())
+        return
+
+    x = [int(row["prefix"]) for row in summary_rows]
+    al_raw = [float(row["al_median_curve_rel_l2_pct"]) for row in summary_rows]
+    lhs_raw = [float(row["lhs_median_curve_rel_l2_pct"]) for row in summary_rows]
+    al_learning = [
+        float(row["al_learning_from_baseline_curve_rel_l2_pct"])
+        if row.get("al_learning_from_baseline_curve_rel_l2_pct") is not None
+        else float("nan")
+        for row in summary_rows
+    ]
+    lhs_learning = [
+        float(row["lhs_learning_from_baseline_curve_rel_l2_pct"])
+        if row.get("lhs_learning_from_baseline_curve_rel_l2_pct") is not None
+        else float("nan")
+        for row in summary_rows
+    ]
+    al_vs_lhs_advantage = [float(row["al_advantage_over_lhs_curve_rel_l2_pct"]) for row in summary_rows]
+    if not any(
+        row.get("al_baseline_median_curve_rel_l2_pct") is not None
+        or row.get("lhs_baseline_median_curve_rel_l2_pct") is not None
+        for row in summary_rows
+    ):
+        path.write_bytes(_fallback_png())
+        return
+
+    fig, axis_left = plt.subplots(1, 2, figsize=(11, 4))
+    axis_left[0].plot(x, al_raw, marker="o", label="AL median")
+    axis_left[0].plot(x, lhs_raw, marker="s", label="LHS median")
+    axis_left[0].set_title("Median relative error by budget")
+    axis_left[0].set_xlabel("Curve-prefix count")
+    axis_left[0].set_ylabel("Median relative curve L2 %")
+    axis_left[0].grid(True, alpha=0.25)
+    axis_left[0].legend(loc="best")
+
+    axis_left[1].plot(
+        x,
+        al_learning,
+        marker="o",
+        label=f"AL gain vs AL baseline (first {_BASELINE_NORMALIZATION_CURVE_COUNT})",
+    )
+    axis_left[1].plot(
+        x,
+        lhs_learning,
+        marker="s",
+        label=f"LHS gain vs LHS baseline (first {_BASELINE_NORMALIZATION_CURVE_COUNT})",
+    )
+    axis_left[1].plot(
+        x,
+        al_vs_lhs_advantage,
+        marker="x",
+        color="black",
+        label="AL advantage vs LHS (positive is AL better)",
+        alpha=0.85,
+    )
+    axis_left[1].axhline(0.0, color="black", alpha=0.4, linestyle="--", linewidth=0.9)
+    axis_left[1].set_title("Baseline-normalized learning")
+    axis_left[1].set_xlabel("Curve-prefix count")
+    axis_left[1].set_ylabel("Improvement from own 30-curve baseline")
+    axis_left[1].grid(True, alpha=0.25)
+    axis_left[1].legend(loc="best")
+
     fig.tight_layout()
     fig.savefig(path, dpi=120)
     plt.close(fig)
@@ -1222,6 +1357,16 @@ def _write_summary_csv(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
         "prefix_curve_count",
         "al_curve_count",
         "lhs_curve_count",
+        "baseline_reference_curve_count",
+        "al_baseline_median_curve_rel_l2_pct",
+        "lhs_baseline_median_curve_rel_l2_pct",
+        "al_learning_from_baseline_curve_rel_l2_pct",
+        "lhs_learning_from_baseline_curve_rel_l2_pct",
+        "al_learning_from_baseline_pct",
+        "lhs_learning_from_baseline_pct",
+        "al_minus_lhs_delta",
+        "al_minus_lhs_absolute_delta",
+        "al_advantage_over_lhs_curve_rel_l2_pct",
         "al_median_curve_rel_l2_pct",
         "lhs_median_curve_rel_l2_pct",
         "median_delta",
@@ -1341,9 +1486,11 @@ def build_emb_34um_al_vs_lhs_validation_report(
         "kb_bounds": [float(kb_bounds[0]), float(kb_bounds[1])],
         "runtime_rows": list(runtime_rows_payload),
         "exploration_samples": [
-            item for item in curve_records if str(item.get("sample_source", "")).lower().startswith("explor")
+            item for item in curve_records if _selection_source_bucket(item.get("sample_source")) == "exploration"
         ],
-        "acquisition_samples": [item for item in curve_records if "acquis" in str(item.get("sample_source", "")).lower()],
+        "acquisition_samples": [
+            item for item in curve_records if _selection_source_bucket(item.get("sample_source")) == "acquisition"
+        ],
         "selected_samples": [item for item in curve_records if bool(item.get("selected"))],
         "blockers": blockers,
         "limitations": limitations,
@@ -1374,6 +1521,9 @@ def write_emb_34um_al_vs_lhs_validation_artifacts(
     round1_sample_plot_path = artifact_dir / EMB_34UM_AL_VS_LHS_VALIDATION_ROUND1_SAMPLES_PLOT_FILENAME
     round_additions_plot_path = artifact_dir / EMB_34UM_AL_VS_LHS_VALIDATION_ROUND_ADDITIONS_PLOT_FILENAME
     source_plot_path = artifact_dir / EMB_34UM_AL_VS_LHS_VALIDATION_SOURCE_PLOT_FILENAME
+    baseline_normalized_learning_plot_path = (
+        artifact_dir / EMB_34UM_AL_VS_LHS_VALIDATION_BASELINE_NORMALIZED_PLOT_FILENAME
+    )
     disagreement_plot_path = artifact_dir / EMB_34UM_AL_VS_LHS_VALIDATION_DISAGREEMENT_PLOT_FILENAME
     overlay_plot_path = artifact_dir / EMB_34UM_AL_VS_LHS_VALIDATION_FORCE_OVERLAY_PLOT_FILENAME
     failure_plot_path = artifact_dir / EMB_34UM_AL_VS_LHS_VALIDATION_FAILURE_PLOT_FILENAME
@@ -1393,6 +1543,11 @@ def write_emb_34um_al_vs_lhs_validation_artifacts(
 
     _write_summary_csv(summary_csv_path, summary_rows)
     _write_plot(plot_path, summary_rows, include_plot=include_plot)
+    _plot_baseline_normalized_learning(
+        baseline_normalized_learning_plot_path,
+        summary_rows,
+        include_plot=include_plot,
+    )
     _plot_sample_scatter(sample_plot_path, curve_records, include_plot=include_plot)
     _plot_round1_sample_scatter(round1_sample_plot_path, curve_records, include_plot=include_plot)
     _plot_round_additions(round_additions_plot_path, round_rows, include_plot=include_plot)
@@ -1410,6 +1565,7 @@ def write_emb_34um_al_vs_lhs_validation_artifacts(
         "initial_round1_samples": str(round1_sample_plot_path),
         "per_round_additions": str(round_additions_plot_path),
         "exploration_vs_acquisition": str(source_plot_path),
+        "baseline_normalized_learning": str(baseline_normalized_learning_plot_path),
         "disagreement_acquisition_map": str(disagreement_plot_path),
         "force_curve_overlays": str(overlay_plot_path),
         "failure_quarantine_replacement": str(failure_plot_path),
@@ -1438,6 +1594,7 @@ __all__ = [
     "EMB_34UM_AL_VS_LHS_VALIDATION_SCHEMA_VERSION",
     "EMB_34UM_AL_VS_LHS_VALIDATION_SUMMARY_CSV_FILENAME",
     "EMB_34UM_AL_VS_LHS_VALIDATION_SAMPLES_PLOT_FILENAME",
+    "EMB_34UM_AL_VS_LHS_VALIDATION_BASELINE_NORMALIZED_PLOT_FILENAME",
     "EMB_34UM_AL_VS_LHS_VALIDATION_ROUND1_SAMPLES_PLOT_FILENAME",
     "EMB_34UM_AL_VS_LHS_VALIDATION_ROUND_ADDITIONS_PLOT_FILENAME",
     "EMB_34UM_AL_VS_LHS_VALIDATION_SOURCE_PLOT_FILENAME",
