@@ -53,7 +53,7 @@ if not torch.cuda.is_available():
 print('CUDA OK:', torch.cuda.get_device_name(0))
 "
 
-"$PYTHON_BIN" scripts/platforms/vega/train_bnn_surrogates.py \
+"$PYTHON_BIN" scripts/platforms/hpc/train_bnn_surrogates.py \
   --site vega \
   --output-root "${OUTPUT_ROOT}" \
   --run-tag "${RUN_TAG}" \

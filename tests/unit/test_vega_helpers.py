@@ -131,7 +131,7 @@ def test_resolve_repo_root_raises_when_no_repo_marker_exists(tmp_path):
 def test_build_runtime_pythonpath_prefers_repo_local_korali(tmp_path):
     repo_root = _make_repo(tmp_path)
     paths = get_vega_paths(repo_root)
-    external_site = tmp_path / "external" / "lib" / "python3.10" / "site-packages"
+    external_site = tmp_path / "external" / "lib" / "python-external" / "site-packages"
     (external_site / "korali").mkdir(parents=True)
     other_entry = tmp_path / "other"
     other_entry.mkdir()
@@ -166,7 +166,7 @@ def test_build_gv_runtime_pythonpath_sets_gv_site_prefix(tmp_path):
 def test_find_external_korali_entries_reports_user_global_path(tmp_path):
     repo_root = _make_repo(tmp_path)
     paths = get_vega_paths(repo_root)
-    external_site = tmp_path / "external" / "lib" / "python3.10" / "site-packages"
+    external_site = tmp_path / "external" / "lib" / "python-external" / "site-packages"
     (external_site / "korali").mkdir(parents=True)
 
     external = find_external_korali_entries(

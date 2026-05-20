@@ -53,7 +53,7 @@ That editable install now includes the mesh-preparation dependency `trimesh`, wh
 Run the Vega doctor before building Korali:
 
 ```bash
-python scripts/platforms/vega/doctor_vega.py
+python scripts/platforms/hpc/doctor_hpc.py --site vega
 ```
 
 The doctor reports:
@@ -69,13 +69,13 @@ If you already have a user-global Korali on `PYTHONPATH`, the doctor will report
 If you also need MAP Mirheo workflows, use the Mirheo-aware doctor mode:
 
 ```bash
-python scripts/platforms/vega/doctor_vega.py --with-mirheo
+python scripts/platforms/hpc/doctor_hpc.py --site vega --with-mirheo
 ```
 
 ## Build vendored Korali
 
 ```bash
-bash scripts/platforms/vega/bootstrap_korali.sh --jobs 8
+bash scripts/platforms/hpc/bootstrap_korali.sh --site vega --jobs 8
 ```
 
 Default behavior:
@@ -146,7 +146,7 @@ source _vega/korali/env.sh
 source _vega/gv_venv/env.sh
 source _vega/mirheo/env.sh
 source _vega/tinytex/env.sh
-python scripts/platforms/vega/doctor_vega.py --strict --with-mirheo --with-tex
+python scripts/platforms/hpc/doctor_hpc.py --site vega --strict --with-mirheo --with-tex
 ```
 
 The generated env script for Korali intentionally replaces inherited `PYTHONPATH` entries so the repo-local install wins over any preexisting user-global Korali.
@@ -156,7 +156,7 @@ The `gv_venv` env script activates the dedicated GV runtime Python path, records
 For GV runtime hardening checks (mirheo import, `libmirheo`, `scale_space` resolution, MDAnalysis), run:
 
 ```bash
-python scripts/platforms/vega/doctor_vega.py --with-gv-runtime
+python scripts/platforms/hpc/doctor_hpc.py --site vega --with-gv-runtime
 ```
 
 ## Build repo-local TinyTeX for paper-facing figures
@@ -166,7 +166,7 @@ Paper-facing figure generation uses the original UQ_DPD TeX rendering path. On V
 ```bash
 bash scripts/platforms/vega/bootstrap_tex.sh
 source _vega/tinytex/env.sh
-python scripts/platforms/vega/doctor_vega.py --with-tex
+python scripts/platforms/hpc/doctor_hpc.py --site vega --with-tex
 ```
 
 The TinyTeX bootstrap installs the exact packages needed by the figure scripts, including:
@@ -182,6 +182,6 @@ The TinyTeX bootstrap installs the exact packages needed by the figure scripts, 
 With the repo-local runtime active, continue with:
 
 - `pytest`
-- `python scripts/platforms/vega/run_validation_matrix.py ...`
+- `python scripts/platforms/hpc/run_validation_matrix.py ...`
 - `python scripts/run_vega_acceptance.py ...`
 - the public Phase 1 / Phase 2 / Phase 3b / propagation / MAP wrappers as they are added in later PRs

@@ -54,6 +54,16 @@ def test_karolina_validation_matrix_template_uses_only_karolina_runtime_paths() 
     assert "_vega/" not in text
 
 
+def test_vega_validation_matrix_template_matches_workflow_only_defaults() -> None:
+    text = (SBATCH_DIR / "validation_matrix.sbatch").read_text(encoding="utf-8")
+
+    assert 'RUN_MAP_MIRHEO="${RUN_MAP_MIRHEO:-false}"' in text
+    assert 'MAP_MIRHEO_N_DISPLACEMENTS="${MAP_MIRHEO_N_DISPLACEMENTS:-1}"' in text
+    assert 'SKIP_RELEASE_MANIFEST="${SKIP_RELEASE_MANIFEST:-true}"' in text
+    assert "--run-map-mirheo" in text
+    assert "--skip-release-manifest" in text
+
+
 @pytest.mark.parametrize("template", ALL_TEMPLATES)
 def test_matrix_templates_use_login_shell_repo_venv_and_repo_pythonpath(template: str) -> None:
     text = _read(template)
@@ -200,19 +210,19 @@ def test_promote_template_dispatches_cpu_runner_with_certification_root_and_dry_
 
 
 @pytest.mark.parametrize(
-    ("relative_path", "expected_target"),
+    "relative_path",
     [
-        ("scripts/platforms/vega/run_dnn_rebaseline_matrix.py", "scripts/platforms/karolina/run_dnn_rebaseline_matrix.py"),
-        ("scripts/platforms/vega/run_bnn_sweep_matrix.py", "scripts/platforms/karolina/run_bnn_sweep_matrix.py"),
-        ("scripts/platforms/vega/run_bnn_certification_matrix.py", "scripts/platforms/karolina/run_bnn_certification_matrix.py"),
-        ("scripts/platforms/vega/run_bnn_roundtrip_check.py", "scripts/platforms/karolina/run_bnn_roundtrip_check.py"),
-        ("scripts/platforms/vega/promote_certified_bnn.py", "scripts/platforms/karolina/promote_certified_bnn.py"),
+        "scripts/platforms/vega/run_dnn_rebaseline_matrix.py",
+        "scripts/platforms/vega/run_bnn_sweep_matrix.py",
+        "scripts/platforms/vega/run_bnn_certification_matrix.py",
+        "scripts/platforms/vega/run_bnn_roundtrip_check.py",
+        "scripts/platforms/vega/promote_certified_bnn.py",
     ],
 )
-def test_vega_python_wrappers_dispatch_to_karolina(monkeypatch, relative_path: str, expected_target: str) -> None:
+def test_vega_python_wrappers_dispatch_to_hpc(monkeypatch, relative_path: str) -> None:
     module = _load_module(Path(relative_path), f"dispatch_{Path(relative_path).stem}_test")
     captured: list[list[str]] = []
-    expected_abs_target = str((Path(relative_path).resolve().parent.parent / "karolina" / Path(expected_target).name).resolve())
+    expected_abs_target = str((Path(relative_path).resolve().parent.parent / "hpc" / Path(relative_path).name).resolve())
 
     def fake_call(command):  # noqa: ANN001
         captured.append(list(command))
@@ -221,4 +231,43 @@ def test_vega_python_wrappers_dispatch_to_karolina(monkeypatch, relative_path: s
     monkeypatch.setattr(module.subprocess, "call", fake_call)
     rc = module.main(["--flag", "value"])
     assert rc == 0
-    assert captured == [[sys.executable, expected_abs_target, "--flag", "value"]]
+    assert captured == [[sys.executable, expected_abs_target, "--site", "vega", "--flag", "value"]]
+
+
+def test_site_python_wrappers_reject_conflicting_site(monkeypatch, capsys) -> None:
+    module = _load_module(
+        Path("scripts/platforms/vega/run_bnn_sweep_matrix.py"),
+        "dispatch_conflicting_site_test",
+    )
+
+    def fail_call(command):  # noqa: ANN001
+        raise AssertionError(f"unexpected dispatch: {command}")
+
+    monkeypatch.setattr(module.subprocess, "call", fail_call)
+
+    rc = module.main(["--site", "karolina"])
+
+    assert rc == 2
+    assert "compatibility entrypoint" in capsys.readouterr().err
+
+
+def test_site_python_wrappers_accept_matching_explicit_site(monkeypatch) -> None:
+    module = _load_module(
+        Path("scripts/platforms/karolina/run_bnn_sweep_matrix.py"),
+        "dispatch_matching_site_test",
+    )
+    captured: list[list[str]] = []
+
+    def fake_call(command):  # noqa: ANN001
+        captured.append(list(command))
+        return 0
+
+    monkeypatch.setattr(module.subprocess, "call", fake_call)
+
+    rc = module.main(["--site", "karolina", "--flag", "value"])
+
+    assert rc == 0
+    assert captured
+    joined = " ".join(captured[0])
+    assert "scripts/platforms/hpc/run_bnn_sweep_matrix.py" in joined
+    assert joined.count("--site karolina") == 1

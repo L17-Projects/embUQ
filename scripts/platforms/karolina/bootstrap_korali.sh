@@ -2,6 +2,4 @@
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export HPC_SITE=karolina
-export MESOUQ_SITE=karolina
-exec "${script_dir}/../vega/bootstrap_korali.sh" "$@"
+exec bash "${script_dir}/../hpc/bootstrap_korali.sh" --site karolina "$@"

@@ -48,4 +48,4 @@ if [[ -n "${CONFIG_PATH}" ]]; then
   common_args+=(--config "${CONFIG_PATH}")
 fi
 
-python scripts/platforms/vega/run_propagation.py "${common_args[@]}" --device "${DEVICE}"
+python scripts/platforms/hpc/run_propagation.py "${common_args[@]}" --device "${DEVICE}"

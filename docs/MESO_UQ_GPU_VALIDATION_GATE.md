@@ -40,7 +40,7 @@ RUN_TAG=<tag> OUTPUT_ROOT=/scratch/project/eu-26-17/eubrieucb/mesouq/runs/valida
 If you are already inside an allocation, run the matrix directly:
 
 ```bash
-python scripts/platforms/karolina/run_validation_matrix.py --experiments compression indentation --model-families full-model reduced-model --output-root /scratch/project/eu-26-17/eubrieucb/mesouq/runs/validation_matrix/<tag> --site karolina --run-tag <tag> --phase2-cpu-ranks 4 --python-bin /scratch/project/eu-26-17/eubrieucb/mesouq/runtime/venv/bin/python --skip-release-manifest
+python scripts/platforms/hpc/run_validation_matrix.py --site karolina --experiments compression indentation --model-families full-model reduced-model --output-root /scratch/project/eu-26-17/eubrieucb/mesouq/runs/validation_matrix/<tag> --run-tag <tag> --phase2-cpu-ranks 4 --python-bin /scratch/project/eu-26-17/eubrieucb/mesouq/runtime/venv/bin/python --skip-release-manifest
 ```
 
 ## Vega equivalent
@@ -49,7 +49,8 @@ The Vega validation matrix is documented in `docs/VEGA_VALIDATION_MATRIX.md`. It
 command is:
 
 ```bash
-python scripts/platforms/vega/run_validation_matrix.py \
+python scripts/platforms/hpc/run_validation_matrix.py \
+  --site vega \
   --experiments compression indentation \
   --model-families full-model reduced-model \
   --output-root _runs/vega/validation_matrix/<tag> \

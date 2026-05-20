@@ -60,7 +60,7 @@ fi
 
 cd "${REPO_ROOT}"
 
-EXPECTED_PARTITION="$("${PYTHON_BIN}" scripts/platforms/vega/resolve_gpu_partition.py --time-limit "${GPU_TIME_LIMIT}")"
+EXPECTED_PARTITION="$("${PYTHON_BIN}" scripts/platforms/hpc/resolve_gpu_partition.py --time-limit "${GPU_TIME_LIMIT}")"
 if [[ -n "${SLURM_JOB_PARTITION:-}" && "${SLURM_JOB_PARTITION}" != "${EXPECTED_PARTITION}" ]]; then
   echo "ERROR: strict GPU partition policy violation for MAP Mirheo job: partition=${SLURM_JOB_PARTITION} expected=${EXPECTED_PARTITION} time_limit=${GPU_TIME_LIMIT}" >&2
   exit 1
@@ -131,4 +131,4 @@ if [[ -n "${MAP_MIRHEO_DATASET_NAME}" ]]; then
   common_args+=(--dataset-name "${MAP_MIRHEO_DATASET_NAME}")
 fi
 
-python -u scripts/platforms/vega/run_map_mirheo.py "${common_args[@]}" --n-displacements "${MAP_MIRHEO_N_DISPLACEMENTS}"
+python -u scripts/platforms/hpc/run_map_mirheo.py "${common_args[@]}" --n-displacements "${MAP_MIRHEO_N_DISPLACEMENTS}"

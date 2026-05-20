@@ -12,7 +12,6 @@ module load Python/3.10.8-GCCcore-12.2.0
 module load CMake/3.24.3-GCCcore-12.2.0
 
 export MESOUQ_SITE=karolina
-export HPC_SITE=karolina
 export MESOUQ_PROJECT_ID="${MESOUQ_PROJECT_ID:-eu-26-17}"
 export MESOUQ_SCRATCH_ROOT="${MESOUQ_SCRATCH_ROOT:-/scratch/project/${MESOUQ_PROJECT_ID}/eubrieucb/mesouq}"
 export MESOUQ_SITE_RUNTIME_ROOT="${MESOUQ_SITE_RUNTIME_ROOT:-${MESOUQ_SCRATCH_ROOT}/runtime}"
@@ -34,11 +33,15 @@ for _mesouq_env_script in \
 done
 unset _mesouq_env_script
 
-if [[ -d "${MESOUQ_SITE_RUNTIME_ROOT}/korali/install/lib/python3.10/site-packages" ]]; then
+_mesouq_python_tag="$(python -c 'import sys; print(f"python{sys.version_info.major}.{sys.version_info.minor}")')"
+_mesouq_korali_pythonpath="${MESOUQ_SITE_RUNTIME_ROOT}/korali/install/lib/${_mesouq_python_tag}/site-packages"
+
+if [[ -d "${_mesouq_korali_pythonpath}" ]]; then
   export KORALI_PREFIX="${MESOUQ_SITE_RUNTIME_ROOT}/korali/install"
-  export KORALI_PYTHONPATH="${MESOUQ_SITE_RUNTIME_ROOT}/korali/install/lib/python3.10/site-packages"
+  export KORALI_PYTHONPATH="${_mesouq_korali_pythonpath}"
   case ":${PYTHONPATH:-}:" in
     *":${KORALI_PYTHONPATH}:"*) ;;
     *) export PYTHONPATH="${KORALI_PYTHONPATH}${PYTHONPATH:+:${PYTHONPATH}}" ;;
   esac
 fi
+unset _mesouq_python_tag _mesouq_korali_pythonpath

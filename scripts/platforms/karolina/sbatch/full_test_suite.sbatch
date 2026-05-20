@@ -42,7 +42,6 @@ source "${REPO_ROOT}/scripts/platforms/karolina/env_karolina.sh"
 # Keep module/runtime library setup from env_karolina.sh, but do not let
 # site override variables leak into tests that assert repo-local defaults.
 unset \
-  HPC_SITE \
   MESOUQ_SITE \
   MESOUQ_RUNS_ROOT \
   MESOUQ_SCRATCH_ROOT \
@@ -168,7 +167,6 @@ summary = {
         "site_overrides_unset": {
             key: key not in os.environ
             for key in (
-                "HPC_SITE",
                 "MESOUQ_SITE",
                 "MESOUQ_RUNS_ROOT",
                 "MESOUQ_SITE_RUNTIME_ROOT",

@@ -17,7 +17,8 @@ It is intentionally lightweight:
 Phase 1 propagation:
 
 ```bash
-python scripts/platforms/vega/run_propagation.py \
+python scripts/platforms/hpc/run_propagation.py \
+  --site vega \
   --experiment compression \
   --model-family full-model \
   --profile production \
@@ -27,7 +28,8 @@ python scripts/platforms/vega/run_propagation.py \
 Phase 3b propagation:
 
 ```bash
-python scripts/platforms/vega/run_propagation.py \
+python scripts/platforms/hpc/run_propagation.py \
+  --site vega \
   --experiment compression \
   --model-family full-model \
   --profile production \

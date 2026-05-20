@@ -43,7 +43,7 @@ def test_bnn_sweep_runner_passes_max_epochs_instead_of_max_steps(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_sweep_matrix.py",
         "run_bnn_sweep_matrix_max_epochs_test",
     )
     spec = _make_spec(tmp_path, "spec_a")

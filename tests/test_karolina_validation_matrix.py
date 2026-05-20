@@ -21,7 +21,7 @@ def test_karolina_validation_matrix_wrapper_calls_workflow_matrix_with_validatio
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_validation_matrix.py",
         "karolina_validation_matrix_wrapper_test",
     )
     captured = {}
@@ -58,7 +58,7 @@ def test_karolina_validation_matrix_wrapper_calls_workflow_matrix_with_validatio
     assert captured["cwd"] == str(repo_root)
     assert captured["command"][0] == "python"
     assert captured["command"][1] == str(
-        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py"
+        repo_root / "scripts" / "platforms" / "hpc" / "run_workflow_matrix.py"
     )
     assert "--profiles" in captured["command"]
     assert _arg_value(captured["command"], "--profiles") == "validation"
@@ -74,7 +74,7 @@ def test_karolina_validation_matrix_wrapper_uses_default_runs_root_for_relative_
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_validation_matrix.py",
         "karolina_validation_matrix_wrapper_relative_output_test",
     )
     captured = {}
@@ -96,7 +96,7 @@ def test_karolina_validation_matrix_wrapper_uses_default_runs_root_for_relative_
     monkeypatch.setattr(module, "default_runs_root", fake_default_runs_root)
     monkeypatch.setattr(module.subprocess, "run", fake_run)
 
-    rc = module.main(["--selection", "compression:full-model:validation", "--python-bin", "python"])
+    rc = module.main(["--selection", "compression:full-model:validation", "--python-bin", "python", "--site", "karolina"])
 
     assert rc == 0
     assert captured["default_runs_root"] == {

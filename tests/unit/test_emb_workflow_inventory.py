@@ -30,13 +30,13 @@ EMB_WORKFLOW_ENTRYPOINTS = (
     "emb/indentation/surrogate/scripts/run_group_holdout.py",
     "emb/indentation/surrogate/scripts/train_multi_arch.py",
     # Validation / matrix wrappers that reference these surfaces.
-    "scripts/platforms/vega/run_validation_matrix.py",
-    "scripts/platforms/vega/run_workflow_matrix.py",
-    "scripts/platforms/vega/run_dnn_rebaseline_matrix.py",
-    "scripts/platforms/vega/run_bnn_sweep_matrix.py",
-    "scripts/platforms/vega/run_bnn_roundtrip_check.py",
-    "scripts/platforms/vega/run_bnn_certification_matrix.py",
-    "scripts/platforms/vega/promote_certified_bnn.py",
+    "scripts/platforms/hpc/run_validation_matrix.py",
+    "scripts/platforms/hpc/run_workflow_matrix.py",
+    "scripts/platforms/hpc/run_dnn_rebaseline_matrix.py",
+    "scripts/platforms/hpc/run_bnn_sweep_matrix.py",
+    "scripts/platforms/hpc/run_bnn_roundtrip_check.py",
+    "scripts/platforms/hpc/run_bnn_certification_matrix.py",
+    "scripts/platforms/hpc/promote_certified_bnn.py",
     # EMB campaign wrappers that still participate in compatibility planning.
     "scripts/workflows/emb/huq_emb/run_vega_50k_campaign.py",
     "scripts/workflows/emb/huq_emb/run_paper_data_campaign.py",
@@ -51,17 +51,17 @@ WORKFLOW_DOC_EXPECTED_REFERENCES = (
     "emb/indentation/surrogate/evaluate.py",
     "emb/indentation/surrogate/scripts/emb_train.py",
     "emb/indentation/surrogate/scripts/train_multi_arch.py",
-    "scripts/platforms/vega/run_dnn_surrogate_training.py",
+    "scripts/platforms/hpc/run_dnn_surrogate_training.py",
     "scripts/workflows/emb/huq_emb/run_vega_50k_campaign.py",
     "scripts/workflows/emb/huq_emb/run_exact_uqdpd_asset_port.py",
-    "scripts/platforms/vega/run_validation_matrix.py",
+    "scripts/platforms/hpc/run_validation_matrix.py",
     "run_workflow_matrix.py",
 )
 
 
 VEGA_MATRIX_DOC_EXPECTED_REFERENCES = (
-    "scripts/platforms/vega/run_validation_matrix.py",
-    "scripts/platforms/vega/run_workflow_matrix.py",
+    "scripts/platforms/hpc/run_validation_matrix.py",
+    "scripts/platforms/hpc/run_workflow_matrix.py",
 )
 
 

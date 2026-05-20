@@ -40,7 +40,7 @@ def test_gv_platform_vega_runtime_wrapper_forwards_platform_flag(monkeypatch) ->
     )
     captured: list[list[str]] = []
 
-    def _fake_call(cmd) -> int:
+    def _fake_call(cmd, **_kwargs) -> int:
         captured.append(list(cmd))
         return 0
 
@@ -51,8 +51,8 @@ def test_gv_platform_vega_runtime_wrapper_forwards_platform_flag(monkeypatch) ->
     assert rc == 0
     assert captured
     rendered = " ".join(captured[0])
-    assert "scripts/workflows/gv/run_gv_runtime.py" in rendered
-    assert "--platform vega" in rendered
+    assert "scripts/platforms/hpc/run_gv_runtime.py" in rendered
+    assert "--site vega" in rendered
     assert "--selection gv:stretching" in rendered
 
 
@@ -74,8 +74,8 @@ def test_gv_platform_karolina_runtime_wrapper_forwards_platform_flag(monkeypatch
     assert rc == 0
     assert captured
     joined = " ".join(captured[0])
-    assert "scripts/workflows/gv/run_gv_runtime.py" in joined
-    assert "--platform karolina" in joined
+    assert "scripts/platforms/hpc/run_gv_runtime.py" in joined
+    assert "--site karolina" in joined
     assert "--selection gv:torsion" in joined
 
 
@@ -86,19 +86,20 @@ def test_gv_platform_hpc_runtime_wrapper_dispatches_by_site(monkeypatch) -> None
     )
     captured: list[list[str]] = []
 
-    def _fake_call(cmd) -> int:
+    def _fake_call(cmd, **_kwargs) -> int:
         captured.append(list(cmd))
         return 0
 
     monkeypatch.setattr(module.subprocess, "call", _fake_call)
-    monkeypatch.setenv("HPC_SITE", "karolina")
+    monkeypatch.setenv("MESOUQ_SITE", "karolina")
 
     rc = module.main(["--selection", "gv:shear_flow"])
 
     assert rc == 0
     assert captured
     joined = " ".join(captured[0])
-    assert "scripts/platforms/karolina/run_gv_runtime.py" in joined
+    assert "scripts/workflows/gv/run_gv_runtime.py" in joined
+    assert "--platform karolina" in joined
     assert "--selection gv:shear_flow" in joined
 
 
@@ -107,10 +108,9 @@ def test_gv_platform_hpc_runtime_wrapper_rejects_unknown_site(monkeypatch) -> No
         Path("scripts/platforms/hpc/run_gv_runtime.py"),
         "gv_platform_hpc_runtime_wrapper_unknown_site_test",
     )
-    monkeypatch.setenv("HPC_SITE", "unknown")
+    monkeypatch.setenv("MESOUQ_SITE", "unknown")
 
-    with pytest.raises(SystemExit, match="Unsupported HPC_SITE"):
-        module.main(["--selection", "gv:stretching"])
+    assert module.main(["--selection", "gv:stretching"]) == 2
 
 
 def test_gv_runtime_rendering_targets_staged_work_dir_and_generates_scheduler(tmp_path, monkeypatch) -> None:
@@ -625,7 +625,6 @@ def test_gv_runtime_command_execution_propagates_runtime_env_overrides(tmp_path,
         material_overrides_json='{"ka": 1.1}',
         env_overrides={
             "MESOUQ_SITE": "karolina",
-            "HPC_SITE": "karolina",
             "MESOUQ_GV_ENV_SCRIPT": "/scratch/mesouq/runtime/gv_venv/env.sh",
         },
     )
@@ -633,7 +632,6 @@ def test_gv_runtime_command_execution_propagates_runtime_env_overrides(tmp_path,
     assert returncode == 0
     assert records[0]["status"] == "completed"
     assert captured_env[0]["MESOUQ_SITE"] == "karolina"
-    assert captured_env[0]["HPC_SITE"] == "karolina"
     assert captured_env[0]["MESOUQ_GV_ENV_SCRIPT"] == "/scratch/mesouq/runtime/gv_venv/env.sh"
     assert captured_env[0]["MESOUQ_GV_MATERIAL_OVERRIDES_JSON"] == '{"ka": 1.1}'
 
@@ -695,7 +693,6 @@ def test_gv_runtime_workflow_passes_karolina_env_to_subprocesses(tmp_path, monke
     monkeypatch.setattr(module, "RUN_GV_DRY_RUN_MAIN", _fake_dry_run)
     monkeypatch.setattr(module.subprocess, "run", _fake_run)
     monkeypatch.delenv("MESOUQ_SITE", raising=False)
-    monkeypatch.delenv("HPC_SITE", raising=False)
     monkeypatch.delenv("MESOUQ_GV_ENV_SCRIPT", raising=False)
 
     rc = module.main(["--selection", "gv:torsion", "--platform", "karolina", "--output-root", str(output_root)])
@@ -704,7 +701,6 @@ def test_gv_runtime_workflow_passes_karolina_env_to_subprocesses(tmp_path, monke
     assert len(captured_env) == 1
     expected_env_script = str(module._resolve_gv_env_script("karolina"))
     assert captured_env[0]["MESOUQ_SITE"] == "karolina"
-    assert captured_env[0]["HPC_SITE"] == "karolina"
     assert captured_env[0]["MESOUQ_GV_ENV_SCRIPT"] == expected_env_script
 
 

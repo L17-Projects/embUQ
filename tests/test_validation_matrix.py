@@ -30,10 +30,44 @@ def _selection_dataset(command: list[str]) -> str:
     return "indentation_2.1um"
 
 
+def test_workflow_matrix_builds_shared_hpc_commands_for_karolina(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "scripts" / "platforms" / "hpc" / "run_workflow_matrix.py",
+        "workflow_matrix_karolina_command_test",
+    )
+
+    selection = module.VegaWorkflowSelection("compression", "full-model", "validation")
+    commands = module._build_selection_commands(
+        selection,
+        selection_output_root=tmp_path / "lane",
+        python_bin="python",
+        phase2_cpu_ranks=4,
+        config_override=None,
+        inference_device="gpu",
+        propagation_device="cpu",
+        phase2_backend=None,
+        site="karolina",
+        skip_phase1_map=True,
+        skip_phase3b_map=False,
+        skip_phase3b_propagation=False,
+        run_map_mirheo=False,
+        map_mirheo_n_displacements=1,
+    )
+
+    assert commands
+    for _name, command in commands:
+        command_text = " ".join(command)
+        assert "/scripts/vega/" not in command_text
+        assert "scripts/vega" not in command_text
+        assert command[1].startswith(str(repo_root / "scripts" / "platforms" / "hpc"))
+        assert _arg_value(command, "--site") == "karolina"
+
+
 def test_workflow_matrix_runner_writes_machine_readable_report(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py", "workflow_matrix_test"
+        repo_root / "scripts" / "platforms" / "hpc" / "run_workflow_matrix.py", "workflow_matrix_test"
     )
 
     def fake_run(command, cwd=None, text=False, capture_output=False, check=False):
@@ -131,7 +165,7 @@ def test_workflow_matrix_emits_policy_metadata_in_job_and_lane_manifests(
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_workflow_matrix.py",
         "workflow_matrix_policy_manifest_test",
     )
 
@@ -211,7 +245,7 @@ def test_workflow_matrix_writes_paper_release_manifest_with_assets_and_mapping(
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_workflow_matrix.py",
         "workflow_matrix_release_manifest_test",
     )
 
@@ -318,7 +352,7 @@ def test_workflow_matrix_writes_paper_release_manifest_with_assets_and_mapping(
 def test_workflow_matrix_runner_accepts_explicit_override_selector(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py", "workflow_matrix_override_test"
+        repo_root / "scripts" / "platforms" / "hpc" / "run_workflow_matrix.py", "workflow_matrix_override_test"
     )
 
     def fake_run(command, cwd=None, text=False, capture_output=False, check=False):
@@ -351,7 +385,7 @@ def test_workflow_matrix_runner_accepts_explicit_override_selector(tmp_path, mon
 def test_workflow_matrix_forwards_requested_devices(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py", "workflow_matrix_device_test"
+        repo_root / "scripts" / "platforms" / "hpc" / "run_workflow_matrix.py", "workflow_matrix_device_test"
     )
     captured: list[list[str]] = []
 
@@ -395,7 +429,7 @@ def test_workflow_matrix_forwards_requested_devices(tmp_path, monkeypatch):
 def test_workflow_matrix_phase2_backend_defaults_by_profile(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py", "workflow_matrix_phase2_backend_defaults_test"
+        repo_root / "scripts" / "platforms" / "hpc" / "run_workflow_matrix.py", "workflow_matrix_phase2_backend_defaults_test"
     )
     captured: list[list[str]] = []
 
@@ -433,7 +467,7 @@ def test_workflow_matrix_allow_release_fail_keeps_zero_exit_for_command_success(
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_workflow_matrix.py",
         "workflow_matrix_allow_release_fail_test",
     )
 
@@ -470,7 +504,7 @@ def test_workflow_matrix_skip_release_manifest_marks_workflow_only_scope(
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_workflow_matrix.py",
         "workflow_matrix_skip_release_manifest_test",
     )
 
@@ -499,11 +533,11 @@ def test_workflow_matrix_skip_release_manifest_marks_workflow_only_scope(
 
 
 def test_validation_matrix_wrapper_delegates_to_workflow_matrix_with_validation_profile(
-    tmp_path, monkeypatch, capsys
+    tmp_path, monkeypatch
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_validation_matrix.py",
         "validation_matrix_wrapper_test",
     )
     captured = {}
@@ -538,7 +572,7 @@ def test_validation_matrix_wrapper_delegates_to_workflow_matrix_with_validation_
     assert captured["cwd"] == str(repo_root)
     assert captured["command"][0] == "python"
     assert captured["command"][1] == str(
-        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py"
+        repo_root / "scripts" / "platforms" / "hpc" / "run_workflow_matrix.py"
     )
     assert "--profiles" in captured["command"]
     assert captured["command"][captured["command"].index("--profiles") + 1] == "validation"
@@ -546,7 +580,6 @@ def test_validation_matrix_wrapper_delegates_to_workflow_matrix_with_validation_
     assert captured["command"][captured["command"].index("--map-mirheo-n-displacements") + 1] == "1"
     assert "--skip-release-manifest" in captured["command"]
     assert str(tmp_path / "_runs" / "validation") in captured["command"]
-    assert "deprecated" in capsys.readouterr().err
 
 
 def test_validation_matrix_wrapper_resolves_relative_output_root_from_repo_root(
@@ -554,7 +587,7 @@ def test_validation_matrix_wrapper_resolves_relative_output_root_from_repo_root(
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_validation_matrix.py",
         "validation_matrix_wrapper_relative_output_test",
     )
     captured = {}
@@ -590,7 +623,7 @@ def test_validation_matrix_main_rejects_source_tree_output_root(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_validation_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_validation_matrix.py",
         "validation_matrix_wrapper_noncanonical_output_test",
     )
 
@@ -612,7 +645,7 @@ def test_workflow_matrix_main_rejects_output_root_in_repo_source_tree(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_workflow_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_workflow_matrix.py",
         "workflow_matrix_noncanonical_output_test",
     )
     monkeypatch.setattr(module.subprocess, "run", lambda *args, **kwargs: pytest.fail("unexpected command execution"))

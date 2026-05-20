@@ -48,6 +48,6 @@ if [[ -n "${CONFIG_PATH}" ]]; then
   common_args+=(--config "${CONFIG_PATH}")
 fi
 
-python scripts/platforms/vega/run_inference_stage.py "${common_args[@]}" --stage phase1 --device "${DEVICE}"
-python scripts/platforms/vega/run_inference_stage.py "${common_args[@]}" --stage phase2 --cpu-ranks "${PHASE2_CPU_RANKS}"
-python scripts/platforms/vega/run_inference_stage.py "${common_args[@]}" --stage phase3b --device "${DEVICE}"
+python scripts/platforms/hpc/run_inference_stage.py "${common_args[@]}" --stage phase1 --device "${DEVICE}"
+python scripts/platforms/hpc/run_inference_stage.py "${common_args[@]}" --stage phase2 --cpu-ranks "${PHASE2_CPU_RANKS}"
+python scripts/platforms/hpc/run_inference_stage.py "${common_args[@]}" --stage phase3b --device "${DEVICE}"

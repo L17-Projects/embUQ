@@ -15,7 +15,12 @@ if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
   exit 2
 fi
 
-SITE="${SITE:-${HPC_SITE:-vega}}"
+legacy_name="HPC""_SITE"
+if [[ ${!legacy_name+x} ]]; then
+  echo "${legacy_name} is no longer supported. Use --site or MESOUQ_SITE." >&2
+  exit 2
+fi
+SITE="${SITE:-${MESOUQ_SITE:-vega}}"
 RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/${SITE}/surrogate_group_holdout/${RUN_TAG}}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
@@ -30,7 +35,7 @@ DISP_SOURCE="${DISP_SOURCE:-auto}"
 RUPTURE_RATIO="${RUPTURE_RATIO:-2.0}"
 
 cd "${REPO_ROOT}"
-export HPC_SITE="${SITE}"
+export MESOUQ_SITE="${SITE}"
 
 "$PYTHON_BIN" scripts/platforms/hpc/run_surrogate_group_holdout.py \
   --site "${SITE}" \

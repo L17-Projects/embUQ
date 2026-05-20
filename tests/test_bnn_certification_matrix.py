@@ -163,7 +163,7 @@ def _write_holdout_selection_context(
 
 def test_certification_helpers_resolve_and_extract(tmp_path: Path) -> None:
     module = _load_module(
-        Path("scripts/platforms/karolina/run_bnn_certification_matrix.py"),
+        Path("scripts/platforms/hpc/run_bnn_certification_matrix.py"),
         "run_bnn_certification_matrix_helpers_test",
     )
 
@@ -196,7 +196,7 @@ def test_certification_helpers_resolve_and_extract(tmp_path: Path) -> None:
 
 def test_certification_helpers_cover_edge_paths(tmp_path: Path) -> None:
     module = _load_module(
-        Path("scripts/platforms/karolina/run_bnn_certification_matrix.py"),
+        Path("scripts/platforms/hpc/run_bnn_certification_matrix.py"),
         "run_bnn_certification_matrix_edge_helpers_test",
     )
 
@@ -293,7 +293,7 @@ def test_certification_helpers_cover_edge_paths(tmp_path: Path) -> None:
 def test_bnn_certification_matrix_runner_writes_gate_outputs(tmp_path: Path, monkeypatch) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_certification_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_certification_matrix.py",
         "run_bnn_certification_matrix_main_test",
     )
 
@@ -372,7 +372,7 @@ def test_bnn_certification_matrix_runner_writes_gate_outputs(tmp_path: Path, mon
 def test_bnn_certification_matrix_runner_rejects_unknown_only_selector(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_certification_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_certification_matrix.py",
         "run_bnn_certification_matrix_bad_only_test",
     )
     with pytest.raises(ValueError, match="No EMB dataset specs matched --only values"):
@@ -393,7 +393,7 @@ def test_bnn_certification_matrix_runner_rejects_unknown_only_selector(tmp_path:
 def test_bnn_certification_matrix_runner_requires_selection_file(tmp_path: Path, monkeypatch) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_certification_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_certification_matrix.py",
         "run_bnn_certification_matrix_missing_selection_test",
     )
     spec = {
@@ -432,7 +432,7 @@ def test_bnn_certification_matrix_runner_reruns_only_stale_resumed_outputs(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_certification_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_certification_matrix.py",
         "run_bnn_certification_matrix_resume_context_test",
     )
 
@@ -554,7 +554,7 @@ def test_bnn_certification_matrix_runner_detects_missing_outputs_and_context_mis
 ) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_certification_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_certification_matrix.py",
         "run_bnn_certification_matrix_output_guard_test",
     )
 
@@ -654,7 +654,7 @@ def test_bnn_certification_matrix_runner_detects_missing_outputs_and_context_mis
 def test_bnn_certification_matrix_runner_fails_gate_when_reload_fails(tmp_path: Path, monkeypatch) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_certification_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_certification_matrix.py",
         "run_bnn_certification_matrix_failure_test",
     )
 
@@ -721,10 +721,10 @@ def test_bnn_certification_matrix_runner_fails_gate_when_reload_fails(tmp_path: 
 
 def test_hpc_bnn_certification_wrapper_dispatches_to_selected_site(monkeypatch) -> None:
     module = _load_module(
-        Path("scripts/platforms/hpc/run_bnn_certification_matrix.py"),
-        "hpc_bnn_certification_dispatch_test",
+        Path("scripts/platforms/karolina/run_bnn_certification_matrix.py"),
+        "karolina_bnn_certification_dispatch_test",
     )
-    monkeypatch.setenv("HPC_SITE", "karolina")
+    monkeypatch.setenv("MESOUQ_SITE", "karolina")
     captured: list[list[str]] = []
 
     def _fake_call(cmd):  # noqa: ANN001
@@ -736,14 +736,14 @@ def test_hpc_bnn_certification_wrapper_dispatches_to_selected_site(monkeypatch) 
     assert rc == 0
     assert captured
     assert sys.executable in captured[0][0]
-    assert "scripts/platforms/karolina/run_bnn_certification_matrix.py" in " ".join(captured[0])
+    assert "scripts/platforms/hpc/run_bnn_certification_matrix.py" in " ".join(captured[0])
 
 
 def test_hpc_bnn_certification_wrapper_rejects_unknown_site(monkeypatch) -> None:
     module = _load_module(
         Path("scripts/platforms/hpc/run_bnn_certification_matrix.py"),
-        "hpc_bnn_certification_invalid_site_test",
+        "karolina_bnn_certification_invalid_site_test",
     )
-    monkeypatch.setenv("HPC_SITE", "unknown")
-    with pytest.raises(SystemExit, match="Unsupported HPC_SITE"):
-        module.main([])
+    monkeypatch.setenv("MESOUQ_SITE", "unknown")
+    with pytest.raises(ValueError, match="Unsupported MESOUQ_SITE"):
+        module.main(["--dnn-root", "dummy", "--bnn-root", "dummy"])

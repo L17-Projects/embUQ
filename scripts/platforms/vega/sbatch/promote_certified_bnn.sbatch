@@ -53,7 +53,7 @@ export PYTHONPATH="${REPO_ROOT}/src:${REPO_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"
 
 command=(
   "${PYTHON_BIN}"
-  scripts/platforms/vega/promote_certified_bnn.py
+  scripts/platforms/hpc/promote_certified_bnn.py
   --certification-root "${CERTIFICATION_ROOT}"
 )
 

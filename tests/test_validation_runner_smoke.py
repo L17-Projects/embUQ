@@ -95,7 +95,7 @@ class _FakeExperiment:
 def test_validation_runner_smoke_creates_summary_and_artifacts(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_validation_suite.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_validation_suite.py",
         "run_gpu_validation_suite_test",
     )
     workflow_name = "compression:reduced-model:validation"
@@ -158,7 +158,7 @@ def test_validation_runner_smoke_creates_summary_and_artifacts(tmp_path, monkeyp
 def test_validation_runner_strict_json_payload_replaces_nan() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_validation_suite.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_validation_suite.py",
         "run_gpu_validation_suite_json_payload_test",
     )
 
@@ -175,7 +175,7 @@ def test_validation_runner_strict_json_payload_replaces_nan() -> None:
 def test_validation_runner_defaults_to_validation_configs_and_preserves_population(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_validation_suite.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_validation_suite.py",
         "run_gpu_validation_suite_defaults_test",
     )
 
@@ -197,7 +197,7 @@ def test_validation_runner_defaults_to_validation_configs_and_preserves_populati
 def test_validation_runner_rejects_legacy_aliases():
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_validation_suite.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_validation_suite.py",
         "run_gpu_validation_suite_alias_test",
     )
 

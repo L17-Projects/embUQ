@@ -7,7 +7,9 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-VALID_RUNTIME_SITES = {"vega", "karolina"}
+from meso_uq.platforms.site_selector import VALID_MESOUQ_SITES, resolve_hpc_site
+
+VALID_RUNTIME_SITES = set(VALID_MESOUQ_SITES)
 DEFAULT_SITE_ROOT_NAMES = {
     "vega": "_vega",
     "karolina": "_karolina",
@@ -115,7 +117,7 @@ def get_site_runtime_paths(
     env: dict[str, str] | None = None,
 ) -> RuntimePaths:
     source_env = env if env is not None else os.environ
-    resolved_site = normalize_runtime_site(site or source_env.get("MESOUQ_SITE") or source_env.get("HPC_SITE") or "vega")
+    resolved_site = resolve_hpc_site(cli_site=site, env=source_env, default="vega")
     root = resolve_repo_root(repo_root)
     site_root = _resolve_site_root(root, site=resolved_site, runtime_root=runtime_root, env=source_env)
     provenance_root = _resolve_provenance_root(

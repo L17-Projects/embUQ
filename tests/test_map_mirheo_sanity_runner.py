@@ -23,7 +23,7 @@ class _Result:
 def test_map_mirheo_sanity_runner_writes_report(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_map_mirheo_sanity.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_map_mirheo_sanity.py",
         "run_map_mirheo_sanity_test",
     )
 
@@ -102,7 +102,7 @@ def test_map_mirheo_sanity_runner_writes_report(tmp_path, monkeypatch):
 def test_map_mirheo_sanity_runner_requires_phase3b_manifest(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_map_mirheo_sanity.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_map_mirheo_sanity.py",
         "run_map_mirheo_sanity_missing_manifest_test",
     )
 
@@ -127,7 +127,7 @@ def test_map_mirheo_sanity_runner_requires_phase3b_manifest(tmp_path, monkeypatc
 def test_map_mirheo_sanity_selection_resolution_covers_new_policy_branches():
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_map_mirheo_sanity.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_map_mirheo_sanity.py",
         "run_map_mirheo_sanity_selection_test",
     )
 
@@ -163,7 +163,7 @@ def test_map_mirheo_sanity_selection_resolution_covers_new_policy_branches():
 def test_map_mirheo_sanity_selection_run_roots_cover_all_supported_lanes(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_map_mirheo_sanity.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_map_mirheo_sanity.py",
         "run_map_mirheo_sanity_roots_test",
     )
 
@@ -190,15 +190,19 @@ def test_map_mirheo_sanity_selection_run_roots_cover_all_supported_lanes(tmp_pat
 def test_map_mirheo_sanity_submit_failure_and_relative_path(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_map_mirheo_sanity.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_map_mirheo_sanity.py",
         "run_map_mirheo_sanity_submit_failure_test",
     )
     monkeypatch.setattr(module, "REPO_ROOT", tmp_path)
+    template = tmp_path / "scripts" / "platforms" / "vega" / "sbatch" / "workflow_map_mirheo.sbatch"
+    template.parent.mkdir(parents=True, exist_ok=True)
+    template.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
 
     assert module._resolve_path("relative/report") == (tmp_path / "relative" / "report").resolve()
 
     def fake_run(command, **kwargs):
         assert command[0] == "sbatch"
+        assert command[-1] == str(template)
         return _Result(returncode=2, stdout="bad\n", stderr="worse\n")
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
@@ -212,13 +216,14 @@ def test_map_mirheo_sanity_submit_failure_and_relative_path(tmp_path, monkeypatc
             numsteps=2,
             numsteps_eq=3,
             time_limit="00:01:00",
+            site="vega",
         )
 
 
 def test_map_mirheo_sanity_waits_for_active_jobs_and_skips_blank_sacct(monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_map_mirheo_sanity.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_map_mirheo_sanity.py",
         "run_map_mirheo_sanity_wait_test",
     )
 

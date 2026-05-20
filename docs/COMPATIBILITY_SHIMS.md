@@ -59,9 +59,9 @@ For each legacy surface, define the deprecation message contract using these fie
 ## scripts/vega
 
 - legacy path/import: `scripts/vega/*` compatibility wrappers and aliases.
-- canonical replacement: `scripts/platforms/vega/*` during the platform-policy migration, then any later site-neutral dispatcher once it exists.
+- canonical replacement: `scripts/platforms/hpc/* --site vega`; `scripts/platforms/vega/*` remains a fixed-site compatibility wrapper surface during the migration.
 - migration window: one release cycle from first Wave 1 merge.
-- removal condition: remove after site-neutral dispatch coverage is green and migration notes explicitly mark Vega wrappers as deprecated-only.
+- removal condition: remove after shared HPC dispatch coverage is green and migration notes explicitly mark Vega wrappers as deprecated-only.
 - CI noise policy: emit warnings when these wrapper roots are exercised; avoid warning amplification across repeated matrix rows.
 - compatibility-test expectations: keep wrapper delegate behavior intact and covered by existing matrix/acceptance tests as long as compatibility policy is active.
 
@@ -77,16 +77,16 @@ For each legacy surface, define the deprecation message contract using these fie
 ## scripts/karolina
 
 - legacy path/import: `scripts/karolina/*` and related Karolina compatibility shims.
-- canonical replacement: `scripts/platforms/karolina/*` during the platform-policy migration, then any later architecture-neutral platform abstraction layer once it exists.
+- canonical replacement: `scripts/platforms/hpc/* --site karolina`; Karolina-specific sbatch/env files remain only where scheduler or module setup differs.
 - migration window: one release cycle from first Wave 1 merge.
-- removal condition: remove only after Karolina parity is validated and migration playbook points users to canonical equivalents.
+- removal condition: remove only after Karolina parity is validated and the migration playbook points users to shared HPC equivalents.
 - CI noise policy: keep warning emission to one per active script path during CI runs to preserve signal-to-noise ratio.
 - compatibility-test expectations: keep platform-compat tests for Karolina wrappers passing until canonical dispatch is fully authoritative.
 
 ## scripts/hpc
 
 - legacy path/import: `scripts/hpc/*` compatibility wrappers and alias entrypoints.
-- canonical replacement: `scripts/platforms/hpc/*` during the platform-policy migration, then any later shared platform-neutral dispatch once it exists.
+- canonical replacement: `scripts/platforms/hpc/*`; the symlink is compatibility-only.
 - migration window: one release cycle from first Wave 1 merge.
 - removal condition: remove only after HPC launch semantics are stable on canonical dispatcher and deprecation evidence is accepted.
 - CI noise policy: emit a single deprecation message per wrapper module and avoid duplicate emission inside looped workflow stages.

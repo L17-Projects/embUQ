@@ -1,4 +1,4 @@
-"""Tests for scripts/platforms/vega/convert_map_manifest.py (PR 4/6)."""
+"""Tests for scripts/platforms/hpc/convert_map_manifest.py (PR 4/6)."""
 from __future__ import annotations
 
 import json
@@ -9,7 +9,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "src"))
-sys.path.insert(0, str(REPO / "scripts" / "platforms" / "vega"))
+sys.path.insert(0, str(REPO / "scripts" / "platforms" / "hpc"))
 
 from convert_map_manifest import (
     _FULL_OUTPUT_NAMES,

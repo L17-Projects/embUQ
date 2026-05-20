@@ -51,7 +51,7 @@ Postprocessing emits a canonical manifest and HDF5 payload per dataset id.
 - Geometry preprocessing tooling for `scale_space` expects `MPFR/4.2.0-GCCcore-12.2.0` and `GMP/6.2.1-GCCcore-12.2.0`
 - GV runtime postprocessing stack includes `h5py` and `MDAnalysis`
 - Mirheo source lock is read from `extern/mirheo.lock.json`
-- Health checks use `python scripts/platforms/vega/doctor_vega.py --with-gv-runtime`
+- Health checks use `python scripts/platforms/hpc/doctor_hpc.py --site vega --with-gv-runtime`
 - Runtime-generated GV command wrappers require `_vega/gv_venv/env.sh` and intentionally do not fall back to `_vega/mirheo/env.sh`.
 
 ## Geometry identity

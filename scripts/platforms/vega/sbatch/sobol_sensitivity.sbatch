@@ -37,7 +37,7 @@ source "${REPO_ROOT}/_vega/venv/bin/activate"
 source "${REPO_ROOT}/_vega/korali/env.sh"
 
 cd "${REPO_ROOT}"
-export HPC_SITE=vega
+export MESOUQ_SITE=vega
 
 FAMILY_ARGS=""
 for fam in ${MODEL_FAMILIES}; do

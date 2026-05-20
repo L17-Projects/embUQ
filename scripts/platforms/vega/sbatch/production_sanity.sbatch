@@ -19,7 +19,16 @@ fi
 
 SELECTIONS="${SELECTIONS:-compression:full-model:production}"
 ALL_LANES="${ALL_LANES:-0}"
-SITE="${SITE:-vega}"
+if [[ -n "${SITE:-}" && "${SITE}" != "vega" ]]; then
+  echo "This site template is fixed to vega; use scripts/platforms/hpc/sbatch for SITE=${SITE}." >&2
+  exit 2
+fi
+if [[ -n "${MESOUQ_SITE:-}" && "${MESOUQ_SITE}" != "vega" ]]; then
+  echo "This site template is fixed to vega; MESOUQ_SITE=${MESOUQ_SITE} conflicts." >&2
+  exit 2
+fi
+SITE="vega"
+export MESOUQ_SITE="${SITE}"
 RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/${SITE}/production_sanity/${RUN_TAG}}"
 PHASE2_BACKEND="${PHASE2_BACKEND:-}"
@@ -47,7 +56,7 @@ cd "${REPO_ROOT}"
 
 command=(
   "$PYTHON_BIN"
-  scripts/platforms/vega/run_production_sanity.py
+  scripts/platforms/hpc/run_production_sanity.py
   --output-root "$OUTPUT_ROOT"
   --site "$SITE"
   --run-tag "$RUN_TAG"

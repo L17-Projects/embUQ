@@ -58,11 +58,11 @@ Indentation:
 - lightweight training entrypoint: `emb/indentation/surrogate/scripts/emb_train.py`
 - paper-facing 12-architecture sweep + BEST promotion: `emb/indentation/surrogate/scripts/train_multi_arch.py`
 
-Vega DNN rebuild matrix:
-- `scripts/platforms/vega/run_dnn_surrogate_training.py`
-- `scripts/platforms/vega/sbatch/train_dnn_surrogates.sbatch`
+Cross-platform HPC DNN rebuild matrix:
+- `python scripts/platforms/hpc/run_dnn_surrogate_training.py --site vega|karolina`
+- Vega compatibility batch template: `scripts/platforms/vega/sbatch/train_dnn_surrogates.sbatch`
 
-The Vega DNN matrix now writes one per-spec provenance manifest under:
+The DNN matrix writes one per-spec provenance manifest under:
 - `<output-root>/<spec>/dnn_training_manifest.json`
 
 Each per-spec manifest records:
@@ -92,7 +92,7 @@ This surface also feeds the MAP Mirheo execution layer used by the paper-facing 
 MAP extraction:
 - `scripts/shared/postprocess/extract_phase1_map.py`
 - `scripts/shared/postprocess/extract_phase3b_map.py`
-- `scripts/platforms/vega/run_map_mirheo.py`
+- `scripts/platforms/hpc/run_map_mirheo.py --site vega|karolina`
 
 Plotting/postprocessing:
 - `propagation/scripts/plot_validation_overlay.py`
@@ -108,17 +108,18 @@ Phase 1 posterior-figure policy:
 - compute and report chain-leader multiplicity diagnostics from Korali `Chain Leaders`
 - include per-lane comparison between chain-leader and posterior-sample duplication mass in machine-readable diagnostics outputs
 
-## 7. Vega helper surface
+## 7. Cross-platform HPC helper surface
 
-For Vega-first operation, the repo now also ships split helpers under `scripts/platforms/vega/`:
+The shared operator implementations live under `scripts/platforms/hpc/` and select the cluster with `--site vega|karolina`:
 
 - `run_validation_suite.py`
 - `run_inference_stage.py`
 - `run_propagation.py`
 - `extract_map.py`
-- `sbatch/*.sbatch`
-- `sbatch/production/complete_*.sbatch` (production multi-node orchestration)
-- `sbatch/production/phase*.sbatch` (child per-phase jobs used by complete scripts)
+- `run_workflow_matrix.py`
+- `run_validation_matrix.py`
+
+The `scripts/platforms/vega/` and `scripts/platforms/karolina/` Python entrypoints are strict compatibility wrappers around the shared HPC implementations. Site-specific sbatch templates remain under each site directory when scheduler directives or module setup differ.
 
 These helpers expose experiment, model family, run profile, and stage explicitly so the operator surface does not overload the word `reduced`.
 
@@ -251,24 +252,20 @@ For one-command replay of the exact HUQ-EMB paper figures from a stored `paper_d
 This wrapper auto-stages the DNN holdout/Sobol inputs, renders the exact paper figures, copies them into `paper_data/figures/*` and `paper_data/tables/`, and writes a replay report under `runs/<campaign_id>/paper_exact_stage/`.
 If no TeX deps are configured, it falls back to non-TeX matplotlib rendering automatically. See `docs/HUQ_EMB_EXACT_FIGURE_REPLAY.md`.
 
-## 12. Compatibility wrapper retirement plan (Vega → Karolina parity)
+## 12. Compatibility wrapper retirement plan
 
-The compatibility wrappers under `scripts/platforms/vega/` for matrix and acceptance-style entrypoints keep
-legacy command shapes alive while delegating to the shared workflow-matrix runner or, for surrogate/BNN helpers,
-the equivalent `scripts/platforms/karolina/` operator runners.
+The compatibility wrappers under `scripts/platforms/vega/` and `scripts/platforms/karolina/` keep legacy command shapes alive while delegating to the shared `scripts/platforms/hpc/` implementations with a fixed site. A site wrapper rejects a conflicting `--site`; use the shared HPC entrypoint when selecting a site explicitly.
 
 Current plan:
 
-- keep the delegation wrappers until the launcher migration is fully complete and the public release docs
-  point only to the parity `karolina` operators,
+- keep the delegation wrappers until launcher and documentation migration is complete,
 - continue emitting behavior checks that these wrappers preserve the same CLI surface,
 - remove deprecated wrappers in a follow-up release only after:
   - a deprecation period has passed,
-  - `HPC_SITE`-based launch paths are documented as the primary entrypoint,
+  - `scripts/platforms/hpc/... --site vega|karolina` launch paths are documented as the primary entrypoint,
   - and this compatibility test matrix is green for at least one full release cycle.
 
 The following public surfaces are guarded by tests:
 
-- `scripts/platforms/vega/run_validation_matrix.py` still forwards to `run_workflow_matrix.py` with the `validation` profile.
-- `scripts/platforms/vega/run_dnn_rebaseline_matrix.py`, `run_bnn_sweep_matrix.py`, `run_bnn_roundtrip_check.py`,
-  `run_bnn_certification_matrix.py`, `promote_certified_bnn.py` still forward to the equivalent `karolina` runners.
+- `scripts/platforms/hpc/run_validation_matrix.py` forwards to `scripts/platforms/hpc/run_workflow_matrix.py` with the `validation` profile.
+- `scripts/platforms/vega/*.py` and `scripts/platforms/karolina/*.py` compatibility wrappers forward to the matching shared HPC implementation and reject conflicting site selectors.

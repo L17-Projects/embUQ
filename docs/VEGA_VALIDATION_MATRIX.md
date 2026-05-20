@@ -32,7 +32,8 @@ That exercises the full-model and reduced-model codepaths while keeping the work
 Run the matrix directly inside an allocated Vega job:
 
 ```bash
-python scripts/platforms/vega/run_validation_matrix.py \
+python scripts/platforms/hpc/run_validation_matrix.py \
+  --site vega \
   --experiments compression indentation \
   --model-families full-model reduced-model \
   --output-root _runs/vega/validation_matrix \
@@ -41,7 +42,7 @@ python scripts/platforms/vega/run_validation_matrix.py \
 
 The public command always fixes the execution profile to `validation`.
 
-It delegates to the lower-level `scripts/platforms/vega/run_workflow_matrix.py` operator runner, which remains available for broader matrix/debugging use.
+It delegates to the lower-level `scripts/platforms/hpc/run_workflow_matrix.py` operator runner, which remains available for broader matrix/debugging use. The Vega site wrapper remains available at `scripts/platforms/vega/run_validation_matrix.py` for compatibility and injects `--site vega`.
 
 Each selection runs:
 
@@ -94,7 +95,8 @@ The template exposes:
 For targeted debugging, a selection-specific config can be injected with:
 
 ```bash
-python scripts/platforms/vega/run_validation_matrix.py \
+python scripts/platforms/hpc/run_validation_matrix.py \
+  --site vega \
   --selection compression:full-model:validation \
   --output-root _runs/vega/validation_matrix/custom_debug \
   --config-override compression:full-model:validation=/abs/path/config.yaml

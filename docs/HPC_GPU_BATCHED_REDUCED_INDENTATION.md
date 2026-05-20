@@ -47,9 +47,9 @@ python -m pip install -U pip
 pip install -e ".[test,mpi]"
 pip install pybind11 meson ninja
 
-bash scripts/platforms/vega/bootstrap_korali.sh --jobs 8
+bash scripts/platforms/hpc/bootstrap_korali.sh --site vega --jobs 8
 source _vega/korali/env.sh
-python scripts/platforms/vega/doctor_vega.py --strict
+python scripts/platforms/hpc/doctor_hpc.py --site vega --strict
 ```
 
 For more detail on the bootstrap path, see [VEGA_BOOTSTRAP.md](VEGA_BOOTSTRAP.md).
@@ -61,7 +61,8 @@ Use the explicit Vega helper surface with the reduced-model indentation producti
 Phase 1:
 
 ```bash
-python scripts/platforms/vega/run_inference_stage.py \
+python scripts/platforms/hpc/run_inference_stage.py \
+  --site vega \
   --experiment indentation \
   --model-family reduced-model \
   --profile production \
@@ -71,7 +72,8 @@ python scripts/platforms/vega/run_inference_stage.py \
 Phase 2:
 
 ```bash
-python scripts/platforms/vega/run_inference_stage.py \
+python scripts/platforms/hpc/run_inference_stage.py \
+  --site vega \
   --experiment indentation \
   --model-family reduced-model \
   --profile production \
@@ -84,7 +86,8 @@ python scripts/platforms/vega/run_inference_stage.py \
 path. The maintained CPU-MPI fallback remains explicit:
 
 ```bash
-python scripts/platforms/vega/run_inference_stage.py \
+python scripts/platforms/hpc/run_inference_stage.py \
+  --site vega \
   --experiment indentation \
   --model-family reduced-model \
   --profile production \
@@ -96,7 +99,8 @@ python scripts/platforms/vega/run_inference_stage.py \
 Phase 3b:
 
 ```bash
-python scripts/platforms/vega/run_inference_stage.py \
+python scripts/platforms/hpc/run_inference_stage.py \
+  --site vega \
   --experiment indentation \
   --model-family reduced-model \
   --profile production \
@@ -106,7 +110,8 @@ python scripts/platforms/vega/run_inference_stage.py \
 Propagation `Phase 3b`:
 
 ```bash
-python scripts/platforms/vega/run_propagation.py \
+python scripts/platforms/hpc/run_propagation.py \
+  --site vega \
   --experiment indentation \
   --model-family reduced-model \
   --profile production \
@@ -116,7 +121,8 @@ python scripts/platforms/vega/run_propagation.py \
 MAP extraction:
 
 ```bash
-python scripts/platforms/vega/extract_map.py \
+python scripts/platforms/hpc/extract_map.py \
+  --site vega \
   --experiment indentation \
   --model-family reduced-model \
   --profile production \

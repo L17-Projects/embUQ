@@ -53,7 +53,7 @@ if [[ -n "${DATASET_NAME}" ]]; then
   EXTRA_ARGS+=(--dataset-name "${DATASET_NAME}")
 fi
 
-python scripts/platforms/vega/run_inference_stage.py \
+python scripts/platforms/hpc/run_inference_stage.py \
   --experiment "${EXPERIMENT}" \
   --model-family "${MODEL_FAMILY}" \
   --profile "${PROFILE}" \

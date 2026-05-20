@@ -60,7 +60,7 @@ if [[ -e "${LANE_ROOT}/results_phase_1" && ! -L "${LANE_ROOT}/results_phase_1" ]
 fi
 ln -sfn "${PHASE1_SOURCE}" "${LANE_ROOT}/results_phase_1"
 
-RUN_CMD=("${PYTHON_BIN}" "scripts/platforms/vega/run_inference_stage.py")
+RUN_CMD=("${PYTHON_BIN}" "scripts/platforms/hpc/run_inference_stage.py")
 RUN_CMD+=(
   --site karolina
   --experiment indentation

@@ -2,37 +2,41 @@
 
 from __future__ import annotations
 
-import argparse
+import subprocess
 import sys
 from pathlib import Path
 
+SITE = 'vega'
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[2]
-sys.path.insert(0, str(REPO_ROOT / "src"))
+TARGET = REPO_ROOT / "scripts" / "platforms" / "hpc" / 'resolve_gpu_partition.py'
 
-from meso_uq.scheduler_routing import GpuPartitionPolicy, route_gpu_partition  # noqa: E402
+
+def _requested_site(args: list[str]) -> str | None:
+    for index, arg in enumerate(args):
+        if arg == "--site":
+            if index + 1 >= len(args):
+                print(f"{Path(__file__).name}: --site requires a value", file=sys.stderr)
+                raise SystemExit(2)
+            return args[index + 1]
+        if arg.startswith("--site="):
+            return arg.split("=", 1)[1]
+    return None
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Resolve GPU partition from time limit using strict HUQ-EMB routing policy."
-    )
-    parser.add_argument("--time-limit", required=True, help="SLURM walltime (e.g. 00:15:00)")
-    parser.add_argument("--short-partition", default="dev")
-    parser.add_argument("--long-partition", default="gpu")
-    parser.add_argument("--threshold-seconds", type=int, default=1800)
-    args = parser.parse_args(argv)
-
-    partition = route_gpu_partition(
-        args.time_limit,
-        policy=GpuPartitionPolicy(
-            short_partition=args.short_partition,
-            long_partition=args.long_partition,
-            threshold_seconds=args.threshold_seconds,
-        ),
-    )
-    print(partition)
-    return 0
+    args = list(argv if argv is not None else sys.argv[1:])
+    requested_site = _requested_site(args)
+    if requested_site is None:
+        args = ["--site", SITE, *args]
+    elif requested_site != SITE:
+        print(
+            f"{Path(__file__).name} is the {SITE} compatibility entrypoint; "
+            f"use scripts/platforms/hpc/resolve_gpu_partition.py for --site {requested_site}.",
+            file=sys.stderr,
+        )
+        return 2
+    return subprocess.call([sys.executable, str(TARGET), *args])
 
 
 if __name__ == "__main__":

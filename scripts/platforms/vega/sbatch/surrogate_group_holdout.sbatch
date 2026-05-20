@@ -35,7 +35,7 @@ source "${REPO_ROOT}/_vega/korali/env.sh"
 
 cd "${REPO_ROOT}"
 
-"$PYTHON_BIN" scripts/platforms/vega/run_surrogate_group_holdout.py \
+"$PYTHON_BIN" scripts/platforms/hpc/run_surrogate_group_holdout.py \
   --site vega \
   --output-root "${OUTPUT_ROOT}" \
   --run-tag "${RUN_TAG}" \

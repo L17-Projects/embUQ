@@ -104,7 +104,7 @@ def test_bnn_sweep_runner_selects_top_architecture_from_full_stage1_grid(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_sweep_matrix.py",
         "run_bnn_sweep_matrix_main_test",
     )
     spec = _make_spec(tmp_path, "spec_a")
@@ -188,7 +188,7 @@ def test_bnn_sweep_runner_resume_skips_completed_stage1_grid_candidate(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_sweep_matrix.py",
         "run_bnn_sweep_matrix_resume_test",
     )
     spec = _make_spec(tmp_path, "spec_a")
@@ -281,7 +281,7 @@ def test_bnn_sweep_runner_dnn_root_overrides_catalog_reference_for_explicit_arch
 ) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_sweep_matrix.py",
         "run_bnn_sweep_matrix_dnn_root_test",
     )
     spec = _make_spec(tmp_path, "spec_a")
@@ -355,7 +355,7 @@ def test_bnn_sweep_runner_dnn_selection_architecture_mode_uses_seeded_winner(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_sweep_matrix.py",
         "run_bnn_sweep_matrix_dnn_arch_source_test",
     )
     spec = _make_spec(tmp_path, "spec_a")
@@ -431,7 +431,7 @@ def test_bnn_sweep_runner_dnn_selection_architecture_mode_uses_seeded_winner(
 def test_bnn_selection_helpers_validate_missing_values_and_relative_paths(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_sweep_matrix.py",
         "run_bnn_sweep_matrix_selection_helpers_test",
     )
 
@@ -461,7 +461,7 @@ def test_bnn_selection_helpers_validate_missing_values_and_relative_paths(tmp_pa
 def test_bnn_selection_helpers_reject_missing_selection_and_unknown_architecture(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_sweep_matrix.py",
         "run_bnn_sweep_matrix_selection_error_test",
     )
 
@@ -478,13 +478,13 @@ def test_bnn_selection_helpers_reject_missing_selection_and_unknown_architecture
 
 def test_bnn_sweep_runner_import_does_not_require_torch() -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    _assert_runner_import_without_torch(repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py")
+    _assert_runner_import_without_torch(repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_sweep_matrix.py")
 
 
 def test_bnn_sweep_runner_stage1_grid_parsing_defaults_and_resume_helpers(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_sweep_matrix.py",
         "run_bnn_sweep_matrix_parse_test",
     )
 
@@ -547,7 +547,7 @@ def test_bnn_sweep_runner_stage1_grid_parsing_defaults_and_resume_helpers(tmp_pa
 def test_bnn_sweep_runner_rejects_unknown_only_filter(tmp_path: Path, monkeypatch) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_sweep_matrix.py",
         "run_bnn_sweep_matrix_only_filter_test",
     )
     monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [_make_spec(tmp_path, "spec_a")])
@@ -561,7 +561,7 @@ def test_bnn_sweep_runner_rejects_dnn_selection_architecture_mode_without_dnn_ro
 ) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_sweep_matrix.py",
         "run_bnn_sweep_matrix_missing_dnn_root_test",
     )
     monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [_make_spec(tmp_path, "spec_a")])
@@ -584,7 +584,7 @@ def test_bnn_sweep_runner_rejects_dnn_selection_with_explicit_architectures(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_sweep_matrix.py",
         "run_bnn_sweep_matrix_conflicting_arch_source_test",
     )
     monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [_make_spec(tmp_path, "spec_a")])
@@ -611,7 +611,7 @@ def test_bnn_sweep_runner_rejects_explicit_empty_architecture_text(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_sweep_matrix.py",
         "run_bnn_sweep_matrix_empty_architectures_test",
     )
     monkeypatch.setattr(module, "resolve_emb_dataset_specs", lambda _root: [_make_spec(tmp_path, "spec_a")])
@@ -634,7 +634,7 @@ def test_bnn_sweep_runner_resume_skips_completed_stage2_candidate(
 ) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_sweep_matrix.py",
         "run_bnn_sweep_matrix_stage2_resume_test",
     )
     spec = _make_spec(tmp_path, "spec_a")
@@ -710,7 +710,7 @@ def test_bnn_sweep_runner_resume_skips_completed_stage2_candidate(
 def test_bnn_sweep_runner_build_command_honors_require_parity_flag(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "karolina" / "run_bnn_sweep_matrix.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_bnn_sweep_matrix.py",
         "run_bnn_sweep_matrix_build_command_test",
     )
     spec = _make_spec(tmp_path, "spec_a")
@@ -741,10 +741,10 @@ def test_bnn_sweep_runner_build_command_honors_require_parity_flag(tmp_path: Pat
 
 def test_hpc_bnn_sweep_wrapper_dispatches_to_selected_site(monkeypatch) -> None:
     module = _load_module(
-        Path("scripts/platforms/hpc/run_bnn_sweep_matrix.py"),
-        "hpc_bnn_sweep_dispatch_test",
+        Path("scripts/platforms/karolina/run_bnn_sweep_matrix.py"),
+        "karolina_bnn_sweep_dispatch_test",
     )
-    monkeypatch.setenv("HPC_SITE", "karolina")
+    monkeypatch.setenv("MESOUQ_SITE", "karolina")
     captured: list[list[str]] = []
 
     def _fake_call(cmd):  # noqa: ANN001
@@ -756,14 +756,14 @@ def test_hpc_bnn_sweep_wrapper_dispatches_to_selected_site(monkeypatch) -> None:
     assert rc == 0
     assert captured
     assert sys.executable in captured[0][0]
-    assert "scripts/platforms/karolina/run_bnn_sweep_matrix.py" in " ".join(captured[0])
+    assert "scripts/platforms/hpc/run_bnn_sweep_matrix.py" in " ".join(captured[0])
 
 
 def test_hpc_bnn_sweep_wrapper_rejects_unknown_site(monkeypatch) -> None:
     module = _load_module(
         Path("scripts/platforms/hpc/run_bnn_sweep_matrix.py"),
-        "hpc_bnn_sweep_invalid_site_test",
+        "karolina_bnn_sweep_invalid_site_test",
     )
-    monkeypatch.setenv("HPC_SITE", "unknown")
-    with pytest.raises(SystemExit, match="Unsupported HPC_SITE"):
+    monkeypatch.setenv("MESOUQ_SITE", "unknown")
+    with pytest.raises(ValueError, match="Unsupported MESOUQ_SITE"):
         module.main([])

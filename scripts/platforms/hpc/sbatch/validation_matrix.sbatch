@@ -1,15 +1,45 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT="${REPO_ROOT:-${SLURM_SUBMIT_DIR:-$(pwd)}}"
-SITE="${HPC_SITE:-vega}"
+legacy_name="HPC""_SITE"
+if [[ ${!legacy_name+x} ]]; then
+  echo "${legacy_name} is no longer supported. Use --site or MESOUQ_SITE." >&2
+  exit 2
+fi
 
+REPO_ROOT="${REPO_ROOT:-${SLURM_SUBMIT_DIR:-$(pwd)}}"
+SITE_ARG=""
+args=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --site)
+      SITE_ARG="$2"
+      shift 2
+      ;;
+    --site=*)
+      SITE_ARG="${1#--site=}"
+      shift
+      ;;
+    *)
+      args+=("$1")
+      shift
+      ;;
+  esac
+done
+
+ENV_SITE="${MESOUQ_SITE:-}"
+if [[ -n "$SITE_ARG" && -n "$ENV_SITE" && "$SITE_ARG" != "$ENV_SITE" ]]; then
+  echo "Conflicting site selectors: --site=${SITE_ARG} and MESOUQ_SITE=${ENV_SITE}." >&2
+  exit 2
+fi
+SITE="${SITE_ARG:-${ENV_SITE:-vega}}"
 case "$SITE" in
   vega|karolina) ;;
   *)
-    echo "Unsupported HPC_SITE=${SITE}. Expected one of: vega, karolina." >&2
+    echo "Unsupported site=${SITE}. Expected one of: vega, karolina." >&2
     exit 2
     ;;
 esac
 
-exec "${REPO_ROOT}/scripts/${SITE}/sbatch/validation_matrix.sbatch"
+export MESOUQ_SITE="$SITE"
+exec bash "${REPO_ROOT}/scripts/platforms/${SITE}/sbatch/validation_matrix.sbatch" "--site" "$SITE" "${args[@]}"

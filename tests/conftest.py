@@ -13,7 +13,6 @@ if str(REPO_ROOT) not in sys.path:
 
 
 _AMBIENT_PLATFORM_ENV = (
-    "HPC_SITE",
     "MESOUQ_SITE",
     "MESOUQ_PROJECT_ID",
     "MESOUQ_RUNS_ROOT",

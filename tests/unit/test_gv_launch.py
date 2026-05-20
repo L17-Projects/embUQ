@@ -276,12 +276,14 @@ def test_render_gv_launch_campaign_materializes_karolina_and_vega_without_submis
     assert "#SBATCH --partition=qgpu" in karolina_script
     assert "#SBATCH --gpus=2" in karolina_script
     assert 'source "${REPO_ROOT}/scripts/platforms/karolina/env_karolina.sh"' in karolina_script
-    assert "scripts/platforms/karolina/run_gv_runtime.py" in karolina_script
+    assert "scripts/platforms/hpc/run_gv_runtime.py" in karolina_script
+    assert "--site karolina" in karolina_script
     assert "#SBATCH --partition=gpu" in vega_script
     assert "#SBATCH --gres=gpu:2" in vega_script
     assert "module purge" in vega_script
     assert "_vega/gv_venv/env.sh" in vega_script
-    assert "scripts/platforms/vega/run_gv_runtime.py" in vega_script
+    assert "scripts/platforms/hpc/run_gv_runtime.py" in vega_script
+    assert "--site vega" in vega_script
     assert 'export MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"' in vega_script
     assert 'export MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"' in vega_script
     assert 'export MESOUQ_GV_EIGENMODES_DOMAIN_RANKS="${MESOUQ_GV_EIGENMODES_DOMAIN_RANKS:-1,1,1}"' in vega_script

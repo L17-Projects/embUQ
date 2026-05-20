@@ -46,7 +46,7 @@ source "${REPO_ROOT}/_vega/venv/bin/activate"
 cd "${REPO_ROOT}"
 
 # shellcheck disable=SC2086
-"$PYTHON_BIN" scripts/platforms/vega/run_dnn_surrogate_training.py \
+"$PYTHON_BIN" scripts/platforms/hpc/run_dnn_surrogate_training.py \
   --site vega \
   --output-root "${OUTPUT_ROOT}" \
   --run-tag "${RUN_TAG}" \

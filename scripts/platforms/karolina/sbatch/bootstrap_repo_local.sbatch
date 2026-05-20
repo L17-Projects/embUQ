@@ -23,12 +23,13 @@ module load Python/3.10.8-GCCcore-12.2.0
 module load GSL/2.7-GCC-12.3.0
 module load Eigen/3.4.0-GCCcore-12.2.0
 
-python -m venv _vega/venv
-source _vega/venv/bin/activate
+VENV_DIR="${VENV_DIR:-${MESOUQ_SITE_RUNTIME_ROOT}/venv}"
+python -m venv "${VENV_DIR}"
+source "${VENV_DIR}/bin/activate"
 python -m pip install --upgrade pip
 pip install -e ".[test,mpi]"
 pip install pybind11 meson ninja
-python scripts/platforms/karolina/doctor_karolina.py
-bash scripts/platforms/karolina/bootstrap_korali.sh --jobs 8
-source _vega/korali/env.sh
-python scripts/platforms/karolina/doctor_karolina.py --strict
+python scripts/platforms/hpc/doctor_hpc.py --site karolina
+bash scripts/platforms/hpc/bootstrap_korali.sh --site karolina --jobs 8
+source "${MESOUQ_SITE_RUNTIME_ROOT}/korali/env.sh"
+python scripts/platforms/hpc/doctor_hpc.py --site karolina --strict

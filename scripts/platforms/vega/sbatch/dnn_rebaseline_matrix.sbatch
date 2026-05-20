@@ -16,7 +16,16 @@ if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
   exit 2
 fi
 
-SITE="${SITE:-vega}"
+if [[ -n "${SITE:-}" && "${SITE}" != "vega" ]]; then
+  echo "This site template is fixed to vega; use scripts/platforms/hpc/sbatch for SITE=${SITE}." >&2
+  exit 2
+fi
+if [[ -n "${MESOUQ_SITE:-}" && "${MESOUQ_SITE}" != "vega" ]]; then
+  echo "This site template is fixed to vega; MESOUQ_SITE=${MESOUQ_SITE} conflicts." >&2
+  exit 2
+fi
+SITE="vega"
+export MESOUQ_SITE="${SITE}"
 RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/${SITE}/dnn_rebaseline/${RUN_TAG}}"
 LOG_ROOT="${LOG_ROOT:-${OUTPUT_ROOT}/logs}"
@@ -68,7 +77,7 @@ esac
 
 command=(
   "${PYTHON_BIN}"
-  scripts/platforms/vega/run_dnn_rebaseline_matrix.py
+  scripts/platforms/hpc/run_dnn_rebaseline_matrix.py
   --site "${SITE}"
   --output-root "${OUTPUT_ROOT}"
   --run-tag "${RUN_TAG}"

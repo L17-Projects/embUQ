@@ -18,7 +18,16 @@ if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
 fi
 
 SELECTIONS="${SELECTIONS:-compression:reduced-model:validation indentation:reduced-model:validation}"
-SITE="${SITE:-vega}"
+if [[ -n "${SITE:-}" && "${SITE}" != "vega" ]]; then
+  echo "This site template is fixed to vega; use scripts/platforms/hpc/sbatch for SITE=${SITE}." >&2
+  exit 2
+fi
+if [[ -n "${MESOUQ_SITE:-}" && "${MESOUQ_SITE}" != "vega" ]]; then
+  echo "This site template is fixed to vega; MESOUQ_SITE=${MESOUQ_SITE} conflicts." >&2
+  exit 2
+fi
+SITE="vega"
+export MESOUQ_SITE="${SITE}"
 RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/${SITE}/acceptance/${RUN_TAG}}"
 CPU_RANKS="${CPU_RANKS:-1}"

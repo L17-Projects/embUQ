@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import os
-import socket
 from datetime import datetime
 from pathlib import Path
 
-_VALID_SITES = {"vega", "karolina"}
+from meso_uq.platforms.site_selector import VALID_MESOUQ_SITES, resolve_hpc_site
+
+_VALID_SITES = set(VALID_MESOUQ_SITES)
 _REPO_OUTPUT_ROOT_PREFIXES = ("_runs", "paper_data")
 _EXTERNAL_OUTPUT_ROOT_ANCHORS = (*_REPO_OUTPUT_ROOT_PREFIXES, "runs")
 
@@ -30,19 +31,7 @@ def _enforces_canonical_output_root(output_root: Path, repo_root: Path) -> None:
 
 
 def detect_hpc_site(*, env: dict[str, str] | None = None, hostname: str | None = None) -> str:
-    source_env = env if env is not None else os.environ
-    explicit = source_env.get("HPC_SITE", "").strip().lower()
-    if explicit in _VALID_SITES:
-        return explicit
-
-    host = (hostname if hostname is not None else socket.gethostname()).strip().lower()
-    if "karolina" in host or host.startswith("acn"):
-        return "karolina"
-    if "vega" in host:
-        return "vega"
-
-    # Backward-compatible fallback for existing Vega-first logic.
-    return "vega"
+    return resolve_hpc_site(env=env, hostname=hostname, allow_hostname=True, default="vega")
 
 
 def make_run_tag(now: datetime | None = None) -> str:
@@ -60,7 +49,7 @@ def default_runs_root(
 ) -> Path:
     source_env = env if env is not None else os.environ
     root = Path(repo_root).resolve()
-    resolved_site = site if site is not None else detect_hpc_site()
+    resolved_site = resolve_hpc_site(cli_site=site, env=source_env, allow_hostname=True, default="vega")
     if resolved_site not in _VALID_SITES:
         raise ValueError(f"Unsupported site '{resolved_site}'. Expected one of: {sorted(_VALID_SITES)}")
     resolved_tag = run_tag if run_tag is not None else make_run_tag()

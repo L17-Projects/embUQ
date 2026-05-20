@@ -14,7 +14,7 @@ def _load_module(path: Path, name: str):
 
 def test_vega_acceptance_wrapper_writes_machine_readable_report(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
-    module = _load_module(repo_root / "scripts" / "run_vega_acceptance.py", "run_vega_acceptance_test")
+    module = _load_module(repo_root / "scripts" / "platforms" / "hpc" / "run_vega_acceptance.py", "run_vega_acceptance_test")
     captured = {}
 
     class Result:

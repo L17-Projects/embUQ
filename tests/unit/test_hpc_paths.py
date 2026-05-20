@@ -11,11 +11,24 @@ from meso_uq.hpc_paths import (
     ensure_canonical_output_root,
     make_run_tag,
 )
+from meso_uq.platforms.site_selector import SiteSelectionError, resolve_hpc_site
+
+LEGACY_SITE_ENV = "HPC" "_SITE"
 
 
-def test_detect_hpc_site_prefers_explicit_env() -> None:
-    assert detect_hpc_site(env={"HPC_SITE": "karolina"}) == "karolina"
-    assert detect_hpc_site(env={"HPC_SITE": "vega"}) == "vega"
+def test_detect_hpc_site_prefers_mesouq_site_env() -> None:
+    assert detect_hpc_site(env={"MESOUQ_SITE": "karolina"}) == "karolina"
+    assert detect_hpc_site(env={"MESOUQ_SITE": "vega"}) == "vega"
+
+
+def test_legacy_site_env_is_rejected_when_set() -> None:
+    with pytest.raises(SiteSelectionError, match="no longer supported"):
+        detect_hpc_site(env={LEGACY_SITE_ENV: "karolina"})
+
+
+def test_resolve_hpc_site_rejects_conflicting_cli_and_env() -> None:
+    with pytest.raises(SiteSelectionError, match="Conflicting site selectors"):
+        resolve_hpc_site(cli_site="vega", env={"MESOUQ_SITE": "karolina"})
 
 
 def test_detect_hpc_site_uses_hostname_heuristics() -> None:
@@ -56,7 +69,7 @@ def test_default_runs_root_honors_runs_root_override(tmp_path) -> None:
 
 
 def test_default_runs_root_rejects_unknown_site() -> None:
-    with pytest.raises(ValueError, match="Unsupported site"):
+    with pytest.raises(ValueError, match="Unsupported --site"):
         default_runs_root("/tmp/repo", "validation_matrix", site="other")
 
 

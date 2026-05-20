@@ -27,7 +27,8 @@ This is intentional. `reduced-model` is a scientific/model-family choice. `valid
 Run one public inference stage with explicit workflow selection:
 
 ```bash
-python scripts/platforms/vega/run_inference_stage.py \
+python scripts/platforms/hpc/run_inference_stage.py \
+  --site vega \
   --experiment compression \
   --model-family full-model \
   --profile validation \
@@ -37,7 +38,8 @@ python scripts/platforms/vega/run_inference_stage.py \
 For phase 2, MPI ranks can be requested explicitly:
 
 ```bash
-python scripts/platforms/vega/run_inference_stage.py \
+python scripts/platforms/hpc/run_inference_stage.py \
+  --site vega \
   --experiment compression \
   --model-family full-model \
   --profile validation \
@@ -56,7 +58,8 @@ _runs/<site>/runs/<run-tag>/<experiment>/<model-family>/<profile>/
 Run the public lightweight propagation layer with the same explicit selection:
 
 ```bash
-python scripts/platforms/vega/run_propagation.py \
+python scripts/platforms/hpc/run_propagation.py \
+  --site vega \
   --experiment compression \
   --model-family reduced-model \
   --profile production \
@@ -68,7 +71,8 @@ python scripts/platforms/vega/run_propagation.py \
 Extract MAP samples from either Phase 1 or Phase 3b without selecting run directories manually:
 
 ```bash
-python scripts/platforms/vega/extract_map.py \
+python scripts/platforms/hpc/extract_map.py \
+  --site vega \
   --experiment compression \
   --model-family full-model \
   --profile validation \

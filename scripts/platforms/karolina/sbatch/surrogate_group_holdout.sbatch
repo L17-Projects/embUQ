@@ -26,9 +26,10 @@ SELECTIONS="${SELECTIONS:-}"
 cd "${REPO_ROOT}"
 source scripts/platforms/karolina/env_karolina.sh
 module load Python/3.10.8-GCCcore-12.2.0
-source _vega/venv/bin/activate
+VENV_DIR="${VENV_DIR:-${MESOUQ_SITE_RUNTIME_ROOT}/venv}"
+source "${VENV_DIR}/bin/activate"
 
-"$PYTHON_BIN" scripts/platforms/karolina/run_surrogate_group_holdout.py \
+"$PYTHON_BIN" scripts/platforms/hpc/run_surrogate_group_holdout.py \
   --site karolina \
   --output-root "${OUTPUT_ROOT}" \
   --run-tag "${RUN_TAG}" \

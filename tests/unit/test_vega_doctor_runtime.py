@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 def _load_doctor_module():
     spec = importlib.util.spec_from_file_location(
         "mesouq_test_vega_doctor_runtime",
-        Path("scripts/platforms/vega/doctor_vega.py"),
+        Path("scripts/platforms/hpc/doctor_runtime.py"),
     )
     module = importlib.util.module_from_spec(spec)
     assert spec is not None
@@ -175,7 +176,7 @@ def test_doctor_uses_env_site_and_karolina_module_profiles(monkeypatch):
     module = _load_doctor_module()
     monkeypatch.setenv("MESOUQ_SITE", "karolina")
 
-    assert module._default_runtime_site() == "karolina"
+    assert module.resolve_hpc_site(env={"MESOUQ_SITE": "karolina"}) == "karolina"
     assert module._recommended_modules("karolina", with_mirheo=False, with_gv_runtime=False) == list(
         module.DEFAULT_KAROLINA_MODULES
     )
@@ -188,19 +189,17 @@ def test_karolina_doctor_propagates_site_env(monkeypatch):
     module = _load_karolina_doctor_module()
     captured = {}
 
-    def fake_call(args, env):
+    def fake_call(args):
         captured["args"] = args
-        captured["env"] = env
         return 0
 
     monkeypatch.setattr(module.subprocess, "call", fake_call)
 
     assert module.main(["--strict", "--with-gv-runtime"]) == 0
 
-    assert captured["env"]["HPC_SITE"] == "karolina"
-    assert captured["env"]["MESOUQ_SITE"] == "karolina"
+    assert captured["args"][2:4] == ["--site", "karolina"]
     assert captured["args"][-2:] == ["--strict", "--with-gv-runtime"]
-    assert captured["args"][1].endswith("scripts/platforms/vega/doctor_vega.py")
+    assert captured["args"][1].endswith("scripts/platforms/hpc/doctor_hpc.py")
 
 
 def test_doctor_mirheo_diagnostics_cover_source_and_scale_space_warnings(tmp_path, monkeypatch):
@@ -276,6 +275,48 @@ def test_doctor_core_diagnostics_warn_when_korali_import_is_not_repo_local(tmp_p
 
     assert checks["python:korali"]["status"] == "warn"
     assert checks["python:korali"]["details"] == "/opt/korali/korali/__init__.py"
+
+
+def test_doctor_core_diagnostics_accepts_repo_local_korali_via_path_alias(tmp_path, monkeypatch):
+    module = _load_doctor_module()
+    real_repo = tmp_path / "real" / "repo"
+    real_repo.mkdir(parents=True)
+    alias_repo = tmp_path / "alias_repo"
+    alias_repo.symlink_to(real_repo, target_is_directory=True)
+    (real_repo / "pyproject.toml").write_text("[project]\nname='mesouq'\n", encoding="utf-8")
+    (real_repo / "extern" / "korali").mkdir(parents=True)
+    korali_init = (
+        real_repo
+        / "_vega"
+        / "korali"
+        / "install"
+        / "lib"
+        / f"python{sys.version_info.major}.{sys.version_info.minor}"
+        / "site-packages"
+        / "korali"
+        / "__init__.py"
+    )
+    korali_init.parent.mkdir(parents=True)
+    korali_init.write_text("", encoding="utf-8")
+    monkeypatch.setattr(module, "REPO_ROOT", alias_repo)
+    monkeypatch.setenv("LOADEDMODULES", "Python/3.10")
+    monkeypatch.setattr(module, "_command_path", lambda _name: "/bin/tool")
+    monkeypatch.setattr(module, "_pkg_config_version", lambda _name: "1.0")
+
+    def fake_spec(name: str) -> str:
+        if name == "meso_uq":
+            return str(real_repo / "src" / "meso_uq.py")
+        if name == "korali":
+            return str(korali_init)
+        return f"/x/{name}.py"
+
+    monkeypatch.setattr(module, "_python_module_spec", fake_spec)
+
+    report = module.collect_diagnostics("python")
+    checks = {entry["name"]: entry for entry in report["checks"]}
+
+    assert checks["python:korali"]["status"] == "ok"
+    assert checks["python:korali"]["details"] == str(korali_init)
 
 
 def test_doctor_core_diagnostics_omits_openmpi_lib_check_when_mpicxx_is_absent(tmp_path, monkeypatch):

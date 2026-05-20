@@ -602,6 +602,7 @@ def _render_slurm_script(
             "command=(",
             '  "${PYTHON_BIN}"',
             f"  {_platform_runtime_script(platform)}",
+            f"  --site {_shell_quote(platform.value)}",
             '  --experiment "${EXPERIMENT}"',
             '  --radius "${GEOMETRY_RADIUS}"',
             '  --height "${GEOMETRY_HEIGHT}"',
@@ -658,7 +659,7 @@ def _slurm_header(*, request: GVLaunchRequest, platform: Platform, job_name: str
 
 
 def _platform_runtime_script(platform: Platform) -> str:
-    return f"scripts/platforms/{platform.value}/run_gv_runtime.py"
+    return "scripts/platforms/hpc/run_gv_runtime.py"
 
 
 def _platform_runtime_environment_path(platform: Platform) -> str:
@@ -699,7 +700,6 @@ def _platform_setup(platform: Platform) -> list[str]:
             'export MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"',
             'export MESOUQ_GV_EIGENMODES_DOMAIN_RANKS="${MESOUQ_GV_EIGENMODES_DOMAIN_RANKS:-1,1,1}"',
             'export MESOUQ_SITE="karolina"',
-            'export HPC_SITE="karolina"',
         ]
     return [
         "module purge",
@@ -722,7 +722,6 @@ def _platform_setup(platform: Platform) -> list[str]:
         'export MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"',
         'export MESOUQ_GV_EIGENMODES_DOMAIN_RANKS="${MESOUQ_GV_EIGENMODES_DOMAIN_RANKS:-1,1,1}"',
         'export MESOUQ_SITE="vega"',
-        'export HPC_SITE="vega"',
     ]
 
 

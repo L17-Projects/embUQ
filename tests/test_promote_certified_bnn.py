@@ -56,7 +56,7 @@ def _write_certification_inputs(
 
 def test_promote_certified_bnn_dry_run_writes_manifest_without_copy(tmp_path: Path) -> None:
     module = _load_module(
-        Path("scripts/platforms/karolina/promote_certified_bnn.py"),
+        Path("scripts/platforms/hpc/promote_certified_bnn.py"),
         "promote_certified_bnn_dry_run_test",
     )
     certification_root = tmp_path / "cert"
@@ -71,7 +71,7 @@ def test_promote_certified_bnn_dry_run_writes_manifest_without_copy(tmp_path: Pa
 
 def test_promote_certified_bnn_copies_certified_artifact(tmp_path: Path) -> None:
     module = _load_module(
-        Path("scripts/platforms/karolina/promote_certified_bnn.py"),
+        Path("scripts/platforms/hpc/promote_certified_bnn.py"),
         "promote_certified_bnn_copy_test",
     )
     certification_root = tmp_path / "cert"
@@ -84,7 +84,7 @@ def test_promote_certified_bnn_copies_certified_artifact(tmp_path: Path) -> None
 
 def test_promote_certified_bnn_rejects_uncertified_datasets(tmp_path: Path) -> None:
     module = _load_module(
-        Path("scripts/platforms/karolina/promote_certified_bnn.py"),
+        Path("scripts/platforms/hpc/promote_certified_bnn.py"),
         "promote_certified_bnn_reject_test",
     )
     certification_root = tmp_path / "cert"
@@ -96,7 +96,7 @@ def test_promote_certified_bnn_rejects_uncertified_datasets(tmp_path: Path) -> N
 
 def test_promote_certified_bnn_requires_explicit_certified_row(tmp_path: Path) -> None:
     module = _load_module(
-        Path("scripts/platforms/karolina/promote_certified_bnn.py"),
+        Path("scripts/platforms/hpc/promote_certified_bnn.py"),
         "promote_certified_bnn_missing_row_test",
     )
     certification_root = tmp_path / "cert"
@@ -111,7 +111,7 @@ def test_promote_certified_bnn_requires_explicit_certified_row(tmp_path: Path) -
 
 def test_promote_certified_bnn_prevalidates_all_sources_before_copy(tmp_path: Path) -> None:
     module = _load_module(
-        Path("scripts/platforms/karolina/promote_certified_bnn.py"),
+        Path("scripts/platforms/hpc/promote_certified_bnn.py"),
         "promote_certified_bnn_prevalidate_test",
     )
     certification_root = tmp_path / "cert"
@@ -156,7 +156,7 @@ def test_promote_certified_bnn_prevalidates_all_sources_before_copy(tmp_path: Pa
 
 def test_promote_certified_bnn_rolls_back_if_late_replace_fails(tmp_path: Path, monkeypatch) -> None:
     module = _load_module(
-        Path("scripts/platforms/karolina/promote_certified_bnn.py"),
+        Path("scripts/platforms/hpc/promote_certified_bnn.py"),
         "promote_certified_bnn_replace_rollback_test",
     )
     certification_root = tmp_path / "cert"
@@ -213,7 +213,7 @@ def test_promote_certified_bnn_rolls_back_if_late_replace_fails(tmp_path: Path, 
 
 def test_promote_certified_bnn_helper_error_paths(tmp_path: Path, monkeypatch) -> None:
     module = _load_module(
-        Path("scripts/platforms/karolina/promote_certified_bnn.py"),
+        Path("scripts/platforms/hpc/promote_certified_bnn.py"),
         "promote_certified_bnn_helper_error_test",
     )
 
@@ -273,10 +273,10 @@ def test_promote_certified_bnn_helper_error_paths(tmp_path: Path, monkeypatch) -
 
 def test_hpc_promote_certified_bnn_wrapper_dispatches_to_selected_site(monkeypatch) -> None:
     module = _load_module(
-        Path("scripts/platforms/hpc/promote_certified_bnn.py"),
-        "hpc_promote_certified_bnn_dispatch_test",
+        Path("scripts/platforms/karolina/promote_certified_bnn.py"),
+        "karolina_promote_certified_bnn_dispatch_test",
     )
-    monkeypatch.setenv("HPC_SITE", "karolina")
+    monkeypatch.setenv("MESOUQ_SITE", "karolina")
     captured: list[list[str]] = []
 
     def _fake_call(cmd):  # noqa: ANN001
@@ -288,14 +288,23 @@ def test_hpc_promote_certified_bnn_wrapper_dispatches_to_selected_site(monkeypat
     assert rc == 0
     assert captured
     assert sys.executable in captured[0][0]
-    assert "scripts/platforms/karolina/promote_certified_bnn.py" in " ".join(captured[0])
+    assert "scripts/platforms/hpc/promote_certified_bnn.py" in " ".join(captured[0])
 
 
-def test_hpc_promote_certified_bnn_wrapper_rejects_unknown_site(monkeypatch) -> None:
+def test_karolina_promote_certified_bnn_wrapper_dispatches_without_site_env(monkeypatch) -> None:
     module = _load_module(
-        Path("scripts/platforms/hpc/promote_certified_bnn.py"),
-        "hpc_promote_certified_bnn_invalid_site_test",
+        Path("scripts/platforms/karolina/promote_certified_bnn.py"),
+        "karolina_promote_certified_bnn_no_env_dispatch_test",
     )
-    monkeypatch.setenv("HPC_SITE", "unknown")
-    with pytest.raises(SystemExit, match="Unsupported HPC_SITE"):
-        module.main([])
+    monkeypatch.delenv("MESOUQ_SITE", raising=False)
+    captured: list[list[str]] = []
+
+    def _fake_call(cmd):  # noqa: ANN001
+        captured.append(list(cmd))
+        return 0
+
+    monkeypatch.setattr(module.subprocess, "call", _fake_call)
+    assert module.main(["--certification-root", "dummy"]) == 0
+    assert captured
+    assert "scripts/platforms/hpc/promote_certified_bnn.py" in " ".join(captured[0])
+    assert "--site karolina" in " ".join(captured[0])

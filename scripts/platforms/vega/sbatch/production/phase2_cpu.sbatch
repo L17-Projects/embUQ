@@ -33,7 +33,7 @@ if [[ -z "${CONFIG_PATH:-}" ]]; then
   exit 1
 fi
 
-python scripts/platforms/vega/run_inference_stage.py \
+python scripts/platforms/hpc/run_inference_stage.py \
   --experiment "${EXPERIMENT}" \
   --model-family "${MODEL_FAMILY}" \
   --profile "${PROFILE}" \

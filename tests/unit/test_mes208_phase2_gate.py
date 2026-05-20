@@ -42,5 +42,5 @@ def test_mes208_replicate_sbatch_records_explicit_korali_env() -> None:
     assert "source \"${ENV_SCRIPT}\"" in script
     assert "KORALI_ENV_SCRIPT" in script
     assert "source \"${KORALI_ENV_SCRIPT}\"" in script
-    assert "scripts/platforms/vega/run_inference_stage.py" in script
+    assert "scripts/platforms/hpc/run_inference_stage.py" in script
     assert "--phase2-backend" in script

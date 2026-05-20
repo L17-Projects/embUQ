@@ -3,7 +3,7 @@
 This page records the legacy paths, imports, configs, and workflows that must remain
 available for one release cycle while the architecture migration settles.
 
-Snapshot date: 2026-05-13.
+Snapshot date: 2026-05-20.
 
 ## Compatibility rules
 
@@ -60,7 +60,7 @@ rg -n "^(from|import)\s+reduced\." src tests scripts docs .github examples --glo
 rg -n "^(from|import)\s+propagation\." src tests scripts docs .github examples --glob '!venv/**'
 rg -n "^(from|import)\s+meso_uq\.surrogate" src tests scripts docs .github examples --glob '!venv/**'
 rg -n "inference/configs/|reduced/configs/|examples/configs/" docs tests .github scripts examples --glob '!venv/**'
-rg -n "HUQ_INFERENCE_CONFIG|CONFIG_PATH|MESOUQ_RUNS_ROOT|HPC_SITE|MESOUQ_SITE" src tests docs scripts .github examples --glob '!venv/**'
+rg -n "HUQ_INFERENCE_CONFIG|CONFIG_PATH|MESOUQ_RUNS_ROOT|MESOUQ_SITE" src tests docs scripts .github examples --glob '!venv/**'
 rg -n "sys\.modules\.setdefault\(\"learning|learning\.model\"|_install_legacy_pickle_aliases" src/meso_uq/surrogate/model.py
 find scripts -name '*.sbatch' -print0 | xargs -0 rg -n "python\s+([A-Za-z0-9_./-]+\.py|[A-Za-z0-9_./-]+)"
 ```
@@ -79,14 +79,14 @@ find scripts -name '*.sbatch' -print0 | xargs -0 rg -n "python\s+([A-Za-z0-9_./-
 | Direct `reduced/scripts/*` paths | 3 refs / 1 docs file | Prefer shared workflow runners when reduced phases move | Active low-volume legacy script surface | Keep wrappers and explicit docs while reduced workflow remains public | Document replacement commands in workflow docs | One full release after replacement docs land | Medium |
 | Direct `propagation/scripts/*` paths | 8 refs / 5 files in docs and CI backend canary | Prefer package/reporting APIs when propagation moves | Active legacy script surface | Keep scripts until propagation/reporting boundary is extracted | Document replacement path and keep CI canary reachable | One full release after replacement path validates | High |
 | `scripts/ci`, `scripts/vega`, `scripts/karolina`, `scripts/hpc` symlinks | `scripts/ci -> qa/ci`, `scripts/vega -> platforms/vega`, `scripts/karolina -> platforms/karolina`, `scripts/hpc -> platforms/hpc` | Canonical paths are `scripts/qa/ci` and `scripts/platforms/*` | Compatibility-only aliases | Keep symlinks during migration and assert they resolve | Docs should label aliases as compatibility paths | One full release after canonical references replace alias references | High |
-| `scripts/platforms/vega` runner surface | High-reference compatibility surface in docs, tests, CI, and wrappers | `scripts/platforms/hpc` dispatcher with explicit `HPC_SITE` where possible | Active compatibility runner | Keep wrappers delegating to shared workflow code | Existing warnings stay visible; expand only where logs remain parseable | Follow-up release after green compatibility matrix | High |
-| `scripts/platforms/karolina` runner surface | Active references in platform docs, tests, and launch templates | Shared `scripts/platforms/hpc` dispatcher where possible | Active site runner | Keep Karolina-specific sbatch and env bootstrap while shared runner grows | Mark replacement paths in platform docs before runtime warnings | Follow-up release after Karolina matrix parity evidence | Medium |
+| `scripts/platforms/vega` runner surface | High-reference compatibility surface in docs, tests, CI, and wrappers | `scripts/platforms/hpc` entrypoints with explicit `--site vega` | Active compatibility wrapper surface | Keep wrappers delegating to shared HPC code and reject conflicting site selectors | Prefer docs updates over noisy runtime warnings | Follow-up release after green compatibility matrix | High |
+| `scripts/platforms/karolina` runner surface | Active references in platform docs, tests, and launch templates | `scripts/platforms/hpc` entrypoints with explicit `--site karolina` | Active compatibility wrapper and site sbatch surface | Keep Karolina-specific sbatch/env setup while Python implementations stay shared | Mark replacement paths in platform docs before runtime warnings | Follow-up release after Karolina matrix parity evidence | Medium |
 | `scripts/platforms/hpc` runner surface | Canonical shared runner used by matrix dispatch and site wrappers | Canonical | Active canonical surface | Keep as primary dispatcher | No deprecation warning | Not applicable | Low |
 | `inference/configs/*` | 26 refs / 13 files in docs, tests, and scripts | Keep current tree until Phase 3 central config migration | Active legacy/canonical mixed config surface | Preserve resolver and env override support | Warn only for deprecated implicit defaults after replacement schema exists | Not before Phase 3 migration and one release cycle | Medium |
 | `reduced/configs/*` | 18 refs / 8 files | Keep current tree until Phase 3 central config migration | Active legacy/canonical mixed config surface | Preserve wrapper defaults and validation configs | Same as inference configs | Not before Phase 3 migration and one release cycle | Medium |
 | `examples/configs` | Example configs present; no direct filename references in the compatibility scan | Refresh under new taxonomy or archive as historical examples | Needs Phase 3 owner decision | Keep until examples refresh/archive issue closes | Docs should say examples are not durable source of truth | After examples are refreshed or archived | Medium |
 | Serialized artifact aliases `learning`, `learning.model` | Explicit shim in `src/meso_uq/surrogate/model.py`; covered by `tests/unit/test_surrogate_pickle_compat.py` | Canonical loader remains `meso_uq.surrogate.model` | Active critical serialization shim | Keep `_install_legacy_pickle_aliases()` in load path | Keep regression tests; avoid noisy warnings during model loading | Remove only with staged artifact migration and owner-approved compatibility pack | High |
-| Env and CLI path layer | `HUQ_INFERENCE_CONFIG`, `CONFIG_PATH`, `MESOUQ_RUNS_ROOT`, `HPC_SITE`, `MESOUQ_SITE`, and common flags such as `--config`, `--output-root`, `--selection` remain widely referenced | `meso_uq.config.loader`, `meso_uq.hpc_paths`, and platform dispatcher policy | Active runtime/path governance surface | Preserve precedence and normalize output roots | Keep warnings for non-canonical roots where they do not corrupt machine-readable logs | Dedicated migration PR plus one release cycle after policy docs update | High |
+| Env and CLI path layer | `HUQ_INFERENCE_CONFIG`, `CONFIG_PATH`, `MESOUQ_RUNS_ROOT`, `MESOUQ_SITE`, and common flags such as `--config`, `--output-root`, `--selection` remain widely referenced | `meso_uq.config.loader`, `meso_uq.hpc_paths`, and platform dispatcher policy | Active runtime/path governance surface | Preserve precedence and normalize output roots | Keep warnings for non-canonical roots where they do not corrupt machine-readable logs | Dedicated migration PR plus one release cycle after policy docs update | High |
 
 ## High-risk compatibility surfaces
 

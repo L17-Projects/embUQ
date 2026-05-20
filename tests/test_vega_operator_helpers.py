@@ -45,7 +45,7 @@ def test_run_inference_stage_builds_phase2_command_with_profile_and_model_family
 ):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_inference_stage.py", "run_inference_stage_test"
+        repo_root / "scripts" / "platforms" / "hpc" / "run_inference_stage.py", "run_inference_stage_test"
     )
     captured = {}
 
@@ -98,7 +98,7 @@ def test_run_inference_stage_builds_phase2_command_with_profile_and_model_family
 def test_run_inference_stage_phase2_production_defaults_to_native_cuda(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_inference_stage.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_inference_stage.py",
         "run_inference_stage_production_phase2_native_cuda_test",
     )
     captured = {}
@@ -137,7 +137,7 @@ def test_run_inference_stage_phase2_production_defaults_to_native_cuda(tmp_path,
 def test_run_propagation_uses_explicit_stage_wrapper(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_propagation.py", "run_propagation_test"
+        repo_root / "scripts" / "platforms" / "hpc" / "run_propagation.py", "run_propagation_test"
     )
     captured = {}
 
@@ -179,7 +179,7 @@ def test_run_propagation_uses_explicit_stage_wrapper(tmp_path, monkeypatch):
 def test_run_inference_stage_uses_reduced_phase1_wrapper(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_inference_stage.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_inference_stage.py",
         "run_inference_stage_reduced_test",
     )
     captured = {}
@@ -272,7 +272,7 @@ def test_extract_map_writes_manifest_for_single_selected_dataset(tmp_path, monke
     monkeypatch.setitem(sys.modules, "meso_uq.postprocess", fake_postprocess)
 
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "extract_map.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "extract_map.py",
         "extract_map_test",
     )
 
@@ -316,7 +316,7 @@ def test_extract_map_writes_manifest_for_single_selected_dataset(tmp_path, monke
 def test_run_inference_stage_rejects_gv_runtime_before_dispatch(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_inference_stage.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_inference_stage.py",
         "run_inference_stage_gv_runtime_rejection_test",
     )
 
@@ -349,7 +349,7 @@ def test_run_inference_stage_rejects_gv_runtime_before_dispatch(tmp_path, monkey
 def test_run_propagation_rejects_gv_runtime_before_dispatch_with_override(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_propagation.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_propagation.py",
         "run_propagation_gv_runtime_rejection_test",
     )
     config_path = tmp_path / "gv_config.yaml"
@@ -499,8 +499,8 @@ def test_acceptance_template_uses_public_command() -> None:
 
 def test_vega_bootstrap_scripts_resolve_repo_root_after_platforms_move() -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    korali = repo_root / "scripts" / "platforms" / "vega" / "bootstrap_korali.sh"
-    mirheo = repo_root / "scripts" / "platforms" / "vega" / "bootstrap_mirheo.sh"
+    korali = repo_root / "scripts" / "platforms" / "hpc" / "bootstrap_korali.sh"
+    mirheo = repo_root / "scripts" / "platforms" / "hpc" / "bootstrap_mirheo.sh"
     legacy_korali = repo_root / "scripts" / "vega" / "bootstrap_korali.sh"
     legacy_mirheo = repo_root / "scripts" / "vega" / "bootstrap_mirheo.sh"
 
@@ -509,7 +509,10 @@ def test_vega_bootstrap_scripts_resolve_repo_root_after_platforms_move() -> None
     legacy_korali_text = legacy_korali.read_text(encoding="utf-8")
     legacy_mirheo_text = legacy_mirheo.read_text(encoding="utf-8")
 
-    for text in (korali_text, mirheo_text, legacy_korali_text, legacy_mirheo_text):
+    for text in (korali_text, mirheo_text):
         assert 'script_path="$(readlink -f "${BASH_SOURCE[0]}")"' in text
         assert 'script_dir="$(cd "$(dirname "$script_path")" && pwd)"' in text
         assert 'repo_root="$(cd "${script_dir}/../../.." && pwd)"' in text
+    for text in (legacy_korali_text, legacy_mirheo_text):
+        assert 'exec bash "${script_dir}/../hpc/bootstrap_' in text
+        assert '--site vega "$@"' in text

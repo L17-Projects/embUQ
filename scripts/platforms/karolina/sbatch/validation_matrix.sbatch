@@ -22,7 +22,16 @@ fi
 EXPERIMENTS="${EXPERIMENTS:-compression indentation}"
 MODEL_FAMILIES="${MODEL_FAMILIES:-full-model reduced-model}"
 PROFILE="${PROFILE:-validation}"
-SITE="${SITE:-karolina}"
+if [[ -n "${SITE:-}" && "${SITE}" != "karolina" ]]; then
+  echo "This site template is fixed to karolina; use scripts/platforms/hpc/sbatch for SITE=${SITE}." >&2
+  exit 2
+fi
+if [[ -n "${MESOUQ_SITE:-}" && "${MESOUQ_SITE}" != "karolina" ]]; then
+  echo "This site template is fixed to karolina; MESOUQ_SITE=${MESOUQ_SITE} conflicts." >&2
+  exit 2
+fi
+SITE="karolina"
+export MESOUQ_SITE="${SITE}"
 RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 PHASE2_CPU_RANKS="${PHASE2_CPU_RANKS:-4}"
 RUN_MAP_MIRHEO="${RUN_MAP_MIRHEO:-false}"
@@ -63,7 +72,7 @@ case "${SKIP_RELEASE_MANIFEST,,}" in
     ;;
 esac
 
-"$PYTHON_BIN" scripts/platforms/karolina/run_validation_matrix.py \
+"$PYTHON_BIN" scripts/platforms/hpc/run_validation_matrix.py \
   --experiments $EXPERIMENTS \
   --model-families $MODEL_FAMILIES \
   --output-root "$OUTPUT_ROOT" \

@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 from pathlib import Path
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[2]
+TARGET = REPO_ROOT / "scripts" / "platforms" / "hpc" / "doctor_hpc.py"
+
 
 def main(argv: list[str] | None = None) -> int:
-    args = argv if argv is not None else sys.argv[1:]
-    script_dir = Path(__file__).resolve().parent
-    target = script_dir.parent / "vega" / "doctor_vega.py"
-    env = os.environ.copy()
-    env["HPC_SITE"] = "karolina"
-    env["MESOUQ_SITE"] = "karolina"
-    return subprocess.call([sys.executable, str(target), *args], env=env)
+    args = list(argv if argv is not None else sys.argv[1:])
+    if not any(arg == "--site" or arg.startswith("--site=") for arg in args):
+        args = ["--site", "karolina", *args]
+    return subprocess.call([sys.executable, str(TARGET), *args])
 
 
 if __name__ == "__main__":

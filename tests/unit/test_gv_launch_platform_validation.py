@@ -106,7 +106,7 @@ def test_karolina_render_validation_covers_four_non_shear_gv_lanes(tmp_path, mon
         assert script_info["runtime_environment_path"] == (
             "${MESOUQ_GV_ENV_SCRIPT:-${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/env.sh}"
         )
-        assert script_info["runtime_script"] == "scripts/platforms/karolina/run_gv_runtime.py"
+        assert script_info["runtime_script"] == "scripts/platforms/hpc/run_gv_runtime.py"
         assert script_info["gpu_resource_directives"] == ["#SBATCH --gpus=1"]
         assert script_info["operator_checks"]
         _assert_generated_files_payload(payload)
@@ -115,7 +115,8 @@ def test_karolina_render_validation_covers_four_non_shear_gv_lanes(tmp_path, mon
         assert "#SBATCH --partition=qgpu" in script
         assert "#SBATCH --gpus=1" in script
         assert 'source "${REPO_ROOT}/scripts/platforms/karolina/env_karolina.sh"' in script
-        assert "scripts/platforms/karolina/run_gv_runtime.py" in script
+        assert "scripts/platforms/hpc/run_gv_runtime.py" in script
+        assert "--site karolina" in script
         assert _scheduler_submission_commands(script) == []
 
 
@@ -144,7 +145,7 @@ def test_vega_render_validation_covers_four_non_shear_gv_lanes(tmp_path, monkeyp
         assert script_info["runtime_environment_path"] == (
             "${MESOUQ_GV_ENV_SCRIPT:-${REPO_ROOT}/_vega/gv_venv/env.sh}"
         )
-        assert script_info["runtime_script"] == "scripts/platforms/vega/run_gv_runtime.py"
+        assert script_info["runtime_script"] == "scripts/platforms/hpc/run_gv_runtime.py"
         assert script_info["gpu_resource_directives"] == ["#SBATCH --gres=gpu:1"]
         assert any("maintenance" in check for check in script_info["operator_checks"])
         _assert_generated_files_payload(payload)
@@ -153,5 +154,6 @@ def test_vega_render_validation_covers_four_non_shear_gv_lanes(tmp_path, monkeyp
         assert "#SBATCH --gres=gpu:1" in script
         assert "module purge" in script
         assert "_vega/gv_venv/env.sh" in script
-        assert "scripts/platforms/vega/run_gv_runtime.py" in script
+        assert "scripts/platforms/hpc/run_gv_runtime.py" in script
+        assert "--site vega" in script
         assert _scheduler_submission_commands(script) == []

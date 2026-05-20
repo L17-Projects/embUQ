@@ -21,7 +21,7 @@ class _Result:
 def test_production_sanity_command_writes_override_configs_and_machine_readable_report(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_production_sanity.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_production_sanity.py",
         "run_production_sanity_test",
     )
     captured = {}
@@ -90,7 +90,7 @@ def test_production_sanity_command_writes_override_configs_and_machine_readable_
 def test_production_sanity_rejects_native_cuda_multi_rank(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_production_sanity.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_production_sanity.py",
         "run_production_sanity_rank_guard_test",
     )
 
@@ -105,7 +105,7 @@ def test_production_sanity_rejects_native_cuda_multi_rank(tmp_path):
 def test_production_sanity_allows_cpu_mpi_multi_rank(tmp_path, monkeypatch):
     repo_root = Path(__file__).resolve().parents[1]
     module = _load_module(
-        repo_root / "scripts" / "platforms" / "vega" / "run_production_sanity.py",
+        repo_root / "scripts" / "platforms" / "hpc" / "run_production_sanity.py",
         "run_production_sanity_cpu_mpi_test",
     )
     captured = {}

@@ -373,7 +373,6 @@ def _runtime_env_overrides(platform: str, gv_env_script: Path) -> dict[str, str]
     overrides = {"MESOUQ_GV_ENV_SCRIPT": str(gv_env_script)}
     if platform in {"karolina", "vega"}:
         overrides["MESOUQ_SITE"] = platform
-        overrides["HPC_SITE"] = platform
     return overrides
 
 

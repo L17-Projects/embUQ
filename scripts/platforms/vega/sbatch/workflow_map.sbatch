@@ -47,7 +47,7 @@ source "${REPO_ROOT}/_vega/korali/env.sh"
 
 cd "${REPO_ROOT}"
 
-EXPECTED_PARTITION="$("${PYTHON_BIN}" scripts/platforms/vega/resolve_gpu_partition.py --time-limit "${GPU_TIME_LIMIT}")"
+EXPECTED_PARTITION="$("${PYTHON_BIN}" scripts/platforms/hpc/resolve_gpu_partition.py --time-limit "${GPU_TIME_LIMIT}")"
 if [[ -n "${SLURM_JOB_PARTITION:-}" && "${SLURM_JOB_PARTITION}" != "${EXPECTED_PARTITION}" ]]; then
   echo "ERROR: strict GPU partition policy violation for MAP job: partition=${SLURM_JOB_PARTITION} expected=${EXPECTED_PARTITION} time_limit=${GPU_TIME_LIMIT}" >&2
   exit 1
@@ -74,4 +74,4 @@ if [[ -n "${DIAMETER}" ]]; then
   common_args+=(--diameter "${DIAMETER}")
 fi
 
-python scripts/platforms/vega/extract_map.py "${common_args[@]}"
+python scripts/platforms/hpc/extract_map.py "${common_args[@]}"
