@@ -13,6 +13,22 @@ import sys
 from pathlib import Path
 from typing import Any
 
+
+def _repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if (parent / "pyproject.toml").is_file():
+            return parent
+    raise RuntimeError("Unable to resolve repository root.")
+
+
+_REPO_ROOT = _repo_root()
+_SRC_ROOT = _REPO_ROOT / "src"
+if str(_SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SRC_ROOT))
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 from meso_uq.active_learning import (
     ACTIVE_LEARNING_FINAL_GATE_ACQUISITION_PLOT_FILENAME,
     ACTIVE_LEARNING_FINAL_GATE_CURVE_METRICS_PLOT_FILENAME,
@@ -37,22 +53,6 @@ from meso_uq.active_learning import (
     EMB_34UM_FINAL_GATE_QUARANTINE_FILENAME,
 )
 CONTROLLER_SCHEMA_VERSION = "meso_uq.active_learning.emb_34um_active_learning_controller.v1"
-
-
-def _repo_root() -> Path:
-    current = Path(__file__).resolve()
-    for parent in current.parents:
-        if (parent / "pyproject.toml").is_file():
-            return parent
-    raise RuntimeError("Unable to resolve repository root.")
-
-
-_REPO_ROOT = _repo_root()
-_SRC_ROOT = _REPO_ROOT / "src"
-if str(_SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(_SRC_ROOT))
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
 
 
 def _load_prepare_module():
