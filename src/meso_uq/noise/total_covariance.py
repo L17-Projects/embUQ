@@ -121,7 +121,7 @@ def _matrix_summary(matrix: np.ndarray) -> dict[str, Any]:
 
 
 def _cholesky_with_optional_jitter(covariance: np.ndarray, jitter: float, max_jitter: float) -> tuple[np.ndarray | None, float]:
-    if np.allclose(covariance, 0.0):
+    if not np.any(covariance != 0.0):
         return None, 0.0
     symmetric = 0.5 * covariance + 0.5 * covariance.T
     try:
@@ -297,7 +297,7 @@ def assemble_total_covariance(
     _ensure_finite_matrix(total, _TOTAL_COMPONENT)
     _ensure_symmetric(total, _TOTAL_COMPONENT, config.symmetry_tolerance)
     _ensure_psd(total, _TOTAL_COMPONENT, config.psd_tolerance)
-    active = bool(included_names and not np.allclose(total, 0.0))
+    active = bool(included_names and np.any(total != 0.0))
     cholesky, jitter_added = _cholesky_with_optional_jitter(total, config.jitter, config.max_jitter)
     if active and cholesky is None:
         if config.max_jitter <= 0.0:

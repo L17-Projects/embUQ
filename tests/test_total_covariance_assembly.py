@@ -93,6 +93,17 @@ def test_total_covariance_rejects_invalid_component_matrices():
         covariance_term_from_diagonal("observation:additive_relative", (0.1, -0.1))
 
 
+def test_total_covariance_accepts_tiny_positive_definite_scale():
+    tiny = CovarianceTerm("tiny_observation", np.diag([1.0e-12, 2.0e-12]))
+
+    result = assemble_total_covariance((tiny,), TotalCovarianceConfig(jitter=0.0, max_jitter=0.0))
+
+    assert result.summary["active"] is True
+    assert result.summary["cholesky_success"] is True
+    assert result.covariance.cholesky is not None
+    assert result.standard_deviation == pytest.approx((1.0e-6, np.sqrt(2.0e-12)))
+
+
 def test_total_covariance_requires_final_positive_definiteness_or_jitter():
     singular = CovarianceTerm("discrepancy:low_rank", np.ones((2, 2)))
 
