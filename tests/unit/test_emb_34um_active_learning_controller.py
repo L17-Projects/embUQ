@@ -486,3 +486,34 @@ def test_emb_34um_active_learning_controller_builds_final_evidence_from_complete
     assert len(runtime_rows) == 90 + 90 + validation_count
     assert all(row["status"] == "completed" for row in runtime_rows)
     assert all(row["runtime_status_path"] for row in runtime_rows)
+    assert all(row["candidate_id"] for row in curve_rows if row["strategy"] in {"al", "lhs"})
+
+    runtime_map = {
+        (row["strategy"], int(row["round"]), row["candidate_id"]): row["runtime_seconds"]
+        for row in runtime_rows
+    }
+    for row in curve_rows:
+        if row["strategy"] == "al":
+            expected = (row["strategy"], int(row["round"]), row["candidate_id"])
+            assert expected in runtime_map
+        if row["strategy"] == "lhs":
+            assert ("lhs", 0, row["candidate_id"]) in runtime_map
+    for round_index in (1, 2, 3):
+        lhs_ids = [
+            row["candidate_id"]
+            for row in curve_rows
+            if row["strategy"] == "lhs" and int(row["round"]) == round_index
+        ]
+        expected_ids = [
+            f"lhs-c{order:03d}"
+            for order in range((round_index - 1) * validation_count + 1, round_index * validation_count + 1)
+        ]
+        assert lhs_ids == expected_ids
+
+    import meso_uq.active_learning.emb_34um_al_vs_lhs_validation as validation
+
+    validation_manifest, _ = validation.build_emb_34um_al_vs_lhs_validation_report(
+        curve_rows=curve_rows,
+        runtime_rows=runtime_rows,
+    )
+    assert validation_manifest["runtime_curve_count"] == len(curve_rows)

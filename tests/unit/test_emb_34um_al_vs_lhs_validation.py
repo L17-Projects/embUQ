@@ -302,6 +302,33 @@ def test_emb_34um_al_vs_lhs_validation_supports_runtime_rows_from_json_and_csv(t
     assert invalid_runtime_manifest["runtime_seconds_count"] == 0
 
 
+def test_emb_34um_al_vs_lhs_validation_attaches_runtime_by_candidate_id() -> None:
+    rows = [
+        {
+            **_curve_row(strategy="al", curve_id="al-report-1", round_index=1, order=1, rel_l2_pct=1.0),
+            "candidate_id": "candidate-al-001",
+        },
+        {
+            **_curve_row(strategy="lhs", curve_id="lhs-report-1", order=1, rel_l2_pct=3.0),
+            "candidate_id": "candidate-lhs-001",
+        },
+    ]
+    runtime_rows = [
+        {"candidate_id": "candidate-al-001", "runtime_seconds": 12.5, "round": 1},
+        {"candidate_id": "candidate-lhs-001", "runtime_seconds": 7.25, "round": 0},
+    ]
+
+    manifest, _ = build_emb_34um_al_vs_lhs_validation_report(
+        curve_rows=rows,
+        runtime_rows=runtime_rows,
+    )
+
+    attached = {row["candidate_id"]: float(row["runtime_seconds"]) for row in manifest["curve_records"]}
+    assert attached["candidate-al-001"] == 12.5
+    assert attached["candidate-lhs-001"] == 7.25
+    assert manifest["runtime_curve_count"] == 2
+
+
 def test_emb_34um_al_vs_lhs_validation_marks_ingestion_only_rows_blocked(tmp_path: Path) -> None:
     ingestion_only = {
         "records": [

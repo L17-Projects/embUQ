@@ -1030,11 +1030,13 @@ def _curve_metric_rows(
     residual_scores = tuple(metrics.get("residuals", ()))
     for index, validation in enumerate(validation_records, start=1):
         selected = selected_rows[(index - 1) % len(selected_rows)] if selected_rows else validation
+        candidate_id = str(selected.get("candidate_id", "") or validation.get("candidate_id", ""))
         rows.append(
             {
                 "strategy": strategy,
                 "round": round_index,
                 "curve_id": f"{strategy}-r{round_index:02d}-v{index:03d}",
+                "candidate_id": candidate_id,
                 "order": index + (round_index - 1) * len(validation_records),
                 "ka": float(selected.get("ka", validation["ka"])),
                 "kb": float(selected.get("kb", validation["kb"])),
@@ -1082,6 +1084,7 @@ def build_final_evidence(*, campaign_manifest_path: Path) -> dict[str, Any]:
             architecture_names=EMB_34UM_FINAL_GATE_SURROGATE_ARCHITECTURES,
         )
         selected_rows = tuple(al_records[(round_index - 1) * 30 : round_index * 30])
+        lhs_selected_rows = tuple(lhs_records[(round_index - 1) * 30 : round_index * 30])
         selected_scores = [
             float(item.get("acquisition_score", 0.0))
             for item in selected_rows
@@ -1103,6 +1106,7 @@ def build_final_evidence(*, campaign_manifest_path: Path) -> dict[str, Any]:
                 round_index=round_index,
                 metrics=lhs_report,
                 validation_records=validation_records,
+                selected_rows=lhs_selected_rows,
             )
         )
         round_payloads.append(

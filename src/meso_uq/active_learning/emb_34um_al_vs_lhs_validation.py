@@ -271,12 +271,12 @@ def _curve_id(row: Mapping[str, Any], *, index: int) -> str:
     return f"row_{index:06d}"
 
 
-def _row_order(row: Mapping[str, Any]) -> int:
+def _row_order(row: Mapping[str, Any], *, fallback_index: int) -> int:
     for key in _ORDER_SOURCE_ALIASES:
         value = _optional_int(row.get(key))
         if value is not None:
             return value
-    return 0
+    return fallback_index
 
 
 def _has_explicit_order(row: Mapping[str, Any]) -> bool:
@@ -394,7 +394,7 @@ def _extract_curve_records(rows: Sequence[Mapping[str, Any]]) -> tuple[tuple[dic
             continue
         curve_id = _curve_id(row, index=index)
         round_index = _row_round(row)
-        order = _row_order(row)
+        order = _row_order(row, fallback_index=index)
         has_explicit_order = _has_explicit_order(row)
         metric_value = None
         invalid_curve_metric = False
