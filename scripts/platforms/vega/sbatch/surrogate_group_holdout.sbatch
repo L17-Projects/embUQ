@@ -22,7 +22,13 @@ OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/vega/surrogate_group_holdout/${RUN_TAG}}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 MODEL_FAMILIES="${MODEL_FAMILIES:-dnn bnn}"
 SELECTIONS="${SELECTIONS:-}"
+SEED="${SEED:-20260317}"
+VAL_FRACTION="${VAL_FRACTION:-0.10}"
+PRED_MC_SAMPLES="${PRED_MC_SAMPLES:-64}"
+PRED_MC_CHUNK="${PRED_MC_CHUNK:-8}"
 DEVICE="${DEVICE:-gpu}"
+DISP_SOURCE="${DISP_SOURCE:-auto}"
+RUPTURE_RATIO="${RUPTURE_RATIO:-2.0}"
 
 module purge
 module load \
@@ -39,7 +45,13 @@ cd "${REPO_ROOT}"
   --site vega \
   --output-root "${OUTPUT_ROOT}" \
   --run-tag "${RUN_TAG}" \
-  --python-bin "${PYTHON_BIN}" \
+  --seed "${SEED}" \
+  --val-fraction "${VAL_FRACTION}" \
+  --predictive-mc-samples "${PRED_MC_SAMPLES}" \
+  --predictive-mc-chunk-size "${PRED_MC_CHUNK}" \
   --device "${DEVICE}" \
+  --disp-source "${DISP_SOURCE}" \
+  --rupture-ratio "${RUPTURE_RATIO}" \
+  --python-bin "${PYTHON_BIN}" \
   $(for fam in ${MODEL_FAMILIES}; do printf -- "--surrogate-family %s " "${fam}"; done) \
   $(for sel in ${SELECTIONS}; do printf -- "--only %s " "${sel}"; done)

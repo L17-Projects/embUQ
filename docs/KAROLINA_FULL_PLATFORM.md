@@ -39,6 +39,12 @@ One requested GPU on Karolina maps to one eighth of an accelerated node: 1 A100 
 
 The `eu-26-17` account is currently GPU-only from this login context. CPU, fat-memory, and visualization partitions are visible but are not submit-accessible with this account.
 
+Karolina GPU sbatch templates should use the Karolina policy directive
+`#SBATCH --gpus=<n>`, not Vega-style `#SBATCH --gres=gpu:<n>`. The surrogate
+group-holdout and repository-bootstrap templates request one GPU because they run
+single-task orchestration or setup work; they do not consume a full eight-GPU
+node.
+
 Do not expect `/ceph/hpc/home/eubrieucb` to be mounted on Karolina. That path is not part of the Karolina acceptance contract and should not be treated as a missing platform feature.
 
 ## Runtime env-script contract

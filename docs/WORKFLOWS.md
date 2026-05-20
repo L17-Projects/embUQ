@@ -62,6 +62,13 @@ Cross-platform HPC DNN rebuild matrix:
 - `python scripts/platforms/hpc/run_dnn_surrogate_training.py --site vega|karolina`
 - Vega compatibility batch template: `scripts/platforms/vega/sbatch/train_dnn_surrogates.sbatch`
 
+Cross-platform surrogate group-holdout matrix:
+- `python scripts/platforms/hpc/run_surrogate_group_holdout.py --site vega|karolina`
+- Site sbatch templates: `scripts/platforms/{vega,karolina}/sbatch/surrogate_group_holdout.sbatch`
+- The site templates expose the shared seed, split, predictive-MC, device, indentation-loader,
+  and model-selection knobs. Karolina writes to `${MESOUQ_RUNS_ROOT}/surrogate_group_holdout/<run-tag>`
+  by default and uses `#SBATCH --gpus=1` on the `qgpu` partition.
+
 The DNN matrix writes one per-spec provenance manifest under:
 - `<output-root>/<spec>/dnn_training_manifest.json`
 

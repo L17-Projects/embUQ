@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=mesouq-karolina-bootstrap
+#SBATCH --account=eu-26-17
 #SBATCH --partition=qgpu
 #SBATCH --time=02:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --gres=gpu:8
+#SBATCH --gpus=1
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
 
