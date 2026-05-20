@@ -92,6 +92,12 @@ from meso_uq.noise.total_covariance import (
     assemble_total_covariance,
     covariance_term_from_diagonal,
 )
+from meso_uq.noise.synthetic_recovery import (
+    SyntheticRecoveryInputs,
+    SyntheticRecoveryResult,
+    SyntheticRecoveryThresholds,
+    evaluate_synthetic_recovery,
+)
 from meso_uq.noise.surrogate_covariance import (
     SurrogateCovarianceConfig,
     SurrogateCovarianceInputs,
@@ -150,6 +156,9 @@ __all__ = [
     "RobustLikelihoodConfig",
     "RobustLikelihoodKind",
     "SurrogateErrorConfig",
+    "SyntheticRecoveryInputs",
+    "SyntheticRecoveryResult",
+    "SyntheticRecoveryThresholds",
     "SurrogateCovarianceResult",
     "SurrogateCovarianceKind",
     "SurrogateCovarianceInputs",
@@ -175,6 +184,7 @@ __all__ = [
     "compose_total_covariance",
     "compose_toy_likelihood",
     "evaluate_observation_likelihood",
+    "evaluate_synthetic_recovery",
     "evaluate_discrepancy_identifiability",
     "gaussian_log_likelihood_from_covariance",
     "fit_low_rank_discrepancy_coefficients",

@@ -1,0 +1,33 @@
+schema_version: 1
+name: synthetic_recovery
+family: noise_hierarchy
+milestone: M6 Synthetic Recovery and SBC
+thresholds:
+  max_abs_parameter_bias: 0.08
+  max_parameter_z_error: 2.0
+  max_residual_rmse_over_observation_rms: 0.08
+  min_interval_coverage: 1.0
+  interval_z: 2.0
+required_scenarios:
+  - id: legacy_noise_only
+    stage: M1/M2
+    seed: 34017
+  - id: measurement_uncertainty
+    stage: M3
+    seed: 34027
+  - id: surrogate_covariance
+    stage: M4
+    seed: 34037
+  - id: discrepancy_enabled
+    stage: M5
+    seed: 34047
+artifacts:
+  manifest: synthetic_manifest.json
+  metrics: synthetic_recovery_metrics.json
+  summary_table: recovery_summary.csv
+  scenario_directory: scenarios/
+  figures:
+    - figures/recovery_parameter_intervals.png
+    - figures/synthetic_observable_overlay.png
+    - figures/residual_whitened_hist.png
+    - figures/covariance_heatmap.png
