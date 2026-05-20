@@ -539,10 +539,7 @@ def main() -> None:
         "pass": metrics["all_scenarios_passed"],
         "evidence_class": "validation_fixture",
         "production_claim": False,
-        "m6_evidence_expected": {
-            "synthetic_recovery_manifest": "_runs/noise/m6_synthetic_recovery_diagnostics_20260520/synthetic_manifest.json",
-            "predictive_checks_manifest": "_runs/noise/m6_predictive_checks_20260520/predictive_manifest.json",
-        },
+        "m6_evidence_expected": "provided to scripts/qa/noise_gate06_integrated_emb.py at gate runtime",
         "m7_evidence": _artifact_ref(output_root, metrics_path),
         "residual_risk": _known_limitations(),
     }
