@@ -45,6 +45,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Mark the manifest as using a real adaptive acquisition engine.",
     )
+    parser.add_argument(
+        "--runtime-rows",
+        default=None,
+        help="JSON or CSV with per-curve runtime evidence.",
+    )
     parser.add_argument("--no-plot", action="store_true", help="Write a fallback PNG without importing matplotlib.")
     return parser
 
@@ -57,6 +62,7 @@ def main(argv: list[str] | None = None) -> int:
         prefix_curve_counts=_parse_prefix_counts(args.prefix_counts),
         adaptive_acquisition_available=bool(args.adaptive_acquisition_available),
         acquisition_engine_name=args.acquisition_engine,
+        runtime_rows=Path(args.runtime_rows) if args.runtime_rows else None,
         include_plot=not bool(args.no_plot),
     )
     print(artifacts.manifest_path)

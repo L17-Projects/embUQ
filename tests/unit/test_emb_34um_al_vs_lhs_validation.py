@@ -28,12 +28,16 @@ def _curve_row(
     rel_l2_pct: float,
     round_index: int | None = None,
     order: int = 0,
+    ka: float = 100.0,
+    kb: float = 500.0,
 ) -> dict[str, object]:
     return {
         "strategy": strategy,
         "curve_id": curve_id,
         "round": round_index,
         "order": order,
+        "ka": ka,
+        "kb": kb,
         "predicted_curve": [1.0 + rel_l2_pct / 100.0, 0.0],
         "reference_curve": [1.0, 0.0],
     }
@@ -91,12 +95,69 @@ def test_emb_34um_al_vs_lhs_validation_writes_png_json_and_csv_sidecars(tmp_path
     manifest = json.loads(artifacts.manifest_path.read_text(encoding="utf-8"))
     assert manifest["plot_paths"]["al_vs_lhs_validation"] == str(artifacts.plot_path)
     assert manifest["summary_rows"][0]["al_curve_count"] == 2
+    assert "plot_paths" in manifest
+    required_plot_keys = {
+        "al_vs_lhs_l2",
+        "samples_ka_kb",
+        "per_round_additions",
+        "exploration_vs_acquisition",
+        "disagreement_acquisition_map",
+        "force_curve_overlays",
+        "failure_quarantine_replacement",
+        "runtime_per_curve",
+    }
+    assert required_plot_keys.issubset(set(manifest["plot_paths"]))
+    for plot_path in manifest["plot_paths"].values():
+        resolved = Path(plot_path)
+        assert resolved.is_file()
+        assert resolved.stat().st_size > 0
 
     with artifacts.summary_csv_path.open(newline="", encoding="utf-8") as handle:
         csv_rows = list(csv.DictReader(handle))
     assert len(csv_rows) == 2
     assert csv_rows[0]["al_round_prefix"] == "1"
     assert math.isclose(float(csv_rows[1]["lhs_median_curve_rel_l2_pct"]), 5.5)
+
+
+def test_emb_34um_al_vs_lhs_validation_supports_runtime_rows_from_json_and_csv(tmp_path: Path) -> None:
+    runtime_rows = (
+        {
+            "curve_id": "al-r01-c001",
+            "runtime_seconds": 12.5,
+            "round": 1,
+        },
+        {
+            "candidate_id": "lhs-c002",
+            "runtime_seconds": 7.25,
+            "round": 1,
+        },
+    )
+    runtime_rows_csv = tmp_path / "runtime_rows.csv"
+    with runtime_rows_csv.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=("curve_id", "candidate_id", "runtime_seconds", "round"))
+        writer.writeheader()
+        writer.writerows(
+            [
+                {"curve_id": "al-r01-c001", "runtime_seconds": 12.5, "round": 1},
+                {"candidate_id": "al-r01-c002", "runtime_seconds": 15.0, "round": 1},
+            ]
+        )
+
+    manifest, _ = build_emb_34um_al_vs_lhs_validation_report(
+        curve_rows=_validation_rows(),
+        runtime_rows=runtime_rows,
+    )
+    assert manifest["runtime_curve_count"] == 2
+    assert manifest["runtime_seconds_count"] == 2
+    assert math.isclose(manifest["runtime_seconds_total"], 19.75)
+
+    csv_manifest, _ = build_emb_34um_al_vs_lhs_validation_report(
+        curve_rows=_validation_rows(),
+        runtime_rows=runtime_rows_csv,
+    )
+    assert csv_manifest["runtime_curve_count"] == 2
+    assert csv_manifest["runtime_rows"][0]["curve_id"] == "al-r01-c001"
+    assert csv_manifest["runtime_rows"][1]["runtime_seconds"] == 15.0
 
 
 def test_emb_34um_al_vs_lhs_validation_marks_ingestion_only_rows_blocked(tmp_path: Path) -> None:
@@ -147,6 +208,28 @@ def test_emb_34um_al_vs_lhs_validation_stops_before_unpaired_lhs_prefixes() -> N
     assert manifest["prefix_curve_counts"] == [2]
     assert len(summary_rows) == 1
     assert summary_rows[0]["al_round_prefix"] == 1
+
+
+def test_emb_34um_al_vs_lhs_validation_prefers_30_60_90_prefixes_when_available() -> None:
+    rows = []
+    for index in range(1, 31):
+        rows.append(_curve_row(strategy="al", curve_id=f"al-r01-c{index:03d}", rel_l2_pct=1.0 + 0.02 * index, ka=100000 + index, kb=500 + index))
+    for index in range(31, 61):
+        rows.append(_curve_row(strategy="al", curve_id=f"al-r02-c{index:03d}", rel_l2_pct=1.0 + 0.02 * index, ka=100000 + index, kb=500 + index))
+    for index in range(61, 91):
+        rows.append(_curve_row(strategy="al", curve_id=f"al-r03-c{index:03d}", rel_l2_pct=1.0 + 0.02 * index, ka=100000 + index, kb=500 + index))
+    rows.extend(
+        _curve_row(strategy="lhs", curve_id=f"lhs-c{index:03d}", rel_l2_pct=2.0 + 0.02 * index, ka=100000 + index, kb=500 + index)
+        for index in range(1, 91)
+    )
+
+    manifest, summary_rows = build_emb_34um_al_vs_lhs_validation_report(curve_rows=rows)
+
+    assert summary_rows[0]["prefix"] == 30
+    assert summary_rows[1]["prefix"] == 60
+    assert summary_rows[2]["prefix"] == 90
+    assert len(summary_rows) == 3
+    assert manifest["prefix_targets"] == [30, 60, 90]
 
 
 def test_emb_34um_al_vs_lhs_validation_skips_bad_point_axis_without_aborting() -> None:
