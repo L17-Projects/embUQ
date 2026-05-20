@@ -1,7 +1,9 @@
 from meso_uq.noise.composite import (
+    CompositeLikelihood,
     CompositeLikelihoodSpec,
     LikelihoodComponent,
     LikelihoodStage,
+    build_composite_likelihood,
     build_composite_likelihood_spec,
 )
 from meso_uq.noise.contracts import (
@@ -40,6 +42,7 @@ from meso_uq.noise.registry import (
 )
 
 __all__ = [
+    "CompositeLikelihood",
     "CompositeLikelihoodSpec",
     "DiscrepancyConfig",
     "DiscrepancyKind",
@@ -57,6 +60,7 @@ __all__ = [
     "SurrogateErrorConfig",
     "SurrogateUncertaintyKind",
     "ToyLikelihood",
+    "build_composite_likelihood",
     "build_composite_likelihood_spec",
     "build_model_config",
     "compose_toy_likelihood",

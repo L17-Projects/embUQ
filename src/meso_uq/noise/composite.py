@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 
 class LikelihoodStage(str, Enum):
@@ -154,13 +154,48 @@ class CompositeLikelihoodSpec:
         return self.components == (LikelihoodComponent.LEGACY,)
 
 
+LikelihoodEvaluator = Callable[[Mapping[str, Any]], Any]
+
+
+@dataclass(frozen=True)
+class CompositeLikelihood:
+    spec: CompositeLikelihoodSpec
+    evaluators: Mapping[LikelihoodComponent, LikelihoodEvaluator]
+
+    def __post_init__(self) -> None:
+        missing = [component.value for component in self.spec.components if component not in self.evaluators]
+        if missing:
+            raise ValueError("Composite likelihood has no evaluator for component(s): " + ", ".join(missing))
+        object.__setattr__(self, "evaluators", dict(self.evaluators))
+
+    def evaluate(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        results: dict[str, Any] = {}
+        for component in self.spec.components:
+            results[component.value] = self.evaluators[component](payload)
+        return results
+
+
+
+
 def build_composite_likelihood_spec(config: Mapping[str, Any]) -> CompositeLikelihoodSpec:
     return CompositeLikelihoodSpec.from_mapping(config)
 
 
+def build_composite_likelihood(
+    config: Mapping[str, Any],
+    evaluators: Mapping[LikelihoodComponent | str, LikelihoodEvaluator],
+) -> CompositeLikelihood:
+    spec = build_composite_likelihood_spec(config)
+    normalized = {_coerce_component(component): evaluator for component, evaluator in evaluators.items()}
+    return CompositeLikelihood(spec=spec, evaluators=normalized)
+
+
 __all__ = [
+    "CompositeLikelihood",
     "CompositeLikelihoodSpec",
     "LikelihoodComponent",
+    "LikelihoodEvaluator",
     "LikelihoodStage",
+    "build_composite_likelihood",
     "build_composite_likelihood_spec",
 ]

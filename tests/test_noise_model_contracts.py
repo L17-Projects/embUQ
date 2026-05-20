@@ -10,6 +10,7 @@ import pytest
 
 from meso_uq.noise import (
     CompositeLikelihoodSpec,
+    build_composite_likelihood,
     DiscrepancyConfig,
     LikelihoodComponent,
     LikelihoodStage,
@@ -190,6 +191,11 @@ def test_legacy_likelihood_wrapper_preserves_emb_and_gv_golden_values():
     gv = legacy_multiplicative_likelihood([-2.0, 4.0], 0.25, absolute_reference=True)
     assert gv.standard_deviation == pytest.approx((0.5, 1.0))
 
+    with pytest.raises(ValueError, match="legacy multiplicative sigma must be positive"):
+        legacy_multiplicative_likelihood([1.0], 0.0)
+    with pytest.raises(ValueError, match="standard deviations must be positive"):
+        legacy_multiplicative_likelihood([0.0], 0.25)
+
 
 def test_composite_likelihood_spec_switches_components_and_recovers_legacy():
     legacy = CompositeLikelihoodSpec.from_mapping(
@@ -215,6 +221,23 @@ def test_composite_likelihood_spec_switches_components_and_recovers_legacy():
     with pytest.raises(ValueError, match="is not available for stage M1"):
         CompositeLikelihoodSpec.from_mapping(
             {"stage": "M1", "legacy_mode": "emb/compression", "components": ["model_discrepancy"]}
+        )
+
+
+def test_composite_likelihood_dispatches_configured_components():
+    likelihood = build_composite_likelihood(
+        {"stage": "M0", "legacy_mode": "emb/compression", "components": ["legacy"]},
+        {"legacy": lambda payload: legacy_compression_surrogate_likelihood(payload["predictions"], payload["sigma"])},
+    )
+
+    result = likelihood.evaluate({"predictions": [2.0, 4.0], "sigma": 0.5})
+
+    assert result["legacy"].standard_deviation == pytest.approx((1.0, 2.0))
+
+    with pytest.raises(ValueError, match="no evaluator"):
+        build_composite_likelihood(
+            {"stage": "M2", "components": ["additive_noise", "relative_noise"]},
+            {"additive_noise": lambda payload: payload},
         )
 
 

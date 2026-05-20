@@ -554,6 +554,42 @@ def test_compute_compression_surrogate_batch_supports_all_parameter_layouts(monk
         assert np.allclose(sample["Batch Standard Deviation"], (expected_sigma[:, None] * np.asarray([[1.0, 2.0], [3.0, 4.0]])).tolist())
 
 
+def test_compute_compression_surrogate_batch_bnn_preserves_legacy_quadrature(monkeypatch: pytest.MonkeyPatch) -> None:
+    stub = _CompressionBnnStub()
+    monkeypatch.setattr(posterior_compression, "_resolve_project_root", lambda: "/repo")
+    monkeypatch.setattr(posterior_compression, "_load_config", lambda _root: {"surrogate": {"backend": "bnn"}})
+    monkeypatch.setattr(posterior_compression, "_resolve_surrogate_runtime", lambda _config: ("bnn", 7, 3))
+    monkeypatch.setattr(posterior_compression, "get_fixed_parameters", lambda _config: {})
+    monkeypatch.setattr(posterior_compression, "_get_surrogate", lambda *args, **kwargs: stub)
+    sample = {"Batch Parameters": np.asarray([[1, 2, 3, 4, 5, 6, 0.7, 0.8], [9, 8, 7, 6, 5, 4, 0.3, 0.2]], dtype=np.float32)}
+
+    posterior_compression.compute_compression_surrogate_batch(sample, displ=[0.0, 1.0], diameter_um=2.1)
+
+    assert np.allclose(stub.batch_call["d0"], np.asarray([0.7, 0.3], dtype=np.float32))
+    assert np.allclose(
+        sample["Batch Standard Deviation"],
+        np.sqrt(np.asarray([[0.1, 0.2], [0.3, 0.4]]) ** 2 + (np.asarray([[0.8], [0.2]]) * np.abs(np.asarray([[1.0, 2.0], [3.0, 4.0]]))) ** 2),
+    )
+
+
+def test_compute_indentation_surrogate_batch_bnn_preserves_legacy_quadrature(monkeypatch: pytest.MonkeyPatch) -> None:
+    stub = _IndentationBnnStub()
+    monkeypatch.setattr(posterior_indentation, "_resolve_project_root", lambda: "/repo")
+    monkeypatch.setattr(posterior_indentation, "_load_config", lambda _root: {"surrogate": {"backend": "bnn"}})
+    monkeypatch.setattr(posterior_indentation, "_resolve_surrogate_runtime", lambda _config: ("bnn", 11, 5))
+    monkeypatch.setattr(posterior_indentation, "get_fixed_parameters", lambda _config: {})
+    monkeypatch.setattr(posterior_indentation, "_get_surrogate", lambda *args, **kwargs: stub)
+    sample = {"Batch Parameters": np.asarray([[1, 2, 3, 4, 5, 6, 0.7, 0.8], [9, 8, 7, 6, 5, 4, 0.3, 0.2]], dtype=np.float32)}
+
+    posterior_indentation.compute_indentation_surrogate_batch(sample, forces=[-1.0, 2.0], diameter_um=3.2)
+
+    assert np.allclose(stub.batch_call["d0"], np.asarray([0.7, 0.3], dtype=np.float32))
+    assert np.allclose(
+        sample["Batch Standard Deviation"],
+        np.sqrt(np.asarray([[0.1, 0.2], [0.3, 0.4]]) ** 2 + (np.asarray([[0.8], [0.2]]) * np.asarray([[1.0, 2.0], [3.0, 4.0]])) ** 2),
+    )
+
+
 def test_compute_indentation_surrogate_batch_supports_all_parameter_layouts(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(posterior_indentation, "_resolve_project_root", lambda: "/repo")
     monkeypatch.setattr(

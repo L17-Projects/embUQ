@@ -59,6 +59,13 @@ def _quadrature(first: float, second: float) -> float:
     return sqrt(first * first + second * second)
 
 
+def _positive_sigma(value: float, label: str) -> float:
+    value = float(value)
+    if value <= 0.0:
+        raise ValueError(f"{label} must be positive; got {value}.")
+    return value
+
+
 def _float_list(values: tuple[float, ...]) -> list[float]:
     return [float(item) for item in values]
 
@@ -239,8 +246,10 @@ def legacy_multiplicative_likelihood(
     absolute_reference: bool = True,
 ) -> LegacyLikelihoodResult:
     references = _as_float_tuple(reference_evaluations)
-    sigma = float(sigma)
+    sigma = _positive_sigma(sigma, "legacy multiplicative sigma")
     observation_std = tuple(sigma * (abs(value) if absolute_reference else value) for value in references)
+    if any(value <= 0.0 for value in observation_std):
+        raise ValueError("legacy multiplicative standard deviations must be positive.")
     return LegacyLikelihoodResult(
         reference_evaluations=references,
         standard_deviation=observation_std,
