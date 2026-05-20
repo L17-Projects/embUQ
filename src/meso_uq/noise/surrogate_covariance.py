@@ -23,7 +23,10 @@ _LOW_RANK_COMPONENT = "surrogate_predictive_low_rank"
 
 
 def _finite_float(value: float, label: str) -> float:
-    value = float(value)
+    try:
+        value = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} values must be finite numeric scalars; got {value!r}.") from exc
     if not isfinite(value):
         raise ValueError(f"{label} must be finite; got {value}.")
     return value
@@ -87,6 +90,24 @@ def _coerce_low_rank_factors(value: Sequence[Sequence[float]], size: int) -> np.
     if not np.all(np.isfinite(factors)):
         raise ValueError("low_rank_factors values must be finite.")
     return factors
+
+
+def _ensure_finite_matrix(matrix: np.ndarray, label: str) -> np.ndarray:
+    if not np.all(np.isfinite(matrix)):
+        raise ValueError(f"{label} values must be finite after covariance assembly.")
+    return matrix
+
+
+def _finite_diagonal_covariance(std: np.ndarray, label: str) -> np.ndarray:
+    with np.errstate(over="ignore", invalid="ignore"):
+        covariance = np.diag(std * std)
+    return _ensure_finite_matrix(covariance, label)
+
+
+def _finite_low_rank_covariance(factors: np.ndarray, label: str) -> np.ndarray:
+    with np.errstate(over="ignore", invalid="ignore"):
+        covariance = factors @ factors.T
+    return _ensure_finite_matrix(covariance, label)
 
 
 def _correlation_from_covariance(covariance: np.ndarray) -> np.ndarray:
@@ -209,7 +230,7 @@ def build_surrogate_covariance(
         if inputs.predictive_standard_deviation is None:
             raise ValueError("diagonal surrogate covariance requires predictive_standard_deviation.")
         std = np.asarray(inputs.predictive_standard_deviation, dtype=float)
-        components[_DIAGONAL_COMPONENT] = np.diag(std * std)
+        components[_DIAGONAL_COMPONENT] = _finite_diagonal_covariance(std, _DIAGONAL_COMPONENT)
     elif config.kind is SurrogateCovarianceKind.FULL:
         if inputs.predictive_covariance is None:
             raise ValueError("full surrogate covariance requires predictive_covariance.")
@@ -218,10 +239,10 @@ def build_surrogate_covariance(
         if inputs.low_rank_factors is None:
             raise ValueError("low_rank surrogate covariance requires low_rank_factors.")
         factors = _coerce_low_rank_factors(inputs.low_rank_factors, size)
-        components[_LOW_RANK_COMPONENT] = factors @ factors.T
+        components[_LOW_RANK_COMPONENT] = _finite_low_rank_covariance(factors, _LOW_RANK_COMPONENT)
         if inputs.predictive_standard_deviation is not None:
             std = np.asarray(inputs.predictive_standard_deviation, dtype=float)
-            components[_DIAGONAL_COMPONENT] = np.diag(std * std)
+            components[_DIAGONAL_COMPONENT] = _finite_diagonal_covariance(std, _DIAGONAL_COMPONENT)
     else:  # pragma: no cover - enum exhaustiveness guard
         raise AssertionError(f"Unhandled surrogate covariance kind: {config.kind}")
 
@@ -243,10 +264,15 @@ def _build_result(
     *,
     enabled: bool,
 ) -> SurrogateCovarianceResult:
+    finite_components = {
+        name: _ensure_finite_matrix(np.asarray(component, dtype=float), name)
+        for name, component in components.items()
+    }
     covariance = sum(
-        (np.asarray(component, dtype=float) for component in components.values()),
-        np.zeros_like(next(iter(components.values()))),
+        finite_components.values(),
+        np.zeros_like(next(iter(finite_components.values()))),
     )
+    _ensure_finite_matrix(covariance, _TOTAL_COMPONENT)
     cholesky, jitter_added = _cholesky_with_optional_jitter(covariance, config.jitter, config.max_jitter)
     if cholesky is not None and jitter_added > 0.0:
         covariance = covariance + jitter_added * np.eye(covariance.shape[0], dtype=float)
@@ -254,7 +280,7 @@ def _build_result(
     eigenvalues = np.linalg.eigvalsh(0.5 * (covariance + covariance.T))
     condition_number = np.linalg.cond(covariance) if covariance.size and not np.allclose(covariance, 0.0) else float("nan")
     active = enabled and not np.allclose(covariance, 0.0)
-    covariance_components = {name: np.asarray(component, dtype=float) for name, component in components.items()}
+    covariance_components = {name: np.asarray(component, dtype=float) for name, component in finite_components.items()}
     covariance_components[_TOTAL_COMPONENT] = covariance
     variance_components = {name: tuple(float(value) for value in np.diag(component)) for name, component in covariance_components.items()}
     standard_deviation = tuple(float(sqrt(max(value, 0.0))) for value in np.diag(covariance))

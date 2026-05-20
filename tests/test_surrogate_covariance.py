@@ -136,6 +136,24 @@ def test_surrogate_covariance_composes_to_finite_likelihood():
     assert math.isfinite(likelihood.log_likelihood)
 
 
+
+def test_surrogate_covariance_rejects_derived_nonfinite_covariance():
+    with pytest.raises(ValueError, match="surrogate_predictive_diagonal values must be finite"):
+        build_surrogate_covariance(
+            SurrogateCovarianceInputs(predictions=(1.0,), predictive_standard_deviation=(1.0e200,)),
+            SurrogateCovarianceConfig(kind="diagonal"),
+        )
+    with pytest.raises(ValueError, match="surrogate_predictive_low_rank values must be finite"):
+        build_surrogate_covariance(
+            SurrogateCovarianceInputs(predictions=(1.0,), low_rank_factors=((1.0e200,),)),
+            SurrogateCovarianceConfig(kind="low_rank"),
+        )
+
+
+def test_surrogate_covariance_rejects_batched_predictions_explicitly():
+    with pytest.raises(ValueError, match="predictions values must be finite numeric scalars"):
+        SurrogateCovarianceInputs(predictions=((1.0, 2.0), (3.0, 4.0)))  # type: ignore[arg-type]
+
 def test_surrogate_covariance_validation_errors_are_explicit():
     with pytest.raises(ValueError, match="requires predictive_standard_deviation"):
         build_surrogate_covariance(

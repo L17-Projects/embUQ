@@ -61,6 +61,8 @@ _STAGE_DEFAULTS: Mapping[LikelihoodStage, tuple[LikelihoodComponent, ...]] = {
     LikelihoodStage.M4: (
         LikelihoodComponent.ADDITIVE_NOISE,
         LikelihoodComponent.RELATIVE_NOISE,
+        LikelihoodComponent.CONTACT_ALIGNMENT,
+        LikelihoodComponent.GEOMETRY,
         LikelihoodComponent.SURROGATE_COVARIANCE,
     ),
     LikelihoodStage.M5: (

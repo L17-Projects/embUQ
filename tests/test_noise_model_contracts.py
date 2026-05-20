@@ -418,6 +418,18 @@ def test_m3_composite_likelihood_dispatches_measurement_uncertainty_components()
     assert geometry.covariance.covariance.shape == (2, 2)
 
 
+def test_m4_default_composite_spec_includes_measurement_and_surrogate_components():
+    spec = CompositeLikelihoodSpec.from_mapping({"stage": "M4"})
+
+    assert spec.components == (
+        LikelihoodComponent.ADDITIVE_NOISE,
+        LikelihoodComponent.RELATIVE_NOISE,
+        LikelihoodComponent.CONTACT_ALIGNMENT,
+        LikelihoodComponent.GEOMETRY,
+        LikelihoodComponent.SURROGATE_COVARIANCE,
+    )
+
+
 def test_m4_composite_likelihood_dispatches_surrogate_covariance_component():
     likelihood = build_composite_likelihood(
         {"stage": "M4", "components": ["surrogate_covariance"]},
