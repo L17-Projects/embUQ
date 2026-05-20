@@ -184,3 +184,22 @@ The reproducible diagnostic entry point is:
 `python scripts/qa/noise_m6_synthetic_recovery_diagnostics.py --output-root <run-root>`
 
 The script writes a root synthetic manifest, metrics JSON, summary CSV, per-scenario configs/truth/observations/covariance summaries/recovery reports, and plots for parameter intervals, observable overlays, whitened residuals, and covariance heatmaps.
+
+## M6 predictive checks and SBC
+
+M6 predictive checks are validation/reporting over the assembled hierarchy. They compare observed fixture summaries against posterior predictive distributions and run SBC-style rank calibration checks on lightweight deterministic records. They do not change the likelihood API or make production EMB calibration claims.
+
+The first supported diagnostic scenarios are:
+
+- `baseline_legacy`, covering the legacy/noise-only predictive surface;
+- `full_hierarchy`, covering observation, measurement, surrogate, and discrepancy covariance terms together.
+
+Predictive-check reports intentionally separate runtime/numerical failures from calibration failures. Runtime/numerical failures cover nonfinite predictive payloads or invalid input shapes. Calibration failures cover posterior predictive summary z-scores, pointwise predictive interval coverage, predictive rank edge concentration, SBC rank histogram distance, SBC mean rank quantile error, SBC edge concentration, and SBC posterior interval coverage.
+
+The CI-scale thresholds in `configs/noise/predictive_checks.example.yaml` are conservative fixture gates. They are strict enough to catch broken uncertainty plumbing, swapped dimensions, missing rank records, and collapsed predictive intervals, but MES-37 remains responsible for production EMB comparison evidence.
+
+The reproducible diagnostic entry point is:
+
+`python scripts/qa/noise_m6_predictive_checks_diagnostics.py --output-root <run-root>`
+
+The script writes a root predictive manifest, metrics JSON, summary CSV, per-scenario configs/observations/rank records/reports, and plots for PPC observable overlays, PPC summary intervals, SBC rank histograms, and calibration coverage summaries.

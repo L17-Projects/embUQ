@@ -1,0 +1,33 @@
+schema_version: 1
+name: predictive_checks
+family: noise_hierarchy
+milestone: M6 Synthetic Recovery and SBC
+thresholds:
+  max_summary_z_score: 2.5
+  min_pointwise_interval_coverage: 0.85
+  max_pointwise_rank_edge_fraction: 0.45
+  max_sbc_rank_histogram_l1: 0.45
+  max_sbc_mean_rank_quantile_error: 0.15
+  max_sbc_edge_fraction: 0.35
+  min_sbc_interval_coverage: 0.80
+  min_finite_fraction: 1.0
+  interval_alpha: 0.10
+  rank_edge_alpha: 0.10
+  rank_bin_count: 5
+required_scenarios:
+  - id: baseline_legacy
+    stage: M1/M2
+    seed: 35017
+  - id: full_hierarchy
+    stage: M5
+    seed: 35047
+artifacts:
+  manifest: predictive_manifest.json
+  metrics: predictive_check_metrics.json
+  summary_table: predictive_summary.csv
+  scenario_directory: scenarios/
+  figures:
+    - figures/ppc_summary_intervals.png
+    - figures/ppc_observable_overlay.png
+    - figures/sbc_rank_histogram.png
+    - figures/calibration_summary.png

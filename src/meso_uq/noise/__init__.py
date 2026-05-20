@@ -77,6 +77,13 @@ from meso_uq.noise.observation import (
     build_additive_relative_observation_noise,
     compose_additive_relative_gaussian_likelihood,
 )
+from meso_uq.noise.predictive_checks import (
+    PredictiveCheckInputs,
+    PredictiveCheckResult,
+    PredictiveCheckThresholds,
+    SbcRankRecord,
+    evaluate_predictive_checks,
+)
 from meso_uq.noise.registry import (
     NoiseModelSpec,
     build_model_config,
@@ -153,8 +160,12 @@ __all__ = [
     "ObservationNoiseResult",
     "PosteriorUncertaintyConfig",
     "PosteriorUncertaintyKind",
+    "PredictiveCheckInputs",
+    "PredictiveCheckResult",
+    "PredictiveCheckThresholds",
     "RobustLikelihoodConfig",
     "RobustLikelihoodKind",
+    "SbcRankRecord",
     "SurrogateErrorConfig",
     "SyntheticRecoveryInputs",
     "SyntheticRecoveryResult",
@@ -186,6 +197,7 @@ __all__ = [
     "evaluate_observation_likelihood",
     "evaluate_synthetic_recovery",
     "evaluate_discrepancy_identifiability",
+    "evaluate_predictive_checks",
     "gaussian_log_likelihood_from_covariance",
     "fit_low_rank_discrepancy_coefficients",
     "get_model_support",
