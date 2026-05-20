@@ -15,6 +15,10 @@ spec:
       - surrogate_covariance
       - model_discrepancy
       - total_covariance
+  model_discrepancy:
+    enabled: false
+    representation: low_rank
+    requires_explicit_opt_in: true
   total_covariance:
     jitter: 1.0e-10
     max_jitter: 1.0e-6
