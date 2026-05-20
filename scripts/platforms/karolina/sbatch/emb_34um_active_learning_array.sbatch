@@ -31,6 +31,7 @@ SCRATCH_ROOT="${SCRATCH_ROOT:-}"
 VAULT_ROOT="${VAULT_ROOT:-}"
 RUN_ID_PREFIX="${RUN_ID_PREFIX:-emb-34um-final-gate}"
 CAMPAIGN_ROOT="${CAMPAIGN_ROOT:-}"
+BATCH_DIR_OVERRIDE="${BATCH_DIR_OVERRIDE:-}"
 CONCURRENT_JOBS="${CONCURRENT_JOBS:-30}"
 RETRY_LIMIT="${RETRY_LIMIT:-3}"
 if [[ -z "${PYTHON_EXECUTABLE:-}" ]]; then
@@ -87,7 +88,9 @@ echo "Retry limit: ${RETRY_LIMIT}"
 echo "Python executable: ${PYTHON_EXECUTABLE}"
 echo "Vault root: ${VAULT_ROOT}"
 
-if [[ "${MODE}" == "full" ]]; then
+if [[ -n "${BATCH_DIR_OVERRIDE}" ]]; then
+  BATCH_DIR="${BATCH_DIR_OVERRIDE}"
+elif [[ "${MODE}" == "full" ]]; then
   BATCH_DIR="${CAMPAIGN_ROOT}/full_gate"
 elif [[ "${MODE}" == "lhs" ]]; then
   BATCH_DIR="${CAMPAIGN_ROOT}/lhs_gate"

@@ -75,15 +75,15 @@ def test_emb_34um_active_learning_controller_dry_run_manifest_stage_order_and_tr
     expected_stage_order = [
         "canary",
         "benchmark",
+        "lhs_submit",
+        "validation_submit",
         "al_round_1_submit",
-        "al_round_1_retrain_model_select",
-        "al_round_1_score",
+        "al_round_2_select_render",
         "al_round_2_submit",
-        "al_round_2_retrain_model_select",
-        "al_round_2_score",
+        "al_round_3_select_render",
         "al_round_3_submit",
-        "al_round_3_retrain_model_select",
-        "al_round_3_score",
+        "final_ingestion",
+        "build_al_vs_lhs_rows",
         "al_vs_lhs_validation",
         "final_gate_report",
     ]
@@ -91,6 +91,9 @@ def test_emb_34um_active_learning_controller_dry_run_manifest_stage_order_and_tr
     assert manifest["schema_version"] == module.CONTROLLER_SCHEMA_VERSION
     assert manifest["stage_order"] == expected_stage_order
     assert manifest["acceptance"]["pass"] is True
+    assert manifest["production_readiness"]["status"] == "ready"
+    assert manifest["acceptance"]["criteria"]["round_2_fresh_surrogate_selection_implemented"] is True
+    assert manifest["acceptance"]["criteria"]["round_3_fresh_surrogate_selection_implemented"] is True
     assert manifest["linear_traceability"]["project"] == "Active Learning Engine"
     assert manifest["linear_traceability"]["engine"] == "Active Learning Engine"
     assert manifest["linear_traceability"]["issue"] == "MES-210"
@@ -99,7 +102,7 @@ def test_emb_34um_active_learning_controller_dry_run_manifest_stage_order_and_tr
     stage_names = []
     for stage in manifest["stages"]:
         stage_names.append(stage["name"])
-        assert "commands" in stage and stage["commands"]
+        assert "commands" in stage
         for command in stage["commands"]:
             command_texts.append(command["command"])
             assert "EXECUTION_MODE=render-only" in command["command"]
@@ -107,7 +110,16 @@ def test_emb_34um_active_learning_controller_dry_run_manifest_stage_order_and_tr
 
     assert stage_names == expected_stage_order
     assert any("validate_emb_34um_al_vs_lhs.py" in item for item in command_texts)
-    assert any("write_active_learning_final_gate_artifacts" in item for item in command_texts)
+    assert any("--stage-action final-report" in item for item in command_texts)
+    assert any("--stage-action select-render-round" in item for item in command_texts)
+
+    stages = {stage["name"]: stage for stage in manifest["stages"]}
+    assert stages["al_round_2_select_render"]["status"] == "planned"
+    assert stages["al_round_2_select_render"]["commands"]
+    assert stages["al_round_2_submit"]["status"] == "planned"
+    assert stages["al_round_2_submit"]["commands"]
+    assert stages["al_round_3_select_render"]["status"] == "planned"
+    assert stages["al_round_3_submit"]["commands"]
 
 
 def test_emb_34um_active_learning_controller_dry_run_does_not_submit_jobs(
@@ -170,11 +182,17 @@ def test_emb_34um_active_learning_controller_schedules_al_submit_30_at_a_time(
     manifest = json.loads(Path(result["manifest_path"]).read_text(encoding="utf-8"))
 
     submit_commands = {
-        stage["name"]: stage["commands"][0]["command"] for stage in manifest["stages"] if stage["name"].endswith("_submit")
+        stage["name"]: stage["commands"][0]["command"]
+        for stage in manifest["stages"]
+        if stage["name"].endswith("_submit") and stage["commands"]
     }
     assert "--array=0-29%30" in submit_commands["al_round_1_submit"]
-    assert "--array=30-59%30" in submit_commands["al_round_2_submit"]
-    assert "--array=60-89%30" in submit_commands["al_round_3_submit"]
+    assert "--array=0-89%30" in submit_commands["lhs_submit"]
+    assert "--array=0-29%30" in submit_commands["validation_submit"]
+    assert "--array=0-29%30" in submit_commands["al_round_2_submit"]
+    assert "BATCH_DIR_OVERRIDE=" in submit_commands["al_round_2_submit"]
+    assert "--array=0-29%30" in submit_commands["al_round_3_submit"]
+    assert "BATCH_DIR_OVERRIDE=" in submit_commands["al_round_3_submit"]
 
 
 def test_emb_34um_active_learning_controller_keeps_final_validation_and_report_commands(
@@ -203,4 +221,6 @@ def test_emb_34um_active_learning_controller_keeps_final_validation_and_report_c
     inventory = {item["name"]: item["commands"] for item in command_inventory}
 
     assert any("validate_emb_34um_al_vs_lhs.py" in command for command in inventory["al_vs_lhs_validation"])
-    assert any("write_active_learning_final_gate_artifacts" in command for command in inventory["final_gate_report"])
+    assert any("--stage-action final-report" in command for command in inventory["final_gate_report"])
+    assert any("--stage-action select-render-round" in command for command in inventory["al_round_2_select_render"])
+    assert any("--stage-action select-render-round" in command for command in inventory["al_round_3_select_render"])
