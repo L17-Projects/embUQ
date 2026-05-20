@@ -52,6 +52,16 @@ from meso_uq.active_learning import (
     EMB_34UM_FINAL_GATE_INGESTION_SUMMARY_CSV_FILENAME,
     EMB_34UM_FINAL_GATE_QUARANTINE_FILENAME,
 )
+from meso_uq.active_learning.emb_34um_al_vs_lhs_validation import (
+    EMB_34UM_AL_VS_LHS_VALIDATION_DISAGREEMENT_PLOT_FILENAME,
+    EMB_34UM_AL_VS_LHS_VALIDATION_FAILURE_PLOT_FILENAME,
+    EMB_34UM_AL_VS_LHS_VALIDATION_FORCE_OVERLAY_PLOT_FILENAME,
+    EMB_34UM_AL_VS_LHS_VALIDATION_ROUND1_SAMPLES_PLOT_FILENAME,
+    EMB_34UM_AL_VS_LHS_VALIDATION_ROUND_ADDITIONS_PLOT_FILENAME,
+    EMB_34UM_AL_VS_LHS_VALIDATION_RUNTIME_PLOT_FILENAME,
+    EMB_34UM_AL_VS_LHS_VALIDATION_SAMPLES_PLOT_FILENAME,
+    EMB_34UM_AL_VS_LHS_VALIDATION_SOURCE_PLOT_FILENAME,
+)
 CONTROLLER_SCHEMA_VERSION = "meso_uq.active_learning.emb_34um_active_learning_controller.v1"
 
 
@@ -238,26 +248,33 @@ def _build_round_select_render_command(
     )
 
 
-def _build_validation_command(curve_rows: Path, output_root: Path, *, execution_mode: str) -> str:
+def _build_validation_command(
+    curve_rows: Path,
+    output_root: Path,
+    *,
+    runtime_rows: Path | None = None,
+    execution_mode: str,
+) -> str:
     validate_script = (
         _REPO_ROOT / "scripts" / "workflows" / "emb" / "active_learning" / "validate_emb_34um_al_vs_lhs.py"
     )
-    return " ".join(
-        [
-            f"EXECUTION_MODE={shlex.quote(execution_mode)}",
-            _python_exec(),
-            shlex.quote(str(validate_script)),
-            "--curve-rows",
-            shlex.quote(str(curve_rows)),
-            "--output-root",
-            shlex.quote(str(output_root)),
-            "--prefix-counts",
-            "30,60,90",
-            "--acquisition-engine",
-            "dnn_ensemble_disagreement_diversity",
-            "--adaptive-acquisition-available",
-        ]
-    )
+    parts = [
+        f"EXECUTION_MODE={shlex.quote(execution_mode)}",
+        _python_exec(),
+        shlex.quote(str(validate_script)),
+        "--curve-rows",
+        shlex.quote(str(curve_rows)),
+        "--output-root",
+        shlex.quote(str(output_root)),
+        "--prefix-counts",
+        "30,60,90",
+        "--acquisition-engine",
+        "dnn_ensemble_disagreement_diversity",
+        "--adaptive-acquisition-available",
+    ]
+    if runtime_rows is not None:
+        parts.extend(["--runtime-rows", shlex.quote(str(runtime_rows))])
+    return " ".join(parts)
 
 
 def _validation_output_paths(root: Path) -> list[Path]:
@@ -266,6 +283,14 @@ def _validation_output_paths(root: Path) -> list[Path]:
         root / EMB_34UM_AL_VS_LHS_VALIDATION_PLOT_FILENAME,
         root / EMB_34UM_AL_VS_LHS_VALIDATION_PLOT_SIDECAR_FILENAME,
         root / EMB_34UM_AL_VS_LHS_VALIDATION_SUMMARY_CSV_FILENAME,
+        root / EMB_34UM_AL_VS_LHS_VALIDATION_SAMPLES_PLOT_FILENAME,
+        root / EMB_34UM_AL_VS_LHS_VALIDATION_ROUND1_SAMPLES_PLOT_FILENAME,
+        root / EMB_34UM_AL_VS_LHS_VALIDATION_ROUND_ADDITIONS_PLOT_FILENAME,
+        root / EMB_34UM_AL_VS_LHS_VALIDATION_SOURCE_PLOT_FILENAME,
+        root / EMB_34UM_AL_VS_LHS_VALIDATION_DISAGREEMENT_PLOT_FILENAME,
+        root / EMB_34UM_AL_VS_LHS_VALIDATION_FORCE_OVERLAY_PLOT_FILENAME,
+        root / EMB_34UM_AL_VS_LHS_VALIDATION_FAILURE_PLOT_FILENAME,
+        root / EMB_34UM_AL_VS_LHS_VALIDATION_RUNTIME_PLOT_FILENAME,
     ]
 
 
@@ -518,7 +543,14 @@ def build_emb_34um_active_learning_controller(
         _stage_dict(
             name="al_vs_lhs_validation",
             description="Run AL-vs-LHS validation and build prefix comparison artifacts.",
-            commands=[_build_validation_command(final_validation_rows, final_validation_root, execution_mode=execution_mode)],
+            commands=[
+                _build_validation_command(
+                    final_validation_rows,
+                    final_validation_root,
+                    runtime_rows=runtime_rows_path,
+                    execution_mode=execution_mode,
+                )
+            ],
             expected_output_roots=final_validation_outputs,
             command_type="analysis",
             acceptance_criteria={

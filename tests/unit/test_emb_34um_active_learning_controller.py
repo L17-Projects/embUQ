@@ -112,6 +112,7 @@ def test_emb_34um_active_learning_controller_dry_run_manifest_stage_order_and_tr
     assert any("validate_emb_34um_al_vs_lhs.py" in item for item in command_texts)
     assert any("--adaptive-acquisition-available" in item for item in command_texts)
     assert any("--acquisition-engine dnn_ensemble_disagreement_diversity" in item for item in command_texts)
+    assert any("--runtime-rows" in item for item in command_texts)
     assert any("--stage-action final-report" in item for item in command_texts)
     assert any("--stage-action select-render-round" in item for item in command_texts)
 
@@ -122,6 +123,7 @@ def test_emb_34um_active_learning_controller_dry_run_manifest_stage_order_and_tr
     assert stages["al_round_2_submit"]["commands"]
     assert stages["al_round_3_select_render"]["status"] == "planned"
     assert stages["al_round_3_submit"]["commands"]
+    assert len(stages["al_vs_lhs_validation"]["expected_output_roots"]) >= 12
 
 
 def test_emb_34um_active_learning_controller_dry_run_does_not_submit_jobs(
