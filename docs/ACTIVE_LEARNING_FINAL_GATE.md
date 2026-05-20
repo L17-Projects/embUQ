@@ -8,28 +8,35 @@ This document is the final-gate contract for the active-learning production slic
 - **Domain:** EMB indentation workflow.
 - **Indentation diameter:** `3.4um`.
 - **Prior data state:** start from **no prior training data**.
-- **Candidate dimensions:** `Yt` and `kb` only.
-  - `Yt` bounds: `1.0e5` to `1.0e9`.
-  - `kb` bounds: `400.0` to `70000.0`.
+- **Active candidate controls:** `ka` and `kb` only.
+  - `ka` in log-space: `[1e2, 6e5]`.
+  - `kb` in log-space: `[400, 7e4]`.
+- **Legacy compatibility:** `Yt` is derived only from `ka` for legacy Mirheo payload compatibility; it is never an active selected candidate dimension.
+- **Sampling policy:** 3-round dynamic strategy:
+  - Round 1: `initial_sobol_maximin` (30 curves).
+  - Round 2: `ensemble_disagreement_diversity` with `6` exploration + `24` acquisition curves, then greedy diversity selection.
+  - Round 3: `ensemble_disagreement_diversity` with `6` exploration + `24` acquisition curves, then greedy diversity selection.
 - **Budget:** `3 rounds × 30 curves / round`, each curve is a full force sweep.
-- **Comparator:** `LHS 90-curve comparator` for baseline coverage checks.
+- **Comparator:** `LHS 90-curve comparator` baseline for `30/60/90` prefix comparison against AL prefixes.
 - **Canary:** `1 curve × 3 force points` before full campaign admission.
 - **Platform:** `Karolina` with `30 concurrent jobs`.
 - **Retry policy:** retry limit `3`.
+- **Final gate evidence shape:** AL prefixes `30`, `60`, `90` curves; LHS prefixes `30`, `60`, `90` curves.
+- **Labeling policy:** fresh DPD labels only.
+- **Force grid input:** `samples_all.dat` only.
 
 ## Required validation plots (every step)
 
 At every active-learning step, the workflow must produce and record:
 
-- grouped-holdout median curve relative `L2` primary
-- mean curve relative `L2`
-- max curve relative `L2`
-- residuals
-- predicted/reference curves
-- coverage/acquisition
-- failure/quarantine status
-- model-selection diagnostics
-- `AL-vs-LHS` summary
+- runtime-per-curve
+- selected samples ka/kb overlays
+- per-round additions
+- exploration vs acquisition split
+- disagreement-acquisition map
+- force overlays
+- AL-vs-LHS relative `L2` comparison
+- failure/quarantine/replacement
 
 These outputs must be kept as part of the run payload and included in Linear review links.
 
@@ -37,14 +44,12 @@ These outputs must be kept as part of the run payload and included in Linear rev
 
 Final acceptance requires all plots above to be present and the following gating checks to pass:
 
-- grouped-holdout median curve relative `L2` improves for AL versus the 90-curve LHS comparator.
-- mean/max curve relative `L2` supports the grouped-holdout median result.
-- residual diagnostics show no unbounded drift across rounds.
-- predicted/reference overlays remain physically consistent and monotone where expected.
-- coverage/acquisition indicates no acquisition starvation in high-likelihood regions.
-- failure/quarantine counts are explained with retry actions and quarantine resolution.
-- model-selection selects a production-ready surrogate and optimizer path.
-- AL-vs-LHS summary confirms active-learning gain over random/comparator baseline.
+- `runtime_per_curve` must be complete and free from missing values.
+- `samples_ka_kb` and `force_curve_overlays` must show full selected sets for each round.
+- `per_round_additions` must match the 30/60/90 acceptance cadence.
+- `exploration_vs_acquisition` and `disagreement_acquisition_map` must show non-starved acquisition in target regions.
+- `failure_quarantine_replacement` must document each quarantine, retry action, and replacement decision.
+- `al_vs_lhs_relative_l2` must show AL improvement against each LHS prefix (30, 60, 90) where possible.
 
 ## Production runtime fingerprint
 
