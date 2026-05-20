@@ -1,0 +1,22 @@
+schema_version: "1.0"
+kind: noise
+metadata:
+  id: model_discrepancy_low_rank
+  name: Low-Rank Model Discrepancy
+spec:
+  family: model_discrepancy
+  likelihood:
+    stage: M5
+    components:
+      - model_discrepancy
+      - total_covariance
+  model_discrepancy:
+    enabled: false
+    representation: low_rank
+    basis_source: explicit_matrix
+    coefficient_covariance_source: explicit_matrix
+    coefficient_scale: 1.0
+    shrinkage_strength: 1.0
+    minimum_variance: 0.0
+    jitter: 1.0e-10
+    max_jitter: 1.0e-6

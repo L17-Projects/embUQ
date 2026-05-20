@@ -116,3 +116,34 @@ Legacy EMB BNN predictive standard deviation remains a diagonal surrogate covari
 `total_std_i = sqrt((relative_sigma * abs(prediction_i))^2 + surrogate_std_i^2)`
 
 M4 does not introduce a general full-hierarchy assembler. Full observation, measurement, surrogate, and discrepancy assembly remains the M5 total-covariance milestone.
+
+## M5 model discrepancy and total covariance assembly
+
+M5 introduces the first shared full-hierarchy covariance assembler. Runtime adapters remain outside this milestone: EMB, GV, Korali reference fields, and legacy standard-deviation paths are not rewritten automatically. The M5 API is invoked explicitly by tests, diagnostics, or later integration adapters.
+
+### Low-rank model discrepancy
+
+Low-rank model discrepancy is disabled by default. When enabled, it uses an explicit basis matrix `B` with shape `[observation_points, rank]` and a marginal coefficient covariance `K`, producing:
+
+`C_discrepancy = B * K * B.T + C_floor`
+
+The builder also supports diagonal coefficient scales with deterministic shrinkage as a convenience for synthetic fixtures. Full coefficient covariance may include cross terms; those are named as `model_discrepancy_cross:<left>:<right>` so named components reconstruct `model_discrepancy_total`. Non-intercept polynomial helper columns are mean-centered to avoid silently absorbing a constant protected offset in fixture diagnostics.
+
+Enabled discrepancy fails early for missing or inconsistent basis rank, nonfinite basis or coefficient covariance, non-symmetric or non-PSD coefficient covariance, zero prior scale, and overflow during covariance assembly. Disabled discrepancy returns a named zero covariance and does not alter lower-stage behavior.
+
+### Total covariance assembly
+
+The M5 assembler accepts explicit `CovarianceTerm` objects. Only terms marked `included=True` are numerically summed. Child components from M2-M4 builders are preserved in diagnostics, but are not summed when a parent total is included. This prevents double counting patterns such as including both `measurement:geometry` and `geometry:radius`/`geometry_cross:*` as independent summands.
+
+Canonical included terms for the full hierarchy are:
+
+- `observation:additive_relative`
+- `observation:correlated_curve`
+- `measurement:contact_alignment`
+- `measurement:geometry`
+- `surrogate:predictive`
+- `discrepancy:low_rank`
+
+Duplicate term names, duplicate aliases, child/parent identifier collisions, shape mismatches, nonfinite values, asymmetric parent matrices, and non-PSD parent covariance contributions are hard errors. Signed child diagnostics such as geometry cross terms may be non-PSD because they are never summed independently.
+
+The final active total covariance must be positive definite for likelihood use. Singular low-rank terms are allowed as components, but the assembled total must either be positive definite or provide an explicit final jitter policy. Child jitter is retained as diagnostics and is not added a second time.

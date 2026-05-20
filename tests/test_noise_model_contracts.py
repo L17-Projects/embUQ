@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import numpy as np
 import os
 import subprocess
 import sys
@@ -15,6 +16,7 @@ from meso_uq.noise import (
     ContactAlignmentInputs,
     ContactAlignmentUncertaintyConfig,
     CorrelatedCurveNoiseConfig,
+    CovarianceTerm,
     CurveGrid,
     DiscrepancyConfig,
     GeometryParameterUncertainty,
@@ -23,6 +25,8 @@ from meso_uq.noise import (
     LikelihoodInputs,
     LikelihoodComponent,
     LikelihoodStage,
+    LowRankDiscrepancyConfig,
+    LowRankDiscrepancyInputs,
     MeasurementErrorConfig,
     PosteriorUncertaintyConfig,
     PosteriorUncertaintyKind,
@@ -30,14 +34,18 @@ from meso_uq.noise import (
     SurrogateCovarianceConfig,
     SurrogateCovarianceInputs,
     SurrogateErrorConfig,
+    TotalCovarianceConfig,
+    assemble_total_covariance,
     build_additive_relative_observation_noise,
     build_contact_alignment_covariance,
     build_correlated_curve_covariance,
     build_geometry_uncertainty_covariance,
+    build_low_rank_model_discrepancy_covariance,
     build_model_config,
     build_surrogate_covariance,
     compose_toy_likelihood,
     compose_total_covariance,
+    covariance_term_from_diagonal,
     evaluate_observation_likelihood,
     get_model_support,
     legacy_compression_direct_likelihood,
@@ -457,6 +465,80 @@ def test_m4_composite_likelihood_dispatches_surrogate_covariance_component():
     surrogate = result["surrogate_covariance"]
     assert surrogate.summary["kind"] == "diagonal"
     assert surrogate.variance_components["surrogate_covariance_total"] == pytest.approx((0.09, 0.16))
+
+
+
+def test_m5_default_composite_spec_includes_full_hierarchy_components():
+    spec = CompositeLikelihoodSpec.from_mapping({"stage": "M5"})
+
+    assert spec.components == (
+        LikelihoodComponent.ADDITIVE_NOISE,
+        LikelihoodComponent.RELATIVE_NOISE,
+        LikelihoodComponent.CONTACT_ALIGNMENT,
+        LikelihoodComponent.GEOMETRY,
+        LikelihoodComponent.SURROGATE_COVARIANCE,
+        LikelihoodComponent.MODEL_DISCREPANCY,
+        LikelihoodComponent.TOTAL_COVARIANCE,
+    )
+
+
+def test_m5_composite_likelihood_dispatches_discrepancy_and_shared_total_assembler():
+    def _discrepancy(payload):
+        return build_low_rank_model_discrepancy_covariance(
+            LowRankDiscrepancyInputs(
+                predictions=tuple(payload["predictions"]),
+                basis=tuple(tuple(row) for row in payload["basis"]),
+                basis_names=("linear",),
+                curve_id="m5/contract",
+            ),
+            LowRankDiscrepancyConfig(enabled=True, coefficient_scale=0.2, shrinkage_strength=1.0),
+        )
+
+    def _total(payload):
+        discrepancy = _discrepancy(payload)
+        return assemble_total_covariance(
+            (
+                covariance_term_from_diagonal(
+                    "observation:additive_relative",
+                    tuple(payload["observation_variance"]),
+                ),
+                CovarianceTerm(
+                    "discrepancy:low_rank",
+                    discrepancy.covariance.covariance,
+                    children={
+                        name: matrix
+                        for name, matrix in discrepancy.covariance_components.items()
+                        if name != "model_discrepancy_total"
+                    },
+                ),
+            ),
+            TotalCovarianceConfig(jitter=1e-12, max_jitter=1e-8),
+        )
+
+    likelihood = build_composite_likelihood(
+        {"stage": "M5", "components": ["model_discrepancy", "total_covariance"]},
+        {
+            "model_discrepancy": _discrepancy,
+            "total_covariance": _total,
+        },
+    )
+
+    result = likelihood.evaluate(
+        {
+            "predictions": [1.0, 2.0],
+            "basis": [[1.0], [0.5]],
+            "observation_variance": [0.1, 0.2],
+        }
+    )
+
+    discrepancy = result["model_discrepancy"]
+    total = result["total_covariance"]
+    expected = np.diag([0.1, 0.2]) + discrepancy.covariance.covariance
+    assert discrepancy.summary["active"] is True
+    assert total.included_term_names == ("observation:additive_relative", "discrepancy:low_rank")
+    assert "model_discrepancy:linear" in total.child_covariance_components
+    assert np.allclose(total.covariance.covariance, expected)
+    assert total.summary["cholesky_success"] is True
 
 
 def test_supported_observables_and_units_contract():
