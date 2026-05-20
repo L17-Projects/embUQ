@@ -653,8 +653,12 @@ def _discrepancy_total_sigma_stats(discrepancy: np.ndarray, total_covariance: An
         return {"mean_abs_over_sigma": None, "max_abs_over_sigma": None}
     diagonal = np.diag(np.asarray(total_covariance, dtype=float))
     sigma = np.sqrt(np.maximum(diagonal, 0.0))
+    abs_discrepancy = np.abs(discrepancy)
+    safe_sigma = sigma > _EPSILON
+    ratios = np.zeros_like(abs_discrepancy, dtype=float)
     with np.errstate(divide="ignore", invalid="ignore"):
-        ratios = np.divide(np.abs(discrepancy), sigma, out=np.full_like(discrepancy, np.inf), where=sigma > _EPSILON)
+        np.divide(abs_discrepancy, sigma, out=ratios, where=safe_sigma)
+    ratios[(~safe_sigma) & (abs_discrepancy > _EPSILON)] = np.inf
     return {"mean_abs_over_sigma": float(np.mean(ratios)), "max_abs_over_sigma": float(np.max(ratios))}
 
 

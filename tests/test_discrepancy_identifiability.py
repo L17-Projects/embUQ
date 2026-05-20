@@ -194,6 +194,23 @@ def test_opt_in_and_disabled_state_are_enforced():
     assert any("marked disabled" in failure for failure in disabled_nonzero.failures)
 
 
+def test_zero_discrepancy_over_zero_total_sigma_is_safe():
+    result = evaluate_discrepancy_identifiability(
+        DiscrepancyIdentifiabilityInputs(
+            observations=(1.0, 2.0),
+            predictions_without_discrepancy=(1.0, 2.0),
+            discrepancy_mean=(0.0, 0.0),
+            covariance_components={"discrepancy:low_rank": ((0.0, 0.0), (0.0, 0.0))},
+            total_covariance=((0.0, 0.0), (0.0, 0.0)),
+            discrepancy_opt_in=True,
+        )
+    )
+
+    assert result.metrics["discrepancy_abs_over_total_sigma_mean"] == pytest.approx(0.0)
+    assert result.metrics["discrepancy_abs_over_total_sigma_max"] == pytest.approx(0.0)
+    assert not any("dominates total predictive" in failure for failure in result.failures)
+
+
 def test_missing_covariance_decomposition_is_a_gate_failure():
     result = evaluate_discrepancy_identifiability(
         DiscrepancyIdentifiabilityInputs(
