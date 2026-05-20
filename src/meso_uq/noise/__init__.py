@@ -6,6 +6,12 @@ from meso_uq.noise.composite import (
     build_composite_likelihood,
     build_composite_likelihood_spec,
 )
+from meso_uq.noise.contact_alignment import (
+    ContactAlignmentInputs,
+    ContactAlignmentUncertaintyConfig,
+    ContactAlignmentUncertaintyResult,
+    build_contact_alignment_covariance,
+)
 from meso_uq.noise.contracts import (
     DiscrepancyConfig,
     DiscrepancyKind,
@@ -29,6 +35,13 @@ from meso_uq.noise.covariance import (
     build_correlated_curve_covariance,
     compose_total_covariance,
     gaussian_log_likelihood_from_covariance,
+)
+from meso_uq.noise.geometry import (
+    GeometryParameterUncertainty,
+    GeometrySensitivityInputs,
+    GeometryUncertaintyConfig,
+    GeometryUncertaintyResult,
+    build_geometry_uncertainty_covariance,
 )
 from meso_uq.noise.legacy import (
     LegacyBatchLikelihoodResult,
@@ -67,6 +80,9 @@ from meso_uq.noise.robust import (
 
 __all__ = [
     "AdditiveRelativeObservationNoiseConfig",
+    "ContactAlignmentInputs",
+    "ContactAlignmentUncertaintyConfig",
+    "ContactAlignmentUncertaintyResult",
     "CompositeLikelihood",
     "CompositeLikelihoodSpec",
     "CorrelatedCurveNoiseConfig",
@@ -75,6 +91,10 @@ __all__ = [
     "CurveGrid",
     "DiscrepancyConfig",
     "DiscrepancyKind",
+    "GeometryUncertaintyResult",
+    "GeometryUncertaintyConfig",
+    "GeometrySensitivityInputs",
+    "GeometryParameterUncertainty",
     "LegacyBatchLikelihoodResult",
     "LegacyLikelihoodResult",
     "LikelihoodComponent",
@@ -97,9 +117,11 @@ __all__ = [
     "ToyLikelihood",
     "build_additive_relative_observation_noise",
     "build_block_correlated_curve_covariance",
+    "build_contact_alignment_covariance",
     "build_composite_likelihood",
     "build_composite_likelihood_spec",
     "build_correlated_curve_covariance",
+    "build_geometry_uncertainty_covariance",
     "build_model_config",
     "compose_additive_relative_gaussian_likelihood",
     "compose_total_covariance",

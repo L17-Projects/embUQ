@@ -71,3 +71,30 @@ A disabled or zero-amplitude correlated component returns a zero covariance cont
 Robust likelihood is opt-in. The default remains Gaussian and preserves the existing diagonal Normal likelihood when heavy-tail mode is absent. The first robust mode is scaled Student-t with `2 < degrees_of_freedom <= 100`. Diagonal Student-t uses pointwise standard deviations; full-covariance Student-t uses the covariance Cholesky factor and Mahalanobis distance. Robust likelihood rejects nonpositive scales and non-positive-definite covariance instead of silently repairing invalid measurement models.
 
 Korali `Bayesian/Reference` Normal remains the M1 runtime boundary. Full-covariance and scaled heavy-tail likelihoods should attach through an explicit custom likelihood adapter in later integration work rather than overloading the legacy reference fields.
+
+
+## M3 measurement uncertainty primitives
+
+M3 adds measurement-uncertainty covariance terms that are named separately from observation noise. These terms consume legacy-adjusted predictions and control axes; they do not mutate legacy `Reference Evaluations`, `Standard Deviation`, or indentation `d0` handling.
+
+### Contact and alignment uncertainty
+
+Contact/alignment uncertainty is represented as rank-structured covariance over a curve:
+
+- `contact_offset`: `sigma_contact^2 * ones * ones.T`
+- `alignment_tilt`: `sigma_alignment^2 * centered_controls * centered_controls.T`
+- `displacement_scale_calibration`: `sigma_displacement_scale^2 * predictions * predictions.T`
+- `force_scale_calibration`: `sigma_force_scale^2 * (controls * sensitivity) * (controls * sensitivity).T`
+- `minimum_variance_floor`: diagonal variance floor
+
+`enabled=false` returns a named zero contribution even if sigma fields are present. `enabled=true` with all zero sigmas is numerically inactive but still reports the named components. A nonzero force-scale term requires an explicit force sensitivity vector. Legacy indentation `d0` remains a legacy-wrapper concern; M3 contact/alignment covariance consumes the already adjusted prediction curve to avoid double applying offsets.
+
+### Geometry uncertainty
+
+Geometry uncertainty uses a Jacobian covariance model:
+
+`C_geometry = J_geometry * Sigma_geometry * J_geometry.T`
+
+where `J_geometry[i, k]` is the sensitivity of prediction point `i` to geometry parameter `k`. Parameters carry names, units, optional nominal values, and either diagonal sigmas or an explicit positive semidefinite parameter covariance matrix. The resulting contribution is reported as `geometry_jacobian` plus per-parameter diagonal variance components such as `geometry:radius` or `geometry:diameter_um`.
+
+Disabled geometry uncertainty returns a named zero covariance. Enabled geometry uncertainty requires declared parameters, matching sensitivity vectors, finite values, and valid units. It remains distinct from M2 additive/relative observation noise and correlated curve noise to avoid double counting.
