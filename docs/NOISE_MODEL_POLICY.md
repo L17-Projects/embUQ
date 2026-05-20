@@ -228,3 +228,34 @@ Gate 06 is a reader over existing evidence, not another generator. Run it with:
 `python scripts/qa/noise_gate06_integrated_emb.py --synthetic-manifest <MES-34 manifest> --predictive-manifest <MES-35 manifest> --emb-manifest <MES-37 manifest> --output-root <gate-root>`
 
 Use `--require-production` only when closing a production-posterior claim. Validation fixture evidence must fail that stricter gate rather than masquerading as production evidence.
+
+## M8 release readiness and reporting
+
+M8 adds the release-readiness surface for the hierarchy without changing inference semantics. The public mode names are:
+
+- `legacy`, preserving the M1 compatibility wrappers and default behavior;
+- `noise_primitives`, exposing M2 observation-noise and robust-likelihood primitives;
+- `measurement_uncertainty`, exposing M3 contact/alignment and geometry terms;
+- `surrogate_covariance`, exposing M4 surrogate predictive covariance;
+- `discrepancy` and `full_hierarchy`, exposing the M5 total-covariance assembly;
+- `synthetic_recovery` and `predictive_checks`, exposing the M6 validation diagnostics;
+- `emb_comparison`, exposing the M7 paired EMB comparison diagnostic.
+
+The config validator accepts the historical `kind: noise` examples and the newer `family: noise_hierarchy` validation configs. It rejects missing schema metadata, unsupported families, absolute path literals, and private HPC path literals so checked-in examples remain portable across Vega, Karolina, and local CI.
+
+Run the release-readiness report with existing M6/M7/Gate06 evidence:
+
+`python scripts/qa/noise_hierarchy_release_readiness.py --mode full_hierarchy --synthetic-manifest <MES-34 manifest> --predictive-manifest <MES-35 manifest> --emb-manifest <MES-37 manifest> --gate06-manifest <Gate06 manifest> --output-root <release-root>`
+
+The command writes:
+
+- `noise_release_readiness_manifest.json`, including command, seed-free deterministic evidence references, commit, branch, Python environment, config validation, mode surface, merge boundary, skips, and residual risk;
+- `noise_artifact_index.json`, indexing the synthetic recovery, predictive check, and EMB comparison manifests and their sidecars;
+- `noise_config_validation.json`, recording per-config pass/fail/warning state;
+- `noise_release_readiness_report.md`, a human-readable report that distinguishes legacy, staged, and full-hierarchy templates and links the evidence paths.
+
+Gate 07 reads the release manifest and verifies the closeout-facing claims:
+
+`python scripts/qa/noise_gate07_release_checks.py --release-manifest <release-root>/noise_release_readiness_manifest.json --output-root <gate07-root>`
+
+Gate 07 passes when configs pass, required evidence entries exist and report clean scenario gates, Gate 06 passes, the project is either merged or explicitly at a human review/merge boundary, and the manifest records that no active Karolina worktree or session was touched.
