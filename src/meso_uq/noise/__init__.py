@@ -42,6 +42,12 @@ from meso_uq.noise.discrepancy_identifiability import (
     DiscrepancyIdentifiabilityThresholds,
     evaluate_discrepancy_identifiability,
 )
+from meso_uq.noise.emb_comparison import (
+    EmbComparisonInputs,
+    EmbComparisonResult,
+    EmbComparisonThresholds,
+    evaluate_emb_comparison,
+)
 from meso_uq.noise.geometry import (
     GeometryParameterUncertainty,
     GeometrySensitivityInputs,
@@ -138,6 +144,9 @@ __all__ = [
     "DiscrepancyIdentifiabilityResult",
     "DiscrepancyIdentifiabilityThresholds",
     "DiscrepancyKind",
+    "EmbComparisonInputs",
+    "EmbComparisonResult",
+    "EmbComparisonThresholds",
     "GeometryUncertaintyResult",
     "GeometryUncertaintyConfig",
     "GeometrySensitivityInputs",
@@ -197,6 +206,7 @@ __all__ = [
     "evaluate_observation_likelihood",
     "evaluate_synthetic_recovery",
     "evaluate_discrepancy_identifiability",
+    "evaluate_emb_comparison",
     "evaluate_predictive_checks",
     "gaussian_log_likelihood_from_covariance",
     "fit_low_rank_discrepancy_coefficients",
