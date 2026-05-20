@@ -6,6 +6,11 @@ metadata:
 spec:
   family: noise_hierarchy
   milestone: M5 Model Discrepancy
+  likelihood:
+    stage: M5
+    components:
+      - model_discrepancy
+      - total_covariance
   runtime_default:
     model_discrepancy_enabled: false
     model_discrepancy_requires_explicit_opt_in: true

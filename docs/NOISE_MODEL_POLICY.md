@@ -245,17 +245,17 @@ The config validator accepts the historical `kind: noise` examples and the newer
 
 Run the release-readiness report with existing M6/M7/Gate06 evidence:
 
-`python scripts/qa/noise_hierarchy_release_readiness.py --mode full_hierarchy --synthetic-manifest <MES-34 manifest> --predictive-manifest <MES-35 manifest> --emb-manifest <MES-37 manifest> --gate06-manifest <Gate06 manifest> --output-root <release-root>`
+`python scripts/qa/noise_hierarchy_release_readiness.py --mode full_hierarchy --synthetic-manifest <MES-34 manifest> --predictive-manifest <MES-35 manifest> --emb-manifest <MES-37 manifest> --gate06-manifest <Gate06 manifest> --output-root <release-root> --confirm-no-karolina-interaction`
 
 The command writes:
 
-- `noise_release_readiness_manifest.json`, including command, seed-free deterministic evidence references, commit, branch, Python environment, config validation, mode surface, merge boundary, skips, and residual risk;
+- `noise_release_readiness_manifest.json`, including command, seed-free deterministic evidence references, commit, branch, Python environment, config validation, mode surface, merge boundary, explicit Karolina non-interaction confirmation, skips, and residual risk;
 - `noise_artifact_index.json`, indexing the synthetic recovery, predictive check, and EMB comparison manifests and their sidecars;
 - `noise_config_validation.json`, recording per-config pass/fail/warning state;
 - `noise_release_readiness_report.md`, a human-readable report that distinguishes legacy, staged, and full-hierarchy templates and links the evidence paths.
 
 Gate 07 reads the release manifest and verifies the closeout-facing claims:
 
-`python scripts/qa/noise_gate07_release_checks.py --release-manifest <release-root>/noise_release_readiness_manifest.json --output-root <gate07-root>`
+`python scripts/qa/noise_gate07_release_checks.py --release-manifest <release-root>/noise_release_readiness_manifest.json --output-root <gate07-root> --github-pr <PR number> --repo BrieucB/MesoUQ`
 
-Gate 07 passes when configs pass, required evidence entries exist and report clean scenario gates, Gate 06 passes, the project is either merged or explicitly at a human review/merge boundary, and the manifest records that no active Karolina worktree or session was touched.
+Gate 07 independently verifies that configs pass, required evidence entries exist, sidecars are present, scenario gates pass, Git commits and regeneration commands are recorded, Gate 06 passes, release artifacts exist, the release manifest was generated from a clean worktree, GitHub checks are green or explicitly skipped with `--allow-missing-github-checks`, the project is either merged or explicitly at a human review/merge boundary, and the manifest records an explicit no-Karolina-interaction confirmation.

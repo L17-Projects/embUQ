@@ -86,6 +86,28 @@ def test_noise_config_validation_rejects_missing_metadata_and_unknown_family():
     assert any("unsupported spec.family" in error for error in unsupported.errors)
 
 
+def test_noise_config_validation_rejects_invalid_likelihood_components():
+    invalid = validate_noise_config_document(
+        {
+            "schema_version": 1,
+            "kind": "noise",
+            "metadata": {"id": "bad_components", "name": "Bad Components"},
+            "spec": {
+                "family": "measurement_uncertainty",
+                "likelihood": {
+                    "stage": "M2",
+                    "components": ["total_covariance"],
+                },
+            },
+        },
+        source="bad_components.yaml",
+    )
+
+    assert invalid.passed is False
+    assert any("spec.likelihood" in error and "not available for stage M2" in error for error in invalid.errors)
+
+
+
 def test_noise_mode_resolution_covers_legacy_staged_and_full_modes():
     assert supported_noise_modes()[0] == "legacy"
     legacy = resolve_noise_mode("legacy")
@@ -95,9 +117,16 @@ def test_noise_mode_resolution_covers_legacy_staged_and_full_modes():
     assert legacy.stage == "M1"
     assert legacy.components == ("legacy",)
     assert legacy.legacy_mode == "emb_legacy"
+    discrepancy = resolve_noise_mode("discrepancy")
+    synthetic = resolve_noise_mode("synthetic_recovery")
+    predictive = resolve_noise_mode("predictive_checks")
     assert full.stage == "M5"
     assert "total_covariance" in full.components
     assert "model_discrepancy" in full.components
+    assert discrepancy.components == ("model_discrepancy", "total_covariance")
+    assert discrepancy.components != full.components
+    assert synthetic.components == ("synthetic_recovery",)
+    assert predictive.components == ("predictive_checks",)
     assert emb.stage == "M7"
     assert emb.components == ("emb_comparison", "total_covariance")
     with pytest.raises(ValueError, match="Unsupported noise hierarchy mode"):
@@ -129,6 +158,7 @@ def test_release_readiness_and_gate07_scripts_write_required_artifacts(tmp_path)
             str(gate06),
             "--output-root",
             str(output_root),
+            "--confirm-no-karolina-interaction",
         ],
         check=True,
         cwd=repo_root,
@@ -136,6 +166,9 @@ def test_release_readiness_and_gate07_scripts_write_required_artifacts(tmp_path)
 
     manifest_path = output_root / "noise_release_readiness_manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["provenance"]["git_status_clean"] = True
+    manifest["provenance"]["git_status_short"] = ""
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     assert manifest["gate07"]["pass"] is True
     assert manifest["config_validation"]["passed"] is True
     assert manifest["report_template"] == "full"
@@ -155,6 +188,7 @@ def test_release_readiness_and_gate07_scripts_write_required_artifacts(tmp_path)
             str(manifest_path),
             "--output-root",
             str(gate_root),
+            "--allow-missing-github-checks",
         ],
         check=True,
         cwd=repo_root,
@@ -177,6 +211,7 @@ def test_release_readiness_cli_reports_actionable_invalid_mode(tmp_path):
             str(repo_root / "configs/noise/legacy.example.yaml"),
             "--output-root",
             str(tmp_path / "bad"),
+            "--confirm-no-karolina-interaction",
         ],
         cwd=repo_root,
         text=True,
@@ -213,6 +248,7 @@ def test_gate07_rejects_karolina_interaction_claim(tmp_path):
             str(release_manifest),
             "--output-root",
             str(tmp_path / "gate"),
+            "--allow-missing-github-checks",
         ],
         cwd=repo_root,
         text=True,
@@ -223,3 +259,43 @@ def test_gate07_rejects_karolina_interaction_claim(tmp_path):
     assert completed.returncode == 1
     gate_manifest = json.loads((tmp_path / "gate/noise_gate07_manifest.json").read_text(encoding="utf-8"))
     assert any("Karolina" in failure for failure in gate_manifest["failures"])
+
+
+def test_gate07_rejects_forged_incomplete_release_manifest(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    release_manifest = tmp_path / "forged.json"
+    release_manifest.write_text(
+        json.dumps(
+            {
+                "gate07": {"pass": True},
+                "config_validation": {"passed": True, "results": [{"config_name": "legacy", "passed": True}]},
+                "artifact_index": {"entries": {"synthetic_recovery": {"exists": True}}},
+                "merge_boundary": "human_review_required",
+                "no_karolina_interaction": True,
+                "karolina_interaction_confirmation": {"operator_confirmed": True},
+                "provenance": {"git_commit": "abc123", "git_status_clean": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "scripts/qa/noise_gate07_release_checks.py"),
+            "--release-manifest",
+            str(release_manifest),
+            "--output-root",
+            str(tmp_path / "forged_gate"),
+            "--allow-missing-github-checks",
+        ],
+        cwd=repo_root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert completed.returncode == 1
+    gate_manifest = json.loads((tmp_path / "forged_gate/noise_gate07_manifest.json").read_text(encoding="utf-8"))
+    assert any("missing required evidence entries" in failure for failure in gate_manifest["failures"])
+    assert any("Gate06 manifest" in failure for failure in gate_manifest["failures"])

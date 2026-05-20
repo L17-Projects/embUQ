@@ -20,6 +20,13 @@ _ALLOWED_KIND_NOISE_FAMILIES = {
     "surrogate_uncertainty",
 }
 _PRIVATE_PATH_FRAGMENTS = ("/ceph/hpc/home/eubrieucb", "/mnt/proj", "/scratch/project/eu-26-17/eubrieucb")
+_LIKELIHOOD_REQUIRED_KIND_FAMILIES = {
+    "full_hierarchy",
+    "gaussian",
+    "measurement_uncertainty",
+    "model_discrepancy",
+    "surrogate_uncertainty",
+}
 _MODE_ORDER = (
     "legacy",
     "noise_primitives",
@@ -31,16 +38,58 @@ _MODE_ORDER = (
     "predictive_checks",
     "emb_comparison",
 )
-_MODE_TO_STAGE = {
-    "legacy": "M1",
-    "noise_primitives": "M2",
-    "measurement_uncertainty": "M3",
-    "surrogate_covariance": "M4",
-    "discrepancy": "M5",
-    "full_hierarchy": "M5",
-    "synthetic_recovery": "M6",
-    "predictive_checks": "M6",
-    "emb_comparison": "M7",
+_MODE_TO_CONFIG = {
+    "legacy": {
+        "stage": "M1",
+        "components": ["legacy"],
+        "legacy_mode": "emb_legacy",
+    },
+    "noise_primitives": {
+        "stage": "M2",
+        "components": ["additive_noise", "relative_noise", "correlated_curve_noise", "heavy_tail"],
+    },
+    "measurement_uncertainty": {
+        "stage": "M3",
+        "components": ["additive_noise", "relative_noise", "contact_alignment", "geometry"],
+    },
+    "surrogate_covariance": {
+        "stage": "M4",
+        "components": [
+            "additive_noise",
+            "relative_noise",
+            "contact_alignment",
+            "geometry",
+            "surrogate_covariance",
+        ],
+    },
+    "discrepancy": {
+        "stage": "M5",
+        "components": ["model_discrepancy", "total_covariance"],
+    },
+    "full_hierarchy": {
+        "stage": "M5",
+        "components": [
+            "additive_noise",
+            "relative_noise",
+            "contact_alignment",
+            "geometry",
+            "surrogate_covariance",
+            "model_discrepancy",
+            "total_covariance",
+        ],
+    },
+    "synthetic_recovery": {
+        "stage": "M6",
+        "components": ["synthetic_recovery"],
+    },
+    "predictive_checks": {
+        "stage": "M6",
+        "components": ["predictive_checks"],
+    },
+    "emb_comparison": {
+        "stage": "M7",
+        "components": ["emb_comparison", "total_covariance"],
+    },
 }
 _VALIDATION_CONFIGS = {"synthetic_recovery", "predictive_checks", "emb_comparison"}
 
@@ -103,6 +152,26 @@ def load_noise_config(path: str | Path) -> Mapping[str, Any]:
     return payload
 
 
+def _validate_likelihood_config(label: str, location: str, value: Any, errors: list[str]):
+    if not isinstance(value, dict):
+        errors.append(f"{label}: {location} must be a mapping.")
+        return None
+    if "components" not in value:
+        errors.append(f"{label}: {location}.components must explicitly list selected likelihood components.")
+    try:
+        return build_composite_likelihood_spec(value)
+    except ValueError as exc:
+        errors.append(f"{label}: {location} is invalid: {exc}")
+        return None
+
+
+def _compare_likelihood_to_mode(label: str, mode: str, spec: Any, errors: list[str]) -> None:
+    expected = resolve_noise_mode(mode)
+    components = tuple(component.value for component in spec.components)
+    if spec.stage.value != expected.stage or components != expected.components or spec.legacy_mode != expected.legacy_mode:
+        errors.append(f"{label}: likelihood must resolve mode {mode!r} as stage={expected.stage}, components={list(expected.components)}, legacy_mode={expected.legacy_mode!r}.")
+
+
 def validate_noise_config_document(document: Mapping[str, Any], *, source: str | Path = "<config>") -> NoiseConfigValidationResult:
     label = str(source)
     errors: list[str] = []
@@ -112,6 +181,7 @@ def validate_noise_config_document(document: Mapping[str, Any], *, source: str |
 
     kind = document.get("kind")
     legacy_shape = kind == "noise"
+    likelihood_spec = None
     if legacy_shape:
         metadata = document.get("metadata")
         spec = document.get("spec")
@@ -133,6 +203,11 @@ def validate_noise_config_document(document: Mapping[str, Any], *, source: str |
             errors.append(f"{label}: spec.family must be a non-empty string.")
         elif spec_family not in _ALLOWED_KIND_NOISE_FAMILIES:
             errors.append(f"{label}: unsupported spec.family {spec_family!r}. Expected one of: {sorted(_ALLOWED_KIND_NOISE_FAMILIES)}.")
+        likelihood = spec.get("likelihood")
+        if spec_family in _LIKELIHOOD_REQUIRED_KIND_FAMILIES and likelihood is None:
+            errors.append(f"{label}: spec.likelihood is required for family {spec_family!r}.")
+        elif likelihood is not None:
+            likelihood_spec = _validate_likelihood_config(label, "spec.likelihood", likelihood, errors)
     else:
         name = document.get("name")
         if not isinstance(name, str) or not name.strip():
@@ -142,6 +217,13 @@ def validate_noise_config_document(document: Mapping[str, Any], *, source: str |
             errors.append(f"{label}: family must be one of {sorted(_ALLOWED_FAMILIES)}.")
         if not isinstance(document.get("milestone"), str) or not document.get("milestone"):
             errors.append(f"{label}: milestone must be a non-empty string.")
+        likelihood = document.get("likelihood")
+        if name in _MODE_TO_CONFIG and likelihood is None:
+            errors.append(f"{label}: likelihood is required for noise hierarchy mode {name!r}.")
+        elif likelihood is not None:
+            likelihood_spec = _validate_likelihood_config(label, "likelihood", likelihood, errors)
+        if likelihood_spec is not None and name in _MODE_TO_CONFIG:
+            _compare_likelihood_to_mode(label, str(name), likelihood_spec, errors)
 
     if name == "legacy":
         likelihood = document.get("likelihood")
@@ -190,15 +272,10 @@ def supported_noise_modes() -> tuple[str, ...]:
 
 def resolve_noise_mode(mode: str) -> NoiseModeSpec:
     normalized = str(mode).strip().lower().replace("-", "_")
-    if normalized not in _MODE_TO_STAGE:
-        expected = ", ".join(sorted(_MODE_TO_STAGE))
+    if normalized not in _MODE_TO_CONFIG:
+        expected = ", ".join(sorted(_MODE_TO_CONFIG))
         raise ValueError(f"Unsupported noise hierarchy mode {mode!r}. Expected one of: {expected}.")
-    stage = _MODE_TO_STAGE[normalized]
-    config: dict[str, Any] = {"stage": stage}
-    if normalized == "legacy":
-        config["components"] = ["legacy"]
-        config["legacy_mode"] = "emb_legacy"
-    spec = build_composite_likelihood_spec(config)
+    spec = build_composite_likelihood_spec(_MODE_TO_CONFIG[normalized])
     return NoiseModeSpec(
         mode=normalized,
         stage=spec.stage.value,
@@ -215,7 +292,8 @@ def build_noise_artifact_index(manifests: Mapping[str, str | Path]) -> dict[str,
             entries[label] = {"path": path.as_posix(), "exists": False, "all_scenarios_passed": False}
             continue
         payload = json.loads(path.read_text(encoding="utf-8"))
-        metrics_path = _resolve_artifact(path, payload.get("artifacts", {}).get("metrics"))
+        artifacts = payload.get("artifacts", {}) if isinstance(payload.get("artifacts"), dict) else {}
+        metrics_path = _resolve_artifact(path, artifacts.get("metrics"))
         metrics = json.loads(metrics_path.read_text(encoding="utf-8")) if metrics_path and metrics_path.exists() else {}
         entries[label] = {
             "path": path.as_posix(),
@@ -228,7 +306,12 @@ def build_noise_artifact_index(manifests: Mapping[str, str | Path]) -> dict[str,
             "required_scenarios": payload.get("required_scenarios"),
             "all_scenarios_passed": metrics.get("all_scenarios_passed"),
             "scenario_gate_statuses": metrics.get("scenario_gate_statuses"),
-            "artifacts": payload.get("artifacts", {}),
+            "commands": payload.get("commands", {}),
+            "configs": payload.get("configs", payload.get("config", {})),
+            "residual_risk": payload.get("residual_risk", metrics.get("residual_risk_notes", metrics.get("known_limitations"))),
+            "metric_summary": _summarize_metrics(metrics),
+            "artifacts": artifacts,
+            "artifact_existence": _artifact_existence(artifacts),
         }
     return {"schema_version": 1, "entries": entries}
 
@@ -257,8 +340,20 @@ def evaluate_release_gate(
             failures.append(f"Evidence entry {label} does not exist.")
         if entry.get("all_scenarios_passed") is not True:
             failures.append(f"Evidence entry {label} does not report all_scenarios_passed=true.")
+        statuses = entry.get("scenario_gate_statuses")
+        if not isinstance(statuses, dict) or not statuses:
+            failures.append(f"Evidence entry {label} does not record per-scenario gate statuses.")
+        elif any(status != "pass" for status in statuses.values()):
+            failures.append(f"Evidence entry {label} has non-pass scenario gate statuses: {statuses}.")
         if entry.get("git_status_clean") is not True:
             failures.append(f"Evidence entry {label} does not record git_status_clean=true.")
+        if not entry.get("git_commit"):
+            failures.append(f"Evidence entry {label} does not record a git commit.")
+        if not entry.get("commands"):
+            failures.append(f"Evidence entry {label} does not record regeneration commands.")
+        missing_artifacts = [name for name, exists in entry.get("artifact_existence", {}).items() if exists is not True]
+        if missing_artifacts:
+            failures.append(f"Evidence entry {label} has missing artifact sidecars: {missing_artifacts}.")
     if gate06_manifest.get("pass") is not True:
         failures.append("Gate06 manifest does not pass.")
     if merge_boundary not in {"merged", "human_review_required"}:
@@ -276,6 +371,26 @@ def evaluate_release_gate(
         "no_karolina_interaction": bool(no_karolina_interaction),
     }
     return NoiseReleaseGateResult(passed=passed, failures=tuple(failures), warnings=tuple(warnings), summary=summary)
+
+
+def _summarize_metrics(metrics: Mapping[str, Any]) -> dict[str, Any]:
+    summary: dict[str, Any] = {}
+    for key, value in metrics.items():
+        if key in {"scenarios", "scenario_metrics", "scenario_artifacts"}:
+            continue
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            summary[key] = value
+        elif key in {"scenario_gate_statuses", "thresholds"} and isinstance(value, dict):
+            summary[key] = value
+    return summary
+
+
+def _artifact_existence(artifacts: Mapping[str, Any]) -> dict[str, bool]:
+    existence: dict[str, bool] = {}
+    for key, value in artifacts.items():
+        if isinstance(value, str) and value:
+            existence[key] = Path(value).exists()
+    return existence
 
 
 def _resolve_artifact(manifest_path: Path, value: Any) -> Path | None:

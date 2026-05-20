@@ -6,6 +6,10 @@ metadata:
 spec:
   family: noise_hierarchy
   milestone: M6 Synthetic Recovery and SBC
+  likelihood:
+    stage: M6
+    components:
+      - synthetic_recovery
   thresholds:
     max_abs_parameter_bias: 0.08
     max_parameter_z_error: 2.0
