@@ -6,6 +6,8 @@ import math
 from pathlib import Path
 import sys
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src"
@@ -28,12 +30,16 @@ def _curve_row(
     rel_l2_pct: float,
     round_index: int | None = None,
     order: int = 0,
+    ka: float = 100.0,
+    kb: float = 500.0,
 ) -> dict[str, object]:
     return {
         "strategy": strategy,
         "curve_id": curve_id,
         "round": round_index,
         "order": order,
+        "ka": ka,
+        "kb": kb,
         "predicted_curve": [1.0 + rel_l2_pct / 100.0, 0.0],
         "reference_curve": [1.0, 0.0],
     }
@@ -91,12 +97,288 @@ def test_emb_34um_al_vs_lhs_validation_writes_png_json_and_csv_sidecars(tmp_path
     manifest = json.loads(artifacts.manifest_path.read_text(encoding="utf-8"))
     assert manifest["plot_paths"]["al_vs_lhs_validation"] == str(artifacts.plot_path)
     assert manifest["summary_rows"][0]["al_curve_count"] == 2
+    assert "plot_paths" in manifest
+    required_plot_keys = {
+        "al_vs_lhs_l2",
+        "al_vs_lhs_relative_l2",
+        "samples_ka_kb",
+        "initial_round1_samples",
+        "per_round_additions",
+        "exploration_vs_acquisition",
+        "disagreement_acquisition_map",
+        "force_curve_overlays",
+        "failure_quarantine_replacement",
+        "runtime_per_curve",
+    }
+    assert required_plot_keys.issubset(set(manifest["plot_paths"]))
+    for plot_path in manifest["plot_paths"].values():
+        resolved = Path(plot_path)
+        assert resolved.is_file()
+        assert resolved.stat().st_size > 0
 
     with artifacts.summary_csv_path.open(newline="", encoding="utf-8") as handle:
         csv_rows = list(csv.DictReader(handle))
     assert len(csv_rows) == 2
     assert csv_rows[0]["al_round_prefix"] == "1"
     assert math.isclose(float(csv_rows[1]["lhs_median_curve_rel_l2_pct"]), 5.5)
+
+
+def test_emb_34um_al_vs_lhs_validation_disagreement_map_prefers_selected_points(tmp_path: Path) -> None:
+    rows = [
+        {
+            "strategy": "al",
+            "curve_id": "al-r01-selected",
+            "round": 1,
+            "ka": 100.0,
+            "kb": 500.0,
+            "selected": True,
+            "ensemble_disagreement": 0.9,
+            "acquisition_score": 0.9,
+            "curve_rel_l2_pct": 1.0,
+        },
+        {
+            "strategy": "al",
+            "curve_id": "al-r01-noise",
+            "round": 1,
+            "ka": 101.0,
+            "kb": 501.0,
+            "selected": False,
+            "sample_source": "acquisition",
+            "ensemble_disagreement": 0.2,
+            "acquisition_score": 0.1,
+            "curve_rel_l2_pct": 1.1,
+        },
+        {
+            "strategy": "lhs",
+            "curve_id": "lhs-c001",
+            "round": 1,
+            "ka": 120.0,
+            "kb": 520.0,
+            "curve_rel_l2_pct": 4.0,
+        },
+    ]
+    artifacts = write_emb_34um_al_vs_lhs_validation_artifacts(
+        curve_rows=rows,
+        output_root=tmp_path / "selected-only-disagreement",
+        include_plot=False,
+    )
+    manifest = artifacts.manifest
+    assert manifest["plot_paths"]["disagreement_acquisition_map"] == str(artifacts.plot_paths["disagreement_acquisition_map"])
+    assert manifest["al_curve_count"] == 2
+    assert len(manifest["selected_samples"]) == 1
+    assert manifest["selected_samples"][0]["curve_id"] == "al-r01-selected"
+
+
+def test_emb_34um_al_vs_lhs_validation_parses_string_selected_and_quarantined_flags() -> None:
+    rows = [
+        _curve_row(strategy="al", curve_id="al-not-selected", round_index=1, order=1, rel_l2_pct=2.0),
+        _curve_row(strategy="al", curve_id="al-selected", round_index=1, order=2, rel_l2_pct=1.0),
+        _curve_row(strategy="al", curve_id="al-quarantined", round_index=1, order=3, rel_l2_pct=9.0),
+        _curve_row(strategy="lhs", curve_id="lhs-active", order=1, rel_l2_pct=5.0),
+        _curve_row(strategy="lhs", curve_id="lhs-active-2", order=2, rel_l2_pct=6.0),
+        _curve_row(strategy="lhs", curve_id="lhs-quarantined", order=3, rel_l2_pct=4.0),
+    ]
+    rows[0]["selected"] = "False"
+    rows[0]["quarantined"] = "False"
+    rows[1]["selected"] = "True"
+    rows[2]["quarantined"] = "True"
+    rows[3]["selected"] = "False"
+    rows[3]["quarantined"] = "False"
+    rows[4]["quarantined"] = "False"
+    rows[5]["quarantined"] = "True"
+
+    manifest, summary_rows = build_emb_34um_al_vs_lhs_validation_report(curve_rows=rows)
+
+    assert manifest["status"] == "ready"
+    assert manifest["skipped_row_reasons"] == {}
+    assert manifest["al_curve_count"] == 2
+    assert manifest["lhs_curve_count"] == 2
+    assert [item["curve_id"] for item in manifest["selected_samples"]] == ["al-selected"]
+    assert manifest["curve_records"][0]["selected"] is False
+    assert any(item["curve_id"] == "al-quarantined" and item["quarantined"] for item in manifest["curve_records"])
+    assert any(item["curve_id"] == "lhs-quarantined" and item["quarantined"] for item in manifest["curve_records"])
+    assert manifest["round_evidence"][0]["al_quarantine_count"] == 1
+    assert len(summary_rows) == 1
+
+
+def test_emb_34um_al_vs_lhs_validation_skips_nonnumeric_runtime_with_manifest_evidence() -> None:
+    rows = [
+        _curve_row(strategy="al", curve_id="al-bad-runtime", round_index=1, order=1, rel_l2_pct=2.0),
+        _curve_row(strategy="al", curve_id="al-good", round_index=1, order=2, rel_l2_pct=1.0),
+        _curve_row(strategy="lhs", curve_id="lhs-good", order=1, rel_l2_pct=5.0),
+    ]
+    rows[0]["runtime_seconds"] = "not-a-number"
+    rows[1]["runtime_seconds"] = "12.5"
+
+    manifest, summary_rows = build_emb_34um_al_vs_lhs_validation_report(curve_rows=rows)
+
+    assert manifest["status"] == "ready"
+    assert manifest["skipped_row_reasons"] == {"invalid_runtime_seconds": 1}
+    assert manifest["runtime_seconds_count"] == 1
+    assert manifest["runtime_rows"][0]["curve_id"] == "al-good"
+    assert len(summary_rows) == 1
+    assert math.isclose(summary_rows[0]["al_median_curve_rel_l2_pct"], 1.0)
+
+
+def test_emb_34um_al_vs_lhs_validation_preserves_input_order_without_order_metadata() -> None:
+    rows = [
+        {"strategy": "al", "curve_id": "al-input-first", "round": 2, "curve_rel_l2_pct": 20.0},
+        {"strategy": "lhs", "curve_id": "lhs-input-first", "curve_rel_l2_pct": 10.0},
+        {"strategy": "al", "curve_id": "al-input-second", "round": 1, "curve_rel_l2_pct": 1.0},
+        {"strategy": "lhs", "curve_id": "lhs-input-second", "curve_rel_l2_pct": 11.0},
+    ]
+
+    manifest, summary_rows = build_emb_34um_al_vs_lhs_validation_report(curve_rows=rows)
+
+    assert [item["curve_id"] for item in manifest["curve_records"]] == [
+        "al-input-first",
+        "lhs-input-first",
+        "al-input-second",
+        "lhs-input-second",
+    ]
+    assert summary_rows[0]["al_round_prefix"] == 2
+    assert math.isclose(summary_rows[0]["al_median_curve_rel_l2_pct"], 20.0)
+
+
+def test_emb_34um_al_vs_lhs_validation_uses_f_delta_row_index_as_explicit_order() -> None:
+    rows = [
+        {"strategy": "al", "curve_id": "al-second", "round": 1, "f_delta_row_index": 2, "curve_rel_l2_pct": 2.0},
+        {"strategy": "al", "curve_id": "al-first", "round": 1, "f_delta_row_index": 1, "curve_rel_l2_pct": 1.0},
+        {"strategy": "lhs", "curve_id": "lhs-second", "f_delta_row_index": 2, "curve_rel_l2_pct": 5.0},
+        {"strategy": "lhs", "curve_id": "lhs-first", "f_delta_row_index": 1, "curve_rel_l2_pct": 4.0},
+    ]
+
+    manifest, summary_rows = build_emb_34um_al_vs_lhs_validation_report(curve_rows=rows)
+
+    assert [item["curve_id"] for item in manifest["curve_records"]] == [
+        "al-first",
+        "al-second",
+        "lhs-first",
+        "lhs-second",
+    ]
+    assert len(summary_rows) == 1
+    assert math.isclose(summary_rows[0]["al_median_curve_rel_l2_pct"], 1.5)
+
+
+def test_emb_34um_al_vs_lhs_validation_supports_runtime_rows_from_json_and_csv(tmp_path: Path) -> None:
+    runtime_rows = (
+        {
+            "curve_id": "al-r01-c001",
+            "runtime_seconds": 12.5,
+            "round": 1,
+        },
+        {
+            "candidate_id": "lhs-c002",
+            "runtime_seconds": 7.25,
+            "round": 1,
+        },
+    )
+    runtime_rows_csv = tmp_path / "runtime_rows.csv"
+    with runtime_rows_csv.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=("curve_id", "candidate_id", "runtime_seconds", "round"))
+        writer.writeheader()
+        writer.writerows(
+            [
+                {"curve_id": "al-r01-c001", "runtime_seconds": 12.5, "round": 1},
+                {"candidate_id": "al-r01-c002", "runtime_seconds": 15.0, "round": 1},
+            ]
+        )
+
+    manifest, _ = build_emb_34um_al_vs_lhs_validation_report(
+        curve_rows=_validation_rows(),
+        runtime_rows=runtime_rows,
+    )
+    assert manifest["runtime_curve_count"] == 2
+    assert manifest["runtime_seconds_count"] == 2
+    assert math.isclose(manifest["runtime_seconds_total"], 19.75)
+
+    csv_manifest, _ = build_emb_34um_al_vs_lhs_validation_report(
+        curve_rows=_validation_rows(),
+        runtime_rows=runtime_rows_csv,
+    )
+    assert csv_manifest["runtime_curve_count"] == 2
+    assert csv_manifest["runtime_rows"][0]["curve_id"] == "al-r01-c001"
+    assert csv_manifest["runtime_rows"][1]["runtime_seconds"] == 15.0
+
+    invalid_runtime_manifest, _ = build_emb_34um_al_vs_lhs_validation_report(
+        curve_rows=_validation_rows(),
+        runtime_rows=[{"curve_id": "al-r01-c001", "runtime_seconds": "not-a-number"}],
+    )
+    assert invalid_runtime_manifest["skipped_row_reasons"] == {"invalid_runtime_seconds": 1}
+    assert invalid_runtime_manifest["runtime_seconds_count"] == 0
+
+
+def test_emb_34um_al_vs_lhs_validation_attaches_runtime_by_candidate_id() -> None:
+    rows = [
+        {
+            **_curve_row(strategy="al", curve_id="al-report-1", round_index=1, order=1, rel_l2_pct=1.0),
+            "candidate_id": "candidate-al-001",
+        },
+        {
+            **_curve_row(strategy="lhs", curve_id="lhs-report-1", order=1, rel_l2_pct=3.0),
+            "candidate_id": "candidate-lhs-001",
+        },
+    ]
+    runtime_rows = [
+        {"candidate_id": "candidate-al-001", "runtime_seconds": 12.5, "round": 1},
+        {"candidate_id": "candidate-lhs-001", "runtime_seconds": 7.25, "round": 0},
+    ]
+
+    manifest, _ = build_emb_34um_al_vs_lhs_validation_report(
+        curve_rows=rows,
+        runtime_rows=runtime_rows,
+    )
+
+    attached = {row["candidate_id"]: float(row["runtime_seconds"]) for row in manifest["curve_records"]}
+    assert attached["candidate-al-001"] == 12.5
+    assert attached["candidate-lhs-001"] == 7.25
+    assert manifest["runtime_curve_count"] == 2
+
+
+def test_emb_34um_al_vs_lhs_validation_attaches_runtime_by_explicit_join_key() -> None:
+    rows = [
+        {
+            **_curve_row(strategy="al", curve_id="al-r01-v001", round_index=1, order=1, rel_l2_pct=1.0),
+            "runtime_join_key": "candidate-source-001",
+        },
+        _curve_row(strategy="lhs", curve_id="lhs-c001", order=1, rel_l2_pct=3.0),
+    ]
+    runtime_rows = [
+        {"candidate_id": "candidate-source-001", "runtime_seconds": 9.5, "round": 1},
+    ]
+
+    manifest, _ = build_emb_34um_al_vs_lhs_validation_report(
+        curve_rows=rows,
+        runtime_rows=runtime_rows,
+    )
+
+    attached = {row["curve_id"]: row.get("runtime_seconds") for row in manifest["curve_records"]}
+    assert attached["al-r01-v001"] == 9.5
+    assert manifest["runtime_curve_count"] == 1
+    assert manifest["runtime_missing_curve_count"] == 1
+    assert manifest["status"] == "blocked"
+    assert any("Runtime evidence is missing" in item for item in manifest["blockers"])
+
+
+def test_emb_34um_al_vs_lhs_validation_uses_json_null_without_runtime_values() -> None:
+    manifest, _ = build_emb_34um_al_vs_lhs_validation_report(curve_rows=_validation_rows())
+
+    assert manifest["runtime_seconds_count"] == 0
+    assert manifest["runtime_seconds_median"] is None
+    json.dumps(manifest, allow_nan=False)
+
+
+def test_emb_34um_al_vs_lhs_validation_rejects_malformed_mapping_payloads() -> None:
+    with pytest.raises(ValueError, match="curve_rows"):
+        build_emb_34um_al_vs_lhs_validation_report(
+            curve_rows={"metadata": {"unexpected": "mapping"}},
+        )
+
+    with pytest.raises(ValueError, match="runtime_rows"):
+        build_emb_34um_al_vs_lhs_validation_report(
+            curve_rows={"curve_rows": _validation_rows()},
+            runtime_rows={"metadata": {"unexpected": "mapping"}},
+        )
 
 
 def test_emb_34um_al_vs_lhs_validation_marks_ingestion_only_rows_blocked(tmp_path: Path) -> None:
@@ -147,6 +429,28 @@ def test_emb_34um_al_vs_lhs_validation_stops_before_unpaired_lhs_prefixes() -> N
     assert manifest["prefix_curve_counts"] == [2]
     assert len(summary_rows) == 1
     assert summary_rows[0]["al_round_prefix"] == 1
+
+
+def test_emb_34um_al_vs_lhs_validation_prefers_30_60_90_prefixes_when_available() -> None:
+    rows = []
+    for index in range(1, 31):
+        rows.append(_curve_row(strategy="al", curve_id=f"al-r01-c{index:03d}", rel_l2_pct=1.0 + 0.02 * index, ka=100000 + index, kb=500 + index))
+    for index in range(31, 61):
+        rows.append(_curve_row(strategy="al", curve_id=f"al-r02-c{index:03d}", rel_l2_pct=1.0 + 0.02 * index, ka=100000 + index, kb=500 + index))
+    for index in range(61, 91):
+        rows.append(_curve_row(strategy="al", curve_id=f"al-r03-c{index:03d}", rel_l2_pct=1.0 + 0.02 * index, ka=100000 + index, kb=500 + index))
+    rows.extend(
+        _curve_row(strategy="lhs", curve_id=f"lhs-c{index:03d}", rel_l2_pct=2.0 + 0.02 * index, ka=100000 + index, kb=500 + index)
+        for index in range(1, 91)
+    )
+
+    manifest, summary_rows = build_emb_34um_al_vs_lhs_validation_report(curve_rows=rows)
+
+    assert summary_rows[0]["prefix"] == 30
+    assert summary_rows[1]["prefix"] == 60
+    assert summary_rows[2]["prefix"] == 90
+    assert len(summary_rows) == 3
+    assert manifest["prefix_targets"] == [30, 60, 90]
 
 
 def test_emb_34um_al_vs_lhs_validation_skips_bad_point_axis_without_aborting() -> None:
@@ -273,3 +577,26 @@ def test_emb_34um_al_vs_lhs_validation_groups_round_local_point_curve_ids() -> N
     assert manifest["prefix_curve_counts"] == [1, 2]
     assert len(summary_rows) == 2
     assert summary_rows[1]["al_curve_count"] == 2
+
+
+def test_emb_34um_al_vs_lhs_validation_accepts_legacy_pred_truth_point_aliases() -> None:
+    rows: list[dict[str, object]] = [
+        {
+            "strategy": "al",
+            "curve_id": "legacy-point",
+            "round": 1,
+            "force": force,
+            "pred": 1.01,
+            "truth": 1.0,
+        }
+        for force in (0.0, 1.0)
+    ]
+    rows.append(_curve_row(strategy="lhs", curve_id="lhs-c001", order=1, rel_l2_pct=5.0))
+
+    manifest, summary_rows = build_emb_34um_al_vs_lhs_validation_report(curve_rows=rows)
+
+    assert manifest["status"] == "ready"
+    assert manifest["curve_records"][0]["curve_id"] == "legacy-point"
+    assert manifest["curve_records"][0]["predicted_curve"] == (1.01, 1.01)
+    assert manifest["curve_records"][0]["reference_curve"] == (1.0, 1.0)
+    assert len(summary_rows) == 1
