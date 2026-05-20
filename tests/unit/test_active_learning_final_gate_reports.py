@@ -15,6 +15,7 @@ from meso_uq.active_learning import (
     ACTIVE_LEARNING_FINAL_GATE_REPORT_FILENAME,
     ACTIVE_LEARNING_FINAL_GATE_REPORT_MARKDOWN_FILENAME,
     ACTIVE_LEARNING_FINAL_GATE_LHS_COMPARATOR,
+    ACTIVE_LEARNING_FINAL_GATE_KA_KB_PLOT_FILENAME,
     ACTIVE_LEARNING_FINAL_GATE_SUMMARY_CSV_FILENAME,
     ACTIVE_LEARNING_FINAL_GATE_SCHEMA_VERSION,
     build_active_learning_final_gate_report,
@@ -40,6 +41,10 @@ def _build_round_payload(
         "acquisition_scores": [0.25 * i for i in range(4)],
         "selected_candidate_scores": [0.3 * i for i in range(4)],
         "yt_kb_coverage": [
+            [0.1 * round_index, 3.4],
+            [0.2 * round_index, 3.1],
+        ],
+        "ka_kb_coverage": [
             [0.1 * round_index, 3.4],
             [0.2 * round_index, 3.1],
         ],
@@ -216,3 +221,31 @@ def test_write_active_learning_final_gate_artifacts_generates_report_payload_and
     assert rows[0]["round"] == "1"
     assert float(rows[0]["al_curve_count"]) == 30.0
     assert rows[0]["lhs_curve_count"] == "90"
+
+
+def test_build_active_learning_final_gate_report_accepts_ka_kb_coverage_alias() -> None:
+    report, round_rows, _ = build_active_learning_final_gate_report(
+        run_id="ka-kb-alias",
+        iteration=1,
+        rounds=(
+            {
+                **_build_round_payload(1, al_median=1.7, lhs_median=2.4),
+                "yt_kb_coverage": (),
+                "ka_kb_coverage": [[0.1, 3.4], [0.2, 3.3]],
+            },
+            {
+                **_build_round_payload(2, al_median=1.5, lhs_median=2.4),
+                "yt_kb_coverage": (),
+                "ka_kb_coverage": [[0.3, 3.4], [0.4, 3.3]],
+            },
+            {
+                **_build_round_payload(3, al_median=1.3, lhs_median=2.4),
+                "yt_kb_coverage": (),
+                "ka_kb_coverage": [[0.5, 3.4], [0.6, 3.3]],
+            },
+        ),
+    )
+
+    assert report["passed"] is True
+    assert len(round_rows) == 3
+    assert len(report["round_payloads"][0]["ka_kb_coverage"]) == 2
