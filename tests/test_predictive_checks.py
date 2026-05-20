@@ -85,6 +85,14 @@ def test_predictive_checks_fail_edge_rank_fixture():
     assert any("SBC" in failure for failure in result.calibration_failures)
 
 
+def test_sbc_rank_record_uses_midrank_for_ties():
+    record = SbcRankRecord("theta", 0.0, (-1.0, 0.0, 0.0, 1.0))
+
+    assert record.rank() == pytest.approx(2.0)
+    assert record.rank_quantile() == pytest.approx(0.5)
+    assert record.as_dict(alpha=0.1)["rank"] == pytest.approx(2.0)
+
+
 def test_predictive_check_validation_errors_are_explicit():
     with pytest.raises(ValueError, match="column count"):
         PredictiveCheckInputs(

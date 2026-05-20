@@ -122,9 +122,11 @@ class SbcRankRecord:
         object.__setattr__(self, "true_value", _finite_float(self.true_value, f"true_value[{name}]"))
         object.__setattr__(self, "posterior_samples", samples)
 
-    def rank(self) -> int:
+    def rank(self) -> float:
         samples = np.asarray(self.posterior_samples, dtype=float)
-        return int(np.sum(samples < self.true_value))
+        less_count = float(np.sum(samples < self.true_value))
+        equal_count = float(np.sum(samples == self.true_value))
+        return less_count + 0.5 * equal_count
 
     def rank_quantile(self) -> float:
         return float((self.rank() + 0.5) / (len(self.posterior_samples) + 1.0))
