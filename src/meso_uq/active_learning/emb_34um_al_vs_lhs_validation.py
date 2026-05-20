@@ -132,8 +132,6 @@ def _coerce_rows(
             value = rows.get(key)
             if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
                 return tuple(dict(item) for item in value if isinstance(item, Mapping))
-        if rows:
-            return tuple(dict(item) for item in rows.values() if isinstance(item, Mapping))
         raise ValueError(f"row payload mapping must contain one of: {', '.join(record_keys)}.")
     if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes, bytearray)):
         raise TypeError("rows must be a sequence, mapping, JSON path, or CSV path.")

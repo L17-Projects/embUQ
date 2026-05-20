@@ -6,6 +6,8 @@ import math
 from pathlib import Path
 import sys
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src"
@@ -364,6 +366,19 @@ def test_emb_34um_al_vs_lhs_validation_uses_json_null_without_runtime_values() -
     assert manifest["runtime_seconds_count"] == 0
     assert manifest["runtime_seconds_median"] is None
     json.dumps(manifest, allow_nan=False)
+
+
+def test_emb_34um_al_vs_lhs_validation_rejects_malformed_mapping_payloads() -> None:
+    with pytest.raises(ValueError, match="curve_rows"):
+        build_emb_34um_al_vs_lhs_validation_report(
+            curve_rows={"metadata": {"unexpected": "mapping"}},
+        )
+
+    with pytest.raises(ValueError, match="runtime_rows"):
+        build_emb_34um_al_vs_lhs_validation_report(
+            curve_rows={"curve_rows": _validation_rows()},
+            runtime_rows={"metadata": {"unexpected": "mapping"}},
+        )
 
 
 def test_emb_34um_al_vs_lhs_validation_marks_ingestion_only_rows_blocked(tmp_path: Path) -> None:
