@@ -24,6 +24,7 @@ KORALI_RUNTIME_ENV_KEYS = (
     "PATH",
 )
 KORALI_RUNTIME_PLATFORM = "karolina"
+KORALI_RUNTIME_SITE_PLATFORMS = frozenset({"karolina", "vega"})
 KORALI_RUNTIME_SCHEDULER = "slurm"
 
 
@@ -107,7 +108,7 @@ def build_korali_runtime_validation_command(
     library_paths: Sequence[str | Path] = (),
     pythonpath_hint: str | None = None,
     path_hint: str | None = None,
-    platform: str = KORALI_RUNTIME_PLATFORM,
+    platform: str | None = None,
     scheduler: str = KORALI_RUNTIME_SCHEDULER,
 ) -> KoraliRuntimeValidationCommand:
     resolved_repo_root = _resolve_path(repo_root)
@@ -123,6 +124,7 @@ def build_korali_runtime_validation_command(
         library_path_values = ()
     pythonpath_value = pythonpath_hint if pythonpath_hint is not None else resolved_env.get("PYTHONPATH")
     path_value = path_hint if path_hint is not None else resolved_env.get("PATH")
+    resolved_platform = _resolve_platform(platform, resolved_env)
 
     if build_root_value is not None:
         resolved_env["MESOUQ_KORALI_BUILD_ROOT"] = str(_resolve_path(build_root_value))
@@ -144,7 +146,7 @@ def build_korali_runtime_validation_command(
         "--vendor-root",
         str(resolved_vendor_root),
         "--platform",
-        platform,
+        resolved_platform,
         "--scheduler",
         scheduler,
         "--strict",
@@ -179,11 +181,12 @@ def validate_korali_runtime_contract(
     library_paths: Sequence[str | Path] = (),
     pythonpath_hint: str | None = None,
     path_hint: str | None = None,
-    platform: str = KORALI_RUNTIME_PLATFORM,
+    platform: str | None = None,
     scheduler: str = KORALI_RUNTIME_SCHEDULER,
 ) -> KoraliRuntimeValidationReport:
     resolved_repo_root = _resolve_path(repo_root)
     resolved_env = _normalize_env(env)
+    resolved_platform = _resolve_platform(platform, resolved_env)
     issues: list[KoraliRuntimeValidationIssue] = []
 
     site_value = resolved_env.get("MESOUQ_SITE")
@@ -193,17 +196,17 @@ def validate_korali_runtime_contract(
                 severity="warning",
                 code="site-missing",
                 message=(
-                    "MESOUQ_SITE was not supplied. Karolina validation still works, but operators should "
+                    "MESOUQ_SITE was not supplied. Runtime validation still works, but operators should "
                     "record the active site label alongside the runtime snapshot."
                 ),
             )
         )
-    elif site_value != platform:
+    elif site_value != resolved_platform:
         issues.append(
             KoraliRuntimeValidationIssue(
                 severity="error",
                 code="site-mismatch",
-                message=f"MESOUQ_SITE={site_value!r} does not match the validation platform {platform!r}.",
+                message=f"MESOUQ_SITE={site_value!r} does not match the validation platform {resolved_platform!r}.",
             )
         )
 
@@ -379,7 +382,7 @@ def validate_korali_runtime_contract(
     path_value = path_hint if path_hint is not None else resolved_env.get("PATH")
     if path_value:
         path_entries = _split_path_list(path_value)
-        _validate_path_hint_entries(issues, "PATH", path_entries)
+        _validate_path_hint_entries(issues, "PATH", path_entries, severity="warning")
     else:
         issues.append(
             KoraliRuntimeValidationIssue(
@@ -395,7 +398,7 @@ def validate_korali_runtime_contract(
     return KoraliRuntimeValidationReport(
         repo_root=resolved_repo_root,
         vendor_root=resolved_vendor_root,
-        platform=platform,
+        platform=resolved_platform,
         scheduler=scheduler,
         issues=tuple(issues),
     )
@@ -427,7 +430,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         dest="path_hint",
         help="Optional PATH hint to validate against launch helper expectations.",
     )
-    parser.add_argument("--platform", default=KORALI_RUNTIME_PLATFORM)
+    parser.add_argument("--platform", help="Validation platform. Defaults to MESOUQ_SITE, then karolina.")
     parser.add_argument("--scheduler", default=KORALI_RUNTIME_SCHEDULER)
     parser.add_argument("--strict", action="store_true", help="Return non-zero when warnings are present.")
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON output.")
@@ -483,6 +486,17 @@ def _resolve_path(value: str | Path | None) -> Path:
     return Path(value).expanduser().resolve()
 
 
+def _resolve_platform(platform: str | None, env: Mapping[str, str]) -> str:
+    if platform is not None:
+        return str(platform).strip().lower()
+
+    site_value = env.get("MESOUQ_SITE")
+    normalized_site = site_value.strip().lower() if site_value else ""
+    if normalized_site in KORALI_RUNTIME_SITE_PLATFORMS:
+        return normalized_site
+    return KORALI_RUNTIME_PLATFORM
+
+
 def _split_path_list(value: str) -> tuple[str, ...]:
     return tuple(entry for entry in value.split(os.pathsep) if entry)
 
@@ -521,13 +535,14 @@ def _validate_path_hint_entries(
     issues: list[KoraliRuntimeValidationIssue],
     label: str,
     entries: Sequence[str],
+    severity: str = "error",
 ) -> None:
     for entry in entries:
         for private_prefix in FORBIDDEN_PRIVATE_PATHS:
             if private_prefix in entry:
                 issues.append(
                     KoraliRuntimeValidationIssue(
-                        severity="error",
+                        severity=severity,
                         code=f"{label.lower()}-private-path",
                         message=f"{label} contains forbidden private path prefix {private_prefix!r}: {entry}.",
                     )

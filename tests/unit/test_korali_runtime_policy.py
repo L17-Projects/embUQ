@@ -69,6 +69,24 @@ def test_validate_korali_runtime_contract_accepts_existing_vendor_root(tmp_path:
     assert report.vendor_root == repo_root / KORALI_VENDOR_RELATIVE_ROOT
 
 
+def test_validate_korali_runtime_contract_uses_mesouq_site_when_platform_omitted(tmp_path: Path) -> None:
+    repo_root = _make_repo(tmp_path, vendor=True)
+
+    report = validate_korali_runtime_contract(
+        repo_root,
+        env={"MESOUQ_SITE": "vega", "MESOUQ_SITE_RUNTIME_ROOT": str(tmp_path / "runtime")},
+        path_hint="/ceph/hpc/home/eubrieucb/.local/bin:/usr/bin:/bin",
+    )
+
+    assert report.platform == "vega"
+    assert report.ok
+    assert not report.errors
+    assert any(
+        "PATH contains forbidden private path prefix" in warning
+        for warning in report.warnings
+    )
+
+
 def test_validate_korali_runtime_contract_reports_missing_env_hints(tmp_path: Path) -> None:
     repo_root = _make_repo(tmp_path, vendor=True)
 
