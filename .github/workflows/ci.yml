@@ -327,7 +327,7 @@ jobs:
 
       - name: Bootstrap canonical Korali runtime
         if: steps.korali-cache.outputs.cache-hit != 'true'
-        run: bash scripts/platforms/hpc/bootstrap_env.sh --site vega --skip-python-deps --with-korali
+        run: bash scripts/platforms/hpc/bootstrap_env.sh --site vega --with-korali
 
       - name: Validate canonical Korali runtime
         run: test -f "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
