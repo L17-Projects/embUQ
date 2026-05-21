@@ -28,3 +28,11 @@ def test_korali_bootstrap_installs_and_checks_mpi4py_build_dependency() -> None:
 
     assert '"mpi4py>=4.1.1"' in text
     assert "import mpi4py" in text
+
+
+def test_korali_bootstrap_preserves_venv_python_symlink() -> None:
+    text = (REPO_ROOT / "scripts/platforms/hpc/bootstrap_korali.sh").read_text(encoding="utf-8")
+    path_block = text[text.index('if [[ "$python_bin" == */* ]]; then') : text.index("export PATH=")]
+
+    assert "readlink -f \"$python_bin\"" not in path_block
+    assert 'python_bin="${python_bin_dir}/$(basename "$python_bin")"' in path_block
