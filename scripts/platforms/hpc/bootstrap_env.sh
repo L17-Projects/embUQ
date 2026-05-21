@@ -273,10 +273,14 @@ manifest["pip_freeze"] = (freeze.stdout or "").splitlines()
 PY
 chmod +x "$ENV_SCRIPT"
 
-"$env_python" - <<'PY'
+echo "Validating meso_uq import through canonical env activation."
+(
+  source "$ENV_SCRIPT"
+  "$env_python" - <<'PY'
 import meso_uq
 print(f"meso_uq import ok: {meso_uq.__file__}")
 PY
+)
 
 echo ""
 echo "Unified MesoUQ environment completed."
