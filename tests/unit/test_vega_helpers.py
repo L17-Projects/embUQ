@@ -38,6 +38,11 @@ def _make_repo(tmp_path: Path) -> Path:
 def _runtime_root(tmp_path: Path, site: str) -> Path:
     return tmp_path / f"{site}-runtime"
 
+
+def _legacy_root_env(site: str) -> str:
+    return "MESOUQ_" + site.upper() + "_ROOT"
+
+
 def test_vega_paths_use_canonical_runtime_root(tmp_path):
     repo_root = _make_repo(tmp_path)
     runtime_root = _runtime_root(tmp_path, "vega")
@@ -254,6 +259,7 @@ def test_render_unified_env_script_exports_single_canonical_activation(tmp_path)
     assert str(paths.korali_env_script) not in env_script
     assert str(paths.mirheo_env_script) in env_script
     assert str(paths.gv_cgal_tools_env_script) in env_script
+    assert str(paths.tinytex_env_script) in env_script
     assert str(hdf5_root) in env_script
     assert str(python_lib) in env_script
     assert str(module_bin) in env_script
@@ -282,9 +288,9 @@ def test_render_korali_env_script_exports_karolina_runtime_root(tmp_path):
     assert "MESOUQ_SITE=karolina" in env_script
     assert "MESOUQ_SITE_RUNTIME_ROOT" in env_script
     assert "MESOUQ_PROVENANCE_ROOT" in env_script
-    assert "MESOUQ_KAROLINA_ROOT" not in env_script
+    assert _legacy_root_env("karolina") not in env_script
     assert str(paths.korali_prefix) in env_script
-    assert "MESOUQ_VEGA_ROOT" not in env_script
+    assert _legacy_root_env("vega") not in env_script
 
 
 def test_render_tinytex_env_script_exports_repo_local_bin(tmp_path):
@@ -399,8 +405,8 @@ def test_render_mirheo_env_script_exports_karolina_root(tmp_path):
 
     assert "MESOUQ_SITE=karolina" in env_script
     assert "MESOUQ_PROVENANCE_ROOT" in env_script
-    assert "MESOUQ_KAROLINA_ROOT" not in env_script
-    assert "MESOUQ_VEGA_ROOT" not in env_script
+    assert _legacy_root_env("karolina") not in env_script
+    assert _legacy_root_env("vega") not in env_script
 
 
 def test_render_mirheo_env_script_omits_snapshot_when_not_provided(tmp_path):
@@ -421,7 +427,7 @@ def test_render_gv_cgal_tools_env_script_exports_karolina_library_paths(tmp_path
 
     assert "MESOUQ_SITE=karolina" in env_script
     assert "MESOUQ_PROVENANCE_ROOT" in env_script
-    assert "MESOUQ_KAROLINA_ROOT" not in env_script
+    assert _legacy_root_env("karolina") not in env_script
     assert str(paths.scale_space_binary) in env_script
     assert str(paths.gv_cgal_tools_bin_dir) in env_script
     assert "MPFR/4.2.0-GCCcore-12.2.0/lib" in env_script
@@ -436,8 +442,8 @@ def test_render_gv_cgal_tools_env_script_exports_vega_root_without_karolina_libs
     env_script = render_gv_cgal_tools_env_script(paths)
 
     assert "MESOUQ_SITE=vega" in env_script
-    assert "MESOUQ_VEGA_ROOT" not in env_script
-    assert "MESOUQ_KAROLINA_ROOT" not in env_script
+    assert _legacy_root_env("vega") not in env_script
+    assert _legacy_root_env("karolina") not in env_script
     assert "MPFR/4.2.0-GCCcore-12.2.0/lib" not in env_script
 
 
@@ -460,8 +466,8 @@ def test_render_tinytex_env_script_exports_karolina_root(tmp_path):
 
     assert "MESOUQ_SITE=karolina" in env_script
     assert "MESOUQ_PROVENANCE_ROOT" in env_script
-    assert "MESOUQ_KAROLINA_ROOT" not in env_script
-    assert "MESOUQ_VEGA_ROOT" not in env_script
+    assert _legacy_root_env("karolina") not in env_script
+    assert _legacy_root_env("vega") not in env_script
 
 
 def test_gather_mirheo_source_snapshot_ignores_build_artifacts(tmp_path):

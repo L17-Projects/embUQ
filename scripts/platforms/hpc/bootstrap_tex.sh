@@ -128,17 +128,41 @@ packages=(
 
 tlmgr install "${packages[@]}" >>"${log_path}" 2>&1
 
+# The upstream TinyTeX installer may add command symlinks to ~/bin. Keep this
+# bootstrap repo-local by removing only symlinks that target this runtime.
+if [[ -d "${HOME}/bin" ]]; then
+  find "${HOME}/bin" -maxdepth 1 -type l -lname "${TINYTEX_BIN_DIR}/*" -delete
+fi
+
 "$python_bin" - <<'PYCODE' "$repo_root"
 from pathlib import Path
 import sys
 
 repo_root = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(repo_root / "src"))
-from meso_uq.vega import get_runtime_paths, render_tinytex_env_script  # noqa: E402
+from meso_uq.vega import (  # noqa: E402
+    get_runtime_paths,
+    render_tinytex_env_script,
+    render_unified_env_script,
+    resolve_mirheo_source,
+)
 
 paths = get_runtime_paths(repo_root)
 paths.tinytex_root.mkdir(parents=True, exist_ok=True)
 paths.tinytex_env_script.write_text(render_tinytex_env_script(paths), encoding="utf-8")
+if paths.env_script.is_file():
+    source_root = None
+    try:
+        candidate = resolve_mirheo_source(repo_root, site=paths.site)
+        if candidate.is_dir():
+            source_root = candidate
+    except Exception:
+        source_root = None
+    snapshot_path = paths.mirheo_snapshot_path if paths.mirheo_snapshot_path.is_file() else None
+    paths.env_script.write_text(
+        render_unified_env_script(paths, source_root=source_root, snapshot_path=snapshot_path),
+        encoding="utf-8",
+    )
 PYCODE
 
 printf 'TinyTeX ready at %s

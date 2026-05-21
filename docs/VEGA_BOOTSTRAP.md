@@ -142,13 +142,12 @@ Optional flags:
 
 ```bash
 source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
-source ${MESOUQ_SITE_RUNTIME_ROOT}/tinytex/env.sh
 python scripts/platforms/hpc/doctor_hpc.py --site vega --strict --with-mirheo --with-tex
 ```
 
 The generated env script for Korali intentionally replaces inherited `PYTHONPATH` entries so the repo-local install wins over any preexisting user-global Korali.
 The Mirheo env script records the resolved source path, repo-local build/install locations, and the source snapshot manifest used for reproducibility.
-The canonical `${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh` script activates the unified MesoUQ Python path, records Mirheo import paths, sources `${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools/env.sh` when present, and exports OpenMPI plus HDF5 library roots explicitly for rank launches and direct Mirheo imports. It honors `MESOUQ_HDF5_ROOT`, `EBROOTHDF5`, and `HDF5_DIR`, and captures the HDF5 root present during bootstrap.
+The canonical `${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh` script activates the unified MesoUQ Python path, records Mirheo import paths, sources `${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools/env.sh` and `${MESOUQ_SITE_RUNTIME_ROOT}/tinytex/env.sh` when present, and exports OpenMPI plus HDF5 library roots explicitly for rank launches and direct Mirheo imports. It honors `MESOUQ_HDF5_ROOT`, `EBROOTHDF5`, and `HDF5_DIR`, and captures the HDF5 root present during bootstrap.
 
 Build GV CGAL geometry tooling with the same interface:
 
@@ -170,7 +169,7 @@ Paper-facing figure generation uses the original UQ_DPD TeX rendering path. On V
 
 ```bash
 bash scripts/platforms/vega/bootstrap_tex.sh
-source ${MESOUQ_SITE_RUNTIME_ROOT}/tinytex/env.sh
+source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
 python scripts/platforms/hpc/doctor_hpc.py --site vega --with-tex
 ```
 

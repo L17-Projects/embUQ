@@ -249,9 +249,9 @@ This runner performs, in order:
 4. MAP Mirheo
 5. paper asset generation via the postprocess-only paper runner
 
-For exact paper-facing figure rendering on Vega, bootstrap and source repo-local TinyTeX first:
+For exact paper-facing figure rendering on Vega, bootstrap repo-local TinyTeX and source the canonical runtime environment:
 - `bash scripts/platforms/vega/bootstrap_tex.sh`
-- `source ${MESOUQ_SITE_RUNTIME_ROOT}/tinytex/env.sh`
+- `source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh`
 
 For one-command replay of the exact HUQ-EMB paper figures from a stored `paper_data` campaign, use:
 - `scripts/workflows/emb/huq_emb/run_exact_uqdpd_asset_port.py`
