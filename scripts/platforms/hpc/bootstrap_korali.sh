@@ -145,7 +145,7 @@ export PATH="$python_bin_dir${PATH:+:$PATH}"
 export PYTHONNOUSERSITE=1
 
 if [[ "$install_python_build_deps" -eq 1 ]]; then
-  "$python_bin" -m pip install pybind11 meson ninja
+  "$python_bin" -m pip install pybind11 meson ninja "mpi4py>=4.1.1"
 fi
 
 for command in "$python_bin" mpicxx pkg-config meson ninja; do
@@ -154,6 +154,12 @@ for command in "$python_bin" mpicxx pkg-config meson ninja; do
     exit 1
   fi
 done
+
+"$python_bin" - <<'PY'
+import mpi4py
+
+print(f"mpi4py import ok: {mpi4py.__file__}")
+PY
 
 if ! pkg-config --exists gsl; then
   echo "GSL not found via pkg-config. Load GSL/2.7-GCC-12.2.0 first." >&2

@@ -192,7 +192,10 @@ if [[ "$install_python_deps" -eq 1 ]]; then
 fi
 
 if [[ "$with_korali" -eq 1 ]]; then
-  korali_args=(--site "$SITE" --python-bin "$env_python" --skip-python-build-deps)
+  korali_args=(--site "$SITE" --python-bin "$env_python")
+  if [[ "$install_python_deps" -eq 1 ]]; then
+    korali_args+=(--skip-python-build-deps)
+  fi
   if [[ -n "$build_jobs" ]]; then
     korali_args+=(--jobs "$build_jobs")
   fi
