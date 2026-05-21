@@ -84,6 +84,14 @@ def test_dnn_causal_manifest_counts_and_provenance() -> None:
     assert manifest["command_inventory"]["entries"][0]["command"].endswith(
         "scripts/platforms/karolina/sbatch/emb_34um_dnn_causal_validation_array.sbatch"
     )
+    batch_roots = {
+        (entry["replica"], entry["mode"]): entry["batch_root"]
+        for entry in manifest["command_inventory"]["entries"]
+    }
+    assert batch_roots[(1, "al-step-01")].endswith("/replica-001/al-step-01")
+    assert batch_roots[(1, "lhs-step-01")].endswith("/replica-001/lhs-step-01")
+    assert "al-step-01-01" not in json.dumps(manifest["command_inventory"])
+    assert "lhs-step-01-01" not in json.dumps(manifest["command_inventory"])
     assert manifest["provenance"]["ensemble_size"] == EMB_34UM_DNN_CAUSAL_ENSEMBLE_SIZE
     assert manifest["provenance"]["force_grid_signature"] == manifest["policy"]["force_grid_signature"]
 
@@ -175,3 +183,26 @@ def test_prepare_script_reads_rendered_request_schema_version(tmp_path: Path) ->
     )
 
     assert module._ensure_request_payload_schema_version(manifest_path) == module.EMB_34UM_DPD_SCHEMA_VERSION
+
+
+def test_dnn_causal_validation_sbatch_supports_execute_and_runner_invocation() -> None:
+    script_path = (
+        REPO_ROOT
+        / "scripts"
+        / "platforms"
+        / "karolina"
+        / "sbatch"
+        / "emb_34um_dnn_causal_validation_array.sbatch"
+    )
+    text = script_path.read_text(encoding="utf-8")
+
+    assert "source /scratch/project/eu-26-17/eubrieucb/mesouq/load_mesouq_karolina.sh" in text
+    assert 'EXECUTION_MODE="${EXECUTION_MODE:-execute}"' in text
+    assert 'RUNNER_SCRIPT="${RUNNER_SCRIPT:-${REPO_ROOT}/scripts/workflows/emb/active_learning/run_emb_34um_final_gate_candidate.py}"' in text
+    assert '"${EXECUTION_MODE}" == "render-only"' in text
+    assert "BATCH_SUMMARY=\"${BATCH_DIR}/emb_34um_batch_summary.json\"" in text
+    assert "select_candidate_manifest" in text
+    assert "\"${PYTHON_EXECUTABLE}\" \"${RUNNER_SCRIPT}\" \\" in text
+    assert "--candidate-manifest \"${CANDIDATE_MANIFEST}\"" in text
+    assert "srun --ntasks=2" in text
+    assert "--mark-failed" in text
