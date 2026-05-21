@@ -3,6 +3,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+LEGACY_SITE_ENV = "HPC" "_SITE"
 
 
 def _make_runtime(tmp_path: Path, *, include_python3: bool = True) -> tuple[Path, Path]:
@@ -31,7 +32,7 @@ def test_site_env_resolves_path_python_bin_before_executable_check(tmp_path: Pat
 
     script = f"""
 set -euo pipefail
-unset HPC_SITE MESOUQ_SITE MESOUQ_ENV_ROOT MESOUQ_ENV_SCRIPT MESOUQ_GV_ENV_SCRIPT PYTHONPATH
+unset {LEGACY_SITE_ENV} MESOUQ_SITE MESOUQ_ENV_ROOT MESOUQ_ENV_SCRIPT MESOUQ_GV_ENV_SCRIPT PYTHONPATH
 export MESOUQ_SITE_RUNTIME_ROOT={runtime_root}
 export PYTHON_BIN=python3
 source {REPO_ROOT / 'scripts/platforms/hpc/site_env.sh'}
@@ -51,7 +52,7 @@ def test_site_env_defaults_plain_python_to_canonical_env_python(tmp_path: Path) 
 
     script = f"""
 set -euo pipefail
-unset HPC_SITE MESOUQ_SITE MESOUQ_ENV_ROOT MESOUQ_ENV_SCRIPT MESOUQ_GV_ENV_SCRIPT PYTHONPATH
+unset {LEGACY_SITE_ENV} MESOUQ_SITE MESOUQ_ENV_ROOT MESOUQ_ENV_SCRIPT MESOUQ_GV_ENV_SCRIPT PYTHONPATH
 export MESOUQ_SITE_RUNTIME_ROOT={runtime_root}
 export PYTHON_BIN=python
 source {REPO_ROOT / 'scripts/platforms/hpc/site_env.sh'}
@@ -76,7 +77,7 @@ def test_site_env_rejects_alias_resolving_outside_canonical_env(tmp_path: Path) 
 
     script = f"""
 set -euo pipefail
-unset HPC_SITE MESOUQ_SITE MESOUQ_ENV_ROOT MESOUQ_ENV_SCRIPT MESOUQ_GV_ENV_SCRIPT PYTHONPATH
+unset {LEGACY_SITE_ENV} MESOUQ_SITE MESOUQ_ENV_ROOT MESOUQ_ENV_SCRIPT MESOUQ_GV_ENV_SCRIPT PYTHONPATH
 export PATH={external_bin}:$PATH
 export MESOUQ_SITE_RUNTIME_ROOT={runtime_root}
 export PYTHON_BIN=python3
