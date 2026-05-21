@@ -2,7 +2,7 @@
 #SBATCH --job-name=mesouq-emb-34um-al-array
 #SBATCH --account=eu-26-17
 #SBATCH --partition=qgpu
-#SBATCH --time=00:30:00
+#SBATCH --time=01:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=2
 #SBATCH --cpus-per-task=8
@@ -32,6 +32,7 @@ VAULT_ROOT="${VAULT_ROOT:-}"
 RUN_ID_PREFIX="${RUN_ID_PREFIX:-emb-34um-final-gate}"
 CAMPAIGN_ROOT="${CAMPAIGN_ROOT:-}"
 BATCH_DIR_OVERRIDE="${BATCH_DIR_OVERRIDE:-}"
+SEED="${SEED:-}"
 CONCURRENT_JOBS="${CONCURRENT_JOBS:-30}"
 RETRY_LIMIT="${RETRY_LIMIT:-3}"
 if [[ -z "${PYTHON_EXECUTABLE:-}" ]]; then
@@ -61,10 +62,12 @@ if [[ -z "${VAULT_ROOT}" ]]; then
   echo "VAULT_ROOT is required." >&2
   exit 2
 fi
-if [[ "${MODE}" != "full" && "${MODE}" != "canary" && "${MODE}" != "lhs" && "${MODE}" != "benchmark" && "${MODE}" != "validation" ]]; then
-  echo "MODE must be 'full', 'canary', 'lhs', 'benchmark', or 'validation'." >&2
+case "${MODE}" in
+  full|canary|lhs|benchmark|validation|shared_initial|al-step-[0-9][0-9]|lhs-step-[0-9][0-9]) ;;
+  *)
+  echo "MODE must be 'full', 'canary', 'lhs', 'benchmark', 'validation', 'shared_initial', 'al-step-XX', or 'lhs-step-XX'." >&2
   exit 2
-fi
+esac
 if [[ "${EXECUTION_MODE}" != "execute" && "${EXECUTION_MODE}" != "render-only" && "${EXECUTION_MODE}" != "dry-run" ]]; then
   echo "EXECUTION_MODE must be 'execute', 'render-only', or 'dry-run'." >&2
   exit 2
@@ -96,10 +99,32 @@ elif [[ "${MODE}" == "lhs" ]]; then
   BATCH_DIR="${CAMPAIGN_ROOT}/lhs_gate"
 elif [[ "${MODE}" == "benchmark" ]]; then
   BATCH_DIR="${CAMPAIGN_ROOT}/benchmark"
-elif [[ "${MODE}" == "validation" ]]; then
+elif [[ "${MODE}" == "validation" && -z "${SEED}" ]]; then
   BATCH_DIR="${CAMPAIGN_ROOT}/validation"
 else
-  BATCH_DIR="${CAMPAIGN_ROOT}/canary"
+  if [[ "${MODE}" == "canary" ]]; then
+    BATCH_DIR="${CAMPAIGN_ROOT}/canary"
+  else
+    if [[ -z "${SEED}" ]]; then
+      echo "SEED is required for causal stages or canary-like stage batches." >&2
+      exit 2
+    fi
+    if ! [[ "${SEED}" =~ ^[0-9]+$ ]]; then
+      echo "SEED must be a non-negative integer." >&2
+      exit 2
+    fi
+    SEED_PADDED="$(printf '%03d' "${SEED}")"
+    if [[ "${MODE}" == "shared_initial" ]]; then
+      BATCH_DIR="${CAMPAIGN_ROOT}/seed-${SEED_PADDED}/shared_initial"
+    elif [[ "${MODE}" == "validation" ]]; then
+      BATCH_DIR="${CAMPAIGN_ROOT}/seed-${SEED_PADDED}/validation"
+    elif [[ "${MODE}" == al-step-* || "${MODE}" == lhs-step-* ]]; then
+      BATCH_DIR="${CAMPAIGN_ROOT}/seed-${SEED_PADDED}/${MODE}"
+    else
+      echo "Unsupported causal mode: ${MODE}." >&2
+      exit 2
+    fi
+  fi
 fi
 
 if [[ ! -d "${BATCH_DIR}" ]]; then
@@ -126,10 +151,14 @@ fi
 
 if [[ -n "${SLURM_ARRAY_TASK_ID:-}" ]]; then
   TASK_INDEX="${SLURM_ARRAY_TASK_ID}"
-elif [[ "${MODE}" == "canary" || "${MODE}" == "lhs" || "${MODE}" == "benchmark" || "${MODE}" == "validation" ]]; then
+elif [[ "${MODE}" == "canary" || "${MODE}" == "lhs" || "${MODE}" == "benchmark" || ( "${MODE}" == "validation" && -z "${SEED}" ) ]]; then
   TASK_INDEX=0
 else
-  echo "MODE=full requires submission with an sbatch --array range." >&2
+  if [[ "${MODE}" == "full" ]]; then
+    echo "MODE=full requires submission with an sbatch --array range." >&2
+  else
+    echo "MODE=${MODE} requires submission with an sbatch --array range." >&2
+  fi
   exit 2
 fi
 
