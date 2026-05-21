@@ -57,6 +57,13 @@ mesouq_activate_site_env() {
   if [[ -z "${PYTHON_BIN:-}" || "${PYTHON_BIN}" == "python" ]]; then
     PYTHON_BIN="${MESOUQ_ENV_ROOT}/bin/python"
   fi
+  if [[ "${PYTHON_BIN}" != */* ]]; then
+    local resolved_python_bin
+    resolved_python_bin="$(command -v "${PYTHON_BIN}" || true)"
+    if [[ -n "${resolved_python_bin}" ]]; then
+      PYTHON_BIN="${resolved_python_bin}"
+    fi
+  fi
   export ENV_ROOT ENV_SCRIPT PYTHON_BIN
 
   if [[ ! -x "${PYTHON_BIN}" ]]; then
