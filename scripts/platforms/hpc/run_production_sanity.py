@@ -168,7 +168,7 @@ def main(argv: list[str] | None = None) -> int:
             for selection in selections
         ],
         "smoke_overrides": dict(PRODUCTION_SMOKE_OVERRIDES),
-        "korali": load_korali_build_state(REPO_ROOT),
+        "korali": load_korali_build_state(REPO_ROOT, site=resolved_site),
         "matrix": {
             "command": command,
             "command_text": format_command(command),

@@ -12,6 +12,7 @@ import sysconfig
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
+from meso_uq.platforms.site_selector import resolve_hpc_site
 from meso_uq.site_runtime import RuntimePaths as VegaPaths
 from meso_uq.site_runtime import get_site_runtime_paths, resolve_repo_root
 
@@ -99,8 +100,13 @@ MIRHEO_TREE_HASH_IGNORE = {
 }
 
 
-def get_vega_paths(repo_root: str | Path | None = None) -> VegaPaths:
-    return get_site_runtime_paths(repo_root, site="vega")
+def get_vega_paths(
+    repo_root: str | Path | None = None,
+    *,
+    runtime_root: str | Path | None = None,
+    env: dict[str, str] | None = None,
+) -> VegaPaths:
+    return get_site_runtime_paths(repo_root, site="vega", runtime_root=runtime_root, env=env)
 
 
 def get_runtime_paths(
@@ -367,10 +373,6 @@ def render_korali_env_script(paths: VegaPaths) -> str:
         f"export KORALI_PYTHONPATH={shlex.quote(str(paths.korali_site_packages))}",
         f"export PYTHONPATH={shlex.quote(pythonpath)}",
     ]
-    if paths.site == "vega":
-        lines.insert(6, f"export MESOUQ_VEGA_ROOT={shlex.quote(str(paths.site_root))}")
-    elif paths.site == "karolina":
-        lines.insert(6, f"export MESOUQ_KAROLINA_ROOT={shlex.quote(str(paths.site_root))}")
     return "\n".join(lines) + "\n"
 
 def render_unified_env_script(
@@ -483,10 +485,6 @@ def render_unified_env_script(
         'export PATH="${MESOUQ_ENV_ROOT}/bin${PATH:+:${PATH}}"',
         f"export PYTHONPATH={shlex.quote(pythonpath)}",
     ]
-    if paths.site == "vega":
-        lines.insert(4, f"export MESOUQ_VEGA_ROOT={shlex.quote(str(paths.site_root))}")
-    elif paths.site == "karolina":
-        lines.insert(4, f"export MESOUQ_KAROLINA_ROOT={shlex.quote(str(paths.site_root))}")
     if source_text:
         lines.extend(
             [
@@ -533,10 +531,6 @@ def render_gv_cgal_tools_env_script(
         '  *) export PATH="${GV_CGAL_TOOLS_ROOT}${PATH:+:${PATH}}" ;;',
         "esac",
     ]
-    if paths.site == "vega":
-        lines.insert(4, f"export MESOUQ_VEGA_ROOT={shlex.quote(str(paths.site_root))}")
-    elif paths.site == "karolina":
-        lines.insert(4, f"export MESOUQ_KAROLINA_ROOT={shlex.quote(str(paths.site_root))}")
     if libs:
         lines.append("for _mesouq_cgal_lib in \\")
         for index, lib_path in enumerate(libs):
@@ -562,13 +556,15 @@ def load_mirheo_source_lock(
     *,
     site: str | None = None,
 ) -> dict[str, object]:
-    paths = get_runtime_paths(repo_root, site=site)
-    default_source = DEFAULT_MIRHEO_SOURCE_PATHS.get(paths.site, DEFAULT_MIRHEO_SOURCE_PATH)
-    if not paths.mirheo_source_lock.is_file():
+    resolved_site = resolve_hpc_site(cli_site=site, default="vega")
+    root = resolve_repo_root(repo_root)
+    lock_path = root / "extern" / MIRHEO_LOCK_FILENAME
+    default_source = DEFAULT_MIRHEO_SOURCE_PATHS.get(resolved_site, DEFAULT_MIRHEO_SOURCE_PATH)
+    if not lock_path.is_file():
         return {"source_path": default_source}
-    payload = json.loads(paths.mirheo_source_lock.read_text(encoding="utf-8"))
+    payload = json.loads(lock_path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError(f"Invalid Mirheo source lock payload: {paths.mirheo_source_lock}")
+        raise ValueError(f"Invalid Mirheo source lock payload: {lock_path}")
     locked_source = payload.get("source_path")
     source_path = str(locked_source or default_source)
     if locked_source:
@@ -576,7 +572,7 @@ def load_mirheo_source_lock(
         default_candidate = Path(default_source).expanduser()
         if not locked_candidate.exists() and default_candidate.exists():
             payload["source_path_fallback_reason"] = (
-                f"locked source unavailable for site {paths.site}: {locked_candidate}"
+                f"locked source unavailable for site {resolved_site}: {locked_candidate}"
             )
             source_path = default_source
     payload["source_path"] = source_path
@@ -666,10 +662,6 @@ def render_mirheo_env_script(
         f"export MIRHEO_BUILD_DIR={shlex.quote(str(paths.mirheo_build_dir))}",
         f"export MIRHEO_INSTALL_PREFIX={shlex.quote(str(paths.mirheo_prefix))}",
     ]
-    if paths.site == "vega":
-        lines.insert(4, f"export MESOUQ_VEGA_ROOT={shlex.quote(str(paths.site_root))}")
-    elif paths.site == "karolina":
-        lines.insert(4, f"export MESOUQ_KAROLINA_ROOT={shlex.quote(str(paths.site_root))}")
     if snapshot_text:
         lines.append(f"export MIRHEO_SOURCE_SNAPSHOT={shlex.quote(snapshot_text)}")
     return "\n".join(lines) + "\n"
@@ -686,8 +678,4 @@ def render_tinytex_env_script(paths: VegaPaths) -> str:
         f"export MESOUQ_TINYTEX_ROOT={shlex.quote(str(paths.tinytex_root))}",
         f"export PATH={shlex.quote(str(paths.tinytex_bin_dir))}:$PATH",
     ]
-    if paths.site == "vega":
-        lines.insert(4, f"export MESOUQ_VEGA_ROOT={shlex.quote(str(paths.site_root))}")
-    elif paths.site == "karolina":
-        lines.insert(4, f"export MESOUQ_KAROLINA_ROOT={shlex.quote(str(paths.site_root))}")
     return "\n".join(lines) + "\n"

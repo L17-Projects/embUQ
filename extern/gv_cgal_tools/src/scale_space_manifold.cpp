@@ -27,13 +27,13 @@ int main(int argc, char* argv[]) {
   t.start();
   // Construct the mesh in a scale space.
   Reconstruction reconstruct(points.begin(), points.end() );
-  
-    
-    
+
+
+
   int p1 = atoi(argv[2]); //10
   int p2 = atoi(argv[3]); //200
   int p3 = atoi(argv[4]); //4
-  
+
   Smoother smoother(p1,p2 );
   reconstruct.increase_scale(p3, smoother);
   Mesher mesher(smoother.squared_radius(),

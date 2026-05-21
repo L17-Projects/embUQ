@@ -193,11 +193,13 @@ def test_resolve_phase2_backend_rejects_unknown_backend(phase2_module) -> None:
 
 
 
-def test_detect_native_cuda_batch_support_reports_disabled(tmp_path: Path, phase2_module) -> None:
+def test_detect_native_cuda_batch_support_reports_disabled(tmp_path: Path, phase2_module, monkeypatch) -> None:
     mod, _, _ = phase2_module
-    build_opts = (
-        tmp_path / "_vega" / "korali" / "build" / "meson-info" / "intro-buildoptions.json"
-    )
+    (tmp_path / "extern" / "korali").mkdir(parents=True)
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='mesouq'\n", encoding="utf-8")
+    runtime_root = tmp_path / "runtime"
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(runtime_root))
+    build_opts = runtime_root / "korali" / "build" / "meson-info" / "intro-buildoptions.json"
     build_opts.parent.mkdir(parents=True, exist_ok=True)
     build_opts.write_text(
         json.dumps([{"name": "native_cuda_batch", "value": False}]),
@@ -210,19 +212,24 @@ def test_detect_native_cuda_batch_support_reports_disabled(tmp_path: Path, phase
 
 
 
-def test_detect_native_cuda_batch_support_reports_missing_metadata(tmp_path: Path, phase2_module) -> None:
+def test_detect_native_cuda_batch_support_reports_missing_metadata(tmp_path: Path, phase2_module, monkeypatch) -> None:
     mod, _, _ = phase2_module
+    (tmp_path / "extern" / "korali").mkdir(parents=True)
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='mesouq'\n", encoding="utf-8")
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(tmp_path / "runtime"))
     supported, source = mod._detect_native_cuda_batch_support(tmp_path)
     assert supported is None
     assert "build options not found" in source
 
 
 
-def test_detect_native_cuda_batch_support_reports_invalid_json(tmp_path: Path, phase2_module) -> None:
+def test_detect_native_cuda_batch_support_reports_invalid_json(tmp_path: Path, phase2_module, monkeypatch) -> None:
     mod, _, _ = phase2_module
-    build_opts = (
-        tmp_path / "_vega" / "korali" / "build" / "meson-info" / "intro-buildoptions.json"
-    )
+    (tmp_path / "extern" / "korali").mkdir(parents=True)
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='mesouq'\n", encoding="utf-8")
+    runtime_root = tmp_path / "runtime"
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(runtime_root))
+    build_opts = runtime_root / "korali" / "build" / "meson-info" / "intro-buildoptions.json"
     build_opts.parent.mkdir(parents=True, exist_ok=True)
     build_opts.write_text("not-json", encoding="utf-8")
 

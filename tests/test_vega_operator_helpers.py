@@ -409,7 +409,7 @@ def test_vega_sbatch_templates_expose_model_family_and_profile_axes() -> None:
         )
         assert 'source "${REPO_ROOT}/scripts/platforms/hpc/site_env.sh"' in text
         assert "mesouq_activate_site_env vega" in text
-        assert "_vega/" not in text
+        assert ("_vega" + "/") not in text
 
 
 def test_gv_paper_figure_replay_template_uses_public_command_and_gv_runtime() -> None:
@@ -434,7 +434,7 @@ def test_gv_paper_figure_replay_template_uses_public_command_and_gv_runtime() ->
     assert 'command+=(--buckling-timeout-seconds "${BUCKLING_TIMEOUT_SECONDS}")' in text
     assert 'source "${REPO_ROOT}/scripts/platforms/hpc/site_env.sh"' in text
     assert "mesouq_activate_site_env vega" in text
-    assert "_vega/" not in text
+    assert ("_vega" + "/") not in text
     assert "OpenMPI/4.1.4-GCC-12.2.0" in text
     assert "#SBATCH --partition=gpu" in text
     assert "#SBATCH --time=24:00:00" in text
@@ -486,7 +486,7 @@ def test_validation_matrix_template_uses_public_command() -> None:
     assert "EXPERIMENTS" in text
     assert "#SBATCH --mem=64000" in text
     assert "mesouq_activate_site_env vega" in text
-    assert "_vega/" not in text
+    assert ("_vega" + "/") not in text
 
 
 def test_acceptance_template_uses_public_command() -> None:
@@ -499,7 +499,7 @@ def test_acceptance_template_uses_public_command() -> None:
     assert "SELECTIONS" in text
     assert "compression:reduced-model:validation" in text
     assert "mesouq_activate_site_env vega" in text
-    assert "_vega/" not in text
+    assert ("_vega" + "/") not in text
 
 
 def test_vega_bootstrap_scripts_resolve_repo_root_after_platforms_move() -> None:

@@ -47,7 +47,7 @@ def test_production_sanity_command_writes_override_configs_and_machine_readable_
     monkeypatch.setattr(
         module,
         "load_korali_build_state",
-        lambda repo_root: {"status": "detected", "build_options": {"native_cuda_batch": False}},
+        lambda repo_root, **kwargs: {"status": "detected", "build_options": {"native_cuda_batch": False}},
     )
     monkeypatch.setattr(
         module,
@@ -121,7 +121,7 @@ def test_production_sanity_allows_cpu_mpi_multi_rank(tmp_path, monkeypatch):
         return _Result(returncode=0)
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
-    monkeypatch.setattr(module, "load_korali_build_state", lambda repo_root: {"status": "unknown"})
+    monkeypatch.setattr(module, "load_korali_build_state", lambda repo_root, **kwargs: {"status": "unknown"})
     monkeypatch.setattr(module, "render_production_sanity_plots", lambda *args, **kwargs: {})
 
     rc = module.main(

@@ -71,7 +71,7 @@ int main(int argc, char* argv[])
   std::copy(facets.begin(),
             facets.end(),
             std::ostream_iterator<Facet>(std::cout, "\n"));
-  
+
   //Point_set points0;
   //points0 = points;
   std::ofstream out ("out.off");
@@ -79,7 +79,7 @@ int main(int argc, char* argv[])
   for (int it = 0; it != points.size(); ++ it)
     out << points[it] << std::endl;
   for (int it = 0; it != facets.size(); ++ it)
-    out << facets[it] << std::endl;    
-    
+    out << facets[it] << std::endl;
+
   return 0;
 }

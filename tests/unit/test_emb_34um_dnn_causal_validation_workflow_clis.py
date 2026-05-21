@@ -184,7 +184,9 @@ def test_metric_sbatch_runs_metric_cli_and_analysis_on_gpu_node() -> None:
     assert "#SBATCH --partition=qgpu" in text
     assert "#SBATCH --time=08:00:00" in text
     assert "#SBATCH --gpus=1" in text
-    assert "source /scratch/project/eu-26-17/eubrieucb/mesouq/load_mesouq_karolina.sh" in text
+    assert "source scripts/platforms/hpc/site_env.sh" in text
+    assert "mesouq_activate_site_env karolina \"${REPO_ROOT}\"" in text
+    assert "MESOUQ_SITE_RUNTIME_ROOT must be set before using this Karolina sbatch script." in text
     assert "run_emb_34um_dnn_causal_validation_metrics.py" in text
     assert "analyze_emb_34um_dnn_causal_validation.py" in text
     assert "emb_34um_dnn_causal_validation_rows.json" in text

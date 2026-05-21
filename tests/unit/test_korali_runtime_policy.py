@@ -58,7 +58,7 @@ def test_validate_korali_runtime_contract_accepts_existing_vendor_root(tmp_path:
 
     report = validate_korali_runtime_contract(
         repo_root,
-        env={"MESOUQ_SITE": "karolina"},
+        env={"MESOUQ_SITE": "karolina", "MESOUQ_SITE_RUNTIME_ROOT": str(tmp_path / "runtime")},
         build_root=build_root,
         library_paths=(library_path,),
         pythonpath_hint=pythonpath_hint,
@@ -74,9 +74,9 @@ def test_validate_korali_runtime_contract_reports_missing_env_hints(tmp_path: Pa
 
     report = validate_korali_runtime_contract(repo_root, env={})
 
-    assert report.ok
+    assert not report.ok
     assert any("MESOUQ_SITE was not supplied" in warning for warning in report.warnings)
-    assert any("MESOUQ_SITE_RUNTIME_ROOT was not supplied" in warning for warning in report.warnings)
+    assert any("MESOUQ_SITE_RUNTIME_ROOT was not supplied" in error for error in report.errors)
     assert any("No PYTHONPATH hint was supplied" in warning for warning in report.warnings)
     assert any("No PATH hint was supplied" in warning for warning in report.warnings)
 
@@ -122,6 +122,7 @@ def test_korali_runtime_module_executes_cli(tmp_path: Path) -> None:
     repo_root = _make_repo(tmp_path, vendor=True)
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path(__file__).resolve().parents[2] / "src")
+    env["MESOUQ_SITE_RUNTIME_ROOT"] = str(tmp_path / "runtime")
 
     result = subprocess.run(
         [

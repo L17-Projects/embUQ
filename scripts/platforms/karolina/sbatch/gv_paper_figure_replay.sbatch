@@ -55,16 +55,14 @@ BUCKLING_POINT_COUNT="${BUCKLING_POINT_COUNT:-}"
 BUCKLING_TIMEOUT_SECONDS="${BUCKLING_TIMEOUT_SECONDS:-}"
 
 cd "${REPO_ROOT}"
-source scripts/platforms/karolina/env_karolina.sh
-OUTPUT_ROOT="${OUTPUT_ROOT:-${MESOUQ_RUNS_ROOT}/gv/figure_replay/${CAMPAIGN_ID}}"
-
-GV_ENV_SCRIPT="${MESOUQ_GV_ENV_SCRIPT:-${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh}"
-if [[ ! -f "${GV_ENV_SCRIPT}" ]]; then
-  echo "Missing required GV runtime environment: ${GV_ENV_SCRIPT}" >&2
-  exit 1
+if [[ -z "${MESOUQ_SITE_RUNTIME_ROOT:-}" ]]; then
+  echo "MESOUQ_SITE_RUNTIME_ROOT must be set before using this Karolina sbatch script." >&2
+  exit 2
 fi
-
-source "${GV_ENV_SCRIPT}"
+source scripts/platforms/karolina/env_karolina.sh
+source scripts/platforms/hpc/site_env.sh
+mesouq_activate_site_env karolina "${REPO_ROOT}"
+OUTPUT_ROOT="${OUTPUT_ROOT:-${MESOUQ_RUNS_ROOT}/gv/figure_replay/${CAMPAIGN_ID}}"
 export MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"
 export MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"
 export MESOUQ_GV_EIGENMODES_DOMAIN_RANKS="${MESOUQ_GV_EIGENMODES_DOMAIN_RANKS:-1,1,1}"

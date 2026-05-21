@@ -154,7 +154,7 @@ def test_vega_render_validation_covers_four_non_shear_gv_lanes(tmp_path, monkeyp
         assert "#SBATCH --gres=gpu:1" in script
         assert "module purge" in script
         assert "mesouq_activate_site_env vega" in script
-        assert "_vega/" not in script
+        assert ("_vega" + "/") not in script
         assert "scripts/platforms/hpc/run_gv_runtime.py" in script
         assert "--site vega" in script
         assert _scheduler_submission_commands(script) == []

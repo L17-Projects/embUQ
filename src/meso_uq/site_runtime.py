@@ -10,10 +10,6 @@ from pathlib import Path
 from meso_uq.platforms.site_selector import VALID_MESOUQ_SITES, resolve_hpc_site
 
 VALID_RUNTIME_SITES = set(VALID_MESOUQ_SITES)
-DEFAULT_SITE_ROOT_NAMES = {
-    "vega": "_vega",
-    "karolina": "_karolina",
-}
 
 
 @dataclass(frozen=True)
@@ -88,7 +84,10 @@ def _resolve_site_root(
     env_root = env.get("MESOUQ_SITE_RUNTIME_ROOT", "").strip()
     if env_root:
         return Path(env_root).expanduser().resolve()
-    return repo_root / DEFAULT_SITE_ROOT_NAMES[site]
+    raise RuntimeError(
+        "MESOUQ_SITE_RUNTIME_ROOT is required for MesoUQ site runtime paths. "
+        "Set it to a per-site runtime root, or pass runtime_root explicitly."
+    )
 
 
 def _resolve_provenance_root(

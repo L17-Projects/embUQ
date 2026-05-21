@@ -53,7 +53,7 @@ def test_karolina_validation_matrix_template_uses_only_karolina_runtime_paths() 
     assert 'SKIP_RELEASE_MANIFEST="${SKIP_RELEASE_MANIFEST:-true}"' in text
     assert "--run-map-mirheo" in text
     assert "--skip-release-manifest" in text
-    assert "_vega/" not in text
+    assert ("_vega" + "/") not in text
 
 
 def test_vega_validation_matrix_template_matches_workflow_only_defaults() -> None:
@@ -76,7 +76,7 @@ def test_matrix_templates_use_login_shell_canonical_env_and_repo_pythonpath(temp
     assert 'source "${REPO_ROOT}/scripts/platforms/hpc/site_env.sh"' in text
     assert 'mesouq_activate_site_env vega "${REPO_ROOT}"' in text
     assert 'export PYTHONPATH="${REPO_ROOT}/src:${REPO_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"' in text
-    assert '_vega/' not in text
+    assert ('_vega' + '/') not in text
 
 
 @pytest.mark.parametrize("template", ("bnn_sweep_matrix.sbatch", "bnn_certification_matrix.sbatch"))

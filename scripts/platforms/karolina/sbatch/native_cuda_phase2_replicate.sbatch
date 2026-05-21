@@ -24,14 +24,15 @@ unset legacy_name
 : "${PHASE2_BACKEND:?PHASE2_BACKEND must be cpu-mpi or native-cuda}"
 : "${REPLICATE_ID:?REPLICATE_ID must identify this replicate}"
 
-MESOUQ_SITE_RUNTIME_ROOT="${MESOUQ_SITE_RUNTIME_ROOT:-/scratch/project/eu-26-17/eubrieucb/mesouq/runtime}"
+if [[ -z "${MESOUQ_SITE_RUNTIME_ROOT:-}" ]]; then
+  echo "MESOUQ_SITE_RUNTIME_ROOT must be set before using this Karolina sbatch script." >&2
+  exit 2
+fi
 PYTHON_BIN="${PYTHON_BIN:-${MESOUQ_SITE_RUNTIME_ROOT}/env/bin/python}"
 CONFIG_PATH="${CONFIG_PATH:-${REPO_ROOT}/inference/configs/production/inference_config_indentation.yaml}"
 PHASE2_CPU_RANKS="${PHASE2_CPU_RANKS:-1}"
 LOG_ROOT="${LOG_ROOT:-${LANE_ROOT}/logs}"
 MANIFEST_ROOT="${MANIFEST_ROOT:-${LANE_ROOT}/manifests}"
-ENV_SCRIPT="${ENV_SCRIPT:-${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh}"
-KORALI_ENV_SCRIPT="${KORALI_ENV_SCRIPT:-}"
 
 case "${PHASE2_BACKEND}" in
   cpu-mpi)
@@ -53,10 +54,9 @@ case "${PHASE2_BACKEND}" in
 esac
 
 cd "${REPO_ROOT}"
-source "${ENV_SCRIPT}"
-if [[ -n "${KORALI_ENV_SCRIPT}" ]]; then
-  source "${KORALI_ENV_SCRIPT}"
-fi
+source scripts/platforms/karolina/env_karolina.sh
+source scripts/platforms/hpc/site_env.sh
+mesouq_activate_site_env karolina "${REPO_ROOT}"
 
 export PATH="$(dirname "${PYTHON_BIN}"):${PATH}"
 export PYTHONPATH="${REPO_ROOT}/src:${REPO_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"

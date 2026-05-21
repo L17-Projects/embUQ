@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.join(project_root, "emb", "compression", "evalkit"))
 
 from emb.compression.evalkit.tools import datedPrint
 from meso_uq.config import resolve_inference_config_path
+from meso_uq.site_runtime import get_site_runtime_paths
 from meso_uq.experiments import load_experiments
 from meso_uq.workflow_acceleration import (
     configure_korali_conduit,
@@ -29,15 +30,12 @@ VALID_PHASE2_BACKENDS = ("cpu-mpi", "native-cuda")
 
 
 def _detect_native_cuda_batch_support(project_root_path: str | Path) -> tuple[bool | None, str]:
-    """Detect whether the repo-local Korali build exposes native CUDA batching."""
-    build_options_path = (
-        Path(project_root_path)
-        / "_vega"
-        / "korali"
-        / "build"
-        / "meson-info"
-        / "intro-buildoptions.json"
-    )
+    """Detect whether the canonical Korali build exposes native CUDA batching."""
+    try:
+        paths = get_site_runtime_paths(project_root_path)
+    except Exception as exc:
+        return None, f"site runtime root unavailable: {exc}"
+    build_options_path = paths.korali_build_dir / "meson-info" / "intro-buildoptions.json"
     if not build_options_path.exists():
         return None, f"build options not found at {build_options_path}"
 

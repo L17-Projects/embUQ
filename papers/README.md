@@ -32,7 +32,7 @@ module purge
 module load Python/3.10.8-GCCcore-12.2.0 openmpi/4.1.2.1 CUDA/12.2.2 GSL/2.7-GCC-12.2.0 Eigen/3.4.0-GCCcore-12.2.0 CMake/3.24.3-GCCcore-12.2.0 HDF5/1.14.0-gompi-2022b
 
 bash scripts/platforms/hpc/bootstrap_env.sh --site vega
-source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
+source "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
 python -m pip install --upgrade pip
 # Vega's driver stack cannot run the default PyPI CUDA 13 PyTorch wheel.
 # Install a CUDA 12.6 wheel first so the editable install keeps this build.
@@ -41,7 +41,7 @@ python -m pip install -e ".[test,mpi]"
 python -m pip install pybind11 meson ninja h5py
 
 bash scripts/platforms/hpc/bootstrap_korali.sh --jobs 8 --native-cuda-batch
-source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
+source "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
 python - <<'PY'
 import json
 from pathlib import Path
@@ -61,28 +61,28 @@ if [[ ! -f "$MESOUQ_MIRHEO_SRC/CMakeLists.txt" ]]; then
   rsync -rlt --chmod=u+rwX,go+rX /ceph/hpc/home/eubrieucb/software/Mirheo/ "$MESOUQ_MIRHEO_SRC/"
 fi
 bash scripts/platforms/hpc/bootstrap_mirheo.sh --source "$MESOUQ_MIRHEO_SRC" --jobs 8 --reconfigure
-source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
+source "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
 bash scripts/platforms/vega/bootstrap_tex.sh
-source _vega/tinytex/env.sh
+source "${MESOUQ_SITE_RUNTIME_ROOT}/tinytex/env.sh"
 
 python scripts/platforms/hpc/doctor_hpc.py --strict --with-mirheo --with-tex
 python -m pytest tests/test_vega_50k_campaign.py tests/test_huq_emb_campaign_orchestrator.py tests/test_run_exact_uqdpd_asset_port.py
 
-mkdir -p _vega/logs
+mkdir -p "${MESOUQ_RUNS_ROOT}/logs"
 sbatch --wait \
   --partition=dev \
   --gres=gpu:1 \
   --time=00:05:00 \
   --job-name=mesouq-torch-cuda-probe \
-  --output="$REPO/_vega/logs/torch_cuda_probe_%j.out" \
-  --error="$REPO/_vega/logs/torch_cuda_probe_%j.err" \
+  --output="${MESOUQ_RUNS_ROOT}/logs/torch_cuda_probe_%j.out" \
+  --error="${MESOUQ_RUNS_ROOT}/logs/torch_cuda_probe_%j.err" \
   --export=ALL,REPO="$REPO" <<'SBATCH'
 #!/bin/bash
 set -euo pipefail
 cd "$REPO"
 module purge
 module load Python/3.10.8-GCCcore-12.2.0 CUDA/12.2.2
-source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
+source "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
 python - <<'PY'
 import torch
 
@@ -115,10 +115,8 @@ printf '%s\n' "$CAMPAIGN_ID" > "$PAPER_DATA_ROOT/LAST_CAMPAIGN_ID.txt"
 
 module purge
 module load Python/3.10.8-GCCcore-12.2.0 openmpi/4.1.2.1 CUDA/12.2.2 GSL/2.7-GCC-12.2.0 Eigen/3.4.0-GCCcore-12.2.0 HDF5/1.14.0-gompi-2022b
-source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
-source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
-source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
-source _vega/tinytex/env.sh
+source "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
+source "${MESOUQ_SITE_RUNTIME_ROOT}/tinytex/env.sh"
 
 python papers/huq_emb/run_vega_50k_campaign.py \
   --paper-data-root "$PAPER_DATA_ROOT" \
@@ -187,17 +185,15 @@ cd "$REPO"
 export MESOUQ_SITE=vega
 module purge
 module load Python/3.10.8-GCCcore-12.2.0 openmpi/4.1.2.1 CUDA/12.2.2 GSL/2.7-GCC-12.2.0 Eigen/3.4.0-GCCcore-12.2.0 HDF5/1.14.0-gompi-2022b
-source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
-source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
-source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
-source _vega/tinytex/env.sh
+source "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
+source "${MESOUQ_SITE_RUNTIME_ROOT}/tinytex/env.sh"
 python papers/huq_emb/run_exact_uqdpd_asset_port.py \
   --paper-data-root "$PAPER_DATA_ROOT" \
   --campaign-id "$CAMPAIGN_ID" \
   --python-bin "\$(command -v python)" \
   --site vega \
   --staging-device cuda \
-  --texdeps-dir "$REPO/_vega/tinytex" \
+  --texdeps-dir "${MESOUQ_SITE_RUNTIME_ROOT}/tinytex" \
   --force
 SBATCH
 ```
@@ -223,10 +219,8 @@ export CAMPAIGN_ID="${CAMPAIGN_ID:-$(cat "$PAPER_DATA_ROOT/LAST_CAMPAIGN_ID.txt"
 
 module purge
 module load Python/3.10.8-GCCcore-12.2.0 openmpi/4.1.2.1 CUDA/12.2.2 GSL/2.7-GCC-12.2.0 Eigen/3.4.0-GCCcore-12.2.0 HDF5/1.14.0-gompi-2022b
-source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
-source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
-source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
-source _vega/tinytex/env.sh
+source "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
+source "${MESOUQ_SITE_RUNTIME_ROOT}/tinytex/env.sh"
 
 python papers/huq_emb/generate_out_of_scope_figures.py \
   --paper-data-root "$PAPER_DATA_ROOT" \
@@ -251,7 +245,7 @@ export CAMPAIGN_ID="${CAMPAIGN_ID:-$(cat "$PAPER_DATA_ROOT/LAST_CAMPAIGN_ID.txt"
 
 module purge
 module load Python/3.10.8-GCCcore-12.2.0
-source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
+source "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
 
 python - <<'PY'
 import json

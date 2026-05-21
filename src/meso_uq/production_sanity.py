@@ -12,6 +12,7 @@ import yaml
 
 from meso_uq.experiments import load_experiments
 from meso_uq.postprocess import load_posterior_samples
+from meso_uq.site_runtime import get_site_runtime_paths
 from meso_uq.postprocess.plots import (
     plot_posterior_marginals,
     plot_propagation_summary,
@@ -110,16 +111,28 @@ def write_production_smoke_config(
     return base_config, config_path
 
 
-def load_korali_build_state(repo_root: Path | str) -> dict[str, object]:
+def load_korali_build_state(
+    repo_root: Path | str,
+    *,
+    site: str | None = None,
+    runtime_root: Path | str | None = None,
+    env: dict[str, str] | None = None,
+) -> dict[str, object]:
     repo_root = Path(repo_root).resolve()
-    build_options_path = (
-        repo_root / "_vega" / "korali" / "build" / "meson-info" / "intro-buildoptions.json"
-    )
+    try:
+        paths = get_site_runtime_paths(repo_root, site=site, runtime_root=runtime_root, env=env)
+    except Exception as exc:
+        return {
+            "status": "unknown",
+            "build_options_path": None,
+            "reason": f"site runtime root unavailable: {exc}",
+        }
+    build_options_path = paths.korali_build_dir / "meson-info" / "intro-buildoptions.json"
     if not build_options_path.exists():
         return {
             "status": "unknown",
             "build_options_path": str(build_options_path),
-            "reason": "repo-local Korali Meson build metadata not found",
+            "reason": "canonical Korali Meson build metadata not found",
         }
 
     data = json.loads(build_options_path.read_text(encoding="utf-8"))

@@ -15,13 +15,12 @@ export MESOUQ_RUNS_ROOT="${MESOUQ_SCRATCH_ROOT}/runs"
 export MESOUQ_PROVENANCE_ROOT="${MESOUQ_SCRATCH_ROOT}/provenance"
 ```
 
-The site-neutral runtime helper resolves Karolina bootstrap state under `MESOUQ_SITE_RUNTIME_ROOT` when set. Without that override it uses clone-local `_karolina/` paths:
+The site-neutral runtime helper resolves Karolina bootstrap state under `MESOUQ_SITE_RUNTIME_ROOT`. That variable is required for Karolina runtime discovery; missing it is a hard error instead of falling back to clone-local paths:
 
-- `_karolina/env`
-- `_karolina/korali`
-- `_karolina/mirheo`
-- `_karolina/env`
-- `_karolina/gv_cgal_tools`
+- `${MESOUQ_SITE_RUNTIME_ROOT}/env`
+- `${MESOUQ_SITE_RUNTIME_ROOT}/korali`
+- `${MESOUQ_SITE_RUNTIME_ROOT}/mirheo`
+- `${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools`
 
 `MESOUQ_PROVENANCE_ROOT` is explicit and site-aware. On Karolina it should point to scratch-accessible provenance staging (default `${MESOUQ_SCRATCH_ROOT}/provenance` from `env_karolina.sh`), and generated runtime env scripts export the resolved value.
 
@@ -55,13 +54,7 @@ Generated GV runtime commands must source the explicit `MESOUQ_GV_ENV_SCRIPT` wh
 "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
 ```
 
-If no override is set, the fallback is clone-local and site-qualified:
-
-```bash
-_karolina/env/env.sh
-```
-
-Vega compatibility is preserved through `get_vega_paths()` and clone-local `_vega/` defaults.
+If no override is set, `MESOUQ_SITE_RUNTIME_ROOT` is required and the canonical script is resolved under that root. Vega compatibility is preserved through `get_vega_paths()`, but resolved paths now come from the canonical site runtime root.
 
 GV geometry tooling is staged under:
 

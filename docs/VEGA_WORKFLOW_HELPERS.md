@@ -137,4 +137,4 @@ Useful production overrides:
 - `PHASE3B_MEM_ARG="--mem=8000"` when `--exclusive` is too strict on `dev`
 - `RUN_TAG=<tag>` to control output/log folder naming
 
-When submitting with `sbatch`, run them from the repo root or set `REPO_ROOT` explicitly so the batch job can resolve the clone-local `_vega/` runtime correctly.
+When submitting with `sbatch`, run from the repo root or set `REPO_ROOT` explicitly, and set `MESOUQ_SITE_RUNTIME_ROOT` so the batch job can resolve the canonical site runtime.

@@ -50,7 +50,7 @@ def test_check_korali_install_fail(tmp_path, monkeypatch):
 
 def test_check_korali_env_sh_pass(tmp_path, monkeypatch):
     module = _load_module()
-    env_sh = tmp_path / "_vega" / "korali" / "env.sh"
+    env_sh = tmp_path / "runtime" / "env" / "env.sh"
     env_sh.parent.mkdir(parents=True)
     env_sh.write_text("export PATH=...\n", encoding="utf-8")
     monkeypatch.setattr(module, "KORALI_ENV_SH", env_sh)
@@ -112,7 +112,7 @@ def test_check_korali_import_install_backup_path_is_not_treated_as_inside(tmp_pa
 
     fake_result = MagicMock()
     fake_result.returncode = 0
-    fake_result.stdout = str(tmp_path / "_vega" / "korali" / "install_backup" / "korali.py") + "\n"
+    fake_result.stdout = str(tmp_path / "runtime" / "korali" / "install_backup" / "korali.py") + "\n"
     fake_result.stderr = ""
 
     with patch("subprocess.run", return_value=fake_result):

@@ -7,7 +7,7 @@
 #include <fstream>
 #include <iostream>
 #include <stdio.h>      /* printf, NULL */
-#include <stdlib.h> 
+#include <stdlib.h>
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel     Kernel;
 typedef CGAL::Scale_space_surface_reconstruction_3<Kernel>                    Reconstruction;
@@ -27,10 +27,10 @@ int main(int argc, char** argv)
     std::cerr << "Error: cannot read file" << std::endl;
     return EXIT_FAILURE;
   }
-  
+
   int skala = atoi(argv[1]);
   double srf = strtof(argv[2],NULL);
-  
+
   std::cerr << "done: " << points.size() << " points." << std::endl;
   std::cerr << "Reconstruction ";
   CGAL::Timer t;
@@ -45,7 +45,7 @@ int main(int argc, char** argv)
   out << "OFF" << std::endl << points.size() << " " << reconstruct.number_of_facets() << " 0" << std::endl;
   for (Point_set::iterator it = points.begin(); it != points.end(); ++ it)
     out << points.point(*it) << std::endl;
-  //orient_to_bound_a_volume()  
+  //orient_to_bound_a_volume()
   for (Reconstruction::Facet_iterator it = reconstruct.facets_begin();
        it != reconstruct.facets_end(); ++ it)
     out << "3 " << (*it)[0] << " " << (*it)[1] << " " << (*it)[2] << std::endl; //normals point inside which is what mirheo apparently uses

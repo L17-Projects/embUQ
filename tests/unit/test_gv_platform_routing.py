@@ -212,7 +212,7 @@ def test_gv_runtime_rendering_targets_staged_work_dir_and_generates_scheduler(tm
     assert "generate.py" in contents
     assert "run_HPC.sbatch" in contents
     assert "/env/env.sh" in contents
-    assert "_vega/" not in contents
+    assert ("_vega" + "/") not in contents
     assert "Missing required GV runtime environment" in contents
     assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in contents
     assert '"mu_l": 0.5' in contents
@@ -220,7 +220,7 @@ def test_gv_runtime_rendering_targets_staged_work_dir_and_generates_scheduler(tm
 
     scheduler_contents = (work_dir / "run_HPC.sbatch").read_text(encoding="utf-8")
     assert "/env/env.sh" in scheduler_contents
-    assert "_vega/" not in scheduler_contents
+    assert ("_vega" + "/") not in scheduler_contents
     assert "Missing required GV runtime environment" in scheduler_contents
 
 

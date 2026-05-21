@@ -91,7 +91,13 @@ set -euo pipefail
 
 REPO_ROOT="${{REPO_ROOT:-{REPO_ROOT}}}"
 cd "${{REPO_ROOT}}"
-source /scratch/project/eu-26-17/eubrieucb/mesouq/load_mesouq_karolina.sh
+if [[ -z "${{MESOUQ_SITE_RUNTIME_ROOT:-}}" ]]; then
+  echo "MESOUQ_SITE_RUNTIME_ROOT must be set before using this Karolina canary script." >&2
+  exit 2
+fi
+source "${{REPO_ROOT}}/scripts/platforms/karolina/env_karolina.sh"
+source "${{REPO_ROOT}}/scripts/platforms/hpc/site_env.sh"
+mesouq_activate_site_env karolina "${{REPO_ROOT}}"
 
 export MESOUQ_GV_EIGENMODES_PROFILE=canary
 export MESOUQ_GV_EIGENMODES_DOMAIN_RANKS={shlex.quote(domain_ranks)}

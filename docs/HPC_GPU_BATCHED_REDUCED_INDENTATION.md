@@ -4,7 +4,7 @@ This guide describes the current supported operator path for the reduced-model i
 
 ## Scope
 
-- clone-local runtime rooted under `_vega/`
+- canonical runtime rooted under `${MESOUQ_SITE_RUNTIME_ROOT}`
 - vendored `extern/korali/` bootstrap only
 - single-node SLURM jobs on Vega with the strict GPU partition policy
 - one GPU for surrogate-backed `Phase 1`, native-CUDA `Phase 2`, `Phase 3b`, and propagation where applicable

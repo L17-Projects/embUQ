@@ -282,7 +282,7 @@ def test_render_gv_launch_campaign_materializes_karolina_and_vega_without_submis
     assert "#SBATCH --gres=gpu:2" in vega_script
     assert "module purge" in vega_script
     assert "mesouq_activate_site_env vega" in vega_script
-    assert "_vega/" not in vega_script
+    assert ("_vega" + "/") not in vega_script
     assert "scripts/platforms/hpc/run_gv_runtime.py" in vega_script
     assert "--site vega" in vega_script
     assert 'export MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"' in vega_script

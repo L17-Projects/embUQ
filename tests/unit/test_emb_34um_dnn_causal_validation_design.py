@@ -196,7 +196,9 @@ def test_dnn_causal_validation_sbatch_supports_execute_and_runner_invocation() -
     )
     text = script_path.read_text(encoding="utf-8")
 
-    assert "source /scratch/project/eu-26-17/eubrieucb/mesouq/load_mesouq_karolina.sh" in text
+    assert "source scripts/platforms/hpc/site_env.sh" in text
+    assert "mesouq_activate_site_env karolina \"${REPO_ROOT}\"" in text
+    assert "MESOUQ_SITE_RUNTIME_ROOT must be set before using this Karolina sbatch script." in text
     assert 'EXECUTION_MODE="${EXECUTION_MODE:-execute}"' in text
     assert 'RUNNER_SCRIPT="${RUNNER_SCRIPT:-${REPO_ROOT}/scripts/workflows/emb/active_learning/run_emb_34um_final_gate_candidate.py}"' in text
     assert '"${EXECUTION_MODE}" == "render-only"' in text

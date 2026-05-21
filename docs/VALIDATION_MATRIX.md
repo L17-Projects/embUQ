@@ -33,7 +33,7 @@ These checks require a Linux workstation with an NVIDIA GPU:
 These checks require the real target environment:
 
 - install on Vega
-- bootstrap vendored `extern/korali/` into repo-local `_vega/`
+- bootstrap vendored `extern/korali/` into `${MESOUQ_SITE_RUNTIME_ROOT}/korali/install`
 - run the public Vega validation matrix first
 - validate MPI execution
 - run the single Vega-first acceptance command

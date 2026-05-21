@@ -211,11 +211,11 @@ def validate_korali_runtime_contract(
     if site_runtime_root is None:
         issues.append(
             KoraliRuntimeValidationIssue(
-                severity="warning",
+                severity="error",
                 code="site-runtime-root-missing",
                 message=(
-                    "MESOUQ_SITE_RUNTIME_ROOT was not supplied. The validator will use the repo-local "
-                    "_karolina fallback conventions instead of a staged runtime root."
+                    "MESOUQ_SITE_RUNTIME_ROOT was not supplied. Set it to the canonical "
+                    "per-site runtime root before validating Korali runtime state."
                 ),
             )
         )
@@ -439,13 +439,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
 
     args = parser.parse_args(argv)
-    env = {
-        env_key: value
-        for env_key, value in (
-            (env_key, getattr(args, f"env_{env_key.lower()}")) for env_key in KORALI_RUNTIME_ENV_KEYS
-        )
-        if value is not None
-    }
+    env = {}
+    for env_key in KORALI_RUNTIME_ENV_KEYS:
+        value = getattr(args, f"env_{env_key.lower()}")
+        if value is None:
+            value = os.environ.get(env_key)
+        if value is not None:
+            env[env_key] = value
 
     report = validate_korali_runtime_contract(
         args.repo_root,
