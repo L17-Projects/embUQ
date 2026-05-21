@@ -14,7 +14,11 @@ module load CMake/3.24.3-GCCcore-12.2.0
 export MESOUQ_SITE=karolina
 export MESOUQ_PROJECT_ID="${MESOUQ_PROJECT_ID:-eu-26-17}"
 export MESOUQ_SCRATCH_ROOT="${MESOUQ_SCRATCH_ROOT:-/scratch/project/${MESOUQ_PROJECT_ID}/eubrieucb/mesouq}"
-export MESOUQ_SITE_RUNTIME_ROOT="${MESOUQ_SITE_RUNTIME_ROOT:-${MESOUQ_SCRATCH_ROOT}/runtime}"
+if [[ -z "${MESOUQ_SITE_RUNTIME_ROOT:-}" ]]; then
+  echo "MESOUQ_SITE_RUNTIME_ROOT must be set before sourcing env_karolina.sh; choose an isolated per-project runtime root, then source \${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh." >&2
+  return 2 2>/dev/null || exit 2
+fi
+export MESOUQ_SITE_RUNTIME_ROOT
 export MESOUQ_RUNS_ROOT="${MESOUQ_RUNS_ROOT:-${MESOUQ_SCRATCH_ROOT}/runs}"
 export MESOUQ_PROVENANCE_ROOT="${MESOUQ_PROVENANCE_ROOT:-${MESOUQ_SCRATCH_ROOT}/provenance}"
 
