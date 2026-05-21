@@ -17,6 +17,13 @@
 
 set -euo pipefail
 
+legacy_name="HPC""_SITE"
+if [[ ${!legacy_name+x} ]]; then
+  echo "${legacy_name} is no longer supported. Use MESOUQ_SITE." >&2
+  exit 2
+fi
+unset legacy_name
+
 REPO_ROOT="${REPO_ROOT:-${SLURM_SUBMIT_DIR:-$(pwd)}}"
 if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
   echo "Set REPO_ROOT explicitly or submit the job from the repo root." >&2
@@ -47,16 +54,14 @@ fi
 module purge
 module load Python/3.10.8-GCCcore-12.2.0 OpenMPI/4.1.4-GCC-12.2.0 CUDA/12.2.2 GSL/2.7-GCC-12.2.0 Eigen/3.4.0-GCCcore-12.2.0 HDF5/1.14.0-gompi-2022b MPFR/4.2.0-GCCcore-12.2.0 GMP/6.2.1-GCCcore-12.2.0
 
-source "${REPO_ROOT}/_vega/venv/bin/activate"
-source "${REPO_ROOT}/_vega/korali/env.sh"
-if [[ -f "${REPO_ROOT}/_vega/gv_venv/env.sh" ]]; then
-  source "${REPO_ROOT}/_vega/gv_venv/env.sh"
-elif [[ -f "${REPO_ROOT}/_vega/mirheo/env.sh" ]]; then
-  source "${REPO_ROOT}/_vega/mirheo/env.sh"
-else
-  echo "ERROR: repo-local Mirheo bootstrap missing. Run scripts/platforms/hpc/bootstrap_mirheo.sh first." >&2
-  exit 1
+ENV_ROOT="${MESOUQ_ENV_ROOT:-${MESOUQ_SITE_RUNTIME_ROOT:?Set MESOUQ_SITE_RUNTIME_ROOT before using this sbatch script.}/env}"
+ENV_SCRIPT="${MESOUQ_ENV_SCRIPT:-${ENV_ROOT}/env.sh}"
+if [[ ! -f "${ENV_SCRIPT}" ]]; then
+  echo "Missing canonical MesoUQ environment: ${ENV_SCRIPT}" >&2
+  exit 2
 fi
+source "${REPO_ROOT}/scripts/platforms/hpc/site_env.sh"
+mesouq_activate_site_env vega "${REPO_ROOT}"
 
 cd "${REPO_ROOT}"
 

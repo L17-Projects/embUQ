@@ -14,7 +14,7 @@ The wrapper exists so a fresh clone on Vega has one obvious command to run and o
 Before running acceptance from a fresh clone, bootstrap the repo-local Korali runtime and verify it:
 
 - `bash scripts/platforms/vega/bootstrap_korali.sh --jobs 8`
-- `source _vega/korali/env.sh`
+- `source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh`
 - `python scripts/platforms/vega/doctor_vega.py --strict`
 
 For a canned Vega batch submission, the repo also ships:

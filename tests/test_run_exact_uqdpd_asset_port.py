@@ -33,7 +33,7 @@ def _stub_runtime_paths(module, monkeypatch, tmp_path: Path, *, create_tinytex: 
     monkeypatch.setattr(module, "DEFAULT_TEXDEPS_DIR", tmp_path / "missing_texdeps")
     monkeypatch.setattr(
         module,
-        "get_vega_paths",
+        "get_runtime_paths",
         lambda _repo_root: types.SimpleNamespace(
             tinytex_bin_dir=tinytex_bin,
             korali_site_packages=tmp_path / "korali_site_packages",

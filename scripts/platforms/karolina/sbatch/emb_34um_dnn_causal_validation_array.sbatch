@@ -19,8 +19,15 @@ if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
   exit 2
 fi
 export REPO_ROOT
+cd "${REPO_ROOT}"
 
-source /scratch/project/eu-26-17/eubrieucb/mesouq/load_mesouq_karolina.sh
+if [[ -z "${MESOUQ_SITE_RUNTIME_ROOT:-}" ]]; then
+  echo "MESOUQ_SITE_RUNTIME_ROOT must be set before using this Karolina sbatch script." >&2
+  exit 2
+fi
+source scripts/platforms/karolina/env_karolina.sh
+source scripts/platforms/hpc/site_env.sh
+mesouq_activate_site_env karolina "${REPO_ROOT}"
 
 export PYTHONPATH="${REPO_ROOT}:${REPO_ROOT}/src:${REPO_ROOT}/emb/indentation:${REPO_ROOT}/emb/indentation/evalkit${PYTHONPATH:+:${PYTHONPATH}}"
 

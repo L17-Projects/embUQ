@@ -22,7 +22,7 @@ from meso_uq.campaign_manifests import (  # noqa: E402
     utc_now_iso,
     write_manifest,
 )
-from meso_uq.vega import build_runtime_pythonpath, get_vega_paths  # noqa: E402
+from meso_uq.vega import build_runtime_pythonpath, get_runtime_paths  # noqa: E402
 
 MAIN_SCRIPT = REPO_ROOT / "papers" / "huq_emb" / "uqdpd_generate_reduced_story_assets.py"
 SUPP_SCRIPT = REPO_ROOT / "papers" / "huq_emb" / "uqdpd_generate_supplementary_map_figures.py"
@@ -34,12 +34,16 @@ SUPPLEMENTARY_ONLY_TABLES = {
 }
 DEFAULT_PYTHON_CANDIDATES = [
     REPO_ROOT / ".venv" / "bin" / "python",
-    REPO_ROOT / "_vega" / "venv" / "bin" / "python",
 ]
 
 
 def _default_python_bin() -> str:
-    for candidate in DEFAULT_PYTHON_CANDIDATES:
+    runtime_root = os.environ.get("MESOUQ_SITE_RUNTIME_ROOT", "").strip()
+    candidates = []
+    if runtime_root:
+        candidates.append(Path(runtime_root).expanduser() / "env" / "bin" / "python")
+    candidates.extend(DEFAULT_PYTHON_CANDIDATES)
+    for candidate in candidates:
         if candidate.exists():
             return str(candidate)
     return sys.executable
@@ -410,13 +414,13 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     env = dict(os.environ)
-    vega_paths = get_vega_paths(REPO_ROOT)
-    tinytex_bin = vega_paths.tinytex_bin_dir
+    runtime_paths = get_runtime_paths(REPO_ROOT)
+    tinytex_bin = runtime_paths.tinytex_bin_dir
     if tinytex_bin.is_dir():
         env["PATH"] = str(tinytex_bin) + os.pathsep + env.get("PATH", "")
     env["PYTHONPATH"] = build_runtime_pythonpath(
         REPO_ROOT,
-        vega_paths.korali_site_packages,
+        runtime_paths.korali_site_packages,
         env.get("PYTHONPATH"),
         include_existing=True,
     )

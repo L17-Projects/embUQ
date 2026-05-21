@@ -64,7 +64,7 @@ def test_dnn_training_matrix_runner_writes_report_and_invokes_multi_arch(tmp_pat
         return _Result(returncode=0, stdout="ok\n")
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
-    rc = module.main(["--output-root", str(tmp_path), "--only", "compression_2.1um"])
+    rc = module.main(["--site", "vega", "--output-root", str(tmp_path), "--only", "compression_2.1um"])
     assert rc == 0
     assert captured[0][0] == "sbatch"
     assert "--export" in captured[0]

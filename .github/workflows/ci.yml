@@ -278,6 +278,10 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      MESOUQ_SITE: vega
+      MESOUQ_SITE_RUNTIME_ROOT: ${{ github.workspace }}/_ci/vega-runtime
+      MESOUQ_PROVENANCE_ROOT: ${{ github.workspace }}/_ci/provenance
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -294,19 +298,20 @@ jobs:
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
-            _vega/korali/install
-            _vega/korali/env.sh
+            _ci/vega-runtime/env
+            _ci/vega-runtime/korali/install
+            _ci/vega-runtime/korali/env.sh
             extern/korali/subprojects/packagecache
-          key: korali-${{ runner.os }}-py311-${{ hashFiles('extern/korali/**', 'scripts/vega/bootstrap_korali.sh', 'src/meso_uq/vega.py') }}
+          key: korali-${{ runner.os }}-py311-${{ hashFiles('extern/korali/**', 'scripts/platforms/hpc/bootstrap_env.sh', 'scripts/platforms/hpc/bootstrap_korali.sh', 'src/meso_uq/vega.py') }}
 
       - name: Report Korali cache state
         shell: bash
         run: |
           echo "korali_cache_hit=${{ steps.korali-cache.outputs.cache-hit }}"
-          if [ -d _vega/korali/install ]; then
-            du -sh _vega/korali/install || true
+          if [ -d "${MESOUQ_SITE_RUNTIME_ROOT}/korali/install" ]; then
+            du -sh "${MESOUQ_SITE_RUNTIME_ROOT}/korali/install" || true
           else
-            echo "_vega/korali/install not present yet"
+            echo "${MESOUQ_SITE_RUNTIME_ROOT}/korali/install not present yet"
           fi
 
       - name: Install workflow canary system packages
@@ -320,17 +325,17 @@ jobs:
           pip install pybind11 meson ninja
           pip install -e ".[ci,mpi]"
 
-      - name: Bootstrap repo-local Korali
+      - name: Bootstrap canonical Korali runtime
         if: steps.korali-cache.outputs.cache-hit != 'true'
-        run: bash scripts/vega/bootstrap_korali.sh --skip-python-build-deps
+        run: bash scripts/platforms/hpc/bootstrap_env.sh --site vega --skip-python-deps --with-korali
 
-      - name: Validate repo-local Korali runtime
-        run: test -f _vega/korali/env.sh
+      - name: Validate canonical Korali runtime
+        run: test -f "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
 
       - name: Run real CPU workflow canary
         shell: bash
         run: |
-          source _vega/korali/env.sh
+          source "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
           python scripts/ci/run_workflow_canary.py --cpu-ranks 2
 
       - name: Summarize workflow canary outputs

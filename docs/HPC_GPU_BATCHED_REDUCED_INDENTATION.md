@@ -4,7 +4,7 @@ This guide describes the current supported operator path for the reduced-model i
 
 ## Scope
 
-- clone-local runtime rooted under `_vega/`
+- canonical runtime rooted under `${MESOUQ_SITE_RUNTIME_ROOT}`
 - vendored `extern/korali/` bootstrap only
 - single-node SLURM jobs on Vega with the strict GPU partition policy
 - one GPU for surrogate-backed `Phase 1`, native-CUDA `Phase 2`, `Phase 3b`, and propagation where applicable
@@ -41,14 +41,14 @@ module load \
   GSL/2.7-GCC-12.2.0 \
   Eigen/3.4.0-GCCcore-12.2.0
 
-python -m venv _vega/venv
-source _vega/venv/bin/activate
+bash scripts/platforms/hpc/bootstrap_env.sh --site vega
+source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
 python -m pip install -U pip
 pip install -e ".[test,mpi]"
 pip install pybind11 meson ninja
 
 bash scripts/platforms/hpc/bootstrap_korali.sh --site vega --jobs 8
-source _vega/korali/env.sh
+source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
 python scripts/platforms/hpc/doctor_hpc.py --site vega --strict
 ```
 
@@ -170,7 +170,7 @@ That tree then contains:
 
 ### `import korali` fails
 
-Make sure `_vega/korali/env.sh` is sourced in the current shell or batch job.
+Make sure `${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh` is sourced in the current shell or batch job.
 
 ### `mpi4py` or MPI launcher errors
 

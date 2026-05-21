@@ -34,13 +34,14 @@ def test_doctor_gv_runtime_diagnostics_includes_scale_space_and_mirheo_checks(tm
     repo_root = tmp_path / "repo"
     (repo_root / "extern" / "korali").mkdir(parents=True)
     (repo_root / "pyproject.toml").write_text("[project]\nname='mesouq'\n", encoding="utf-8")
-    (repo_root / "_vega").mkdir()
-    (repo_root / "_vega" / "mirheo").mkdir(parents=True, exist_ok=True)
-    (repo_root / "_vega" / "mirheo" / "env.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
-    (repo_root / "_vega" / "mirheo" / "source_snapshot.json").write_text("{}", encoding="utf-8")
-    (repo_root / "_vega" / "gv_venv").mkdir(parents=True, exist_ok=True)
-    (repo_root / "_vega" / "gv_venv" / "env.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
-    mirheo_install = repo_root / "_vega" / "mirheo" / "install" / "lib"
+    runtime_root = tmp_path / "runtime"
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(runtime_root))
+    (runtime_root / "mirheo").mkdir(parents=True, exist_ok=True)
+    (runtime_root / "mirheo" / "env.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    (runtime_root / "mirheo" / "source_snapshot.json").write_text("{}", encoding="utf-8")
+    (runtime_root / "env").mkdir(parents=True, exist_ok=True)
+    (runtime_root / "env" / "env.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    mirheo_install = runtime_root / "mirheo" / "install" / "lib"
     mirheo_install.mkdir(parents=True)
     (mirheo_install / "libmirheo-test.so").write_text("binary", encoding="utf-8")
 
@@ -67,7 +68,7 @@ def test_doctor_gv_runtime_diagnostics_includes_scale_space_and_mirheo_checks(tm
 
     check_map = {entry["name"]: entry for entry in report["checks"]}
     assert report["with_gv_runtime"] is True
-    assert check_map["repo_local_gv_venv_env_script"]["status"] == "ok"
+    assert check_map["repo_local_unified_env_script"]["status"] == "ok"
     assert check_map["mirheo_libmirheo"]["status"] == "ok"
     assert check_map["scale_space_binary:PATH"]["status"] == "ok"
     assert check_map["python:MDAnalysis"]["status"] == "ok"
@@ -133,6 +134,7 @@ def test_doctor_core_and_tex_diagnostics_cover_warning_paths(tmp_path, monkeypat
     repo_root.mkdir()
     (repo_root / "pyproject.toml").write_text("[project]\nname='mesouq'\n", encoding="utf-8")
     (repo_root / "extern" / "korali").mkdir(parents=True)
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(tmp_path / "runtime"))
     monkeypatch.setattr(module, "REPO_ROOT", repo_root)
     monkeypatch.delenv("LOADEDMODULES", raising=False)
     monkeypatch.setattr(module, "_command_path", lambda _name: "")
@@ -159,6 +161,8 @@ def test_doctor_collect_diagnostics_can_target_karolina_site(tmp_path, monkeypat
     repo_root = tmp_path / "repo"
     (repo_root / "extern" / "korali").mkdir(parents=True)
     (repo_root / "pyproject.toml").write_text("[project]\nname='mesouq'\n", encoding="utf-8")
+    runtime_root = tmp_path / "karolina-runtime"
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(runtime_root))
     monkeypatch.setattr(module, "REPO_ROOT", repo_root)
     monkeypatch.setattr(module, "_command_path", lambda _name: "")
     monkeypatch.setattr(module, "_pkg_config_version", lambda _name: "")
@@ -168,8 +172,8 @@ def test_doctor_collect_diagnostics_can_target_karolina_site(tmp_path, monkeypat
 
     assert report["site"] == "karolina"
     assert "CUDA/12.4.0" in report["recommended_modules"]
-    assert report["paths"]["site_root"].endswith("_karolina")
-    assert report["paths"]["scale_space_binary"].endswith("_karolina/gv_cgal_tools/bin/scale_space")
+    assert report["paths"]["site_root"] == str(runtime_root.resolve())
+    assert report["paths"]["scale_space_binary"] == str((runtime_root / "gv_cgal_tools" / "bin" / "scale_space").resolve())
 
 
 def test_doctor_uses_env_site_and_karolina_module_profiles(monkeypatch):
@@ -209,6 +213,7 @@ def test_doctor_mirheo_diagnostics_cover_source_and_scale_space_warnings(tmp_pat
     (repo_root / "pyproject.toml").write_text("[project]\nname='mesouq'\n", encoding="utf-8")
     (repo_root / "extern" / "korali").mkdir(parents=True)
     monkeypatch.setattr(module, "REPO_ROOT", repo_root)
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(tmp_path / "runtime"))
     monkeypatch.setenv("LOADEDMODULES", "Python/3.10")
     monkeypatch.setattr(module, "_command_path", lambda name: "/bin/mpicxx" if name == "mpicxx" else "")
     monkeypatch.setattr(module, "_pkg_config_version", lambda _name: "")
@@ -259,6 +264,7 @@ def test_doctor_core_diagnostics_warn_when_korali_import_is_not_repo_local(tmp_p
     monkeypatch.setattr(module, "REPO_ROOT", repo_root)
     monkeypatch.setenv("LOADEDMODULES", "Python/3.10")
     monkeypatch.setattr(module, "_command_path", lambda name: "/bin/tool" if name in {"python", "mpicxx", "nvcc", "pkg-config", "meson", "ninja"} else "")
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(tmp_path / "runtime"))
     monkeypatch.setattr(module, "_pkg_config_version", lambda _name: "1.0")
 
     def fake_spec(name: str) -> str:
@@ -285,9 +291,10 @@ def test_doctor_core_diagnostics_accepts_repo_local_korali_via_path_alias(tmp_pa
     alias_repo.symlink_to(real_repo, target_is_directory=True)
     (real_repo / "pyproject.toml").write_text("[project]\nname='mesouq'\n", encoding="utf-8")
     (real_repo / "extern" / "korali").mkdir(parents=True)
+    runtime_root = real_repo / "runtime"
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(runtime_root))
     korali_init = (
-        real_repo
-        / "_vega"
+        runtime_root
         / "korali"
         / "install"
         / "lib"
@@ -325,6 +332,7 @@ def test_doctor_core_diagnostics_omits_openmpi_lib_check_when_mpicxx_is_absent(t
     repo_root.mkdir()
     (repo_root / "pyproject.toml").write_text("[project]\nname='mesouq'\n", encoding="utf-8")
     (repo_root / "extern" / "korali").mkdir(parents=True)
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(tmp_path / "runtime"))
     monkeypatch.setattr(module, "REPO_ROOT", repo_root)
     monkeypatch.setattr(module, "_command_path", lambda _name: "")
     monkeypatch.setattr(module, "_python_module_spec", lambda _name: "")

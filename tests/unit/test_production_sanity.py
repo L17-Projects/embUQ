@@ -67,7 +67,10 @@ def test_build_production_smoke_config_only_lowers_cost_knobs() -> None:
 
 def test_load_korali_build_state_reports_known_build_flags(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
-    build_info = repo_root / "_vega" / "korali" / "build" / "meson-info"
+    (repo_root / "extern" / "korali").mkdir(parents=True)
+    (repo_root / "pyproject.toml").write_text("[project]\nname='mesouq'\n", encoding="utf-8")
+    runtime_root = tmp_path / "runtime"
+    build_info = runtime_root / "korali" / "build" / "meson-info"
     build_info.mkdir(parents=True)
     (build_info / "intro-buildoptions.json").write_text(
         json.dumps(
@@ -83,7 +86,7 @@ def test_load_korali_build_state_reports_known_build_flags(tmp_path: Path) -> No
         encoding="utf-8",
     )
 
-    state = load_korali_build_state(repo_root)
+    state = load_korali_build_state(repo_root, runtime_root=runtime_root, env={})
 
     assert state["status"] == "detected"
     assert state["build_options"] == {

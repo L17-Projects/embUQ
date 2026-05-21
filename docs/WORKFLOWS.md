@@ -167,9 +167,9 @@ In particular, the public line now includes focused execution-level slices for:
 Mirheo is not vendored under `extern/`. The current contract is:
 
 - source path lock in `extern/mirheo.lock.json`
-- repo-local build/install state under `_vega/mirheo/`
-- Python package install into the active repo-local venv
-- source snapshot manifest at `_vega/mirheo/source_snapshot.json`
+- repo-local build/install state under `${MESOUQ_SITE_RUNTIME_ROOT}/mirheo/`
+- Python package install into `${MESOUQ_SITE_RUNTIME_ROOT}/env`
+- source snapshot manifest at `${MESOUQ_SITE_RUNTIME_ROOT}/mirheo/source_snapshot.json`
 
 Canonical bootstrap entrypoint:
 - `scripts/platforms/hpc/bootstrap_mirheo.sh`
@@ -249,9 +249,9 @@ This runner performs, in order:
 4. MAP Mirheo
 5. paper asset generation via the postprocess-only paper runner
 
-For exact paper-facing figure rendering on Vega, bootstrap and source repo-local TinyTeX first:
+For exact paper-facing figure rendering on Vega, bootstrap repo-local TinyTeX and source the canonical runtime environment:
 - `bash scripts/platforms/vega/bootstrap_tex.sh`
-- `source _vega/tinytex/env.sh`
+- `source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh`
 
 For one-command replay of the exact HUQ-EMB paper figures from a stored `paper_data` campaign, use:
 - `scripts/workflows/emb/huq_emb/run_exact_uqdpd_asset_port.py`

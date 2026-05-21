@@ -46,6 +46,7 @@ def test_vega_acceptance_wrapper_writes_machine_readable_report(tmp_path, monkey
     monkeypatch.setattr(sys, "argv", [
         "run_vega_acceptance.py",
         "--output-root", str(output_root),
+        "--site", "vega",
     ])
 
     rc = module.main()

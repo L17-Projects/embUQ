@@ -34,13 +34,13 @@ Record all of the following:
 Use the Karolina sbatch launch for the site-default GPU gate:
 
 ```bash
-RUN_TAG=<tag> OUTPUT_ROOT=/scratch/project/eu-26-17/eubrieucb/mesouq/runs/validation_matrix/<tag> PYTHON_BIN=/scratch/project/eu-26-17/eubrieucb/mesouq/runtime/venv/bin/python sbatch --export=ALL,REPO_ROOT="$PWD",RUN_TAG="$RUN_TAG",OUTPUT_ROOT="$OUTPUT_ROOT",PYTHON_BIN="$PYTHON_BIN" scripts/platforms/karolina/sbatch/validation_matrix.sbatch
+RUN_TAG=<tag> OUTPUT_ROOT=/scratch/project/eu-26-17/eubrieucb/mesouq/runs/validation_matrix/<tag> PYTHON_BIN=${MESOUQ_SITE_RUNTIME_ROOT}/env/bin/python sbatch --export=ALL,REPO_ROOT="$PWD",RUN_TAG="$RUN_TAG",OUTPUT_ROOT="$OUTPUT_ROOT",PYTHON_BIN="$PYTHON_BIN" scripts/platforms/karolina/sbatch/validation_matrix.sbatch
 ```
 
 If you are already inside an allocation, run the matrix directly:
 
 ```bash
-python scripts/platforms/hpc/run_validation_matrix.py --site karolina --experiments compression indentation --model-families full-model reduced-model --output-root /scratch/project/eu-26-17/eubrieucb/mesouq/runs/validation_matrix/<tag> --run-tag <tag> --phase2-cpu-ranks 4 --python-bin /scratch/project/eu-26-17/eubrieucb/mesouq/runtime/venv/bin/python --skip-release-manifest
+python scripts/platforms/hpc/run_validation_matrix.py --site karolina --experiments compression indentation --model-families full-model reduced-model --output-root /scratch/project/eu-26-17/eubrieucb/mesouq/runs/validation_matrix/<tag> --run-tag <tag> --phase2-cpu-ranks 4 --python-bin ${MESOUQ_SITE_RUNTIME_ROOT}/env/bin/python --skip-release-manifest
 ```
 
 ## Vega equivalent

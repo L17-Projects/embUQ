@@ -26,10 +26,11 @@ def test_gv_paper_figure_replay_karolina_template_uses_public_command_and_karoli
     assert 'command+=(--stretching-point-stop "${STRETCHING_POINT_STOP}")' in text
     assert 'source scripts/platforms/karolina/env_karolina.sh' in text
     assert text.index('source scripts/platforms/karolina/env_karolina.sh') < text.index('OUTPUT_ROOT="${OUTPUT_ROOT:-${MESOUQ_RUNS_ROOT}/gv/figure_replay/${CAMPAIGN_ID}}"')
-    assert 'GV_ENV_SCRIPT="${MESOUQ_GV_ENV_SCRIPT:-${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/env.sh}"' in text
-    assert "Missing required GV runtime environment" in text
+    assert 'source scripts/platforms/hpc/site_env.sh' in text
+    assert 'mesouq_activate_site_env karolina "${REPO_ROOT}"' in text
+    assert "MESOUQ_SITE_RUNTIME_ROOT must be set before using this Karolina sbatch script." in text
     assert "for lane in ${LANES}; do" in text
-    assert "_vega/gv_venv/env.sh" not in text
+    assert "_vega" + "/env/env.sh" not in text
     assert "#SBATCH --partition=qgpu" in text
     assert "#SBATCH --account=eu-26-17" in text
     assert "#SBATCH --ntasks=2" in text

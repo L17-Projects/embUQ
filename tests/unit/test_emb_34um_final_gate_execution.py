@@ -231,7 +231,9 @@ def test_karolina_sbatch_executes_runner_and_keeps_render_only_mode() -> None:
     script = repo_root / "scripts" / "platforms" / "karolina" / "sbatch" / "emb_34um_active_learning_array.sbatch"
     text = script.read_text(encoding="utf-8")
 
-    assert "source /scratch/project/eu-26-17/eubrieucb/mesouq/load_mesouq_karolina.sh" in text
+    assert ("load_mesouq" + "_karolina.sh") not in text
+    assert "scripts/platforms/hpc/site_env.sh" in text
+    assert "mesouq_activate_site_env karolina" in text
     assert 'EXECUTION_MODE="${EXECUTION_MODE:-execute}"' in text
     assert '"${EXECUTION_MODE}" == "render-only"' in text
     assert "run_emb_34um_final_gate_candidate.py" in text

@@ -17,6 +17,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[2]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
+from meso_uq.site_runtime import get_site_runtime_paths  # noqa: E402
 from meso_uq.production_sanity import render_production_sanity_plots  # noqa: E402
 from meso_uq.vega_workflows import (  # noqa: E402
     VALID_EXPERIMENTS,
@@ -67,9 +68,11 @@ def _prepend_pythonpath(env: dict[str, str], path: Path) -> None:
 
 
 def _discover_repo_local_korali_site() -> Path | None:
-    candidates = sorted(
-        (REPO_ROOT / "_vega" / "korali" / "install" / "lib").glob("python*/site-packages")
-    )
+    try:
+        paths = get_site_runtime_paths(REPO_ROOT)
+    except Exception:
+        return None
+    candidates = sorted((paths.korali_prefix / "lib").glob("python*/site-packages"))
     if not candidates:
         return None
     return candidates[-1]
@@ -99,8 +102,8 @@ def _build_runtime_env(python_bin: str) -> tuple[dict[str, str], list[str]]:
         notes.append(f"Using repo-local Korali runtime path: {korali_site}")
     else:
         notes.append(
-            "Repo-local Korali runtime path not found under "
-            "_vega/korali/install/lib/python*/site-packages"
+            "Canonical Korali runtime path not found under "
+            "${MESOUQ_SITE_RUNTIME_ROOT}/korali/install/lib/python*/site-packages"
         )
 
     ok, error_text = _probe_korali_engine(python_bin, env)

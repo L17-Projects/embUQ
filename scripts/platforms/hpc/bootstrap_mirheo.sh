@@ -7,11 +7,11 @@ usage() {
 Usage: bootstrap_mirheo.sh [--python-bin PYTHON] [--source PATH] [--jobs N] [--reconfigure] [--skip-python-deps]
 
 Build Mirheo from an external pinned source path into the site runtime area
-and install the Python package into the active repo-local venv.
+and install the Python package into the canonical site env.
 
 Expected environment:
   - HPC module stack loaded
-  - active Python environment with pip available
+  - canonical site env created by bootstrap_env.sh, or Python with venv available
   - a Mirheo source tree available at the locked path or via --source / MESOUQ_MIRHEO_SRC
 EOF
 }
@@ -109,13 +109,13 @@ print(f"MIRHEO_BUILD_DIR={paths.mirheo_build_dir}")
 print(f"MIRHEO_PREFIX={paths.mirheo_prefix}")
 print(f"MIRHEO_PACKAGE_DIR={paths.mirheo_package_dir}")
 print(f"MIRHEO_ENV_SCRIPT={paths.mirheo_env_script}")
-print(f"GV_VENV_ROOT={paths.gv_venv_root}")
-print(f"GV_VENV_ENV_SCRIPT={paths.gv_venv_env_script}")
+print(f"ENV_ROOT={paths.env_root}")
+print(f"ENV_ENV_SCRIPT={paths.env_script}")
 print(f"MIRHEO_SNAPSHOT_PATH={paths.mirheo_snapshot_path}")
 PY
 )"
 
-mkdir -p "$LOGS_DIR" "$(dirname "$MIRHEO_ENV_SCRIPT")" "$GV_VENV_ROOT"
+mkdir -p "$LOGS_DIR" "$(dirname "$MIRHEO_ENV_SCRIPT")" "$ENV_ROOT"
 log_file="$LOGS_DIR/bootstrap_mirheo.log"
 exec > >(tee "$log_file") 2>&1
 
@@ -125,7 +125,7 @@ echo "Log file:       $log_file"
 echo "Mirheo source:  $MIRHEO_SOURCE"
 echo "Build dir:      $MIRHEO_BUILD_DIR"
 echo "Install prefix: $MIRHEO_PREFIX"
-echo "GV venv:        $GV_VENV_ROOT"
+echo "Unified env:    $ENV_ROOT"
 
 if [[ ! -f "$MIRHEO_SOURCE/CMakeLists.txt" || ! -f "$MIRHEO_SOURCE/setup.py" ]]; then
   echo "Mirheo source path is missing required files: $MIRHEO_SOURCE" >&2
@@ -150,11 +150,11 @@ fi
 
 echo "Compile jobs: $build_jobs"
 
-if [[ ! -x "$GV_VENV_ROOT/bin/python" ]]; then
-  echo "Creating dedicated GV runtime venv at $GV_VENV_ROOT"
-  "$python_bin" -m venv "$GV_VENV_ROOT"
+if [[ ! -x "$ENV_ROOT/bin/python" ]]; then
+  echo "Creating canonical MesoUQ env at $ENV_ROOT"
+  "$python_bin" -m venv "$ENV_ROOT"
 fi
-runtime_python="$GV_VENV_ROOT/bin/python"
+runtime_python="$ENV_ROOT/bin/python"
 
 if [[ "$install_python_deps" -eq 1 ]]; then
   "$runtime_python" -m pip install --upgrade pip
@@ -212,10 +212,10 @@ if [[ -f "$MIRHEO_SOURCE/README.md" ]]; then
 fi
 ln -sfn "$MIRHEO_BUILD_DIR" "$MIRHEO_PACKAGE_DIR/build"
 
-echo "Installing Mirheo Python package into the dedicated GV runtime venv"
+echo "Installing Mirheo Python package into the canonical MesoUQ env"
 "$runtime_python" -m pip install --no-deps --force-reinstall "$MIRHEO_PACKAGE_DIR"
 
-"$runtime_python" - <<'PY' "$repo_root" "$MIRHEO_SOURCE" "$MIRHEO_SNAPSHOT_PATH" "$MIRHEO_ENV_SCRIPT" "$GV_VENV_ENV_SCRIPT"
+"$runtime_python" - <<'PY' "$repo_root" "$MIRHEO_SOURCE" "$MIRHEO_SNAPSHOT_PATH" "$MIRHEO_ENV_SCRIPT" "$ENV_ENV_SCRIPT"
 from pathlib import Path
 import json
 import sys
@@ -223,15 +223,15 @@ import sys
 repo_root = Path(sys.argv[1]).resolve()
 source_root = Path(sys.argv[2]).resolve()
 snapshot_path = Path(sys.argv[3]).resolve()
-env_script = Path(sys.argv[4]).resolve()
-gv_env_script = Path(sys.argv[5]).resolve()
+mirheo_env_script = Path(sys.argv[4]).resolve()
+unified_env_script = Path(sys.argv[5]).resolve()
 sys.path.insert(0, str(repo_root / "src"))
 from meso_uq.vega import (
     gather_mirheo_source_snapshot,
     get_runtime_paths,
     render_gv_cgal_tools_env_script,
-    render_gv_venv_env_script,
-    render_mirheo_env_script,  # noqa: E402
+    render_mirheo_env_script,
+    render_unified_env_script,  # noqa: E402
 )
 
 paths = get_runtime_paths(repo_root)
@@ -241,27 +241,27 @@ snapshot["install_prefix"] = str(paths.mirheo_prefix)
 snapshot["package_dir"] = str(paths.mirheo_package_dir)
 snapshot_path.parent.mkdir(parents=True, exist_ok=True)
 snapshot_path.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
-env_script.write_text(
+mirheo_env_script.write_text(
     render_mirheo_env_script(paths, source_root=source_root, snapshot_path=snapshot_path),
     encoding="utf-8",
 )
-gv_env_script.write_text(
-    render_gv_venv_env_script(
-        paths,
-        source_root=source_root,
-        snapshot_path=snapshot_path,
-    ),
+unified_env_script.parent.mkdir(parents=True, exist_ok=True)
+unified_env_script.write_text(
+    render_unified_env_script(paths, source_root=source_root, snapshot_path=snapshot_path),
     encoding="utf-8",
 )
-paths.gv_cgal_tools_env_script.parent.mkdir(parents=True, exist_ok=True)
-paths.gv_cgal_tools_env_script.write_text(
-    render_gv_cgal_tools_env_script(paths),
-    encoding="utf-8",
-)
+if not paths.gv_cgal_tools_env_script.is_file():
+    paths.gv_cgal_tools_env_script.parent.mkdir(parents=True, exist_ok=True)
+    paths.gv_cgal_tools_env_script.write_text(
+        render_gv_cgal_tools_env_script(paths),
+        encoding="utf-8",
+    )
 PY
 
-chmod +x "$MIRHEO_ENV_SCRIPT" "$GV_VENV_ENV_SCRIPT"
-chmod +x "$(dirname "$GV_VENV_ENV_SCRIPT")/../gv_cgal_tools/env.sh"
+chmod +x "$MIRHEO_ENV_SCRIPT" "$ENV_ENV_SCRIPT"
+if [[ -f "$(dirname "$ENV_ENV_SCRIPT")/../gv_cgal_tools/env.sh" ]]; then
+  chmod +x "$(dirname "$ENV_ENV_SCRIPT")/../gv_cgal_tools/env.sh"
+fi
 
 echo "Verifying Mirheo and h5py imports"
 "$runtime_python" - <<'PY'
@@ -279,6 +279,6 @@ echo ""
 echo "Mirheo bootstrap completed."
 echo "Source the repo-local runtime before running MAP Mirheo workflows:"
 echo "  source $MIRHEO_ENV_SCRIPT"
-echo "  source $GV_VENV_ENV_SCRIPT"
+echo "  source $ENV_ENV_SCRIPT"
 echo "Then re-run the doctor in strict mode:"
 echo "  $runtime_python $repo_root/scripts/platforms/hpc/doctor_hpc.py --strict --with-gv-runtime"

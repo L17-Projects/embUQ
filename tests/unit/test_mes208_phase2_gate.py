@@ -39,8 +39,9 @@ def test_mes208_gate_statistics_detect_shift() -> None:
 def test_mes208_replicate_sbatch_records_explicit_korali_env() -> None:
     script = SBATCH_PATH.read_text(encoding="utf-8")
 
-    assert "source \"${ENV_SCRIPT}\"" in script
+    assert "source scripts/platforms/hpc/site_env.sh" in script
+    assert "mesouq_activate_site_env karolina \"${REPO_ROOT}\"" in script
+    assert "MESOUQ_SITE_RUNTIME_ROOT must be set before using this Karolina sbatch script." in script
     assert "KORALI_ENV_SCRIPT" in script
-    assert "source \"${KORALI_ENV_SCRIPT}\"" in script
     assert "scripts/platforms/hpc/run_inference_stage.py" in script
     assert "--phase2-backend" in script

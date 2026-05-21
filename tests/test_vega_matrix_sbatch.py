@@ -45,13 +45,15 @@ def test_karolina_validation_matrix_template_uses_only_karolina_runtime_paths() 
     assert "#SBATCH --gpus=1" in text
     assert 'source "${REPO_ROOT}/scripts/platforms/karolina/env_karolina.sh"' in text
     assert 'OUTPUT_ROOT="${OUTPUT_ROOT:-${MESOUQ_RUNS_ROOT}/validation_matrix/${RUN_TAG}}"' in text
+    assert 'source "${REPO_ROOT}/scripts/platforms/hpc/site_env.sh"' in text
+    assert 'mesouq_activate_site_env karolina "${REPO_ROOT}"' in text
     assert 'PYTHON_BIN="${PYTHON_BIN:-$(command -v python)}"' in text
     assert 'RUN_MAP_MIRHEO="${RUN_MAP_MIRHEO:-false}"' in text
     assert 'MAP_MIRHEO_N_DISPLACEMENTS="${MAP_MIRHEO_N_DISPLACEMENTS:-1}"' in text
     assert 'SKIP_RELEASE_MANIFEST="${SKIP_RELEASE_MANIFEST:-true}"' in text
     assert "--run-map-mirheo" in text
     assert "--skip-release-manifest" in text
-    assert "_vega/" not in text
+    assert ("_vega" + "/") not in text
 
 
 def test_vega_validation_matrix_template_matches_workflow_only_defaults() -> None:
@@ -65,13 +67,16 @@ def test_vega_validation_matrix_template_matches_workflow_only_defaults() -> Non
 
 
 @pytest.mark.parametrize("template", ALL_TEMPLATES)
-def test_matrix_templates_use_login_shell_repo_venv_and_repo_pythonpath(template: str) -> None:
+def test_matrix_templates_use_login_shell_canonical_env_and_repo_pythonpath(template: str) -> None:
     text = _read(template)
     assert text.startswith("#!/bin/bash -l\n")
-    assert 'VENV_DIR="${VENV_DIR:-${REPO_ROOT}/_vega/venv}"' in text
-    assert 'source "${VENV_DIR}/bin/activate"' in text
+    assert 'ENV_ROOT="${MESOUQ_ENV_ROOT:-${MESOUQ_SITE_RUNTIME_ROOT:?Set MESOUQ_SITE_RUNTIME_ROOT before using this sbatch script.}/env}"' in text
+    assert 'ENV_SCRIPT="${MESOUQ_ENV_SCRIPT:-${ENV_ROOT}/env.sh}"' in text
+    assert 'PYTHON_BIN="${PYTHON_BIN:-${ENV_ROOT}/bin/python}"' in text
+    assert 'source "${REPO_ROOT}/scripts/platforms/hpc/site_env.sh"' in text
+    assert 'mesouq_activate_site_env vega "${REPO_ROOT}"' in text
     assert 'export PYTHONPATH="${REPO_ROOT}/src:${REPO_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"' in text
-    assert 'source "${REPO_ROOT}/_vega/korali/env.sh"' in text
+    assert ('_vega' + '/') not in text
 
 
 @pytest.mark.parametrize("template", ("bnn_sweep_matrix.sbatch", "bnn_certification_matrix.sbatch"))

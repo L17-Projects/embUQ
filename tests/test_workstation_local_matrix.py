@@ -138,16 +138,20 @@ def test_resolve_path_and_discover_repo_local_korali_site(monkeypatch, tmp_path)
         "run_local_validation_matrix_paths",
     )
 
+    (tmp_path / "extern" / "korali").mkdir(parents=True)
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='mesouq'\n", encoding="utf-8")
+    runtime_root = tmp_path / "runtime"
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(runtime_root))
     monkeypatch.setattr(module, "REPO_ROOT", tmp_path)
     assert module._resolve_path("relative/output") == (tmp_path / "relative" / "output").resolve()
 
-    site_a = tmp_path / "_vega" / "korali" / "install" / "lib" / "python3.11" / "site-packages"
-    site_b = tmp_path / "_vega" / "korali" / "install" / "lib" / "python3.12" / "site-packages"
+    site_a = runtime_root / "korali" / "install" / "lib" / "python3.11" / "site-packages"
+    site_b = runtime_root / "korali" / "install" / "lib" / "python3.12" / "site-packages"
     site_a.mkdir(parents=True, exist_ok=True)
     site_b.mkdir(parents=True, exist_ok=True)
     assert module._discover_repo_local_korali_site() == site_b
 
-    monkeypatch.setattr(module, "REPO_ROOT", tmp_path / "missing-root")
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(tmp_path / "empty-runtime"))
     assert module._discover_repo_local_korali_site() is None
 
 
@@ -224,7 +228,7 @@ def test_build_runtime_env_handles_probe_outcomes(monkeypatch, tmp_path):
     )
     env_fail, notes_fail = module._build_runtime_env("python")
     assert any(
-        "not found under _vega/korali/install/lib/python*/site-packages" in note
+        "not found under ${MESOUQ_SITE_RUNTIME_ROOT}/korali/install/lib/python*/site-packages" in note
         for note in notes_fail
     )
     assert any(

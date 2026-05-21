@@ -18,8 +18,14 @@ if [[ -n "${OMPI_BIN_DIR}" ]]; then
   export PATH="${OMPI_BIN_DIR}:${PATH}"
   export LD_LIBRARY_PATH="${OMPI_ROOT}/lib:${LD_LIBRARY_PATH:-}"
 fi
-source "${REPO_ROOT}/_vega/venv/bin/activate"
-source "${REPO_ROOT}/_vega/korali/env.sh"
+ENV_ROOT="${MESOUQ_ENV_ROOT:-${MESOUQ_SITE_RUNTIME_ROOT:?Set MESOUQ_SITE_RUNTIME_ROOT before using this sbatch script.}/env}"
+ENV_SCRIPT="${MESOUQ_ENV_SCRIPT:-${ENV_ROOT}/env.sh}"
+if [[ ! -f "${ENV_SCRIPT}" ]]; then
+  echo "Missing canonical MesoUQ environment: ${ENV_SCRIPT}" >&2
+  exit 2
+fi
+source "${REPO_ROOT}/scripts/platforms/hpc/site_env.sh"
+mesouq_activate_site_env vega "${REPO_ROOT}"
 
 cd "${REPO_ROOT}"
 

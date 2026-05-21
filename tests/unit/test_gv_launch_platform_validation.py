@@ -104,7 +104,7 @@ def test_karolina_render_validation_covers_four_non_shear_gv_lanes(tmp_path, mon
             "_runs/gv/launch_validation/karolina/"
         )
         assert script_info["runtime_environment_path"] == (
-            "${MESOUQ_GV_ENV_SCRIPT:-${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/env.sh}"
+            "${MESOUQ_GV_ENV_SCRIPT:-${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh}"
         )
         assert script_info["runtime_script"] == "scripts/platforms/hpc/run_gv_runtime.py"
         assert script_info["gpu_resource_directives"] == ["#SBATCH --gpus=1"]
@@ -143,7 +143,7 @@ def test_vega_render_validation_covers_four_non_shear_gv_lanes(tmp_path, monkeyp
         assert payload["provenance"]["git"]["commit"]
         assert payload["output_root"].startswith("_runs/gv/launch_validation/vega/")
         assert script_info["runtime_environment_path"] == (
-            "${MESOUQ_GV_ENV_SCRIPT:-${REPO_ROOT}/_vega/gv_venv/env.sh}"
+            "${MESOUQ_GV_ENV_SCRIPT:-${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh}"
         )
         assert script_info["runtime_script"] == "scripts/platforms/hpc/run_gv_runtime.py"
         assert script_info["gpu_resource_directives"] == ["#SBATCH --gres=gpu:1"]
@@ -153,7 +153,8 @@ def test_vega_render_validation_covers_four_non_shear_gv_lanes(tmp_path, monkeyp
         assert "#SBATCH --partition=gpu" in script
         assert "#SBATCH --gres=gpu:1" in script
         assert "module purge" in script
-        assert "_vega/gv_venv/env.sh" in script
+        assert "mesouq_activate_site_env vega" in script
+        assert ("_vega" + "/") not in script
         assert "scripts/platforms/hpc/run_gv_runtime.py" in script
         assert "--site vega" in script
         assert _scheduler_submission_commands(script) == []

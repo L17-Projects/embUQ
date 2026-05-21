@@ -663,9 +663,7 @@ def _platform_runtime_script(platform: Platform) -> str:
 
 
 def _platform_runtime_environment_path(platform: Platform) -> str:
-    if platform == Platform.KAROLINA:
-        return "${MESOUQ_GV_ENV_SCRIPT:-${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/env.sh}"
-    return "${MESOUQ_GV_ENV_SCRIPT:-${REPO_ROOT}/_vega/gv_venv/env.sh}"
+    return "${MESOUQ_GV_ENV_SCRIPT:-${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh}"
 
 
 def _gpu_resource_directives(*, platform: Platform, gpu_count: int) -> tuple[str, ...]:
@@ -678,7 +676,7 @@ def _platform_operator_checks(platform: Platform) -> tuple[str, ...]:
     if platform == Platform.VEGA:
         return (
             "Vega maintenance state and partition availability must be checked by the operator before submission.",
-            "Verify that the Vega module stack and _vega/gv_venv/env.sh are current for the checkout.",
+            "Verify MESOUQ_SITE_RUNTIME_ROOT contains the canonical GV runtime environment for this checkout.",
         )
     return (
         "Verify Karolina project allocation and qgpu availability before submission.",
@@ -689,13 +687,13 @@ def _platform_operator_checks(platform: Platform) -> tuple[str, ...]:
 def _platform_setup(platform: Platform) -> list[str]:
     if platform == Platform.KAROLINA:
         return [
-            'source "${REPO_ROOT}/scripts/platforms/karolina/env_karolina.sh"',
-            'GV_ENV_SCRIPT="${MESOUQ_GV_ENV_SCRIPT:-${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/env.sh}"',
-            'if [[ ! -f "${GV_ENV_SCRIPT}" ]]; then',
-            '  echo "Missing required GV runtime environment: ${GV_ENV_SCRIPT}" >&2',
-            "  exit 1",
+            'if [[ -z "${MESOUQ_SITE_RUNTIME_ROOT:-}" ]]; then',
+            '  echo "MESOUQ_SITE_RUNTIME_ROOT must be set before running Karolina GV scripts." >&2',
+            "  exit 2",
             "fi",
-            'source "${GV_ENV_SCRIPT}"',
+            'source "${REPO_ROOT}/scripts/platforms/karolina/env_karolina.sh"',
+            'source "${REPO_ROOT}/scripts/platforms/hpc/site_env.sh"',
+            'mesouq_activate_site_env karolina "${REPO_ROOT}"',
             'export MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"',
             'export MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"',
             'export MESOUQ_GV_EIGENMODES_DOMAIN_RANKS="${MESOUQ_GV_EIGENMODES_DOMAIN_RANKS:-1,1,1}"',
@@ -712,12 +710,8 @@ def _platform_setup(platform: Platform) -> list[str]:
         "  HDF5/1.14.0-gompi-2022b \\",
         "  MPFR/4.2.0-GCCcore-12.2.0 \\",
         "  GMP/6.2.1-GCCcore-12.2.0",
-        'GV_ENV_SCRIPT="${MESOUQ_GV_ENV_SCRIPT:-${REPO_ROOT}/_vega/gv_venv/env.sh}"',
-        'if [[ ! -f "${GV_ENV_SCRIPT}" ]]; then',
-        '  echo "Missing required GV runtime environment: ${GV_ENV_SCRIPT}" >&2',
-        "  exit 1",
-        "fi",
-        'source "${GV_ENV_SCRIPT}"',
+        'source "${REPO_ROOT}/scripts/platforms/hpc/site_env.sh"',
+        'mesouq_activate_site_env vega "${REPO_ROOT}"',
         'export MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"',
         'export MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"',
         'export MESOUQ_GV_EIGENMODES_DOMAIN_RANKS="${MESOUQ_GV_EIGENMODES_DOMAIN_RANKS:-1,1,1}"',

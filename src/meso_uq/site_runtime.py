@@ -10,10 +10,6 @@ from pathlib import Path
 from meso_uq.platforms.site_selector import VALID_MESOUQ_SITES, resolve_hpc_site
 
 VALID_RUNTIME_SITES = set(VALID_MESOUQ_SITES)
-DEFAULT_SITE_ROOT_NAMES = {
-    "vega": "_vega",
-    "karolina": "_karolina",
-}
 
 
 @dataclass(frozen=True)
@@ -24,15 +20,15 @@ class RuntimePaths:
     site_root: Path
     provenance_root: Path
     logs_dir: Path
+    env_root: Path
+    env_site_packages: Path
+    env_script: Path
     korali_source: Path
     korali_root: Path
     korali_build_dir: Path
     korali_prefix: Path
     korali_site_packages: Path
     korali_env_script: Path
-    gv_venv_root: Path
-    gv_venv_site_packages: Path
-    gv_venv_env_script: Path
     gv_cgal_tools_root: Path
     gv_cgal_tools_bin_dir: Path
     gv_cgal_tools_env_script: Path
@@ -88,7 +84,10 @@ def _resolve_site_root(
     env_root = env.get("MESOUQ_SITE_RUNTIME_ROOT", "").strip()
     if env_root:
         return Path(env_root).expanduser().resolve()
-    return repo_root / DEFAULT_SITE_ROOT_NAMES[site]
+    raise RuntimeError(
+        "MESOUQ_SITE_RUNTIME_ROOT is required for MesoUQ site runtime paths. "
+        "Set it to a per-site runtime root, or pass runtime_root explicitly."
+    )
 
 
 def _resolve_provenance_root(
@@ -129,9 +128,11 @@ def get_site_runtime_paths(
     korali_root = site_root / "korali"
     mirheo_root = site_root / "mirheo"
     gv_cgal_tools_root = site_root / "gv_cgal_tools"
+    env_root = site_root / "env"
     venv_root = site_root / "venv"
     tinytex_root = site_root / "tinytex"
     py_tag = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    env_site_packages = env_root / "lib" / py_tag / "site-packages"
     return RuntimePaths(
         site=resolved_site,
         repo_root=root,
@@ -139,15 +140,15 @@ def get_site_runtime_paths(
         site_root=site_root,
         provenance_root=provenance_root,
         logs_dir=site_root / "logs",
+        env_root=env_root,
+        env_site_packages=env_site_packages,
+        env_script=env_root / "env.sh",
         korali_source=root / "extern" / "korali",
         korali_root=korali_root,
         korali_build_dir=korali_root / "build",
         korali_prefix=korali_root / "install",
         korali_site_packages=korali_root / "install" / "lib" / py_tag / "site-packages",
         korali_env_script=korali_root / "env.sh",
-        gv_venv_root=site_root / "gv_venv",
-        gv_venv_site_packages=site_root / "gv_venv" / "lib" / py_tag / "site-packages",
-        gv_venv_env_script=site_root / "gv_venv" / "env.sh",
         gv_cgal_tools_root=gv_cgal_tools_root,
         gv_cgal_tools_bin_dir=gv_cgal_tools_root / "bin",
         gv_cgal_tools_env_script=gv_cgal_tools_root / "env.sh",

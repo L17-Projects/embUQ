@@ -150,7 +150,7 @@ pip install -e ".[mpi]"
 
 See `docs/DEPENDENCY_EXTRAS.md` for the full extras contract and the remaining Korali/backend caveats.
 
-For a fresh Vega clone, the supported bootstrap path is documented in `docs/VEGA_BOOTSTRAP.md` and builds vendored `extern/korali/` into repo-local `_vega/`. For Karolina, see `docs/KAROLINA_FULL_PLATFORM.md` for the scratch-backed runtime and run-root contract.
+For fresh Vega and Karolina clones, the supported bootstrap path is documented in `docs/VEGA_BOOTSTRAP.md` and `docs/KAROLINA_FULL_PLATFORM.md` and builds vendored `extern/korali/` into `${MESOUQ_SITE_RUNTIME_ROOT}/korali/install`.
 
 ## Quick start
 
@@ -165,15 +165,15 @@ module load \
   GSL/2.7-GCC-12.2.0 \
   Eigen/3.4.0-GCCcore-12.2.0
 
-python -m venv _vega/venv
-source _vega/venv/bin/activate
+bash scripts/platforms/hpc/bootstrap_env.sh --site vega
+source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
 python -m pip install --upgrade pip
 pip install -e ".[test,mpi]"
 pip install pybind11 meson ninja
 
 python scripts/platforms/hpc/doctor_hpc.py --site vega
 bash scripts/platforms/hpc/bootstrap_korali.sh --site vega --jobs 8
-source _vega/korali/env.sh
+source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
 python scripts/platforms/hpc/doctor_hpc.py --site vega --strict
 
 REPO_ROOT=$(pwd) sbatch scripts/platforms/vega/sbatch/validation_matrix.sbatch

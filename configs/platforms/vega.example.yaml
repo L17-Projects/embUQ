@@ -13,7 +13,7 @@ spec:
     qos_env: MESOUQ_SLURM_QOS
     time_limit: "24:00:00"
   paths:
-    runtime_root: ${MESOUQ_REPO_ROOT}/_vega
+    runtime_root: ${MESOUQ_SITE_RUNTIME_ROOT}
     runs_root: ${MESOUQ_RUNS_ROOT}/vega
     scratch_root: ${MESOUQ_SCRATCH_ROOT}
     korali_vendor_root: extern/korali
@@ -29,8 +29,8 @@ path_policy:
   gpu_resource_syntax:
     - --gres=gpu:1
   environment_scripts:
+    - ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
     - ${MESOUQ_SITE_RUNTIME_ROOT}/korali/env.sh
     - ${MESOUQ_SITE_RUNTIME_ROOT}/mirheo/env.sh
-    - ${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/env.sh
     - ${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools/env.sh
   forbidden_literals: []

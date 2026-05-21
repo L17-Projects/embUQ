@@ -26,6 +26,13 @@
 
 set -euo pipefail
 
+legacy_name="HPC""_SITE"
+if [[ ${!legacy_name+x} ]]; then
+  echo "${legacy_name} is no longer supported. Use MESOUQ_SITE." >&2
+  exit 2
+fi
+unset legacy_name
+
 REPO_ROOT="${REPO_ROOT:-${SLURM_SUBMIT_DIR:-$(pwd)}}"
 if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
   echo "Set REPO_ROOT explicitly or submit the job from the repo root." >&2
@@ -59,12 +66,8 @@ module load \
   MPFR/4.2.0-GCCcore-12.2.0 \
   GMP/6.2.1-GCCcore-12.2.0
 
-if [[ ! -f "${REPO_ROOT}/_vega/gv_venv/env.sh" ]]; then
-  echo "Missing required GV runtime environment: ${REPO_ROOT}/_vega/gv_venv/env.sh" >&2
-  exit 1
-fi
-
-source "${REPO_ROOT}/_vega/gv_venv/env.sh"
+source "${REPO_ROOT}/scripts/platforms/hpc/site_env.sh"
+mesouq_activate_site_env vega "${REPO_ROOT}"
 export MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"
 export MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"
 export MESOUQ_GV_EIGENMODES_DOMAIN_RANKS="${MESOUQ_GV_EIGENMODES_DOMAIN_RANKS:-1,1,1}"

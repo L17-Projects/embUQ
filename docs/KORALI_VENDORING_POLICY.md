@@ -52,7 +52,7 @@ The validator understands these runtime hints:
 Expected behavior:
 
 - `MESOUQ_SITE` should match the validation platform.
-- `MESOUQ_SITE_RUNTIME_ROOT` is optional, but when absent the validator assumes the repo-local `_karolina/` fallback conventions.
+- `MESOUQ_SITE_RUNTIME_ROOT` is required and must point at the canonical per-site runtime root used for Korali bootstrap state.
 - `MESOUQ_KORALI_BUILD_ROOT` and `MESOUQ_KORALI_LIBRARY_PATH` are optional, but when present they should resolve to real paths and must not point into private-path prefixes.
 - `PYTHONPATH` should include repo-local `src/` and the repository root when performing a repo-local Korali bootstrap.
 - `PATH` should retain the operator launch helpers needed for the runtime environment.

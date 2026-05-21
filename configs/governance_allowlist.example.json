@@ -54,6 +54,11 @@
           "path": ".github/workflows/ci.yml",
           "fragments": [
             "_ci/surrogate_retraining",
+            "_ci/provenance",
+            "_ci/vega-runtime",
+            "_ci/vega-runtime/env",
+            "_ci/vega-runtime/korali/env.sh",
+            "_ci/vega-runtime/korali/install",
             "_ci/workflow_canary"
           ]
         }

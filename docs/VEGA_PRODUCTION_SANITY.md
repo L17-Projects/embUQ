@@ -54,7 +54,7 @@ Run it inside an allocated Vega job:
 
 ```bash
 python scripts/platforms/vega/run_production_sanity.py \
-  --output-root _vega/production_sanity \
+  --output-root "${MESOUQ_RUNS_ROOT}/production_sanity" \
   --phase2-cpu-ranks 1 \
   --python-bin python
 ```
@@ -69,7 +69,7 @@ To run a non-default lane:
 ```bash
 python scripts/platforms/vega/run_production_sanity.py \
   --selection indentation:reduced-model:production \
-  --output-root _vega/production_sanity/indentation_reduced_model
+  --output-root "${MESOUQ_RUNS_ROOT}/production_sanity"/indentation_reduced_model
 ```
 
 To run multiple lanes explicitly:
@@ -78,7 +78,7 @@ To run multiple lanes explicitly:
 python scripts/platforms/vega/run_production_sanity.py \
   --selection compression:full-model:production \
   --selection compression:reduced-model:production \
-  --output-root _vega/production_sanity/compression_pair
+  --output-root "${MESOUQ_RUNS_ROOT}/production_sanity"/compression_pair
 ```
 
 ## Outputs
@@ -86,15 +86,15 @@ python scripts/platforms/vega/run_production_sanity.py \
 The command writes:
 
 - one machine-readable report:
-  - `_vega/production_sanity/<label>/production_sanity_report.json`
+  - `${MESOUQ_RUNS_ROOT}/production_sanity/<label>/production_sanity_report.json`
 - one generated override config per selected lane:
-  - `_vega/production_sanity/<label>/configs/*.yaml`
+  - `${MESOUQ_RUNS_ROOT}/production_sanity/<label>/configs/*.yaml`
 - the nested workflow matrix outputs:
-  - `_vega/production_sanity/<label>/matrix/...`
+  - `${MESOUQ_RUNS_ROOT}/production_sanity/<label>/matrix/...`
 - captured workflow-matrix logs:
-  - `_vega/production_sanity/<label>/logs/...`
+  - `${MESOUQ_RUNS_ROOT}/production_sanity/<label>/logs/...`
 - standardized plots:
-  - `_vega/production_sanity/<label>/plots/...`
+  - `${MESOUQ_RUNS_ROOT}/production_sanity/<label>/plots/...`
 
 The standardized plot bundle includes:
 

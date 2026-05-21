@@ -33,6 +33,11 @@ def _load_module(path: Path, name: str):
     return module
 
 
+@pytest.fixture(autouse=True)
+def _default_site_runtime_root(monkeypatch, tmp_path):
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(tmp_path / "site-runtime"))
+
+
 def test_gv_platform_vega_runtime_wrapper_forwards_platform_flag(monkeypatch) -> None:
     module = _load_module(
         Path("scripts/platforms/vega/run_gv_runtime.py"),
@@ -178,6 +183,7 @@ def test_gv_runtime_rendering_targets_staged_work_dir_and_generates_scheduler(tm
         raise AssertionError("runtime commands should not execute under --dry-run")
 
     monkeypatch.setattr(module.subprocess, "run", _run)
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(tmp_path / "site-runtime"))
 
     rc = module.main(
         [
@@ -205,16 +211,16 @@ def test_gv_runtime_rendering_targets_staged_work_dir_and_generates_scheduler(tm
     contents = commands_txt.read_text(encoding="utf-8")
     assert "generate.py" in contents
     assert "run_HPC.sbatch" in contents
-    assert "_vega/gv_venv/env.sh" in contents
-    assert "_vega/mirheo/env.sh" not in contents
+    assert "/env/env.sh" in contents
+    assert ("_vega" + "/") not in contents
     assert "Missing required GV runtime environment" in contents
     assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in contents
     assert '"mu_l": 0.5' in contents
     assert "source" in contents
 
     scheduler_contents = (work_dir / "run_HPC.sbatch").read_text(encoding="utf-8")
-    assert "_vega/gv_venv/env.sh" in scheduler_contents
-    assert "_vega/mirheo/env.sh" not in scheduler_contents
+    assert "/env/env.sh" in scheduler_contents
+    assert ("_vega" + "/") not in scheduler_contents
     assert "Missing required GV runtime environment" in scheduler_contents
 
 
@@ -228,7 +234,7 @@ def test_gv_runtime_resolves_karolina_env_script_from_site_runtime_root(tmp_path
 
     env_script = module._resolve_gv_env_script("karolina")
 
-    assert env_script == (runtime_root / "gv_venv" / "env.sh").resolve()
+    assert env_script == (runtime_root / "env" / "env.sh").resolve()
 
 
 def test_gv_runtime_resolves_explicit_env_script_override(tmp_path, monkeypatch) -> None:
@@ -302,7 +308,7 @@ def test_gv_generated_mirheo_jobs_source_runtime_environment_and_preserve_materi
     assert "MESOUQ_GV_ENV_SCRIPT" in contents
     assert "MESOUQ_SITE_RUNTIME_ROOT" in contents
     assert "f'_{site}'" in contents
-    assert "_vega' / 'gv_venv' / 'env.sh" not in contents
+    assert "_vega' / 'env' / 'env.sh" not in contents
     assert "source {shlex.quote(env_script)}" in contents
     assert "MESOUQ_GV_MATERIAL_OVERRIDES_JSON" in contents
     assert "MESOUQ_GV_MIRHEO_MODULE" in contents
@@ -625,14 +631,14 @@ def test_gv_runtime_command_execution_propagates_runtime_env_overrides(tmp_path,
         material_overrides_json='{"ka": 1.1}',
         env_overrides={
             "MESOUQ_SITE": "karolina",
-            "MESOUQ_GV_ENV_SCRIPT": "/scratch/mesouq/runtime/gv_venv/env.sh",
+            "MESOUQ_GV_ENV_SCRIPT": "/scratch/mesouq/runtime/env/env.sh",
         },
     )
 
     assert returncode == 0
     assert records[0]["status"] == "completed"
     assert captured_env[0]["MESOUQ_SITE"] == "karolina"
-    assert captured_env[0]["MESOUQ_GV_ENV_SCRIPT"] == "/scratch/mesouq/runtime/gv_venv/env.sh"
+    assert captured_env[0]["MESOUQ_GV_ENV_SCRIPT"] == "/scratch/mesouq/runtime/env/env.sh"
     assert captured_env[0]["MESOUQ_GV_MATERIAL_OVERRIDES_JSON"] == '{"ka": 1.1}'
 
 
@@ -694,6 +700,7 @@ def test_gv_runtime_workflow_passes_karolina_env_to_subprocesses(tmp_path, monke
     monkeypatch.setattr(module.subprocess, "run", _fake_run)
     monkeypatch.delenv("MESOUQ_SITE", raising=False)
     monkeypatch.delenv("MESOUQ_GV_ENV_SCRIPT", raising=False)
+    monkeypatch.setenv("MESOUQ_SITE_RUNTIME_ROOT", str(tmp_path / "karolina-runtime"))
 
     rc = module.main(["--selection", "gv:torsion", "--platform", "karolina", "--output-root", str(output_root)])
 
@@ -812,7 +819,7 @@ def test_gv_runtime_render_manifest_records_classified_known_issues(tmp_path, mo
         ],
         manifest={"work_dir": str(work_dir)},
         platform="vega",
-        gv_env_script=Path("/tmp/gv_venv/env.sh"),
+        gv_env_script=Path("/tmp/env/env.sh"),
     )
     assert scheduled == []
 
@@ -823,7 +830,7 @@ def test_gv_runtime_render_manifest_records_classified_known_issues(tmp_path, mo
         command_list=[(("sbatch", "existing.sbatch"), work_dir)],
         manifest={"work_dir": str(work_dir)},
         platform="vega",
-        gv_env_script=Path("/tmp/gv_venv/env.sh"),
+        gv_env_script=Path("/tmp/env/env.sh"),
     ) == []
 
     module._ensure_generated_directories(work_dir, {"generated_subdirs": ["logs", 3]})

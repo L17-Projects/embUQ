@@ -116,8 +116,8 @@ The following canned templates live under `scripts/platforms/vega/sbatch/`:
 They assume:
 
 - the repo-local bootstrap from `docs/VEGA_BOOTSTRAP.md` is already complete
-- `_vega/venv` exists
-- `_vega/korali/env.sh` exists
+- `${MESOUQ_SITE_RUNTIME_ROOT}/env` exists
+- `${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh` exists
 
 Each template exposes `EXPERIMENT`, `MODEL_FAMILY`, and `PROFILE` at the shell-variable level so fresh-clone workflow jobs do not rely on editing Python code or guessing config paths.
 
@@ -137,4 +137,4 @@ Useful production overrides:
 - `PHASE3B_MEM_ARG="--mem=8000"` when `--exclusive` is too strict on `dev`
 - `RUN_TAG=<tag>` to control output/log folder naming
 
-When submitting with `sbatch`, run them from the repo root or set `REPO_ROOT` explicitly so the batch job can resolve the clone-local `_vega/` runtime correctly.
+When submitting with `sbatch`, run from the repo root or set `REPO_ROOT` explicitly, and set `MESOUQ_SITE_RUNTIME_ROOT` so the batch job can resolve the canonical site runtime.

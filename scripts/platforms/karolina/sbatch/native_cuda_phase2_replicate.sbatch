@@ -11,19 +11,28 @@
 
 set -euo pipefail
 
+legacy_name="HPC""_SITE"
+if [[ ${!legacy_name+x} ]]; then
+  echo "${legacy_name} is no longer supported. Use MESOUQ_SITE." >&2
+  exit 2
+fi
+unset legacy_name
+
 : "${REPO_ROOT:?REPO_ROOT must point at the MesoUQ checkout}"
 : "${LANE_ROOT:?LANE_ROOT must be the per-replicate output root}"
 : "${PHASE1_SOURCE:?PHASE1_SOURCE must point at results_phase_1}"
 : "${PHASE2_BACKEND:?PHASE2_BACKEND must be cpu-mpi or native-cuda}"
 : "${REPLICATE_ID:?REPLICATE_ID must identify this replicate}"
 
-PYTHON_BIN="${PYTHON_BIN:-/scratch/project/eu-26-17/eubrieucb/mesouq/runtime/venv/bin/python}"
+if [[ -z "${MESOUQ_SITE_RUNTIME_ROOT:-}" ]]; then
+  echo "MESOUQ_SITE_RUNTIME_ROOT must be set before using this Karolina sbatch script." >&2
+  exit 2
+fi
+PYTHON_BIN="${PYTHON_BIN:-${MESOUQ_SITE_RUNTIME_ROOT}/env/bin/python}"
 CONFIG_PATH="${CONFIG_PATH:-${REPO_ROOT}/inference/configs/production/inference_config_indentation.yaml}"
 PHASE2_CPU_RANKS="${PHASE2_CPU_RANKS:-1}"
 LOG_ROOT="${LOG_ROOT:-${LANE_ROOT}/logs}"
 MANIFEST_ROOT="${MANIFEST_ROOT:-${LANE_ROOT}/manifests}"
-ENV_SCRIPT="${ENV_SCRIPT:-/scratch/project/eu-26-17/eubrieucb/mesouq/load_mesouq_karolina.sh}"
-KORALI_ENV_SCRIPT="${KORALI_ENV_SCRIPT:-}"
 
 case "${PHASE2_BACKEND}" in
   cpu-mpi)
@@ -45,10 +54,9 @@ case "${PHASE2_BACKEND}" in
 esac
 
 cd "${REPO_ROOT}"
-source "${ENV_SCRIPT}"
-if [[ -n "${KORALI_ENV_SCRIPT}" ]]; then
-  source "${KORALI_ENV_SCRIPT}"
-fi
+source scripts/platforms/karolina/env_karolina.sh
+source scripts/platforms/hpc/site_env.sh
+mesouq_activate_site_env karolina "${REPO_ROOT}"
 
 export PATH="$(dirname "${PYTHON_BIN}"):${PATH}"
 export PYTHONPATH="${REPO_ROOT}/src:${REPO_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"

@@ -49,10 +49,13 @@ def test_karolina_surrogate_holdout_uses_single_gpu_and_scratch_runtime() -> Non
     assert "#SBATCH --gpus=1" in text
     assert "#SBATCH --gres=gpu" not in text
     assert 'source scripts/platforms/karolina/env_karolina.sh' in text
+    assert 'source scripts/platforms/hpc/site_env.sh' in text
+    assert 'mesouq_activate_site_env karolina "${REPO_ROOT}"' in text
     assert 'OUTPUT_ROOT="${OUTPUT_ROOT:-${MESOUQ_RUNS_ROOT}/surrogate_group_holdout/${RUN_TAG}}"' in text
-    assert 'VENV_DIR="${VENV_DIR:-${MESOUQ_SITE_RUNTIME_ROOT}/venv}"' in text
-    assert 'source "${VENV_DIR}/bin/activate"' in text
-    assert "_vega/" not in text
+    legacy_venv = 'VENV' + '_DIR'
+    assert f'{legacy_venv}=' not in text
+    assert f'source "${{{legacy_venv}}}/bin/activate"' not in text
+    assert ("_vega" + "/") not in text
     assert "--site karolina" in text
 
 

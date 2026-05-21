@@ -1,22 +1,26 @@
+import json
 import os
 import shlex
 import subprocess
 from pathlib import Path
 
+import meso_uq.vega as vega_module
 from meso_uq.site_runtime import normalize_runtime_site
 from meso_uq.vega import (
-    build_gv_runtime_pythonpath,
     build_runtime_pythonpath,
+    build_unified_env_pythonpath,
+    discover_python_runtime_library_dirs,
+    discover_hdf5_runtime_roots,
     find_external_korali_entries,
     gather_mirheo_source_snapshot,
     get_runtime_paths,
     get_vega_paths,
     load_mirheo_source_lock,
     render_gv_cgal_tools_env_script,
-    render_gv_venv_env_script,
     render_mirheo_env_script,
     render_korali_env_script,
     render_tinytex_env_script,
+    render_unified_env_script,
     resolve_repo_root,
     resolve_mirheo_source,
 )
@@ -31,34 +35,44 @@ def _make_repo(tmp_path: Path) -> Path:
     return repo_root
 
 
-def test_vega_paths_use_repo_local_visible_state(tmp_path):
+def _runtime_root(tmp_path: Path, site: str) -> Path:
+    return tmp_path / f"{site}-runtime"
+
+
+def _legacy_root_env(site: str) -> str:
+    return "MESOUQ_" + site.upper() + "_ROOT"
+
+
+def test_vega_paths_use_canonical_runtime_root(tmp_path):
     repo_root = _make_repo(tmp_path)
-    paths = get_vega_paths(repo_root)
+    runtime_root = _runtime_root(tmp_path, "vega")
+    paths = get_vega_paths(repo_root, runtime_root=runtime_root)
 
-    assert paths.vega_root == repo_root / "_vega"
-    assert paths.korali_prefix == repo_root / "_vega" / "korali" / "install"
-    assert paths.korali_env_script == repo_root / "_vega" / "korali" / "env.sh"
-    assert paths.tinytex_root == repo_root / "_vega" / "tinytex"
-    assert paths.tinytex_env_script == repo_root / "_vega" / "tinytex" / "env.sh"
-    assert paths.mirheo_prefix == repo_root / "_vega" / "mirheo" / "install"
-    assert paths.mirheo_env_script == repo_root / "_vega" / "mirheo" / "env.sh"
-    assert paths.gv_venv_root == repo_root / "_vega" / "gv_venv"
-    assert paths.gv_venv_env_script == repo_root / "_vega" / "gv_venv" / "env.sh"
+    assert paths.vega_root == runtime_root.resolve()
+    assert paths.site_root == runtime_root.resolve()
+    assert paths.env_root == runtime_root.resolve() / "env"
+    assert paths.env_script == runtime_root.resolve() / "env" / "env.sh"
+    assert paths.korali_prefix == runtime_root.resolve() / "korali" / "install"
+    assert paths.korali_env_script == runtime_root.resolve() / "korali" / "env.sh"
+    assert paths.tinytex_root == runtime_root.resolve() / "tinytex"
+    assert paths.tinytex_env_script == runtime_root.resolve() / "tinytex" / "env.sh"
+    assert paths.mirheo_prefix == runtime_root.resolve() / "mirheo" / "install"
+    assert paths.mirheo_env_script == runtime_root.resolve() / "mirheo" / "env.sh"
 
 
-def test_runtime_paths_support_karolina_repo_local_root(tmp_path):
+def test_runtime_paths_support_karolina_canonical_runtime_root(tmp_path):
     repo_root = _make_repo(tmp_path)
-    paths = get_runtime_paths(repo_root, site="karolina", env={})
+    runtime_root = _runtime_root(tmp_path, "karolina")
+    paths = get_runtime_paths(repo_root, site="karolina", runtime_root=runtime_root, env={})
 
     assert paths.site == "karolina"
-    assert paths.site_root == repo_root / "_karolina"
-    assert paths.karolina_root == repo_root / "_karolina"
-    assert paths.korali_prefix == repo_root / "_karolina" / "korali" / "install"
-    assert paths.mirheo_prefix == repo_root / "_karolina" / "mirheo" / "install"
-    assert paths.gv_venv_env_script == repo_root / "_karolina" / "gv_venv" / "env.sh"
-    assert paths.gv_cgal_tools_env_script == repo_root / "_karolina" / "gv_cgal_tools" / "env.sh"
-    assert paths.scale_space_binary == repo_root / "_karolina" / "gv_cgal_tools" / "bin" / "scale_space"
-    assert paths.provenance_root == repo_root / "provenance"
+    assert paths.site_root == runtime_root.resolve()
+    assert paths.karolina_root == runtime_root.resolve()
+    assert paths.korali_prefix == runtime_root.resolve() / "korali" / "install"
+    assert paths.mirheo_prefix == runtime_root.resolve() / "mirheo" / "install"
+    assert paths.gv_cgal_tools_env_script == runtime_root.resolve() / "gv_cgal_tools" / "env.sh"
+    assert paths.scale_space_binary == runtime_root.resolve() / "gv_cgal_tools" / "bin" / "scale_space"
+    assert paths.provenance_root == runtime_root.resolve().parent / "provenance"
 
 
 def test_runtime_paths_honor_site_runtime_root_override(tmp_path):
@@ -71,9 +85,10 @@ def test_runtime_paths_honor_site_runtime_root_override(tmp_path):
     )
 
     assert paths.site_root == runtime_root.resolve()
+    assert paths.env_root == runtime_root.resolve() / "env"
+    assert paths.env_script == runtime_root.resolve() / "env" / "env.sh"
     assert paths.venv_root == runtime_root.resolve() / "venv"
     assert paths.korali_env_script == runtime_root.resolve() / "korali" / "env.sh"
-    assert paths.gv_venv_env_script == runtime_root.resolve() / "gv_venv" / "env.sh"
     assert paths.provenance_root == runtime_root.resolve().parent / "provenance"
 
     explicit_paths = get_runtime_paths(
@@ -92,7 +107,10 @@ def test_runtime_paths_honor_karolina_provenance_root_override(tmp_path):
     paths = get_runtime_paths(
         repo_root,
         site="karolina",
-        env={"MESOUQ_PROVENANCE_ROOT": str(provenance_root)},
+        env={
+            "MESOUQ_SITE_RUNTIME_ROOT": str(tmp_path / "runtime"),
+            "MESOUQ_PROVENANCE_ROOT": str(provenance_root),
+        },
     )
 
     assert paths.provenance_root == provenance_root.resolve()
@@ -130,7 +148,7 @@ def test_resolve_repo_root_raises_when_no_repo_marker_exists(tmp_path):
 
 def test_build_runtime_pythonpath_prefers_repo_local_korali(tmp_path):
     repo_root = _make_repo(tmp_path)
-    paths = get_vega_paths(repo_root)
+    paths = get_vega_paths(repo_root, runtime_root=_runtime_root(tmp_path, "vega"))
     external_site = tmp_path / "external" / "lib" / "python-external" / "site-packages"
     (external_site / "korali").mkdir(parents=True)
     other_entry = tmp_path / "other"
@@ -152,20 +170,9 @@ def test_build_runtime_pythonpath_prefers_repo_local_korali(tmp_path):
     assert str(external_site) not in entries
     assert str(other_entry) in entries
 
-
-def test_build_gv_runtime_pythonpath_sets_gv_site_prefix(tmp_path):
-    repo_root = _make_repo(tmp_path)
-    paths = get_vega_paths(repo_root)
-    built = build_gv_runtime_pythonpath(repo_root, gv_venv_site_packages=paths.gv_venv_site_packages)
-
-    entries = built.split(":")
-    assert entries[0] == str(paths.gv_venv_site_packages)
-    assert entries[1:] == [str(repo_root / "src"), str(repo_root)]
-
-
 def test_find_external_korali_entries_reports_user_global_path(tmp_path):
     repo_root = _make_repo(tmp_path)
-    paths = get_vega_paths(repo_root)
+    paths = get_vega_paths(repo_root, runtime_root=_runtime_root(tmp_path, "vega"))
     external_site = tmp_path / "external" / "lib" / "python-external" / "site-packages"
     (external_site / "korali").mkdir(parents=True)
 
@@ -178,9 +185,92 @@ def test_find_external_korali_entries_reports_user_global_path(tmp_path):
     assert external == [str(external_site)]
 
 
+def test_build_unified_env_pythonpath_prefers_env_then_local_korali(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    paths = get_vega_paths(repo_root, runtime_root=_runtime_root(tmp_path, "vega"))
+    external_site = tmp_path / "external" / "lib" / "python-external" / "site-packages"
+    (external_site / "korali").mkdir(parents=True)
+
+    built = build_unified_env_pythonpath(
+        repo_root,
+        paths.env_site_packages,
+        paths.korali_site_packages,
+        current_pythonpath=str(external_site),
+        include_existing=True,
+    )
+
+    entries = built.split(":")
+    assert entries[:4] == [
+        str(paths.env_site_packages),
+        str(paths.korali_site_packages),
+        str(repo_root / "src"),
+        str(repo_root),
+    ]
+    assert str(external_site) not in entries
+
+
+def test_discover_python_runtime_library_dirs_honors_env_override(tmp_path):
+    lib_dir = tmp_path / "python" / "lib"
+    ffi_dir = tmp_path / "libffi" / "lib64"
+    lib_dir.mkdir(parents=True)
+    ffi_dir.mkdir(parents=True)
+    (lib_dir / "libpython3.10.so.1.0").touch()
+
+    discovered = discover_python_runtime_library_dirs(
+        env={
+            "MESOUQ_PYTHON_LIB_DIR": str(lib_dir),
+            "LD_LIBRARY_PATH": str(ffi_dir),
+        }
+    )
+
+    assert lib_dir.resolve() in discovered
+    assert ffi_dir.resolve() in discovered
+
+
+def test_render_unified_env_script_exports_single_canonical_activation(tmp_path):
+    repo_root = _make_repo(tmp_path)
+    paths = get_runtime_paths(repo_root, site="karolina", runtime_root=_runtime_root(tmp_path, "karolina"), env={})
+    source_root = tmp_path / "Mirheo"
+    source_root.mkdir()
+    hdf5_root = tmp_path / "hdf5"
+    (hdf5_root / "lib").mkdir(parents=True)
+    python_lib = tmp_path / "python" / "lib"
+    module_bin = tmp_path / "module" / "bin"
+    pkg_config = tmp_path / "module" / "lib" / "pkgconfig"
+    python_lib.mkdir(parents=True)
+    module_bin.mkdir(parents=True)
+    pkg_config.mkdir(parents=True)
+
+    env_script = render_unified_env_script(
+        paths,
+        source_root=source_root,
+        snapshot_path=paths.mirheo_snapshot_path,
+        hdf5_runtime_roots=(hdf5_root,),
+        python_runtime_lib_dirs=(python_lib,),
+        captured_env={"PATH": str(module_bin), "PKG_CONFIG_PATH": str(pkg_config)},
+    )
+
+    assert "MESOUQ_SITE=karolina" in env_script
+    assert f"MESOUQ_ENV_ROOT={paths.env_root}" in env_script
+    assert f"MESOUQ_ENV_SCRIPT={paths.env_script}" in env_script
+    assert f"MESOUQ_GV_ENV_SCRIPT={paths.env_script}" in env_script
+    assert str(paths.env_site_packages) in env_script
+    assert str(paths.korali_site_packages) in env_script
+    assert str(paths.korali_env_script) not in env_script
+    assert str(paths.mirheo_env_script) in env_script
+    assert str(paths.gv_cgal_tools_env_script) in env_script
+    assert str(paths.tinytex_env_script) in env_script
+    assert str(hdf5_root) in env_script
+    assert str(python_lib) in env_script
+    assert str(module_bin) in env_script
+    assert str(pkg_config) in env_script
+    assert "MESOUQ_OPENMPI_LIB_DIR" in env_script
+
+
+
 def test_render_korali_env_script_uses_deterministic_pythonpath(tmp_path):
     repo_root = _make_repo(tmp_path)
-    paths = get_vega_paths(repo_root)
+    paths = get_vega_paths(repo_root, runtime_root=_runtime_root(tmp_path, "vega"))
     env_script = render_korali_env_script(paths)
 
     assert "KORALI_PYTHONPATH" in env_script
@@ -191,21 +281,21 @@ def test_render_korali_env_script_uses_deterministic_pythonpath(tmp_path):
 
 def test_render_korali_env_script_exports_karolina_runtime_root(tmp_path):
     repo_root = _make_repo(tmp_path)
-    paths = get_runtime_paths(repo_root, site="karolina", env={})
+    paths = get_runtime_paths(repo_root, site="karolina", runtime_root=_runtime_root(tmp_path, "karolina"), env={})
 
     env_script = render_korali_env_script(paths)
 
     assert "MESOUQ_SITE=karolina" in env_script
     assert "MESOUQ_SITE_RUNTIME_ROOT" in env_script
     assert "MESOUQ_PROVENANCE_ROOT" in env_script
-    assert "MESOUQ_KAROLINA_ROOT" in env_script
-    assert str(repo_root / "_karolina" / "korali" / "install") in env_script
-    assert "MESOUQ_VEGA_ROOT" not in env_script
+    assert _legacy_root_env("karolina") not in env_script
+    assert str(paths.korali_prefix) in env_script
+    assert _legacy_root_env("vega") not in env_script
 
 
 def test_render_tinytex_env_script_exports_repo_local_bin(tmp_path):
     repo_root = _make_repo(tmp_path)
-    paths = get_vega_paths(repo_root)
+    paths = get_vega_paths(repo_root, runtime_root=_runtime_root(tmp_path, "vega"))
 
     env_script = render_tinytex_env_script(paths)
 
@@ -246,6 +336,27 @@ def test_load_mirheo_source_lock_uses_karolina_default_when_lock_missing(tmp_pat
     assert lock["source_path"] == "/home/it4i-bbenvegnen/software/Mirheo"
 
 
+def test_load_mirheo_source_lock_falls_back_to_site_default_when_locked_path_is_missing(tmp_path, monkeypatch):
+    repo_root = _make_repo(tmp_path)
+    missing_source = tmp_path / "missing-mirheo"
+    default_source = tmp_path / "karolina-mirheo"
+    default_source.mkdir()
+    monkeypatch.setitem(
+        vega_module.DEFAULT_MIRHEO_SOURCE_PATHS,
+        "karolina",
+        str(default_source),
+    )
+    (repo_root / "extern" / "mirheo.lock.json").write_text(
+        json.dumps({"source_path": str(missing_source)}),
+        encoding="utf-8",
+    )
+
+    lock = load_mirheo_source_lock(repo_root, site="karolina")
+
+    assert lock["source_path"] == str(default_source)
+    assert "locked source unavailable for site karolina" in lock["source_path_fallback_reason"]
+
+
 def test_load_mirheo_source_lock_rejects_non_mapping_payload(tmp_path):
     repo_root = _make_repo(tmp_path)
     (repo_root / "extern" / "mirheo.lock.json").write_text('["bad"]', encoding="utf-8")
@@ -268,7 +379,7 @@ def test_resolve_mirheo_source_prefers_explicit_override(tmp_path):
 
 def test_render_mirheo_env_script_exports_local_paths(tmp_path):
     repo_root = _make_repo(tmp_path)
-    paths = get_vega_paths(repo_root)
+    paths = get_vega_paths(repo_root, runtime_root=_runtime_root(tmp_path, "vega"))
     source_root = tmp_path / "Mirheo"
     source_root.mkdir()
 
@@ -286,7 +397,7 @@ def test_render_mirheo_env_script_exports_local_paths(tmp_path):
 
 def test_render_mirheo_env_script_exports_karolina_root(tmp_path):
     repo_root = _make_repo(tmp_path)
-    paths = get_runtime_paths(repo_root, site="karolina", env={})
+    paths = get_runtime_paths(repo_root, site="karolina", runtime_root=_runtime_root(tmp_path, "karolina"), env={})
     source_root = tmp_path / "Mirheo"
     source_root.mkdir()
 
@@ -294,13 +405,13 @@ def test_render_mirheo_env_script_exports_karolina_root(tmp_path):
 
     assert "MESOUQ_SITE=karolina" in env_script
     assert "MESOUQ_PROVENANCE_ROOT" in env_script
-    assert "MESOUQ_KAROLINA_ROOT" in env_script
-    assert "MESOUQ_VEGA_ROOT" not in env_script
+    assert _legacy_root_env("karolina") not in env_script
+    assert _legacy_root_env("vega") not in env_script
 
 
 def test_render_mirheo_env_script_omits_snapshot_when_not_provided(tmp_path):
     repo_root = _make_repo(tmp_path)
-    paths = get_vega_paths(repo_root)
+    paths = get_vega_paths(repo_root, runtime_root=_runtime_root(tmp_path, "vega"))
     source_root = tmp_path / "Mirheo"
     source_root.mkdir()
 
@@ -308,87 +419,15 @@ def test_render_mirheo_env_script_omits_snapshot_when_not_provided(tmp_path):
 
     assert "MIRHEO_SOURCE_SNAPSHOT" not in env_script
 
-
-def test_render_gv_venv_env_script_exports_openmpi_and_scale_space_paths(tmp_path):
-    repo_root = _make_repo(tmp_path)
-    paths = get_vega_paths(repo_root)
-    source_root = tmp_path / "Mirheo"
-    source_root.mkdir()
-    snapshot = paths.mirheo_snapshot_path
-    snapshot.parent.mkdir(parents=True, exist_ok=True)
-    snapshot.write_text("{}")
-
-    env_script = render_gv_venv_env_script(paths, source_root=source_root, snapshot_path=snapshot)
-
-    assert "MESOUQ_GV_VENV_ROOT" in env_script
-    assert str(paths.gv_venv_root) in env_script
-    assert "MESOUQ_GV_ENV_SCRIPT" in env_script
-    assert str(paths.gv_venv_env_script) in env_script
-    assert "VIRTUAL_ENV" in env_script
-    assert "${MESOUQ_GV_VENV_ROOT}/bin" in env_script
-    assert "GV_SCALE_SPACE_BINARY" in env_script
-    assert "_vega/gv_cgal_tools/bin/scale_space" in env_script
-    assert "GV_CGAL_TOOLS_ROOT" in env_script
-    assert "_vega/gv_cgal_tools/env.sh" in env_script
-    assert "MESOUQ_OPENMPI_LIB_DIR" in env_script
-    assert 'case ":${LD_LIBRARY_PATH:-}:" in' in env_script
-    assert str(paths.mirheo_snapshot_path) in env_script
-
-
-def test_render_gv_venv_env_script_exports_karolina_root(tmp_path):
-    repo_root = _make_repo(tmp_path)
-    paths = get_runtime_paths(repo_root, site="karolina", env={})
-    source_root = tmp_path / "Mirheo"
-    source_root.mkdir()
-
-    env_script = render_gv_venv_env_script(paths, source_root=source_root)
-
-    assert "MESOUQ_SITE=karolina" in env_script
-    assert "MESOUQ_PROVENANCE_ROOT" in env_script
-    assert "MESOUQ_KAROLINA_ROOT" in env_script
-    assert "MESOUQ_VEGA_ROOT" not in env_script
-
-
-def test_render_gv_venv_env_script_sources_under_nounset_without_ld_library_path(tmp_path):
-    repo_root = _make_repo(tmp_path)
-    paths = get_vega_paths(repo_root)
-    source_root = tmp_path / "Mirheo"
-    source_root.mkdir()
-    mpi_root = tmp_path / "mpi"
-    mpi_bin = mpi_root / "bin"
-    mpi_lib = mpi_root / "lib"
-    mpi_bin.mkdir(parents=True)
-    mpi_lib.mkdir()
-    (mpi_bin / "mpicxx").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
-    (mpi_bin / "mpicxx").chmod(0o755)
-    env_path = tmp_path / "gv_env.sh"
-    env_path.write_text(render_gv_venv_env_script(paths, source_root=source_root), encoding="utf-8")
-
-    subprocess.run(
-        [
-            "bash",
-            "-u",
-            "-c",
-            (
-                "unset LD_LIBRARY_PATH; "
-                f"source {shlex.quote(str(env_path))}; "
-                f'case ":${{LD_LIBRARY_PATH:-}}:" in *":{shlex.quote(str(mpi_lib))}:"*) ;; *) exit 7 ;; esac'
-            ),
-        ],
-        check=True,
-        env={**os.environ, "PATH": f"{mpi_bin}:{os.environ['PATH']}"},
-    )
-
-
 def test_render_gv_cgal_tools_env_script_exports_karolina_library_paths(tmp_path):
     repo_root = _make_repo(tmp_path)
-    paths = get_runtime_paths(repo_root, site="karolina", env={})
+    paths = get_runtime_paths(repo_root, site="karolina", runtime_root=_runtime_root(tmp_path, "karolina"), env={})
 
     env_script = render_gv_cgal_tools_env_script(paths)
 
     assert "MESOUQ_SITE=karolina" in env_script
     assert "MESOUQ_PROVENANCE_ROOT" in env_script
-    assert "MESOUQ_KAROLINA_ROOT" in env_script
+    assert _legacy_root_env("karolina") not in env_script
     assert str(paths.scale_space_binary) in env_script
     assert str(paths.gv_cgal_tools_bin_dir) in env_script
     assert "MPFR/4.2.0-GCCcore-12.2.0/lib" in env_script
@@ -398,37 +437,37 @@ def test_render_gv_cgal_tools_env_script_exports_karolina_library_paths(tmp_path
 
 def test_render_gv_cgal_tools_env_script_exports_vega_root_without_karolina_libs(tmp_path):
     repo_root = _make_repo(tmp_path)
-    paths = get_vega_paths(repo_root)
+    paths = get_vega_paths(repo_root, runtime_root=_runtime_root(tmp_path, "vega"))
 
     env_script = render_gv_cgal_tools_env_script(paths)
 
     assert "MESOUQ_SITE=vega" in env_script
-    assert "MESOUQ_VEGA_ROOT" in env_script
-    assert "MESOUQ_KAROLINA_ROOT" not in env_script
+    assert _legacy_root_env("vega") not in env_script
+    assert _legacy_root_env("karolina") not in env_script
     assert "MPFR/4.2.0-GCCcore-12.2.0/lib" not in env_script
 
 
-def test_render_gv_venv_env_script_omits_snapshot_when_not_provided(tmp_path):
-    repo_root = _make_repo(tmp_path)
-    paths = get_vega_paths(repo_root)
-    source_root = tmp_path / "Mirheo"
-    source_root.mkdir()
+def test_discover_hdf5_runtime_roots_deduplicates_and_normalizes_lib_dirs(tmp_path):
+    hdf5_root = tmp_path / "hdf5"
+    hdf5_lib = hdf5_root / "lib"
+    hdf5_lib.mkdir(parents=True)
 
-    env_script = render_gv_venv_env_script(paths, source_root=source_root)
+    roots = discover_hdf5_runtime_roots(
+        {"MESOUQ_HDF5_ROOT": str(hdf5_root), "EBROOTHDF5": str(hdf5_lib), "HDF5_DIR": ""}
+    )
 
-    assert "MIRHEO_SOURCE_SNAPSHOT" not in env_script
-
+    assert roots == (hdf5_root.resolve(),)
 
 def test_render_tinytex_env_script_exports_karolina_root(tmp_path):
     repo_root = _make_repo(tmp_path)
-    paths = get_runtime_paths(repo_root, site="karolina", env={})
+    paths = get_runtime_paths(repo_root, site="karolina", runtime_root=_runtime_root(tmp_path, "karolina"), env={})
 
     env_script = render_tinytex_env_script(paths)
 
     assert "MESOUQ_SITE=karolina" in env_script
     assert "MESOUQ_PROVENANCE_ROOT" in env_script
-    assert "MESOUQ_KAROLINA_ROOT" in env_script
-    assert "MESOUQ_VEGA_ROOT" not in env_script
+    assert _legacy_root_env("karolina") not in env_script
+    assert _legacy_root_env("vega") not in env_script
 
 
 def test_gather_mirheo_source_snapshot_ignores_build_artifacts(tmp_path):

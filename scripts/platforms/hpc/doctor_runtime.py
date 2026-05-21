@@ -18,9 +18,11 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from meso_uq.platforms.site_selector import SiteSelectionError, resolve_hpc_site
 from meso_uq.vega import (
+    DEFAULT_KAROLINA_GV_CGAL_MODULES,
     DEFAULT_KAROLINA_MIRHEO_MODULES,
     DEFAULT_KAROLINA_MODULES,
     DEFAULT_KAROLINA_RUNTIME_MODULES,
+    DEFAULT_VEGA_GV_CGAL_MODULES,
     DEFAULT_VEGA_MIRHEO_MODULES,
     DEFAULT_VEGA_MODULES,
     DEFAULT_VEGA_RUNTIME_MODULES,
@@ -105,7 +107,7 @@ def _resolve_scale_space_dynamic_libs(binary: str) -> tuple[bool, str]:
 
 def _find_mirheo_lib_paths(paths) -> list[str]:
     candidates = []
-    for root in (paths.mirheo_prefix, paths.mirheo_package_dir, paths.gv_venv_site_packages):
+    for root in (paths.mirheo_prefix, paths.mirheo_package_dir, paths.env_site_packages):
         prefix = Path(root)
         if not prefix.is_dir():
             continue
@@ -121,12 +123,12 @@ def _check(name: str, status: str, details: str) -> dict[str, str]:
 def _recommended_modules(site: str, *, with_mirheo: bool, with_gv_runtime: bool) -> list[str]:
     if site == "karolina":
         if with_gv_runtime:
-            return list(DEFAULT_KAROLINA_MIRHEO_MODULES + DEFAULT_KAROLINA_RUNTIME_MODULES[len(DEFAULT_KAROLINA_MODULES) :])
+            return list(DEFAULT_KAROLINA_GV_CGAL_MODULES)
         if with_mirheo:
             return list(DEFAULT_KAROLINA_MIRHEO_MODULES)
         return list(DEFAULT_KAROLINA_MODULES)
     if with_gv_runtime:
-        return list(DEFAULT_VEGA_MIRHEO_MODULES + DEFAULT_VEGA_RUNTIME_MODULES[len(DEFAULT_VEGA_MODULES) :])
+        return list(DEFAULT_VEGA_GV_CGAL_MODULES)
     if with_mirheo:
         return list(DEFAULT_VEGA_MIRHEO_MODULES)
     return list(DEFAULT_VEGA_MODULES)
@@ -165,11 +167,18 @@ def collect_diagnostics(
     )
 
     loaded_modules = os.environ.get("LOADEDMODULES", "")
+    canonical_env_script = os.environ.get("MESOUQ_ENV_SCRIPT", "")
+    canonical_env_active = canonical_env_script == str(paths.env_script) and paths.env_script.is_file()
     checks.append(
         _check(
             "loaded_modules",
-            "ok" if loaded_modules else "warn",
-            loaded_modules or f"empty; recommended stack: {' '.join(recommended_modules)}",
+            "ok" if loaded_modules or canonical_env_active else "warn",
+            loaded_modules
+            or (
+                f"canonical env active; module paths captured in {canonical_env_script}"
+                if canonical_env_active
+                else f"empty; recommended stack: {' '.join(recommended_modules)}"
+            ),
         )
     )
 
@@ -249,10 +258,18 @@ def collect_diagnostics(
             )
         )
 
+        unified_env_script_exists = paths.env_script.is_file()
+        checks.append(
+            _check(
+                "repo_local_unified_env_script",
+                "ok" if unified_env_script_exists else "warn",
+                str(paths.env_script),
+            )
+        )
         env_script_exists = paths.korali_env_script.is_file()
         checks.append(
             _check(
-                "repo_local_env_script",
+                "repo_local_korali_env_script",
                 "ok" if env_script_exists else "warn",
                 str(paths.korali_env_script),
             )
@@ -300,9 +317,9 @@ def collect_diagnostics(
         )
         checks.append(
             _check(
-                "repo_local_gv_venv_env_script",
-                "ok" if paths.gv_venv_env_script.is_file() else "warn",
-                str(paths.gv_venv_env_script),
+                "repo_local_unified_env_script",
+                "ok" if paths.env_script.is_file() else "warn",
+                str(paths.env_script),
             )
         )
         scale_binary, scale_origin = _resolve_scale_space_binary()
@@ -365,6 +382,9 @@ def collect_diagnostics(
         "recommended_modules": recommended_modules,
         "paths": {
             "site_root": str(paths.site_root),
+            "env_root": str(paths.env_root),
+            "env_site_packages": str(paths.env_site_packages),
+            "env_script": str(paths.env_script),
             "vega_root": str(paths.vega_root),
             "korali_source": str(paths.korali_source),
             "korali_prefix": str(paths.korali_prefix),
@@ -378,9 +398,6 @@ def collect_diagnostics(
             "mirheo_prefix": str(paths.mirheo_prefix),
             "mirheo_env_script": str(paths.mirheo_env_script),
             "mirheo_snapshot_path": str(paths.mirheo_snapshot_path),
-            "gv_venv_root": str(paths.gv_venv_root),
-            "gv_venv_site_packages": str(paths.gv_venv_site_packages),
-            "gv_venv_env_script": str(paths.gv_venv_env_script),
             "gv_cgal_tools_root": str(paths.gv_cgal_tools_root),
             "gv_cgal_tools_env_script": str(paths.gv_cgal_tools_env_script),
             "scale_space_binary": str(paths.scale_space_binary),
