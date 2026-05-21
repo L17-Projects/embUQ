@@ -135,8 +135,12 @@ fi
 
 echo "Compile jobs: $build_jobs"
 
+if [[ "$python_bin" == */* ]]; then
+  python_bin_dir="$(cd "$(dirname "$python_bin")" && pwd)"
+else
+  python_bin_dir="$(dirname "$(command -v "$python_bin")")"
+fi
 python_bin="$(readlink -f "$python_bin")"
-python_bin_dir="$(dirname "$python_bin")"
 export PATH="$python_bin_dir${PATH:+:$PATH}"
 export PYTHONNOUSERSITE=1
 
