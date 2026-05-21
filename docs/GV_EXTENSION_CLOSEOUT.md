@@ -69,6 +69,6 @@ Keep this slice blocked until campaign and PR evidence is recorded (campaign IDs
 
 ## Runtime guardrails
 
-- For `gv:stretching`, `gv:torsion`, `gv:buckling`, and `gv:eigenmodes`, generated command staging should run with `_vega/env/env.sh` sourced.
+- For `gv:stretching`, `gv:torsion`, `gv:buckling`, and `gv:eigenmodes`, generated command staging should run with `${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh` sourced.
 - `doctor_vega --with-gv-runtime` remains the hardening check for Mirheo import/lib path, `scale_space` resolution, dynamic-library checks, MDAnalysis importability, and OpenMPI wiring.
-- The GV runtime sbatch wrapper and generated command staging (`commands.txt`) require `_vega/env/env.sh` and fail fast if that environment script is missing.
+- The GV runtime sbatch wrapper and generated command staging (`commands.txt`) require `${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh` and fail fast if that environment script is missing.

@@ -99,8 +99,8 @@ def _build_runtime_env(python_bin: str) -> tuple[dict[str, str], list[str]]:
         notes.append(f"Using repo-local Korali runtime path: {korali_site}")
     else:
         notes.append(
-            "Repo-local Korali runtime path not found under "
-            "_vega/korali/install/lib/python*/site-packages"
+            "Canonical Korali runtime path not found under "
+            "${MESOUQ_SITE_RUNTIME_ROOT}/korali/install/lib/python*/site-packages"
         )
 
     ok, error_text = _probe_korali_engine(python_bin, env)

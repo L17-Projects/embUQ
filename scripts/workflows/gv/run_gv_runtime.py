@@ -132,9 +132,13 @@ def _resolve_gv_env_script(platform: str) -> Path:
     env_script = os.environ.get("MESOUQ_GV_ENV_SCRIPT", "").strip()
     if env_script:
         return Path(env_script).expanduser().resolve()
-    if platform == "karolina":
-        return get_site_runtime_paths(REPO_ROOT, site="karolina").env_script
-    return get_site_runtime_paths(REPO_ROOT, site="vega").env_script
+    runtime_root = os.environ.get("MESOUQ_SITE_RUNTIME_ROOT", "").strip()
+    if not runtime_root:
+        raise RuntimeError(
+            "MESOUQ_SITE_RUNTIME_ROOT must be set; expected canonical GV runtime at "
+            "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh."
+        )
+    return get_site_runtime_paths(REPO_ROOT, site=platform, runtime_root=runtime_root).env_script
 
 
 def _load_runtime_manifest(path: Path) -> dict[str, Any]:

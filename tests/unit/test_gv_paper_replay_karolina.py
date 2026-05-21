@@ -29,7 +29,7 @@ def test_gv_paper_figure_replay_karolina_template_uses_public_command_and_karoli
     assert 'GV_ENV_SCRIPT="${MESOUQ_GV_ENV_SCRIPT:-${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh}"' in text
     assert "Missing required GV runtime environment" in text
     assert "for lane in ${LANES}; do" in text
-    assert "_vega/env/env.sh" not in text
+    assert "_vega" + "/env/env.sh" not in text
     assert "#SBATCH --partition=qgpu" in text
     assert "#SBATCH --account=eu-26-17" in text
     assert "#SBATCH --ntasks=2" in text

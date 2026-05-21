@@ -9,11 +9,11 @@ A fresh clone should not depend on a user-global Korali install or an ad hoc `PY
 The supported path is:
 
 - use the repo checkout as the anchor
-- place all Vega-specific state under `_vega/`
-- build vendored `extern/korali/` into `_vega/korali/install`
-- build Mirheo from the locked external source path into `_vega/mirheo/`
-- install repo-local TinyTeX into `_vega/tinytex/`
-- source the generated `_vega/korali/env.sh` before running workflows
+- set `MESOUQ_SITE_RUNTIME_ROOT` to the per-site runtime root and keep generated state there
+- build vendored `extern/korali/` into `${MESOUQ_SITE_RUNTIME_ROOT}/korali/install`
+- build Mirheo from the locked external source path into `${MESOUQ_SITE_RUNTIME_ROOT}/mirheo/`
+- install repo-local TinyTeX into `${MESOUQ_SITE_RUNTIME_ROOT}/tinytex/`
+- source the generated `${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh` before running workflows
 
 ## Recommended module stack
 
@@ -37,14 +37,14 @@ Create or activate your preferred Python environment, then install the Python st
 
 ```bash
 bash scripts/platforms/hpc/bootstrap_env.sh --site vega
-source _vega/env/env.sh
+source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
 python -m pip install --upgrade pip
 pip install -e ".[test,mpi]"
 pip install pybind11 meson ninja
 ```
 
 The helper script below can also install `pybind11`, `meson`, and `ninja` into the active environment automatically.
-The Mirheo bootstrap helper creates `_vega/env` and installs the GV runtime Python dependencies there, including `h5py` and `MDAnalysis`.
+The Mirheo bootstrap helper creates `${MESOUQ_SITE_RUNTIME_ROOT}/env` and installs the GV runtime Python dependencies there, including `h5py` and `MDAnalysis`.
 
 That editable install now includes the mesh-preparation dependency `trimesh`, which is required by the public Phase 1 workflow bootstrap for compression and indentation.
 
@@ -62,7 +62,7 @@ The doctor reports:
 - required commands (`mpicxx`, `nvcc`, `meson`, `ninja`, `pkg-config`)
 - required pkg-config packages (`gsl`, `eigen3`)
 - Python modules needed for the bootstrap path
-- whether `korali` is resolving from an external user-global path instead of repo-local `_vega/`
+- whether `korali` is resolving from an external user-global path instead of the site runtime root
 
 If you already have a user-global Korali on `PYTHONPATH`, the doctor will report it as contamination that should be replaced by the repo-local install.
 
@@ -81,9 +81,9 @@ bash scripts/platforms/hpc/bootstrap_korali.sh --site vega --jobs 8
 Default behavior:
 
 - builds `extern/korali/`
-- installs into `_vega/korali/install`
-- writes `_vega/korali/env.sh`
-- records the bootstrap log at `_vega/logs/bootstrap_korali.log`
+- installs into `${MESOUQ_SITE_RUNTIME_ROOT}/korali/install`
+- writes `${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh`
+- records the bootstrap log at `${MESOUQ_SITE_RUNTIME_ROOT}/logs/bootstrap_korali.log`
 
 Optional flags:
 
@@ -110,14 +110,13 @@ bash scripts/platforms/vega/bootstrap_mirheo.sh --jobs 8
 Default behavior:
 
 - resolves Mirheo from `extern/mirheo.lock.json`
-- builds it into `_vega/mirheo/build`
-- installs CMake outputs into `_vega/mirheo/install`
-- creates `_vega/env`
-- installs `h5py`, `MDAnalysis`, and the Mirheo Python package into `_vega/env`
-- writes `_vega/mirheo/env.sh`
-- writes `_vega/env/env.sh`
-- records `_vega/mirheo/source_snapshot.json`
-- records `_vega/logs/bootstrap_mirheo.log`
+- builds it into `${MESOUQ_SITE_RUNTIME_ROOT}/mirheo/build`
+- installs CMake outputs into `${MESOUQ_SITE_RUNTIME_ROOT}/mirheo/install`
+- creates `${MESOUQ_SITE_RUNTIME_ROOT}/env`
+- installs `h5py`, `MDAnalysis`, and the Mirheo Python package into `${MESOUQ_SITE_RUNTIME_ROOT}/env`
+- writes `${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh`
+- records `${MESOUQ_SITE_RUNTIME_ROOT}/mirheo/source_snapshot.json`
+- records `${MESOUQ_SITE_RUNTIME_ROOT}/logs/bootstrap_mirheo.log`
 
 Supported MAP Mirheo micro-canary floor on Vega:
 
@@ -142,10 +141,8 @@ Optional flags:
 ## Activate the repo-local runtime
 
 ```bash
-source _vega/korali/env.sh
-source _vega/env/env.sh
-source _vega/mirheo/env.sh
-source _vega/tinytex/env.sh
+source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
+source ${MESOUQ_SITE_RUNTIME_ROOT}/tinytex/env.sh
 python scripts/platforms/hpc/doctor_hpc.py --site vega --strict --with-mirheo --with-tex
 ```
 
@@ -173,7 +170,7 @@ Paper-facing figure generation uses the original UQ_DPD TeX rendering path. On V
 
 ```bash
 bash scripts/platforms/vega/bootstrap_tex.sh
-source _vega/tinytex/env.sh
+source ${MESOUQ_SITE_RUNTIME_ROOT}/tinytex/env.sh
 python scripts/platforms/hpc/doctor_hpc.py --site vega --with-tex
 ```
 

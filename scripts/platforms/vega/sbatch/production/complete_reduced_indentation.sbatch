@@ -56,14 +56,14 @@ PROP3B_GPU_PARTITION="$(route_gpu_partition "${PROP3B_TIME}")"
 module purge
 module load Python/3.10.8-GCCcore-12.2.0 openmpi/4.1.2.1 CUDA/12.2.2 \
             GSL/2.7-GCC-12.2.0 Eigen/3.4.0-GCCcore-12.2.0
-ENV_ROOT="${MESOUQ_ENV_ROOT:-${REPO_ROOT}/_vega/env}"
+ENV_ROOT="${MESOUQ_ENV_ROOT:-${MESOUQ_SITE_RUNTIME_ROOT:?Set MESOUQ_SITE_RUNTIME_ROOT before using this sbatch script.}/env}"
 ENV_SCRIPT="${MESOUQ_ENV_SCRIPT:-${ENV_ROOT}/env.sh}"
 if [[ ! -f "${ENV_SCRIPT}" ]]; then
   echo "Missing canonical MesoUQ environment: ${ENV_SCRIPT}" >&2
   exit 2
 fi
-source "${ENV_SCRIPT}"
-source "${REPO_ROOT}/_vega/korali/env.sh"
+source "${REPO_ROOT}/scripts/platforms/hpc/site_env.sh"
+mesouq_activate_site_env vega "${REPO_ROOT}"
 
 LOGS_DIR="${LOGS_DIR:-${OUTPUT_DIR%/}/logs}"
 mkdir -p "${LOGS_DIR}"

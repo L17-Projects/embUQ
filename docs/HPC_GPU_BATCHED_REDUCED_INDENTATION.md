@@ -42,13 +42,13 @@ module load \
   Eigen/3.4.0-GCCcore-12.2.0
 
 bash scripts/platforms/hpc/bootstrap_env.sh --site vega
-source _vega/env/env.sh
+source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
 python -m pip install -U pip
 pip install -e ".[test,mpi]"
 pip install pybind11 meson ninja
 
 bash scripts/platforms/hpc/bootstrap_korali.sh --site vega --jobs 8
-source _vega/korali/env.sh
+source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
 python scripts/platforms/hpc/doctor_hpc.py --site vega --strict
 ```
 
@@ -170,7 +170,7 @@ That tree then contains:
 
 ### `import korali` fails
 
-Make sure `_vega/korali/env.sh` is sourced in the current shell or batch job.
+Make sure `${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh` is sourced in the current shell or batch job.
 
 ### `mpi4py` or MPI launcher errors
 

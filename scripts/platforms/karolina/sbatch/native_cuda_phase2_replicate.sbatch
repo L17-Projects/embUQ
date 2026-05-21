@@ -11,6 +11,13 @@
 
 set -euo pipefail
 
+legacy_name="HPC""_SITE"
+if [[ ${!legacy_name+x} ]]; then
+  echo "${legacy_name} is no longer supported. Use MESOUQ_SITE." >&2
+  exit 2
+fi
+unset legacy_name
+
 : "${REPO_ROOT:?REPO_ROOT must point at the MesoUQ checkout}"
 : "${LANE_ROOT:?LANE_ROOT must be the per-replicate output root}"
 : "${PHASE1_SOURCE:?PHASE1_SOURCE must point at results_phase_1}"

@@ -78,8 +78,8 @@ Submit the template from the repo root, or set `REPO_ROOT=/abs/path/to/clone` ex
 
 It assumes:
 
-- `_vega/env` exists
-- `_vega/korali/env.sh` exists
+- `${MESOUQ_SITE_RUNTIME_ROOT}/env` exists
+- `${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh` exists
 - the recommended Vega modules are available
 
 The template exposes:

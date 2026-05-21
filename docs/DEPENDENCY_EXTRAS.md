@@ -87,7 +87,7 @@ For the full workflow and Vega acceptance paths, the environment still needs:
 For Vega, the supported bootstrap path is now repo-managed:
 
 - build vendored `extern/korali/`
-- install it into repo-local `_vega/korali/install`
-- source `_vega/korali/env.sh`
+- install it into repo-local `${MESOUQ_SITE_RUNTIME_ROOT}/korali/install`
+- source `${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh`
 
 See `VEGA_BOOTSTRAP.md` for the exact commands and helper scripts.

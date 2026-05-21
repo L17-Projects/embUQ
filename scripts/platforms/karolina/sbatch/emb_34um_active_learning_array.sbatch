@@ -13,6 +13,13 @@
 
 set -euo pipefail
 
+legacy_name="HPC""_SITE"
+if [[ ${!legacy_name+x} ]]; then
+  echo "${legacy_name} is no longer supported. Use MESOUQ_SITE." >&2
+  exit 2
+fi
+unset legacy_name
+
 REPO_ROOT="${REPO_ROOT:-${SLURM_SUBMIT_DIR:-$(pwd)}}"
 if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
   echo "Set REPO_ROOT explicitly or submit from the repo root." >&2

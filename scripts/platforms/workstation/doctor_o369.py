@@ -3,9 +3,9 @@
 Pre-flight health check for o369 workstation runs.
 
 Checks:
-  - repo-local Korali install under _vega/korali/install
-  - _vega/korali/env.sh exists
-  - `python -c "import korali"` resolves inside _vega/korali/install/
+  - canonical Korali install under ${MESOUQ_SITE_RUNTIME_ROOT}/korali/install
+  - ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh exists
+  - `python -c "import korali"` resolves inside the canonical runtime
   - mpirun is available on PATH
   - free RAM > 2 GB
 
@@ -14,14 +14,18 @@ Prints PASS / WARN / FAIL per check and exits non-zero if any FAIL.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-KORALI_INSTALL = REPO_ROOT / "_vega" / "korali" / "install"
-KORALI_ENV_SH = REPO_ROOT / "_vega" / "korali" / "env.sh"
+_RUNTIME_ROOT_VALUE = os.environ.get("MESOUQ_SITE_RUNTIME_ROOT", "").strip()
+RUNTIME_ROOT = Path(_RUNTIME_ROOT_VALUE).expanduser().resolve() if _RUNTIME_ROOT_VALUE else None
+KORALI_INSTALL = RUNTIME_ROOT / "korali" / "install" if RUNTIME_ROOT is not None else None
+CANONICAL_ENV_SH = RUNTIME_ROOT / "env" / "env.sh" if RUNTIME_ROOT is not None else None
+KORALI_ENV_SH = CANONICAL_ENV_SH
 MIN_FREE_RAM_GB = 2.0
 
 _PASS = "PASS"
@@ -42,15 +46,19 @@ def _path_is_within(candidate: Path, root: Path) -> bool:
 
 
 def check_korali_install() -> tuple[str, str]:
+    if KORALI_INSTALL is None:
+        return _FAIL, "MESOUQ_SITE_RUNTIME_ROOT is required for the canonical runtime check"
     if KORALI_INSTALL.is_dir():
         return _PASS, f"Korali install dir found: {KORALI_INSTALL}"
     return _FAIL, f"Korali install dir missing: {KORALI_INSTALL}"
 
 
 def check_korali_env_sh() -> tuple[str, str]:
+    if KORALI_ENV_SH is None:
+        return _FAIL, "MESOUQ_SITE_RUNTIME_ROOT is required for the canonical env check"
     if KORALI_ENV_SH.is_file():
-        return _PASS, f"Korali env.sh found: {KORALI_ENV_SH}"
-    return _FAIL, f"Korali env.sh missing: {KORALI_ENV_SH}"
+        return _PASS, f"Canonical env.sh found: {KORALI_ENV_SH}"
+    return _FAIL, f"Canonical env.sh missing: {KORALI_ENV_SH}"
 
 
 def check_korali_import(python_bin: str = sys.executable) -> tuple[str, str]:
@@ -77,11 +85,13 @@ def check_korali_import(python_bin: str = sys.executable) -> tuple[str, str]:
 
     korali_file = result.stdout.strip()
     resolved_korali_path = Path(korali_file).resolve()
+    if KORALI_INSTALL is None:
+        return _FAIL, "MESOUQ_SITE_RUNTIME_ROOT is required for the canonical Korali import check"
     expected_root = KORALI_INSTALL.resolve()
     if _path_is_within(resolved_korali_path, expected_root):
-        return _PASS, f"korali resolves inside _vega/korali/install: {resolved_korali_path}"
+        return _PASS, f"korali resolves inside canonical runtime: {resolved_korali_path}"
     return _WARN, (
-        f"korali found but NOT under _vega/korali/install.\n"
+        f"korali found but NOT under canonical runtime Korali install.\n"
         f"  Found:    {resolved_korali_path}\n"
         f"  Expected: {expected_root}/..."
     )
@@ -118,7 +128,7 @@ def check_free_ram(meminfo_path: str = _MEMINFO_PATH) -> tuple[str, str]:
 def run_checks(python_bin: str = sys.executable) -> int:
     checks = [
         ("korali_install", check_korali_install),
-        ("korali_env_sh", check_korali_env_sh),
+        ("canonical_env_sh", check_korali_env_sh),
         ("korali_import", lambda: check_korali_import(python_bin)),
         ("mpirun", check_mpirun),
         ("free_ram", check_free_ram),

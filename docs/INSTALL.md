@@ -79,8 +79,8 @@ For workflow execution on GPU/HPC targets you still need:
 For Vega, the supported path is repo-managed and clone-local:
 
 - build vendored `extern/korali/`
-- install it under `_vega/korali/install`
-- source `_vega/korali/env.sh`
+- install it under `${MESOUQ_SITE_RUNTIME_ROOT}/korali/install`
+- source `${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh`
 
 Use [VEGA_BOOTSTRAP.md](VEGA_BOOTSTRAP.md) for the exact bootstrap commands.
 

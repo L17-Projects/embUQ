@@ -13,6 +13,13 @@
 
 set -euo pipefail
 
+legacy_name="HPC""_SITE"
+if [[ ${!legacy_name+x} ]]; then
+  echo "${legacy_name} is no longer supported. Use MESOUQ_SITE." >&2
+  exit 2
+fi
+unset legacy_name
+
 REPO_ROOT="${REPO_ROOT:-${SLURM_SUBMIT_DIR:-$(pwd)}}"
 if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
   echo "Set REPO_ROOT explicitly or submit the job from the repo root." >&2
@@ -44,7 +51,13 @@ if [[ "${PROFILE}" != "validation" ]]; then
 fi
 
 cd "${REPO_ROOT}"
+if [[ -z "${MESOUQ_SITE_RUNTIME_ROOT:-}" ]]; then
+  echo "MESOUQ_SITE_RUNTIME_ROOT must be set before using this Karolina sbatch script." >&2
+  exit 2
+fi
 source "${REPO_ROOT}/scripts/platforms/karolina/env_karolina.sh"
+source "${REPO_ROOT}/scripts/platforms/hpc/site_env.sh"
+mesouq_activate_site_env karolina "${REPO_ROOT}"
 
 OUTPUT_ROOT="${OUTPUT_ROOT:-${MESOUQ_RUNS_ROOT}/validation_matrix/${RUN_TAG}}"
 PYTHON_BIN="${PYTHON_BIN:-$(command -v python)}"

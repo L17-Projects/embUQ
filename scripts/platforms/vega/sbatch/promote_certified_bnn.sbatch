@@ -10,6 +10,13 @@
 
 set -euo pipefail
 
+legacy_name="HPC""_SITE"
+if [[ ${!legacy_name+x} ]]; then
+  echo "${legacy_name} is no longer supported. Use MESOUQ_SITE." >&2
+  exit 2
+fi
+unset legacy_name
+
 REPO_ROOT="${REPO_ROOT:-${SLURM_SUBMIT_DIR:-$(pwd)}}"
 if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
   echo "Set REPO_ROOT explicitly or submit from the repo root." >&2
@@ -24,7 +31,7 @@ DRY_RUN="${DRY_RUN:-false}"
 SELECTIONS="${SELECTIONS:-}"
 DEFAULT_LOG_BASE="${CERTIFICATION_ROOT:-${REPO_ROOT}/_runs/vega/bnn_promotion_preflight}"
 LOG_ROOT="${LOG_ROOT:-${DEFAULT_LOG_BASE}/logs}"
-ENV_ROOT="${MESOUQ_ENV_ROOT:-${REPO_ROOT}/_vega/env}"
+ENV_ROOT="${MESOUQ_ENV_ROOT:-${MESOUQ_SITE_RUNTIME_ROOT:?Set MESOUQ_SITE_RUNTIME_ROOT before using this sbatch script.}/env}"
 ENV_SCRIPT="${MESOUQ_ENV_SCRIPT:-${ENV_ROOT}/env.sh}"
 PYTHON_BIN="${PYTHON_BIN:-${ENV_ROOT}/bin/python}"
 
@@ -46,10 +53,8 @@ if [[ ! -x "${PYTHON_BIN}" || ! -f "${ENV_SCRIPT}" ]]; then
   exit 2
 fi
 
-source "${ENV_SCRIPT}"
-if [[ -f "${REPO_ROOT}/_vega/korali/env.sh" ]]; then
-  source "${REPO_ROOT}/_vega/korali/env.sh"
-fi
+source "${REPO_ROOT}/scripts/platforms/hpc/site_env.sh"
+mesouq_activate_site_env vega "${REPO_ROOT}"
 export PYTHONPATH="${REPO_ROOT}/src:${REPO_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"
 
 command=(

@@ -224,7 +224,7 @@ def test_build_runtime_env_handles_probe_outcomes(monkeypatch, tmp_path):
     )
     env_fail, notes_fail = module._build_runtime_env("python")
     assert any(
-        "not found under _vega/korali/install/lib/python*/site-packages" in note
+        "not found under ${MESOUQ_SITE_RUNTIME_ROOT}/korali/install/lib/python*/site-packages" in note
         for note in notes_fail
     )
     assert any(

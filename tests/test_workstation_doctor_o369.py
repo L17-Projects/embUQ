@@ -27,7 +27,7 @@ def _load_module():
 
 def test_check_korali_install_pass(tmp_path, monkeypatch):
     module = _load_module()
-    korali_dir = tmp_path / "_vega" / "korali" / "install"
+    korali_dir = tmp_path / "runtime" / "korali" / "install"
     korali_dir.mkdir(parents=True)
     monkeypatch.setattr(module, "KORALI_INSTALL", korali_dir)
     level, msg = module.check_korali_install()
@@ -72,7 +72,7 @@ def test_check_korali_env_sh_fail(tmp_path, monkeypatch):
 
 def test_check_korali_import_resolves_inside_install(tmp_path, monkeypatch):
     module = _load_module()
-    korali_dir = tmp_path / "_vega" / "korali" / "install"
+    korali_dir = tmp_path / "runtime" / "korali" / "install"
     monkeypatch.setattr(module, "KORALI_INSTALL", korali_dir)
     korali_file = str(korali_dir / "lib" / "korali" / "__init__.py")
 
@@ -85,12 +85,12 @@ def test_check_korali_import_resolves_inside_install(tmp_path, monkeypatch):
         level, msg = module.check_korali_import(python_bin=sys.executable)
 
     assert level == "PASS"
-    assert "_vega/korali/install" in msg
+    assert "canonical runtime" in msg
 
 
 def test_check_korali_import_resolves_outside_install(tmp_path, monkeypatch):
     module = _load_module()
-    korali_dir = tmp_path / "_vega" / "korali" / "install"
+    korali_dir = tmp_path / "runtime" / "korali" / "install"
     monkeypatch.setattr(module, "KORALI_INSTALL", korali_dir)
 
     fake_result = MagicMock()
@@ -107,7 +107,7 @@ def test_check_korali_import_resolves_outside_install(tmp_path, monkeypatch):
 
 def test_check_korali_import_install_backup_path_is_not_treated_as_inside(tmp_path, monkeypatch):
     module = _load_module()
-    korali_dir = tmp_path / "_vega" / "korali" / "install"
+    korali_dir = tmp_path / "runtime" / "korali" / "install"
     monkeypatch.setattr(module, "KORALI_INSTALL", korali_dir)
 
     fake_result = MagicMock()
