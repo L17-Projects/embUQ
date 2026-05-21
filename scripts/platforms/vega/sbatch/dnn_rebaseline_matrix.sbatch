@@ -29,8 +29,9 @@ export MESOUQ_SITE="${SITE}"
 RUN_TAG="${RUN_TAG:-$(date +%Y%m%d_%H%M%S)}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/${SITE}/dnn_rebaseline/${RUN_TAG}}"
 LOG_ROOT="${LOG_ROOT:-${OUTPUT_ROOT}/logs}"
-VENV_DIR="${VENV_DIR:-${REPO_ROOT}/_vega/venv}"
-PYTHON_BIN="${PYTHON_BIN:-${VENV_DIR}/bin/python}"
+ENV_ROOT="${MESOUQ_ENV_ROOT:-${REPO_ROOT}/_vega/env}"
+ENV_SCRIPT="${MESOUQ_ENV_SCRIPT:-${ENV_ROOT}/env.sh}"
+PYTHON_BIN="${PYTHON_BIN:-${ENV_ROOT}/bin/python}"
 SELECTIONS="${SELECTIONS:-${ONLY:-}}"
 SEEDS="${SEEDS:-${SEED:-}}"
 ARCHITECTURES="${ARCHITECTURES:-}"
@@ -47,12 +48,12 @@ exec > >(tee -a "${LOG_ROOT}/slurm-${JOB_TOKEN}.out") 2> >(tee -a "${LOG_ROOT}/s
 module purge
 module load Python/3.10.8-GCCcore-12.2.0
 
-if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
-  echo "Missing Vega runtime virtualenv at ${VENV_DIR}." >&2
+if [[ ! -x "${PYTHON_BIN}" || ! -f "${ENV_SCRIPT}" ]]; then
+  echo "Missing canonical MesoUQ environment at ${ENV_ROOT}." >&2
   exit 2
 fi
 
-source "${VENV_DIR}/bin/activate"
+source "${ENV_SCRIPT}"
 if [[ -f "${REPO_ROOT}/_vega/korali/env.sh" ]]; then
   source "${REPO_ROOT}/_vega/korali/env.sh"
 fi

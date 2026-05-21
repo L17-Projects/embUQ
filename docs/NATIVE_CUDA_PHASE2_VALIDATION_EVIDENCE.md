@@ -139,9 +139,9 @@ When Vega access returns, use the same support contract:
 export REPO_ROOT="${PWD}"
 module load Python/3.10.8-GCCcore-12.2.0 openmpi/4.1.2.1 CUDA/12.2.2 \
   GSL/2.7-GCC-12.2.0 Eigen/3.4.0-GCCcore-12.2.0
-source "${REPO_ROOT}/_vega/venv/bin/activate"
+source "${REPO_ROOT}/_vega/env/bin/activate"
 source "${REPO_ROOT}/_vega/korali/env.sh"
-export PYTHON_BIN="${REPO_ROOT}/_vega/venv/bin/python"
+export PYTHON_BIN="${REPO_ROOT}/_vega/env/bin/python"
 export PATH="$(dirname "${PYTHON_BIN}"):${PATH}"
 
 "${PYTHON_BIN}" scripts/platforms/vega/run_workflow_matrix.py \

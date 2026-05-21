@@ -51,10 +51,10 @@ _PLATFORM_POLICIES: dict[PlatformPolicy, PlatformPolicyRecord] = {
         canonical_runs_root="${MESOUQ_SCRATCH_ROOT}/runs",
         forbidden_path_prefixes=("/ceph/hpc/home/eubrieucb",),
         environment_scripts=(
+            "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh",
             "${MESOUQ_SITE_RUNTIME_ROOT}/korali/env.sh",
             "${MESOUQ_SITE_RUNTIME_ROOT}/mirheo/env.sh",
             "${MESOUQ_SITE_RUNTIME_ROOT}/mirheoOBMD/env.sh",
-            "${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/env.sh",
             "${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools/env.sh",
         ),
     ),
@@ -65,9 +65,9 @@ _PLATFORM_POLICIES: dict[PlatformPolicy, PlatformPolicyRecord] = {
         canonical_runs_root="${MESOUQ_RUNS_ROOT}",
         forbidden_path_prefixes=(),
         environment_scripts=(
+            "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh",
             "${MESOUQ_SITE_RUNTIME_ROOT}/korali/env.sh",
             "${MESOUQ_SITE_RUNTIME_ROOT}/mirheo/env.sh",
-            "${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/env.sh",
             "${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools/env.sh",
         ),
     ),
@@ -86,9 +86,9 @@ _PLATFORM_POLICIES: dict[PlatformPolicy, PlatformPolicyRecord] = {
         canonical_runs_root="${MESOUQ_RUNS_ROOT}",
         forbidden_path_prefixes=(),
         environment_scripts=(
+            "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh",
             "${MESOUQ_SITE_RUNTIME_ROOT}/korali/env.sh",
             "${MESOUQ_SITE_RUNTIME_ROOT}/mirheo/env.sh",
-            "${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/env.sh",
         ),
     ),
 }

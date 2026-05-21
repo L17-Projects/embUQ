@@ -165,8 +165,8 @@ module load \
   GSL/2.7-GCC-12.2.0 \
   Eigen/3.4.0-GCCcore-12.2.0
 
-python -m venv _vega/venv
-source _vega/venv/bin/activate
+bash scripts/platforms/hpc/bootstrap_env.sh --site vega
+source _vega/env/env.sh
 python -m pip install --upgrade pip
 pip install -e ".[test,mpi]"
 pip install pybind11 meson ninja

@@ -133,8 +133,8 @@ def _resolve_gv_env_script(platform: str) -> Path:
     if env_script:
         return Path(env_script).expanduser().resolve()
     if platform == "karolina":
-        return get_site_runtime_paths(REPO_ROOT, site="karolina").gv_venv_env_script
-    return get_site_runtime_paths(REPO_ROOT, site="vega").gv_venv_env_script
+        return get_site_runtime_paths(REPO_ROOT, site="karolina").env_script
+    return get_site_runtime_paths(REPO_ROOT, site="vega").env_script
 
 
 def _load_runtime_manifest(path: Path) -> dict[str, Any]:

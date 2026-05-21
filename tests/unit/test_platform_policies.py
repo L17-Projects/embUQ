@@ -39,10 +39,10 @@ def test_karolina_platform_policy_forbids_private_root() -> None:
     assert "/ceph/hpc/home/eubrieucb" in policy.forbidden_path_prefixes
     assert policy.canonical_runs_root == "${MESOUQ_SCRATCH_ROOT}/runs"
     assert policy.environment_scripts == (
+        "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh",
         "${MESOUQ_SITE_RUNTIME_ROOT}/korali/env.sh",
         "${MESOUQ_SITE_RUNTIME_ROOT}/mirheo/env.sh",
         "${MESOUQ_SITE_RUNTIME_ROOT}/mirheoOBMD/env.sh",
-        "${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/env.sh",
         "${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools/env.sh",
     )
 

@@ -68,14 +68,18 @@ def _gv_env_script():
         return str(Path(env_script).expanduser().resolve())
     runtime_root = os.environ.get('MESOUQ_SITE_RUNTIME_ROOT', '').strip()
     if runtime_root:
-        return str((Path(runtime_root).expanduser() / 'gv_venv' / 'env.sh').resolve())
+        return str((Path(runtime_root).expanduser() / 'env' / 'env.sh').resolve())
     repo_root = _find_repo_root()
     if repo_root is None:
         return ''
-    site = (os.environ.get('MESOUQ_SITE', '') or os.environ.get('HPC_SITE', '') or 'vega').strip().lower()
+
+    legacy_site_env = 'HPC' + '_SITE'
+    if os.environ.get(legacy_site_env):
+        raise RuntimeError(f'{legacy_site_env} is no longer supported; use MESOUQ_SITE.')
+    site = (os.environ.get('MESOUQ_SITE', '') or 'vega').strip().lower()
     if site not in {'vega', 'karolina'}:
         site = 'vega'
-    return str((repo_root / f'_{site}' / 'gv_venv' / 'env.sh').resolve())
+    return str((repo_root / f'_{site}' / 'env' / 'env.sh').resolve())
 def _write_runtime_preamble(file_commands):
     env_script = _gv_env_script()
     if env_script:

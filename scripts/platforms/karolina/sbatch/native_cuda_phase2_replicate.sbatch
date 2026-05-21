@@ -17,12 +17,13 @@ set -euo pipefail
 : "${PHASE2_BACKEND:?PHASE2_BACKEND must be cpu-mpi or native-cuda}"
 : "${REPLICATE_ID:?REPLICATE_ID must identify this replicate}"
 
-PYTHON_BIN="${PYTHON_BIN:-/scratch/project/eu-26-17/eubrieucb/mesouq/runtime/venv/bin/python}"
+MESOUQ_SITE_RUNTIME_ROOT="${MESOUQ_SITE_RUNTIME_ROOT:-/scratch/project/eu-26-17/eubrieucb/mesouq/runtime}"
+PYTHON_BIN="${PYTHON_BIN:-${MESOUQ_SITE_RUNTIME_ROOT}/env/bin/python}"
 CONFIG_PATH="${CONFIG_PATH:-${REPO_ROOT}/inference/configs/production/inference_config_indentation.yaml}"
 PHASE2_CPU_RANKS="${PHASE2_CPU_RANKS:-1}"
 LOG_ROOT="${LOG_ROOT:-${LANE_ROOT}/logs}"
 MANIFEST_ROOT="${MANIFEST_ROOT:-${LANE_ROOT}/manifests}"
-ENV_SCRIPT="${ENV_SCRIPT:-/scratch/project/eu-26-17/eubrieucb/mesouq/load_mesouq_karolina.sh}"
+ENV_SCRIPT="${ENV_SCRIPT:-${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh}"
 KORALI_ENV_SCRIPT="${KORALI_ENV_SCRIPT:-}"
 
 case "${PHASE2_BACKEND}" in

@@ -48,7 +48,7 @@ python scripts/platforms/vega/run_workflow_matrix.py \
   --selection compression:full-model:production \
   --output-root "${MESOUQ_RUNS_ROOT}/native_cuda_phase2/<run-tag>" \
   --site karolina \
-  --python-bin "${MESOUQ_SITE_RUNTIME_ROOT}/venv/bin/python" \
+  --python-bin "${MESOUQ_SITE_RUNTIME_ROOT}/env/bin/python" \
   --phase2-backend native-cuda \
   --phase2-cpu-ranks 1 \
   --inference-device gpu \
@@ -59,7 +59,7 @@ python scripts/platforms/vega/run_workflow_matrix.py \
 If the lane prepares compression runtime assets, set:
 
 ```bash
-export PYTHON_BIN="${MESOUQ_SITE_RUNTIME_ROOT}/venv/bin/python"
+export PYTHON_BIN="${MESOUQ_SITE_RUNTIME_ROOT}/env/bin/python"
 export PATH="$(dirname "${PYTHON_BIN}"):${PATH}"
 ```
 

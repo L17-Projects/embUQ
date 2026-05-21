@@ -29,7 +29,13 @@ PYTHON_BIN="${PYTHON_BIN:-python}"
 module purge
 module load Python/3.10.8-GCCcore-12.2.0 openmpi/4.1.2.1 CUDA/12.2.2 GSL/2.7-GCC-12.2.0 Eigen/3.4.0-GCCcore-12.2.0
 
-source "${REPO_ROOT}/_vega/venv/bin/activate"
+ENV_ROOT="${MESOUQ_ENV_ROOT:-${REPO_ROOT}/_vega/env}"
+ENV_SCRIPT="${MESOUQ_ENV_SCRIPT:-${ENV_ROOT}/env.sh}"
+if [[ ! -f "${ENV_SCRIPT}" ]]; then
+  echo "Missing canonical MesoUQ environment: ${ENV_SCRIPT}" >&2
+  exit 2
+fi
+source "${ENV_SCRIPT}"
 source "${REPO_ROOT}/_vega/korali/env.sh"
 
 cd "${REPO_ROOT}"

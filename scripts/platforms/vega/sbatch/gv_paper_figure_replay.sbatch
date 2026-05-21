@@ -59,12 +59,12 @@ module load \
   MPFR/4.2.0-GCCcore-12.2.0 \
   GMP/6.2.1-GCCcore-12.2.0
 
-if [[ ! -f "${REPO_ROOT}/_vega/gv_venv/env.sh" ]]; then
-  echo "Missing required GV runtime environment: ${REPO_ROOT}/_vega/gv_venv/env.sh" >&2
+if [[ ! -f "${REPO_ROOT}/_vega/env/env.sh" ]]; then
+  echo "Missing required GV runtime environment: ${REPO_ROOT}/_vega/env/env.sh" >&2
   exit 1
 fi
 
-source "${REPO_ROOT}/_vega/gv_venv/env.sh"
+source "${REPO_ROOT}/_vega/env/env.sh"
 export MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"
 export MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"
 export MESOUQ_GV_EIGENMODES_DOMAIN_RANKS="${MESOUQ_GV_EIGENMODES_DOMAIN_RANKS:-1,1,1}"

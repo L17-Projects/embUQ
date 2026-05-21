@@ -78,7 +78,7 @@ Submit the template from the repo root, or set `REPO_ROOT=/abs/path/to/clone` ex
 
 It assumes:
 
-- `_vega/venv` exists
+- `_vega/env` exists
 - `_vega/korali/env.sh` exists
 - the recommended Vega modules are available
 

@@ -430,7 +430,7 @@ def test_gv_paper_figure_replay_template_uses_public_command_and_gv_runtime() ->
     assert 'command+=(--stretching-point-start "${STRETCHING_POINT_START}")' in text
     assert 'command+=(--stretching-point-stop "${STRETCHING_POINT_STOP}")' in text
     assert 'command+=(--buckling-timeout-seconds "${BUCKLING_TIMEOUT_SECONDS}")' in text
-    assert "_vega/gv_venv/env.sh" in text
+    assert "_vega/env/env.sh" in text
     assert "Missing required GV runtime environment" in text
     assert "OpenMPI/4.1.4-GCC-12.2.0" in text
     assert "#SBATCH --partition=gpu" in text

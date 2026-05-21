@@ -51,7 +51,7 @@ cd "${REPO_ROOT}"
 source scripts/platforms/karolina/env_karolina.sh
 OUTPUT_ROOT="${OUTPUT_ROOT:-${MESOUQ_RUNS_ROOT}/gv/figure_replay/${CAMPAIGN_ID}}"
 
-GV_ENV_SCRIPT="${MESOUQ_GV_ENV_SCRIPT:-${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/env.sh}"
+GV_ENV_SCRIPT="${MESOUQ_GV_ENV_SCRIPT:-${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh}"
 if [[ ! -f "${GV_ENV_SCRIPT}" ]]; then
   echo "Missing required GV runtime environment: ${GV_ENV_SCRIPT}" >&2
   exit 1

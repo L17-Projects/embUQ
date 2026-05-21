@@ -36,15 +36,15 @@ module load \
 Create or activate your preferred Python environment, then install the Python stack needed for local testing plus the Meson build helpers used by the vendored Korali bootstrap:
 
 ```bash
-python -m venv _vega/venv
-source _vega/venv/bin/activate
+bash scripts/platforms/hpc/bootstrap_env.sh --site vega
+source _vega/env/env.sh
 python -m pip install --upgrade pip
 pip install -e ".[test,mpi]"
 pip install pybind11 meson ninja
 ```
 
 The helper script below can also install `pybind11`, `meson`, and `ninja` into the active environment automatically.
-The Mirheo bootstrap helper creates `_vega/gv_venv` and installs the GV runtime Python dependencies there, including `h5py` and `MDAnalysis`.
+The Mirheo bootstrap helper creates `_vega/env` and installs the GV runtime Python dependencies there, including `h5py` and `MDAnalysis`.
 
 That editable install now includes the mesh-preparation dependency `trimesh`, which is required by the public Phase 1 workflow bootstrap for compression and indentation.
 
@@ -112,10 +112,10 @@ Default behavior:
 - resolves Mirheo from `extern/mirheo.lock.json`
 - builds it into `_vega/mirheo/build`
 - installs CMake outputs into `_vega/mirheo/install`
-- creates `_vega/gv_venv`
-- installs `h5py`, `MDAnalysis`, and the Mirheo Python package into `_vega/gv_venv`
+- creates `_vega/env`
+- installs `h5py`, `MDAnalysis`, and the Mirheo Python package into `_vega/env`
 - writes `_vega/mirheo/env.sh`
-- writes `_vega/gv_venv/env.sh`
+- writes `_vega/env/env.sh`
 - records `_vega/mirheo/source_snapshot.json`
 - records `_vega/logs/bootstrap_mirheo.log`
 
@@ -143,7 +143,7 @@ Optional flags:
 
 ```bash
 source _vega/korali/env.sh
-source _vega/gv_venv/env.sh
+source _vega/env/env.sh
 source _vega/mirheo/env.sh
 source _vega/tinytex/env.sh
 python scripts/platforms/hpc/doctor_hpc.py --site vega --strict --with-mirheo --with-tex
@@ -151,7 +151,15 @@ python scripts/platforms/hpc/doctor_hpc.py --site vega --strict --with-mirheo --
 
 The generated env script for Korali intentionally replaces inherited `PYTHONPATH` entries so the repo-local install wins over any preexisting user-global Korali.
 The Mirheo env script records the resolved source path, repo-local build/install locations, and the source snapshot manifest used for reproducibility.
-The `gv_venv` env script activates the dedicated GV runtime Python path, records Mirheo import paths, and exports the OpenMPI library path explicitly for rank launches.
+The canonical `${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh` script activates the unified MesoUQ Python path, records Mirheo import paths, sources `${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools/env.sh` when present, and exports OpenMPI plus HDF5 library roots explicitly for rank launches and direct Mirheo imports. It honors `MESOUQ_HDF5_ROOT`, `EBROOTHDF5`, and `HDF5_DIR`, and captures the HDF5 root present during bootstrap.
+
+Build GV CGAL geometry tooling with the same interface:
+
+```bash
+bash scripts/platforms/vega/bootstrap_env.sh --with-gv-cgal
+# or, for only the CGAL helper after the unified env already exists:
+bash scripts/platforms/vega/bootstrap_gv_cgal_tools.sh
+```
 
 For GV runtime hardening checks (mirheo import, `libmirheo`, `scale_space` resolution, MDAnalysis), run:
 

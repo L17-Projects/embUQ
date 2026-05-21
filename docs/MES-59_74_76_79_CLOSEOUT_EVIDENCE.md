@@ -65,7 +65,7 @@ The Karolina full pytest suite is launched through:
 ```bash
 RUN_TAG=<tag> \
 OUTPUT_ROOT=/scratch/project/eu-26-17/eubrieucb/mesouq/runs/full_test_suite/<tag> \
-PYTHON_BIN=/scratch/project/eu-26-17/eubrieucb/mesouq/runtime/venv/bin/python \
+PYTHON_BIN=${MESOUQ_SITE_RUNTIME_ROOT}/env/bin/python \
 sbatch --export=ALL,REPO_ROOT="$PWD",RUN_TAG="$RUN_TAG",OUTPUT_ROOT="$OUTPUT_ROOT",PYTHON_BIN="$PYTHON_BIN" \
   scripts/platforms/karolina/sbatch/full_test_suite.sbatch -q
 ```

@@ -26,13 +26,13 @@ test -f pyproject.toml
 test -f papers/huq_emb/run_vega_50k_campaign.py
 
 export REPO="$(pwd -P)"
-export HPC_SITE=vega
+export MESOUQ_SITE=vega
 
 module purge
 module load Python/3.10.8-GCCcore-12.2.0 openmpi/4.1.2.1 CUDA/12.2.2 GSL/2.7-GCC-12.2.0 Eigen/3.4.0-GCCcore-12.2.0 CMake/3.24.3-GCCcore-12.2.0 HDF5/1.14.0-gompi-2022b
 
-python -m venv _vega/venv
-source _vega/venv/bin/activate
+bash scripts/platforms/hpc/bootstrap_env.sh --site vega
+source _vega/env/env.sh
 python -m pip install --upgrade pip
 # Vega's driver stack cannot run the default PyPI CUDA 13 PyTorch wheel.
 # Install a CUDA 12.6 wheel first so the editable install keeps this build.
@@ -82,7 +82,7 @@ set -euo pipefail
 cd "$REPO"
 module purge
 module load Python/3.10.8-GCCcore-12.2.0 CUDA/12.2.2
-source _vega/venv/bin/activate
+source _vega/env/env.sh
 python - <<'PY'
 import torch
 
@@ -107,7 +107,7 @@ wheel, reinstall the CUDA 12.6 wheel above before running the paper campaign.
 set -euo pipefail
 
 export REPO="$(pwd -P)"
-export HPC_SITE=vega
+export MESOUQ_SITE=vega
 export PAPER_DATA_ROOT="${PAPER_DATA_ROOT:-$HOME/mesouq_paper_data}"
 export CAMPAIGN_ID="${CAMPAIGN_ID:-huq_emb_50k_$(date -u +%Y%m%dT%H%M%SZ)}"
 mkdir -p "$PAPER_DATA_ROOT/logs/$CAMPAIGN_ID"
@@ -115,7 +115,7 @@ printf '%s\n' "$CAMPAIGN_ID" > "$PAPER_DATA_ROOT/LAST_CAMPAIGN_ID.txt"
 
 module purge
 module load Python/3.10.8-GCCcore-12.2.0 openmpi/4.1.2.1 CUDA/12.2.2 GSL/2.7-GCC-12.2.0 Eigen/3.4.0-GCCcore-12.2.0 HDF5/1.14.0-gompi-2022b
-source _vega/venv/bin/activate
+source _vega/env/env.sh
 source _vega/korali/env.sh
 source _vega/mirheo/env.sh
 source _vega/tinytex/env.sh
@@ -152,7 +152,7 @@ Run this only after step 2 finished and the campaign report passed.
 set -euo pipefail
 
 export REPO="$(pwd -P)"
-export HPC_SITE=vega
+export MESOUQ_SITE=vega
 export PAPER_DATA_ROOT="${PAPER_DATA_ROOT:-$HOME/mesouq_paper_data}"
 export CAMPAIGN_ID="${CAMPAIGN_ID:-$(cat "$PAPER_DATA_ROOT/LAST_CAMPAIGN_ID.txt")}"
 mkdir -p "$PAPER_DATA_ROOT/logs/$CAMPAIGN_ID"
@@ -184,10 +184,10 @@ sbatch --wait \
 #!/bin/bash
 set -euo pipefail
 cd "$REPO"
-export HPC_SITE=vega
+export MESOUQ_SITE=vega
 module purge
 module load Python/3.10.8-GCCcore-12.2.0 openmpi/4.1.2.1 CUDA/12.2.2 GSL/2.7-GCC-12.2.0 Eigen/3.4.0-GCCcore-12.2.0 HDF5/1.14.0-gompi-2022b
-source _vega/venv/bin/activate
+source _vega/env/env.sh
 source _vega/korali/env.sh
 source _vega/mirheo/env.sh
 source _vega/tinytex/env.sh
@@ -223,7 +223,7 @@ export CAMPAIGN_ID="${CAMPAIGN_ID:-$(cat "$PAPER_DATA_ROOT/LAST_CAMPAIGN_ID.txt"
 
 module purge
 module load Python/3.10.8-GCCcore-12.2.0 openmpi/4.1.2.1 CUDA/12.2.2 GSL/2.7-GCC-12.2.0 Eigen/3.4.0-GCCcore-12.2.0 HDF5/1.14.0-gompi-2022b
-source _vega/venv/bin/activate
+source _vega/env/env.sh
 source _vega/korali/env.sh
 source _vega/mirheo/env.sh
 source _vega/tinytex/env.sh
@@ -251,7 +251,7 @@ export CAMPAIGN_ID="${CAMPAIGN_ID:-$(cat "$PAPER_DATA_ROOT/LAST_CAMPAIGN_ID.txt"
 
 module purge
 module load Python/3.10.8-GCCcore-12.2.0
-source _vega/venv/bin/activate
+source _vega/env/env.sh
 
 python - <<'PY'
 import json

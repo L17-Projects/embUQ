@@ -38,8 +38,8 @@ def test_doctor_gv_runtime_diagnostics_includes_scale_space_and_mirheo_checks(tm
     (repo_root / "_vega" / "mirheo").mkdir(parents=True, exist_ok=True)
     (repo_root / "_vega" / "mirheo" / "env.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
     (repo_root / "_vega" / "mirheo" / "source_snapshot.json").write_text("{}", encoding="utf-8")
-    (repo_root / "_vega" / "gv_venv").mkdir(parents=True, exist_ok=True)
-    (repo_root / "_vega" / "gv_venv" / "env.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    (repo_root / "_vega" / "env").mkdir(parents=True, exist_ok=True)
+    (repo_root / "_vega" / "env" / "env.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
     mirheo_install = repo_root / "_vega" / "mirheo" / "install" / "lib"
     mirheo_install.mkdir(parents=True)
     (mirheo_install / "libmirheo-test.so").write_text("binary", encoding="utf-8")
@@ -67,7 +67,7 @@ def test_doctor_gv_runtime_diagnostics_includes_scale_space_and_mirheo_checks(tm
 
     check_map = {entry["name"]: entry for entry in report["checks"]}
     assert report["with_gv_runtime"] is True
-    assert check_map["repo_local_gv_venv_env_script"]["status"] == "ok"
+    assert check_map["repo_local_unified_env_script"]["status"] == "ok"
     assert check_map["mirheo_libmirheo"]["status"] == "ok"
     assert check_map["scale_space_binary:PATH"]["status"] == "ok"
     assert check_map["python:MDAnalysis"]["status"] == "ok"

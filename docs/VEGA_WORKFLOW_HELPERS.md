@@ -116,7 +116,7 @@ The following canned templates live under `scripts/platforms/vega/sbatch/`:
 They assume:
 
 - the repo-local bootstrap from `docs/VEGA_BOOTSTRAP.md` is already complete
-- `_vega/venv` exists
+- `_vega/env` exists
 - `_vega/korali/env.sh` exists
 
 Each template exposes `EXPERIMENT`, `MODEL_FAMILY`, and `PROFILE` at the shell-variable level so fresh-clone workflow jobs do not rely on editing Python code or guessing config paths.

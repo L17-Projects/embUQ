@@ -65,11 +65,13 @@ def test_vega_validation_matrix_template_matches_workflow_only_defaults() -> Non
 
 
 @pytest.mark.parametrize("template", ALL_TEMPLATES)
-def test_matrix_templates_use_login_shell_repo_venv_and_repo_pythonpath(template: str) -> None:
+def test_matrix_templates_use_login_shell_canonical_env_and_repo_pythonpath(template: str) -> None:
     text = _read(template)
     assert text.startswith("#!/bin/bash -l\n")
-    assert 'VENV_DIR="${VENV_DIR:-${REPO_ROOT}/_vega/venv}"' in text
-    assert 'source "${VENV_DIR}/bin/activate"' in text
+    assert 'ENV_ROOT="${MESOUQ_ENV_ROOT:-${REPO_ROOT}/_vega/env}"' in text
+    assert 'ENV_SCRIPT="${MESOUQ_ENV_SCRIPT:-${ENV_ROOT}/env.sh}"' in text
+    assert 'PYTHON_BIN="${PYTHON_BIN:-${ENV_ROOT}/bin/python}"' in text
+    assert 'source "${ENV_SCRIPT}"' in text
     assert 'export PYTHONPATH="${REPO_ROOT}/src:${REPO_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"' in text
     assert 'source "${REPO_ROOT}/_vega/korali/env.sh"' in text
 
