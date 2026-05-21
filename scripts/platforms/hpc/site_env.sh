@@ -64,11 +64,24 @@ mesouq_activate_site_env() {
       PYTHON_BIN="${resolved_python_bin}"
     fi
   fi
+  local canonical_env_bin
+  if ! canonical_env_bin="$(cd "${MESOUQ_ENV_ROOT}/bin" 2>/dev/null && pwd -P)"; then
+    echo "Missing canonical MesoUQ env bin: ${MESOUQ_ENV_ROOT}/bin" >&2
+    return 2
+  fi
+  local python_bin_dir
+  local python_bin_name
+  if ! python_bin_dir="$(cd "$(dirname "${PYTHON_BIN}")" 2>/dev/null && pwd -P)"; then
+    echo "Missing canonical MesoUQ Python: ${PYTHON_BIN}" >&2
+    return 2
+  fi
+  python_bin_name="$(basename "${PYTHON_BIN}")"
+  PYTHON_BIN="${python_bin_dir}/${python_bin_name}"
   export ENV_ROOT ENV_SCRIPT PYTHON_BIN
 
   case "${PYTHON_BIN}" in
-    "${MESOUQ_ENV_ROOT}/bin/"*) ;;
-    *) echo "PYTHON_BIN=${PYTHON_BIN} is outside canonical MesoUQ env ${MESOUQ_ENV_ROOT}/bin." >&2; return 2 ;;
+    "${canonical_env_bin}/"*) ;;
+    *) echo "PYTHON_BIN=${PYTHON_BIN} is outside canonical MesoUQ env ${canonical_env_bin}." >&2; return 2 ;;
   esac
 
   if [[ ! -x "${PYTHON_BIN}" ]]; then

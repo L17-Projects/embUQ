@@ -89,3 +89,31 @@ mesouq_activate_site_env vega {repo_root}
 
     assert result.returncode == 2
     assert "outside canonical MesoUQ env" in result.stderr
+
+
+def test_site_env_rejects_path_traversal_outside_canonical_env(tmp_path: Path) -> None:
+    runtime_root, env_root = _make_runtime(tmp_path)
+    repo_root = tmp_path / "repo"
+    external_bin = tmp_path / "external" / "bin"
+    (repo_root / "src").mkdir(parents=True)
+    external_bin.mkdir(parents=True)
+    external_python = external_bin / "python3"
+    external_python.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    external_python.chmod(0o755)
+    traversal_python = (
+        env_root / "bin" / ".." / ".." / ".." / "external" / "bin" / "python3"
+    )
+
+    script = f"""
+set -euo pipefail
+unset {LEGACY_SITE_ENV} MESOUQ_SITE MESOUQ_ENV_ROOT MESOUQ_ENV_SCRIPT MESOUQ_GV_ENV_SCRIPT PYTHONPATH
+export MESOUQ_SITE_RUNTIME_ROOT={runtime_root}
+export PYTHON_BIN={traversal_python}
+source {REPO_ROOT / 'scripts/platforms/hpc/site_env.sh'}
+mesouq_activate_site_env vega {repo_root}
+"""
+
+    result = subprocess.run(["bash", "-c", script], text=True, capture_output=True, check=False)
+
+    assert result.returncode == 2
+    assert "outside canonical MesoUQ env" in result.stderr
