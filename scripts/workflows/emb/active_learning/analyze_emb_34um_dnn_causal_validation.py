@@ -18,15 +18,35 @@ if str(REPO_ROOT) not in sys.path:
 from meso_uq.active_learning.emb_34um_dnn_causal_validation_report import (  # noqa: E402
     write_emb_34um_dnn_causal_validation_artifacts,
 )
+from meso_uq.active_learning.emb_34um_dnn_causal_validation_ingestion import (  # noqa: E402
+    EMB_34UM_DNN_CAUSAL_VALIDATION_INGESTION_MANIFEST_FILENAME,
+)
+from meso_uq.active_learning.emb_34um_dnn_causal_validation_metrics import (  # noqa: E402
+    EMB_34UM_DNN_CAUSAL_VALIDATION_METRIC_ROWS_FILENAME,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Build EMB 3.4um DNN causal AL-vs-LHS validation artifacts.")
-    parser.add_argument("--rows", required=True, help="JSON/CSV file with validation rows.")
+    parser.add_argument(
+        "--rows",
+        default=None,
+        help="JSON/CSV file with precomputed DNN validation rows.",
+    )
+    parser.add_argument(
+        "--ingestion-manifest",
+        default=None,
+        help="DNN ingestion manifest/report JSON with rows from campaign ingestion.",
+    )
+    parser.add_argument(
+        "--campaign-root",
+        default=None,
+        help="Campaign root containing ingest artifacts.",
+    )
     parser.add_argument(
         "--output-root",
         default=None,
-        help="Directory for report, CSV, and plots. Defaults to <rows-parent>/analyze.",
+        help="Directory for report, CSV, and plots. Defaults to <campaign-root>/analyze when provided.",
     )
     parser.add_argument("--bootstrap-resamples", type=int, default=2000)
     parser.add_argument("--bootstrap-seed", type=int, default=2026202405)
@@ -44,8 +64,22 @@ def main(argv: list[str] | None = None) -> int:
     raw_args = list(sys.argv[1:] if argv is None else argv)
     args = build_parser().parse_args(argv)
 
-    rows_path = Path(args.rows)
-    output_root = Path(args.output_root) if args.output_root else rows_path.parent / "analyze"
+    if args.ingestion_manifest:
+        rows_path = Path(args.ingestion_manifest)
+    elif args.campaign_root:
+        ingest_root = Path(args.campaign_root) / "ingest"
+        metric_rows_path = ingest_root / EMB_34UM_DNN_CAUSAL_VALIDATION_METRIC_ROWS_FILENAME
+        rows_path = (
+            metric_rows_path
+            if metric_rows_path.is_file()
+            else ingest_root / EMB_34UM_DNN_CAUSAL_VALIDATION_INGESTION_MANIFEST_FILENAME
+        )
+    elif args.rows:
+        rows_path = Path(args.rows)
+    else:
+        raise ValueError("Either --rows, --ingestion-manifest, or --campaign-root must be provided.")
+
+    output_root = Path(args.output_root) if args.output_root else Path(args.campaign_root or rows_path.parent) / "analyze"
     command = " ".join(shlex.quote(item) for item in [Path(__file__).name, *raw_args])
     artifacts = write_emb_34um_dnn_causal_validation_artifacts(
         rows=rows_path,

@@ -203,6 +203,8 @@ def _batch_root(
         return campaign_root / "unseen_test"
     if replica is None:
         raise ValueError("Replica is required for non-shared stages.")
+    if mode.startswith(("al-step-", "lhs-step-")):
+        return campaign_root / f"replica-{replica:03d}" / mode
     if cycle is None:
         return campaign_root / f"replica-{replica:03d}" / mode
     return campaign_root / f"replica-{replica:03d}" / f"{mode}-{cycle:02d}"
