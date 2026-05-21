@@ -123,6 +123,8 @@ class PosteriorUncertaintyConfig:
         object.__setattr__(self, "sigma", _positive_sigma(self.sigma, "posterior_uncertainty.sigma"))
 
     def variances(self, residuals: NumberSequence) -> tuple[float, ...]:
+        if self.kind is PosteriorUncertaintyKind.NONE:
+            return (0.0,) * len(_as_float_tuple(residuals))
         return (self.sigma * self.sigma,) * len(_as_float_tuple(residuals))
 
 

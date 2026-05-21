@@ -639,6 +639,44 @@ def test_gv_hbi_evaluate_reference_applies_optional_d0(monkeypatch: pytest.Monke
     assert sample_data["Reference Evaluations"] == [4.0, 5.0]
 
 
+def test_gv_hbi_evaluate_reference_sets_multiplicative_sigma_std(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(gv_hbi, "_predict_gv_dnn", lambda _state, _x_raw: np.asarray([-2.0, 4.0]))
+    sample_data = {"Parameters": [0.5, 0.25]}
+
+    gv_hbi._evaluate_gv_dnn_reference(
+        sample_data,
+        {
+            "variable_names": ["ka", "sigma"],
+            "reference_rows": [{"axis": "0.0"}, {"axis": "1.0"}],
+            "input_columns": ["ka", "axis"],
+            "controls": {},
+            "geometry_parameters": {},
+            "model_state": object(),
+        },
+    )
+
+    assert sample_data["Reference Evaluations"] == [-2.0, 4.0]
+    assert sample_data["Standard Deviation"] == pytest.approx([0.5, 1.0])
+
+
+def test_gv_hbi_evaluate_reference_rejects_nonpositive_multiplicative_std(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(gv_hbi, "_predict_gv_dnn", lambda _state, _x_raw: np.asarray([0.0]))
+    sample_data = {"Parameters": [0.5, 0.25]}
+
+    with pytest.raises(ValueError, match="standard deviations must be positive"):
+        gv_hbi._evaluate_gv_dnn_reference(
+            sample_data,
+            {
+                "variable_names": ["ka", "sigma"],
+                "reference_rows": [{"axis": "0.0"}],
+                "input_columns": ["ka", "axis"],
+                "controls": {},
+                "geometry_parameters": {},
+                "model_state": object(),
+            },
+        )
+
+
 def test_gv_phase1_dnn_execution_rejects_controls_as_korali_variables(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

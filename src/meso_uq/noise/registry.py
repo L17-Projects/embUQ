@@ -28,6 +28,20 @@ _MODEL_SUPPORT: dict[str, NoiseModelSupportMetadata] = {
         supports_surrogate_error=True,
         supports_posterior_uncertainty=True,
     ),
+    "emb/indentation": NoiseModelSupportMetadata(
+        model_id="emb/indentation",
+        family="emb",
+        supported_observables=("displacement",),
+        observable_units={"displacement": "micrometer"},
+        requires_measurement_error=True,
+        required_measurement_error_kinds=(
+            MeasurementErrorKind.ABSOLUTE_GAUSSIAN,
+            MeasurementErrorKind.RELATIVE_GAUSSIAN,
+        ),
+        supports_discrepancy=False,
+        supports_surrogate_error=True,
+        supports_posterior_uncertainty=True,
+    ),
     "gv/stretching": NoiseModelSupportMetadata(
         model_id="gv/stretching",
         family="gv",
