@@ -1,8 +1,10 @@
+import json
 import os
 import shlex
 import subprocess
 from pathlib import Path
 
+import meso_uq.vega as vega_module
 from meso_uq.site_runtime import normalize_runtime_site
 from meso_uq.vega import (
     build_runtime_pythonpath,
@@ -317,6 +319,27 @@ def test_load_mirheo_source_lock_uses_karolina_default_when_lock_missing(tmp_pat
     lock = load_mirheo_source_lock(repo_root, site="karolina")
 
     assert lock["source_path"] == "/home/it4i-bbenvegnen/software/Mirheo"
+
+
+def test_load_mirheo_source_lock_falls_back_to_site_default_when_locked_path_is_missing(tmp_path, monkeypatch):
+    repo_root = _make_repo(tmp_path)
+    missing_source = tmp_path / "missing-mirheo"
+    default_source = tmp_path / "karolina-mirheo"
+    default_source.mkdir()
+    monkeypatch.setitem(
+        vega_module.DEFAULT_MIRHEO_SOURCE_PATHS,
+        "karolina",
+        str(default_source),
+    )
+    (repo_root / "extern" / "mirheo.lock.json").write_text(
+        json.dumps({"source_path": str(missing_source)}),
+        encoding="utf-8",
+    )
+
+    lock = load_mirheo_source_lock(repo_root, site="karolina")
+
+    assert lock["source_path"] == str(default_source)
+    assert "locked source unavailable for site karolina" in lock["source_path_fallback_reason"]
 
 
 def test_load_mirheo_source_lock_rejects_non_mapping_payload(tmp_path):

@@ -569,7 +569,16 @@ def load_mirheo_source_lock(
     payload = json.loads(paths.mirheo_source_lock.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"Invalid Mirheo source lock payload: {paths.mirheo_source_lock}")
-    source_path = payload.get("source_path") or default_source
+    locked_source = payload.get("source_path")
+    source_path = str(locked_source or default_source)
+    if locked_source:
+        locked_candidate = Path(str(locked_source)).expanduser()
+        default_candidate = Path(default_source).expanduser()
+        if not locked_candidate.exists() and default_candidate.exists():
+            payload["source_path_fallback_reason"] = (
+                f"locked source unavailable for site {paths.site}: {locked_candidate}"
+            )
+            source_path = default_source
     payload["source_path"] = source_path
     return payload
 
