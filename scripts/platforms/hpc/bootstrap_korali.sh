@@ -10,7 +10,7 @@ Build and install the vendored extern/korali tree into the site runtime area.
 
 Expected environment:
   - Vega module stack loaded
-  - active Python environment with pip available
+  - canonical site env Python with pip available
 EOF
 }
 
@@ -134,6 +134,11 @@ if ! [[ "$build_jobs" =~ ^[1-9][0-9]*$ ]]; then
 fi
 
 echo "Compile jobs: $build_jobs"
+
+python_bin="$(readlink -f "$python_bin")"
+python_bin_dir="$(dirname "$python_bin")"
+export PATH="$python_bin_dir${PATH:+:$PATH}"
+export PYTHONNOUSERSITE=1
 
 if [[ "$install_python_build_deps" -eq 1 ]]; then
   "$python_bin" -m pip install pybind11 meson ninja
