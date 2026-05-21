@@ -11,6 +11,7 @@ from meso_uq.noise import (
     compose_total_covariance,
     gaussian_log_likelihood_from_covariance,
 )
+from meso_uq.noise.covariance import _cholesky_with_jitter
 
 
 def test_correlated_curve_covariance_is_symmetric_and_summarized():
@@ -67,6 +68,16 @@ def test_repeated_grid_points_are_stabilized_with_recorded_jitter():
     assert result.jitter_added > 0.0
     assert result.cholesky is not None
     assert result.summary["jitter_added"] == pytest.approx(result.jitter_added)
+
+
+def test_cholesky_jitter_attempts_maximum_before_failure():
+    covariance = np.diag([-9e-7, 1.0])
+
+    stabilized, cholesky, jitter_added = _cholesky_with_jitter(covariance, jitter=6e-7, max_jitter=1e-6)
+
+    assert jitter_added == pytest.approx(1e-6)
+    assert np.diag(stabilized) == pytest.approx((1e-7, 1.000001))
+    assert cholesky.shape == (2, 2)
 
 
 def test_covariance_validation_errors_are_explicit():

@@ -162,13 +162,16 @@ def _cholesky_with_jitter(covariance: np.ndarray, jitter: float, max_jitter: flo
     if max_jitter <= 0.0:
         raise ValueError("Covariance matrix is not positive definite and no jitter is allowed.")
     candidate = jitter if jitter > 0.0 else min(max_jitter, 1e-12)
+    candidate = min(candidate, max_jitter)
     eye = np.eye(symmetric.shape[0], dtype=float)
-    while candidate <= max_jitter * (1.0 + 1e-12):
+    while True:
         stabilized = symmetric + candidate * eye
         try:
             return stabilized, np.linalg.cholesky(stabilized), candidate
         except np.linalg.LinAlgError:
-            candidate *= 10.0
+            if candidate >= max_jitter:
+                break
+            candidate = min(candidate * 10.0, max_jitter)
     raise ValueError("Covariance matrix is not positive definite within max_jitter.")
 
 
