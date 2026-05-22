@@ -70,6 +70,13 @@ from meso_uq.noise.registry import (
     list_model_support_metadata,
     supports_for_observable,
 )
+from meso_uq.noise.surrogate_covariance import (
+    SurrogateCovarianceConfig,
+    SurrogateCovarianceInputs,
+    SurrogateCovarianceKind,
+    SurrogateCovarianceResult,
+    build_surrogate_covariance,
+)
 from meso_uq.noise.robust import (
     LikelihoodEvaluation,
     LikelihoodInputs,
@@ -113,6 +120,10 @@ __all__ = [
     "RobustLikelihoodConfig",
     "RobustLikelihoodKind",
     "SurrogateErrorConfig",
+    "SurrogateCovarianceResult",
+    "SurrogateCovarianceKind",
+    "SurrogateCovarianceInputs",
+    "SurrogateCovarianceConfig",
     "SurrogateUncertaintyKind",
     "ToyLikelihood",
     "build_additive_relative_observation_noise",
@@ -123,6 +134,7 @@ __all__ = [
     "build_correlated_curve_covariance",
     "build_geometry_uncertainty_covariance",
     "build_model_config",
+    "build_surrogate_covariance",
     "compose_additive_relative_gaussian_likelihood",
     "compose_total_covariance",
     "compose_toy_likelihood",
