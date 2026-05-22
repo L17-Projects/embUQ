@@ -661,3 +661,94 @@ def test_gate07_rejects_non_mapping_artifact_entry_without_traceback(tmp_path):
     assert "Traceback" not in completed.stderr
     gate_manifest = json.loads((tmp_path / "scalar_entry_gate/noise_gate07_manifest.json").read_text(encoding="utf-8"))
     assert any("artifact index entry synthetic_recovery is not an object" in failure for failure in gate_manifest["failures"])
+
+
+def test_gate07_reports_malformed_release_manifest_without_traceback(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    release_manifest = tmp_path / "malformed_release.json"
+    release_manifest.write_text("{not json", encoding="utf-8")
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "scripts/qa/noise_gate07_release_checks.py"),
+            "--release-manifest",
+            str(release_manifest),
+            "--output-root",
+            str(tmp_path / "malformed_release_gate"),
+            "--allow-missing-github-checks",
+        ],
+        cwd=repo_root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert completed.returncode == 1
+    assert "Traceback" not in completed.stderr
+    gate_manifest = json.loads((tmp_path / "malformed_release_gate/noise_gate07_manifest.json").read_text(encoding="utf-8"))
+    assert any("release manifest could not be read" in failure for failure in gate_manifest["failures"])
+
+
+def test_gate07_rejects_non_mapping_evidence_manifest_without_traceback(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    evidence_manifest = tmp_path / "synthetic_evidence.json"
+    evidence_manifest.write_text("[]", encoding="utf-8")
+    release_manifest = tmp_path / "forged_evidence_root.json"
+    release_manifest.write_text(
+        json.dumps(
+            {
+                "gate07": {"pass": True},
+                "config_validation": {
+                    "passed": True,
+                    "results": [
+                        {"config_name": name, "passed": True, "path": f"{name}.yaml"}
+                        for name in ("legacy", "synthetic_recovery", "predictive_checks", "emb_comparison")
+                    ],
+                },
+                "artifact_index": {
+                    "entries": {
+                        "synthetic_recovery": {
+                            "exists": True,
+                            "path": evidence_manifest.name,
+                            "all_scenarios_passed": True,
+                            "scenario_gate_statuses": {"fixture": "pass"},
+                            "git_status_clean": True,
+                            "git_commit": "abc123",
+                            "commands": {"regenerate": "python synthetic.py"},
+                            "configs": {"primary": "configs/noise/full_hierarchy.example.yaml"},
+                            "residual_risk": "fixture residual risk",
+                        },
+                        "predictive_checks": {},
+                        "emb_comparison": {},
+                    }
+                },
+                "merge_boundary": "human_review_required",
+                "no_karolina_interaction": True,
+                "karolina_interaction_confirmation": {"operator_confirmed": True},
+                "provenance": {"git_commit": "abc123", "git_status_clean": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "scripts/qa/noise_gate07_release_checks.py"),
+            "--release-manifest",
+            str(release_manifest),
+            "--output-root",
+            str(tmp_path / "evidence_root_gate"),
+            "--allow-missing-github-checks",
+        ],
+        cwd=repo_root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert completed.returncode == 1
+    assert "Traceback" not in completed.stderr
+    gate_manifest = json.loads((tmp_path / "evidence_root_gate/noise_gate07_manifest.json").read_text(encoding="utf-8"))
+    assert any("evidence manifest synthetic_recovery root is not an object" in failure for failure in gate_manifest["failures"])

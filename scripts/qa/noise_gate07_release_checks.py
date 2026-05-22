@@ -128,6 +128,9 @@ def _validate_evidence_manifest(label: str, manifest_path: Path, entry: MappingL
     except (OSError, json.JSONDecodeError) as exc:
         failures.append(f"evidence manifest {label} could not be read: {exc}.")
         return
+    if not isinstance(evidence_manifest, dict):
+        failures.append(f"evidence manifest {label} root is not an object.")
+        return
 
     artifacts = evidence_manifest.get("artifacts")
     if not isinstance(artifacts, dict) or not artifacts:
@@ -152,6 +155,9 @@ def _validate_evidence_manifest(label: str, manifest_path: Path, entry: MappingL
             metrics = _load_json(metrics_path)
         except (OSError, json.JSONDecodeError) as exc:
             failures.append(f"evidence manifest {label} metrics could not be read: {exc}.")
+            metrics = {}
+        if not isinstance(metrics, dict):
+            failures.append(f"evidence manifest {label} metrics root is not an object.")
             metrics = {}
 
     if metrics.get("all_scenarios_passed") is not True:
