@@ -3,6 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from scripts.qa.noise_gate06_integrated_emb import _resolve_artifact
+
 
 def _write_evidence(root: Path, name: str, *, evidence_class: str | None = None, production_claim: bool = False, clean: bool = True) -> Path:
     root.mkdir(parents=True, exist_ok=True)
@@ -90,3 +92,29 @@ def test_gate06_rejects_fixture_when_production_is_required(tmp_path):
     manifest = json.loads((output_root / "noise_gate06_manifest.json").read_text(encoding="utf-8"))
     assert manifest["pass"] is False
     assert any("require-production" in failure for failure in manifest["failures"])
+
+
+def test_gate06_resolves_manifest_relative_artifact_before_cwd(tmp_path, monkeypatch):
+    manifest_dir = tmp_path / "manifest_dir"
+    manifest_dir.mkdir()
+    manifest_metrics = manifest_dir / "metrics.json"
+    cwd_metrics = tmp_path / "metrics.json"
+    manifest_metrics.write_text("{}", encoding="utf-8")
+    cwd_metrics.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    resolved = _resolve_artifact(manifest_dir / "manifest.json", "metrics.json")
+
+    assert resolved == manifest_metrics
+
+
+def test_gate06_resolves_output_root_prefixed_relative_artifact(tmp_path, monkeypatch):
+    artifact = Path("_runs/noise/m7/emb_comparison_metrics.json")
+    manifest = Path("_runs/noise/m7/emb_comparison_manifest.json")
+    (tmp_path / artifact).parent.mkdir(parents=True)
+    (tmp_path / artifact).write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    resolved = _resolve_artifact(manifest, artifact.as_posix())
+
+    assert resolved.resolve() == (tmp_path / artifact).resolve()

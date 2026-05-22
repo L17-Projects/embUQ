@@ -27,7 +27,16 @@ def _resolve_artifact(manifest_path: Path, artifact: str) -> Path:
     candidate = Path(artifact)
     if candidate.is_absolute():
         return candidate
-    return manifest_path.parent / candidate
+    manifest_relative = manifest_path.parent / candidate
+    if manifest_relative.exists():
+        return manifest_relative
+    cwd_relative = Path.cwd() / candidate
+    if cwd_relative.exists():
+        return cwd_relative
+    repo_relative = Path(__file__).resolve().parents[2] / candidate
+    if repo_relative.exists():
+        return repo_relative
+    return manifest_relative
 
 
 def _load_metrics(manifest_path: Path, manifest: MappingLike, label: str) -> MappingLike:
