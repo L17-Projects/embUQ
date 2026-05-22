@@ -298,6 +298,119 @@ def test_gate07_rejects_karolina_interaction_claim(tmp_path):
     assert any("Karolina" in failure for failure in gate_manifest["failures"])
 
 
+def test_gate07_resolves_release_manifest_relative_paths_from_other_cwd(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    release_root = tmp_path / "release"
+    release_root.mkdir()
+    other_cwd = tmp_path / "other"
+    other_cwd.mkdir()
+    required_artifacts = {
+        "synthetic_recovery": {
+            "metrics",
+            "summary_csv",
+            "covariance_heatmap",
+            "recovery_parameter_intervals",
+            "residual_whitened_hist",
+            "synthetic_observable_overlay",
+        },
+        "predictive_checks": {
+            "metrics",
+            "summary_csv",
+            "calibration_summary",
+            "ppc_observable_overlay",
+            "ppc_summary_intervals",
+            "sbc_rank_histogram",
+        },
+        "emb_comparison": {
+            "metrics",
+            "summary_csv",
+            "gate06_summary",
+            "report_md",
+            "metrics_table",
+            "posterior_intervals",
+            "predictive_bands",
+            "residual_diagnostics",
+        },
+    }
+    entries = {}
+    for label, artifact_names in required_artifacts.items():
+        metrics_path = release_root / f"{label}_metrics.json"
+        metrics_path.write_text(
+            json.dumps({"all_scenarios_passed": True, "scenario_gate_statuses": {"fixture": "pass"}}),
+            encoding="utf-8",
+        )
+        sidecar_path = release_root / f"{label}_sidecar.txt"
+        sidecar_path.write_text("sidecar\n", encoding="utf-8")
+        artifacts = {name: sidecar_path.name for name in artifact_names}
+        artifacts["metrics"] = metrics_path.name
+        manifest_path = release_root / f"{label}_manifest.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "commands": {"regenerate": f"python {label}.py"},
+                    "provenance": {"git_commit": "abc123", "git_status_clean": True},
+                    "configs": {"primary": "configs/noise/full_hierarchy.example.yaml"},
+                    "artifacts": artifacts,
+                    "residual_risk": "fixture residual risk",
+                }
+            ),
+            encoding="utf-8",
+        )
+        entries[label] = {
+            "path": manifest_path.name,
+            "exists": True,
+            "all_scenarios_passed": True,
+            "scenario_gate_statuses": {"fixture": "pass"},
+            "git_status_clean": True,
+            "git_commit": "abc123",
+            "commands": {"regenerate": f"python {label}.py"},
+            "configs": {"primary": "configs/noise/full_hierarchy.example.yaml"},
+            "residual_risk": "fixture residual risk",
+            "artifact_existence": {name: True for name in artifact_names},
+        }
+    gate06_path = release_root / "gate06.json"
+    gate06_path.write_text(json.dumps({"pass": True}), encoding="utf-8")
+    report_path = release_root / "report.md"
+    report_path.write_text("# report\n", encoding="utf-8")
+    release_manifest = release_root / "release.json"
+    release_manifest.write_text(
+        json.dumps(
+            {
+                "gate07": {"pass": True},
+                "config_validation": {
+                    "passed": True,
+                    "results": [
+                        {"config_name": name, "passed": True, "path": f"{name}.yaml"}
+                        for name in ("legacy", "synthetic_recovery", "predictive_checks", "emb_comparison")
+                    ],
+                },
+                "artifact_index": {"entries": entries},
+                "gate06_manifest": gate06_path.name,
+                "artifacts": {"release_report": report_path.name},
+                "merge_boundary": "human_review_required",
+                "no_karolina_interaction": True,
+                "karolina_interaction_confirmation": {"operator_confirmed": True},
+                "provenance": {"git_commit": "abc123", "git_status_clean": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "scripts/qa/noise_gate07_release_checks.py"),
+            "--release-manifest",
+            str(release_manifest),
+            "--output-root",
+            str(tmp_path / "gate07_relative"),
+            "--allow-missing-github-checks",
+        ],
+        cwd=other_cwd,
+        check=True,
+    )
+
+
 def test_gate07_rejects_forged_incomplete_release_manifest(tmp_path):
     repo_root = Path(__file__).resolve().parents[1]
     release_manifest = tmp_path / "forged.json"

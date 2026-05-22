@@ -88,12 +88,23 @@ def _write_report(path: Path, payload: MappingLike) -> None:
     lines.extend(f"- {warning}" for warning in payload["warnings"] or ["None"])
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-def _check_path(path_value: Any, failures: list[str], label: str) -> None:
+def _resolve_release_path(base_dir: Path | None, path_value: Any) -> Path | None:
     if not isinstance(path_value, str) or not path_value:
+        return None
+    path = Path(path_value)
+    if path.is_absolute() or base_dir is None:
+        return path
+    return base_dir / path
+
+
+def _check_path(path_value: Any, failures: list[str], label: str, *, base_dir: Path | None = None) -> Path | None:
+    path = _resolve_release_path(base_dir, path_value)
+    if path is None:
         failures.append(f"{label} path is missing.")
-        return
-    if not Path(path_value).exists():
+        return None
+    if not path.exists():
         failures.append(f"{label} path does not exist: {path_value}.")
+    return path
 
 
 def _resolve_manifest_artifact(manifest_path: Path, value: Any) -> Path | None:
@@ -321,12 +332,14 @@ def _github_evidence_summary(
 def evaluate_gate07(
     release_manifest: MappingLike,
     *,
+    release_manifest_path: Path | None = None,
     github_checks: MappingLike | None = None,
     github_failures: tuple[str, ...] = (),
     github_warnings: tuple[str, ...] = (),
 ) -> MappingLike:
     failures: list[str] = list(github_failures)
     warnings: list[str] = list(github_warnings)
+    release_base_dir = release_manifest_path.parent if release_manifest_path is not None else None
     gate07 = release_manifest.get("gate07")
     if not isinstance(gate07, dict) or gate07.get("pass") is not True:
         failures.append("release manifest gate07.pass is not true.")
@@ -358,7 +371,7 @@ def evaluate_gate07(
         entry = entries[label]
         if entry.get("exists") is not True:
             failures.append(f"evidence entry {label} does not exist.")
-        _check_path(entry.get("path"), failures, f"evidence entry {label}")
+        entry_path = _check_path(entry.get("path"), failures, f"evidence entry {label}", base_dir=release_base_dir)
         if entry.get("all_scenarios_passed") is not True:
             failures.append(f"evidence entry {label} does not report all_scenarios_passed=true.")
         statuses = entry.get("scenario_gate_statuses")
@@ -376,19 +389,18 @@ def evaluate_gate07(
             failures.append(f"evidence entry {label} does not record config references.")
         if not entry.get("residual_risk"):
             failures.append(f"evidence entry {label} does not record residual risk or limitations.")
-        entry_path = Path(entry.get("path")) if isinstance(entry.get("path"), str) else None
         if entry_path is not None and entry_path.exists():
             _validate_evidence_manifest(label, entry_path, entry, failures)
 
     gate06_path = release_manifest.get("gate06_manifest")
-    _check_path(gate06_path, failures, "Gate06 manifest")
-    if isinstance(gate06_path, str) and Path(gate06_path).exists():
-        gate06_manifest = _load_json(Path(gate06_path))
+    resolved_gate06_path = _check_path(gate06_path, failures, "Gate06 manifest", base_dir=release_base_dir)
+    if resolved_gate06_path is not None and resolved_gate06_path.exists():
+        gate06_manifest = _load_json(resolved_gate06_path)
         if gate06_manifest.get("pass") is not True:
             failures.append("Gate06 manifest does not pass.")
 
     for artifact_name, artifact_path in (release_manifest.get("artifacts") or {}).items():
-        _check_path(artifact_path, failures, f"release artifact {artifact_name}")
+        _check_path(artifact_path, failures, f"release artifact {artifact_name}", base_dir=release_base_dir)
 
     provenance = release_manifest.get("provenance", {})
     if provenance.get("git_status_clean") is not True:
@@ -438,7 +450,13 @@ def main(argv: list[str] | None = None) -> int:
         allow_missing=args.allow_missing_github_checks,
         expected_commit=expected_commit,
     )
-    payload = evaluate_gate07(release_manifest, github_checks=github_checks, github_failures=github_failures, github_warnings=github_warnings)
+    payload = evaluate_gate07(
+        release_manifest,
+        release_manifest_path=args.release_manifest,
+        github_checks=github_checks,
+        github_failures=github_failures,
+        github_warnings=github_warnings,
+    )
     payload["source_release_manifest"] = args.release_manifest.as_posix()
     _write_json(args.output_root / "noise_gate07_manifest.json", payload)
     _write_report(args.output_root / "noise_gate07_report.md", payload)
