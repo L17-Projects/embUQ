@@ -204,10 +204,18 @@ def _github_pr_head_summary(*, pr: str, repo: str | None, expected_commit: str |
     command = ["gh", "pr", "view", pr, "--json", "headRefOid,headRefName,url"]
     if repo:
         command.extend(["--repo", repo])
-    completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
+    try:
+        completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
+    except OSError as exc:
+        return {"status": "error", "stderr": f"{exc.__class__.__name__}: {exc}"}, ("GitHub PR head commit could not be read.",)
     if completed.returncode != 0 or not completed.stdout.strip():
         return {"status": "error", "stderr": completed.stderr.strip()}, ("GitHub PR head commit could not be read.",)
-    head = json.loads(completed.stdout)
+    try:
+        head = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        return {"status": "error", "stderr": f"invalid gh JSON: {exc}"}, ("GitHub PR head commit could not be read.",)
+    if not isinstance(head, dict):
+        return {"status": "error", "stderr": "gh PR head JSON root is not an object"}, ("GitHub PR head commit could not be read.",)
     failures: list[str] = []
     if expected_commit and head.get("headRefOid") != expected_commit:
         failures.append(f"GitHub PR head SHA {head.get('headRefOid')} does not match release manifest commit {expected_commit}.")
@@ -229,10 +237,18 @@ def _github_check_summary(
     command = ["gh", "pr", "checks", pr, "--json", "bucket,name,state,workflow"]
     if repo:
         command.extend(["--repo", repo])
-    completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
+    try:
+        completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
+    except OSError as exc:
+        return {"status": "error", "stderr": f"{exc.__class__.__name__}: {exc}", "checks": []}, ("GitHub PR checks could not be read.",), ()
     if completed.returncode not in {0, 8} and not completed.stdout.strip():
         return {"status": "error", "stderr": completed.stderr.strip(), "checks": []}, ("GitHub PR checks could not be read.",), ()
-    checks = json.loads(completed.stdout or "[]")
+    try:
+        checks = json.loads(completed.stdout or "[]")
+    except json.JSONDecodeError as exc:
+        return {"status": "error", "stderr": f"invalid gh JSON: {exc}", "checks": []}, ("GitHub PR checks could not be read.",), ()
+    if not isinstance(checks, list):
+        return {"status": "error", "stderr": "gh PR checks JSON root is not a list", "checks": []}, ("GitHub PR checks could not be read.",), ()
     if not checks:
         if allow_no_checks:
             return {"status": "no_pr_checks", "checks": []}, (), ("GitHub reports no PR checks; explicit workflow run evidence is being used.",)
@@ -262,12 +278,26 @@ def _github_run_summary(
         ]
         if repo:
             command.extend(["--repo", repo])
-        completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
+        try:
+            completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
+        except OSError as exc:
+            failures.append(f"GitHub workflow run {run_id} could not be read.")
+            runs.append({"id": run_id, "status": "error", "stderr": f"{exc.__class__.__name__}: {exc}"})
+            continue
         if completed.returncode != 0 or not completed.stdout.strip():
             failures.append(f"GitHub workflow run {run_id} could not be read.")
             runs.append({"id": run_id, "status": "error", "stderr": completed.stderr.strip()})
             continue
-        run = json.loads(completed.stdout)
+        try:
+            run = json.loads(completed.stdout)
+        except json.JSONDecodeError as exc:
+            failures.append(f"GitHub workflow run {run_id} could not be read.")
+            runs.append({"id": run_id, "status": "error", "stderr": f"invalid gh JSON: {exc}"})
+            continue
+        if not isinstance(run, dict):
+            failures.append(f"GitHub workflow run {run_id} could not be read.")
+            runs.append({"id": run_id, "status": "error", "stderr": "gh workflow run JSON root is not an object"})
+            continue
         run["id"] = run_id
         runs.append(run)
         if expected_commit and run.get("headSha") != expected_commit:
@@ -416,8 +446,14 @@ def evaluate_gate07(
     gate06_path = release_manifest.get("gate06_manifest")
     resolved_gate06_path = _check_path(gate06_path, failures, "Gate06 manifest", base_dir=release_base_dir)
     if resolved_gate06_path is not None and resolved_gate06_path.exists():
-        gate06_manifest = _load_json(resolved_gate06_path)
-        if gate06_manifest.get("pass") is not True:
+        try:
+            gate06_manifest = _load_json(resolved_gate06_path)
+        except (OSError, json.JSONDecodeError) as exc:
+            failures.append(f"Gate06 manifest could not be read: {exc}.")
+            gate06_manifest = {}
+        if not isinstance(gate06_manifest, dict):
+            failures.append("Gate06 manifest root is not an object.")
+        elif gate06_manifest.get("pass") is not True:
             failures.append("Gate06 manifest does not pass.")
 
     release_artifacts = release_manifest.get("artifacts")

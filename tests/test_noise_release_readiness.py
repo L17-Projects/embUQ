@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -752,3 +753,100 @@ def test_gate07_rejects_non_mapping_evidence_manifest_without_traceback(tmp_path
     assert "Traceback" not in completed.stderr
     gate_manifest = json.loads((tmp_path / "evidence_root_gate/noise_gate07_manifest.json").read_text(encoding="utf-8"))
     assert any("evidence manifest synthetic_recovery root is not an object" in failure for failure in gate_manifest["failures"])
+
+
+def test_gate07_reports_malformed_gate06_without_traceback(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    gate06 = tmp_path / "gate06.json"
+    gate06.write_text("{not json", encoding="utf-8")
+    release_manifest = tmp_path / "malformed_gate06_release.json"
+    release_manifest.write_text(
+        json.dumps(
+            {
+                "gate07": {"pass": True},
+                "config_validation": {
+                    "passed": True,
+                    "results": [
+                        {"config_name": name, "passed": True, "path": f"{name}.yaml"}
+                        for name in ("legacy", "synthetic_recovery", "predictive_checks", "emb_comparison")
+                    ],
+                },
+                "artifact_index": {"entries": {"synthetic_recovery": {}, "predictive_checks": {}, "emb_comparison": {}}},
+                "gate06_manifest": gate06.name,
+                "merge_boundary": "human_review_required",
+                "no_karolina_interaction": True,
+                "karolina_interaction_confirmation": {"operator_confirmed": True},
+                "provenance": {"git_commit": "abc123", "git_status_clean": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "scripts/qa/noise_gate07_release_checks.py"),
+            "--release-manifest",
+            str(release_manifest),
+            "--output-root",
+            str(tmp_path / "malformed_gate06_gate"),
+            "--allow-missing-github-checks",
+        ],
+        cwd=repo_root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert completed.returncode == 1
+    assert "Traceback" not in completed.stderr
+    gate_manifest = json.loads((tmp_path / "malformed_gate06_gate/noise_gate07_manifest.json").read_text(encoding="utf-8"))
+    assert any("Gate06 manifest could not be read" in failure for failure in gate_manifest["failures"])
+
+
+def test_gate07_reports_missing_gh_without_traceback(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    release_manifest = tmp_path / "github_release.json"
+    release_manifest.write_text(
+        json.dumps(
+            {
+                "gate07": {"pass": True},
+                "config_validation": {"passed": True, "results": []},
+                "artifact_index": {"entries": {}},
+                "merge_boundary": "human_review_required",
+                "no_karolina_interaction": True,
+                "karolina_interaction_confirmation": {"operator_confirmed": True},
+                "provenance": {"git_commit": "abc123", "git_status_clean": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+    empty_path = tmp_path / "empty-path"
+    empty_path.mkdir()
+    env = {**os.environ, "PATH": empty_path.as_posix()}
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "scripts/qa/noise_gate07_release_checks.py"),
+            "--release-manifest",
+            str(release_manifest),
+            "--output-root",
+            str(tmp_path / "missing_gh_gate"),
+            "--github-pr",
+            "202",
+            "--repo",
+            "BrieucB/MesoUQ",
+        ],
+        cwd=repo_root,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert completed.returncode == 1
+    assert "Traceback" not in completed.stderr
+    gate_manifest = json.loads((tmp_path / "missing_gh_gate/noise_gate07_manifest.json").read_text(encoding="utf-8"))
+    assert any("GitHub PR head commit could not be read" in failure for failure in gate_manifest["failures"])
+    assert any("GitHub PR checks could not be read" in failure for failure in gate_manifest["failures"])
