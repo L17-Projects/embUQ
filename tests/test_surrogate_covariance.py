@@ -108,6 +108,24 @@ def test_surrogate_covariance_low_rank_can_include_diagonal_residual():
     }
 
 
+def test_surrogate_covariance_inputs_snapshot_nested_payloads():
+    covariance_payload = [[0.09, 0.02], [0.02, 0.16]]
+    low_rank_payload = [[1.0], [0.5]]
+    inputs = SurrogateCovarianceInputs(
+        predictions=(1.0, 2.0),
+        predictive_covariance=covariance_payload,
+        low_rank_factors=low_rank_payload,
+    )
+    covariance_payload[0][0] = 9.0
+    low_rank_payload[0][0] = 9.0
+
+    full = build_surrogate_covariance(inputs, SurrogateCovarianceConfig(kind="full"))
+    low_rank = build_surrogate_covariance(inputs, SurrogateCovarianceConfig(kind="low_rank"))
+
+    assert full.covariance.covariance[0, 0] == pytest.approx(0.09)
+    assert low_rank.covariance_components["surrogate_predictive_low_rank"][0, 0] == pytest.approx(1.0)
+
+
 def test_surrogate_covariance_matches_legacy_bnn_predictive_std_quadrature():
     predictions = (2.0, 4.0)
     sigma = 0.5

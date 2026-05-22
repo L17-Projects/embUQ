@@ -53,6 +53,13 @@ def _nonnegative_vector(values: Sequence[float], label: str) -> tuple[float, ...
     return result
 
 
+def _finite_matrix_snapshot(values: Sequence[Sequence[float]], label: str) -> tuple[tuple[float, ...], ...]:
+    rows = tuple(tuple(_finite_float(value, label) for value in row) for row in values)
+    if not rows:
+        raise ValueError(f"{label} must contain at least one row.")
+    return rows
+
+
 def _coerce_kind(value: SurrogateCovarianceKind | str) -> SurrogateCovarianceKind:
     if isinstance(value, SurrogateCovarianceKind):
         return value
@@ -193,6 +200,12 @@ class SurrogateCovarianceInputs:
                     "predictive_standard_deviation count "
                     f"{len(predictive_standard_deviation)} does not match prediction count {size}."
                 )
+        predictive_covariance = None
+        if self.predictive_covariance is not None:
+            predictive_covariance = _finite_matrix_snapshot(self.predictive_covariance, "predictive_covariance")
+        low_rank_factors = None
+        if self.low_rank_factors is not None:
+            low_rank_factors = _finite_matrix_snapshot(self.low_rank_factors, "low_rank_factors")
         curve_grid = None
         if self.curve_grid is not None:
             curve_grid = _finite_vector(self.curve_grid, "curve_grid")
@@ -203,6 +216,8 @@ class SurrogateCovarianceInputs:
             raise ValueError("curve_id must be non-empty.")
         object.__setattr__(self, "predictions", predictions)
         object.__setattr__(self, "predictive_standard_deviation", predictive_standard_deviation)
+        object.__setattr__(self, "predictive_covariance", predictive_covariance)
+        object.__setattr__(self, "low_rank_factors", low_rank_factors)
         object.__setattr__(self, "curve_grid", curve_grid)
         object.__setattr__(self, "curve_id", curve_id)
 
