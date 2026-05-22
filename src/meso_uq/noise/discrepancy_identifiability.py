@@ -212,9 +212,13 @@ class DiscrepancyIdentifiabilityInputs:
             raise ValueError("predictions_without_discrepancy length must match observations.")
         if len(discrepancy_mean) != point_count:
             raise ValueError("discrepancy_mean length must match observations.")
-        predictions_with = predictions_without if self.predictions_with_discrepancy is None else _finite_vector(
-            self.predictions_with_discrepancy,
-            "predictions_with_discrepancy",
+        predictions_with = (
+            tuple(prediction + discrepancy for prediction, discrepancy in zip(predictions_without, discrepancy_mean))
+            if self.predictions_with_discrepancy is None
+            else _finite_vector(
+                self.predictions_with_discrepancy,
+                "predictions_with_discrepancy",
+            )
         )
         if len(predictions_with) != point_count:
             raise ValueError("predictions_with_discrepancy length must match observations.")
@@ -402,7 +406,7 @@ def evaluate_discrepancy_identifiability(
     predictions_with = np.asarray(inputs.predictions_with_discrepancy, dtype=float)
     discrepancy = np.asarray(inputs.discrepancy_mean, dtype=float)
     residual_without = observations - predictions_without
-    residual_after = observations - predictions_with - discrepancy
+    residual_after = observations - predictions_with
     response_rms = _rms(observations)
     residual_without_rms = _rms(residual_without)
     residual_after_rms = _rms(residual_after)

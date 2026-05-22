@@ -211,6 +211,28 @@ def test_zero_discrepancy_over_zero_total_sigma_is_safe():
     assert not any("dominates total predictive" in failure for failure in result.failures)
 
 
+def test_predictions_with_discrepancy_are_not_double_subtracted():
+    predictions_without = np.asarray((1.0, 2.0, 3.0), dtype=float)
+    discrepancy = np.asarray((0.1, -0.2, 0.05), dtype=float)
+    observations = predictions_without + discrepancy
+    components, total = _components(3)
+
+    result = evaluate_discrepancy_identifiability(
+        DiscrepancyIdentifiabilityInputs(
+            observations=_tuple_vector(observations),
+            predictions_without_discrepancy=_tuple_vector(predictions_without),
+            predictions_with_discrepancy=_tuple_vector(observations),
+            discrepancy_mean=_tuple_vector(discrepancy),
+            covariance_components=components,
+            total_covariance=total,
+            discrepancy_opt_in=True,
+        )
+    )
+
+    assert result.metrics["residual_rms_after_discrepancy"] == pytest.approx(0.0)
+    assert result.metrics["discrepancy_explained_residual_share"] == pytest.approx(1.0)
+
+
 def test_missing_covariance_decomposition_is_a_gate_failure():
     result = evaluate_discrepancy_identifiability(
         DiscrepancyIdentifiabilityInputs(
