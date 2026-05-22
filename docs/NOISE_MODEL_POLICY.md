@@ -167,3 +167,20 @@ Canonical included terms for the full hierarchy are:
 Duplicate term names, duplicate aliases, child/parent identifier collisions, shape mismatches, nonfinite values, asymmetric parent matrices, and non-PSD parent covariance contributions are hard errors. Signed child diagnostics such as geometry cross terms may be non-PSD because they are never summed independently.
 
 The final active total covariance must be positive definite for likelihood use. Singular low-rank terms are allowed as components, but the assembled total must either be positive definite or provide an explicit final jitter policy. Child jitter is retained as diagnostics and is not added a second time.
+
+## M6 synthetic recovery
+
+M6 synthetic recovery is validation/reporting over the M1-M5 hierarchy, not a change to inference semantics. The lightweight recovery harness uses deterministic linear-Gaussian fixtures with named covariance components for:
+
+- legacy/noise-only behavior;
+- measurement uncertainty;
+- surrogate predictive covariance;
+- opt-in discrepancy covariance.
+
+Recovery metrics include parameter bias, absolute error, posterior-standard-deviation z-error, interval coverage, residual RMSE, finite-observable checks, design/covariance conditioning, and covariance group trace shares. CI-scale thresholds are intentionally conservative plumbing checks; they do not claim final EMB posterior calibration.
+
+The reproducible diagnostic entry point is:
+
+`python scripts/qa/noise_m6_synthetic_recovery_diagnostics.py --output-root <run-root>`
+
+The script writes a root synthetic manifest, metrics JSON, summary CSV, per-scenario configs/truth/observations/covariance summaries/recovery reports, and plots for parameter intervals, observable overlays, whitened residuals, and covariance heatmaps.
