@@ -1,0 +1,29 @@
+schema_version: "1.0"
+kind: noise
+metadata:
+  id: geometry_uncertainty
+  name: Geometry Measurement Uncertainty
+spec:
+  family: measurement_uncertainty
+  likelihood:
+    stage: M3
+    components:
+      - additive_noise
+      - relative_noise
+      - geometry
+  measurement_hierarchy:
+    geometry_uncertainty:
+      enabled: true
+      model: geometry_jacobian_covariance
+      parameters:
+        radius:
+          sigma: 0.02
+          units: micrometer
+          nominal: 2.0
+        height:
+          sigma: 0.05
+          units: micrometer
+          nominal: 14.28
+      covariance: null
+      jitter: 1.0e-10
+      max_jitter: 1.0e-6

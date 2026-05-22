@@ -1,0 +1,23 @@
+schema_version: "1.0"
+kind: noise
+metadata:
+  id: contact_alignment
+  name: Contact and Alignment Measurement Uncertainty
+spec:
+  family: measurement_uncertainty
+  likelihood:
+    stage: M3
+    components:
+      - additive_noise
+      - relative_noise
+      - contact_alignment
+  measurement_hierarchy:
+    contact_alignment:
+      enabled: true
+      contact_offset_sigma: 0.02
+      alignment_slope_sigma: 0.01
+      displacement_scale_sigma: 0.02
+      force_scale_sigma: 0.0
+      minimum_variance: 1.0e-12
+      jitter: 1.0e-10
+      max_jitter: 1.0e-6

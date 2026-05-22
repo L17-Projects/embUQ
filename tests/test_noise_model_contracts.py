@@ -12,9 +12,14 @@ from meso_uq.noise import (
     AdditiveRelativeObservationNoiseConfig,
     CompositeLikelihoodSpec,
     build_composite_likelihood,
+    ContactAlignmentInputs,
+    ContactAlignmentUncertaintyConfig,
     CorrelatedCurveNoiseConfig,
     CurveGrid,
     DiscrepancyConfig,
+    GeometryParameterUncertainty,
+    GeometrySensitivityInputs,
+    GeometryUncertaintyConfig,
     LikelihoodInputs,
     LikelihoodComponent,
     LikelihoodStage,
@@ -24,7 +29,9 @@ from meso_uq.noise import (
     RobustLikelihoodConfig,
     SurrogateErrorConfig,
     build_additive_relative_observation_noise,
+    build_contact_alignment_covariance,
     build_correlated_curve_covariance,
+    build_geometry_uncertainty_covariance,
     build_model_config,
     compose_toy_likelihood,
     compose_total_covariance,
@@ -344,6 +351,68 @@ def test_m2_composite_likelihood_dispatches_executable_noise_primitives():
     assert result["correlated_curve_noise"].covariance.shape == (2, 2)
     assert result["heavy_tail"].covariance_mode == "full"
     assert math.isfinite(result["heavy_tail"].log_likelihood)
+
+
+def test_m3_composite_likelihood_dispatches_measurement_uncertainty_components():
+    def _contact_alignment(payload):
+        return build_contact_alignment_covariance(
+            ContactAlignmentInputs(
+                controls=tuple(payload["controls"]),
+                predictions=tuple(payload["predictions"]),
+                curve_id="emb/indentation",
+            ),
+            ContactAlignmentUncertaintyConfig(
+                contact_offset_sigma=0.1,
+                alignment_slope_sigma=0.2,
+                minimum_variance=0.005,
+            ),
+        )
+
+    def _geometry(payload):
+        return build_geometry_uncertainty_covariance(
+            GeometrySensitivityInputs(
+                predictions=tuple(payload["predictions"]),
+                sensitivities={
+                    "radius": tuple(payload["geometry_sensitivities"]["radius"]),
+                    "height": tuple(payload["geometry_sensitivities"]["height"]),
+                },
+                curve_id="gv/stretching",
+            ),
+            GeometryUncertaintyConfig(
+                parameters=(
+                    GeometryParameterUncertainty("radius", sigma=0.1, units="micrometer", nominal=2.0),
+                    GeometryParameterUncertainty("height", sigma=0.2, units="micrometer", nominal=14.28),
+                ),
+            ),
+        )
+
+    likelihood = build_composite_likelihood(
+        {"stage": "M3", "components": ["contact_alignment", "geometry"]},
+        {
+            "contact_alignment": _contact_alignment,
+            "geometry": _geometry,
+        },
+    )
+
+    result = likelihood.evaluate(
+        {
+            "controls": [0.0, 1.0],
+            "predictions": [2.0, 4.0],
+            "geometry_sensitivities": {
+                "radius": [1.0, 2.0],
+                "height": [0.5, 1.0],
+            },
+        }
+    )
+
+    contact = result["contact_alignment"]
+    geometry = result["geometry"]
+    assert contact.summary["active"] is True
+    assert geometry.summary["active"] is True
+    assert contact.variance_components["contact_alignment_total"] == pytest.approx((0.025, 0.025))
+    assert geometry.variance_components["geometry_jacobian"] == pytest.approx((0.02, 0.08))
+    assert contact.covariance.covariance.shape == (2, 2)
+    assert geometry.covariance.covariance.shape == (2, 2)
 
 
 def test_supported_observables_and_units_contract():
