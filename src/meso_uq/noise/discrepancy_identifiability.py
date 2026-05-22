@@ -293,6 +293,8 @@ class DiscrepancyIdentifiabilityInputs:
                 raise ValueError("coefficient_names must be non-empty.")
             if len(set(coefficient_names)) != len(coefficient_names):
                 raise ValueError("coefficient_names must be unique.")
+            if basis_rank and len(coefficient_names) != basis_rank:
+                raise ValueError("coefficient_names count must match basis column count.")
             coefficient_count = len(coefficient_names)
         elif basis_names is not None:
             coefficient_names = basis_names
@@ -677,7 +679,7 @@ def _basis_metrics(inputs: DiscrepancyIdentifiabilityInputs) -> dict[str, float 
     return {
         "basis_rank": rank,
         "basis_columns": int(basis.shape[1]),
-        "basis_rank_fraction": float(basis.shape[1] / basis.shape[0]),
+        "basis_rank_fraction": float(rank / basis.shape[0]),
         "basis_condition_number": condition_number,
         "basis_rank_deficient": rank < basis.shape[1],
     }

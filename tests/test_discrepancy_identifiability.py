@@ -225,6 +225,31 @@ def test_missing_covariance_decomposition_is_a_gate_failure():
     assert any("covariance component report is missing" in failure for failure in result.failures)
 
 
+def test_rank_fraction_uses_effective_basis_rank_not_column_count():
+    basis = ((1.0, 1.0, 1.0), (2.0, 2.0, 2.0), (3.0, 3.0, 3.0), (4.0, 4.0, 4.0))
+    components, total = _components(4)
+
+    result = evaluate_discrepancy_identifiability(
+        DiscrepancyIdentifiabilityInputs(
+            observations=(1.0, 2.0, 3.0, 4.0),
+            predictions_without_discrepancy=(1.0, 2.0, 3.0, 4.0),
+            discrepancy_mean=(0.0, 0.0, 0.0, 0.0),
+            basis=basis,
+            coefficient_names=("duplicate_0", "duplicate_1", "duplicate_2"),
+            covariance_components=components,
+            total_covariance=total,
+            discrepancy_opt_in=True,
+        ),
+        DiscrepancyIdentifiabilityThresholds(warning_basis_rank_fraction=0.5),
+    )
+
+    assert result.metrics["basis_rank"] == 1
+    assert result.metrics["basis_columns"] == 3
+    assert result.metrics["basis_rank_fraction"] == pytest.approx(0.25)
+    assert "discrepancy basis is rank deficient." in result.warnings
+    assert not any("rank is large relative" in warning for warning in result.warnings)
+
+
 def test_identifiability_validation_errors_are_explicit():
     with pytest.raises(ValueError, match="length must match observations"):
         DiscrepancyIdentifiabilityInputs(
@@ -246,6 +271,14 @@ def test_identifiability_validation_errors_are_explicit():
             predictions_without_discrepancy=(1.0, 2.0),
             discrepancy_mean=(0.0, 0.0),
             total_covariance=((1.0, 0.1), (0.0, 1.0)),
+        )
+    with pytest.raises(ValueError, match="coefficient_names count must match basis column count"):
+        DiscrepancyIdentifiabilityInputs(
+            observations=(1.0, 2.0),
+            predictions_without_discrepancy=(1.0, 2.0),
+            discrepancy_mean=(0.0, 0.0),
+            basis=((1.0, 0.0), (0.0, 1.0)),
+            coefficient_names=("only_one",),
         )
 
 
