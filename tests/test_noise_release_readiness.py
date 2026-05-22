@@ -123,6 +123,25 @@ def test_noise_config_validation_rejects_invalid_likelihood_components():
     assert any("spec.likelihood" in error and "not available for stage M2" in error for error in invalid.errors)
 
 
+def test_noise_config_validation_requires_likelihood_for_hierarchy_modes():
+    invalid = validate_noise_config_document(
+        {
+            "schema_version": "1.0",
+            "kind": "noise",
+            "metadata": {"id": "synthetic_recovery", "name": "Synthetic Recovery"},
+            "spec": {
+                "family": "noise_hierarchy",
+                "required_scenarios": [{"id": "fixture"}],
+                "artifacts": {"metrics": "metrics.json"},
+            },
+        },
+        source="synthetic_recovery.yaml",
+    )
+
+    assert invalid.passed is False
+    assert any("spec.likelihood is required" in error for error in invalid.errors)
+
+
 def test_noise_config_validation_rejects_family_stage_mismatch():
     invalid = validate_noise_config_document(
         {
@@ -213,8 +232,12 @@ def test_release_readiness_and_gate07_scripts_write_required_artifacts(tmp_path)
     assert manifest["no_karolina_interaction"] is True
     assert "python_version" in manifest["provenance"]
     assert {mode["mode"] for mode in manifest["modes"]} == set(supported_noise_modes())
+    assert manifest["artifacts"]["release_report"] == "noise_release_readiness_report.md"
     for path in manifest["artifacts"].values():
-        assert Path(path).exists()
+        artifact_path = Path(path)
+        if not artifact_path.is_absolute():
+            artifact_path = manifest_path.parent / artifact_path
+        assert artifact_path.exists()
 
     gate_root = tmp_path / "gate07"
     subprocess.run(
@@ -228,7 +251,7 @@ def test_release_readiness_and_gate07_scripts_write_required_artifacts(tmp_path)
             "--allow-missing-github-checks",
         ],
         check=True,
-        cwd=repo_root,
+        cwd=tmp_path,
     )
     gate_manifest = json.loads((gate_root / "noise_gate07_manifest.json").read_text(encoding="utf-8"))
     assert gate_manifest["pass"] is True

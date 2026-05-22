@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -54,6 +55,23 @@ def _provenance(start_time: float) -> MappingLike:
 
 def _load_json(path: Path) -> MappingLike:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _manifest_ref(manifest_path: Path, path: Path | None) -> str | None:
+    if path is None:
+        return None
+    base_dir = manifest_path.parent.expanduser().resolve(strict=False)
+    resolved_path = path.expanduser().resolve(strict=False)
+    return Path(os.path.relpath(resolved_path, start=base_dir)).as_posix()
+
+
+def _rebase_artifact_index_paths(artifact_index: MappingLike, manifest_path: Path) -> MappingLike:
+    entries = artifact_index.get("entries") if isinstance(artifact_index.get("entries"), dict) else {}
+    for entry in entries.values():
+        entry_path = entry.get("path") if isinstance(entry, dict) else None
+        if isinstance(entry_path, str) and entry_path:
+            entry["path"] = _manifest_ref(manifest_path, Path(entry_path))
+    return artifact_index
 
 
 def _report_template(mode: str) -> str:
@@ -158,8 +176,16 @@ def main(argv: list[str] | None = None) -> int:
         "predictive_checks": args.predictive_manifest,
         "emb_comparison": args.emb_manifest,
     }
-    provided_manifests = {label: path for label, path in manifests.items() if path is not None}
-    artifact_index = build_noise_artifact_index(provided_manifests)
+    artifact_index_path = args.output_root / "noise_artifact_index.json"
+    config_validation_path = args.output_root / "noise_config_validation.json"
+    manifest_path = args.output_root / "noise_release_readiness_manifest.json"
+    report_path = args.output_root / "noise_release_readiness_report.md"
+    provided_manifests = {
+        label: path.expanduser().resolve(strict=False)
+        for label, path in manifests.items()
+        if path is not None
+    }
+    artifact_index = _rebase_artifact_index_paths(build_noise_artifact_index(provided_manifests), manifest_path)
     gate06_manifest = _load_json(args.gate06_manifest) if args.gate06_manifest else {"pass": False}
     gate07 = evaluate_release_gate(
         config_results=config_results,
@@ -173,10 +199,6 @@ def main(argv: list[str] | None = None) -> int:
         "results": [result.as_dict() for result in config_results],
         "config_paths": [path.as_posix() for path in config_paths],
     }
-    artifact_index_path = args.output_root / "noise_artifact_index.json"
-    config_validation_path = args.output_root / "noise_config_validation.json"
-    manifest_path = args.output_root / "noise_release_readiness_manifest.json"
-    report_path = args.output_root / "noise_release_readiness_report.md"
     manifest: MappingLike = {
         "schema_version": 1,
         "description": "M8 noise hierarchy release-readiness manifest for MES-38/MES-39/MES-47.",
@@ -192,10 +214,10 @@ def main(argv: list[str] | None = None) -> int:
         "config_validation": config_validation,
         "artifact_index": artifact_index,
         "artifacts": {
-            "artifact_index": artifact_index_path.as_posix(),
-            "config_validation": config_validation_path.as_posix(),
-            "release_manifest": manifest_path.as_posix(),
-            "release_report": report_path.as_posix(),
+            "artifact_index": _manifest_ref(manifest_path, artifact_index_path),
+            "config_validation": _manifest_ref(manifest_path, config_validation_path),
+            "release_manifest": _manifest_ref(manifest_path, manifest_path),
+            "release_report": _manifest_ref(manifest_path, report_path),
         },
         "merge_boundary": args.merge_boundary,
         "no_karolina_interaction": args.confirm_no_karolina_interaction,
@@ -203,7 +225,7 @@ def main(argv: list[str] | None = None) -> int:
             "operator_confirmed": args.confirm_no_karolina_interaction,
             "scope": "No active Karolina worktree or running Karolina session was touched for this evidence run.",
         },
-        "gate06_manifest": None if args.gate06_manifest is None else args.gate06_manifest.as_posix(),
+        "gate06_manifest": _manifest_ref(manifest_path, args.gate06_manifest),
         "gate07": gate07.as_dict(),
         "skips": [],
         "residual_risk": "Required PRs are stacked and recorded at a human review/merge boundary until reviewer approval and merge.",

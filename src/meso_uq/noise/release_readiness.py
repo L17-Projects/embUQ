@@ -282,7 +282,9 @@ def validate_noise_config_document(document: Mapping[str, Any], *, source: str |
         elif spec_family not in _ALLOWED_KIND_NOISE_FAMILIES:
             errors.append(f"{label}: unsupported spec.family {spec_family!r}. Expected one of: {sorted(_ALLOWED_KIND_NOISE_FAMILIES)}.")
         likelihood = spec.get("likelihood")
-        if spec_family in _LIKELIHOOD_REQUIRED_KIND_FAMILIES and likelihood is None:
+        if name in _MODE_TO_CONFIG and likelihood is None:
+            errors.append(f"{label}: spec.likelihood is required for noise hierarchy mode {name!r}.")
+        elif spec_family in _LIKELIHOOD_REQUIRED_KIND_FAMILIES and likelihood is None:
             errors.append(f"{label}: spec.likelihood is required for family {spec_family!r}.")
         elif likelihood is not None:
             likelihood_spec = _validate_likelihood_config(label, "spec.likelihood", likelihood, errors)
