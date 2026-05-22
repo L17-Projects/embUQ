@@ -1,0 +1,49 @@
+schema_version: "1.0"
+kind: noise
+metadata:
+  id: emb_comparison
+  name: Integrated EMB Comparison Gate
+spec:
+  family: noise_hierarchy
+  milestone: M7 Integrated EMB Workflow
+  likelihood:
+    stage: M7
+    components:
+      - emb_comparison
+      - total_covariance
+  evidence:
+    class: validation_fixture
+    production_claim: false
+    approved_dataset: tracked_emb_reference_fixture
+  execution:
+    mode: isolated_vega_local_fixture
+    scheduler: none
+    karolina_interaction: forbidden
+  thresholds:
+    min_legacy_interval_coverage: 0.70
+    min_upgraded_interval_coverage: 0.85
+    min_upgraded_to_legacy_uncertainty_ratio: 1.0
+    max_upgraded_residual_rmse_over_legacy: 1.10
+    max_posterior_mean_shift_sd: 2.0
+    interval_z: 2.0
+  required_scenarios:
+    - id: emb_compression_reference
+      modality: emb_compression
+      dataset_path: emb/compression/evalkit/data/data_1.csv
+      config_id: legacy_vs_full_hierarchy_compression
+    - id: emb_indentation_reference
+      modality: emb_indentation
+      dataset_path: emb/indentation/evalkit/data/data_morris_3.40.csv
+      config_id: legacy_vs_full_hierarchy_indentation
+  artifacts:
+    manifest: emb_comparison_manifest.json
+    metrics: emb_comparison_metrics.json
+    summary_table: emb_comparison_summary.csv
+    gate06_summary: gate06_integrated_emb_summary.json
+    report_md: emb_comparison_report.md
+    scenario_directory: scenarios/
+    figures:
+      - figures/emb_posterior_intervals.png
+      - figures/emb_predictive_bands.png
+      - figures/emb_residual_diagnostics.png
+      - figures/emb_metrics_table.png

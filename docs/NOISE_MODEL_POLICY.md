@@ -203,3 +203,28 @@ The reproducible diagnostic entry point is:
 `python scripts/qa/noise_m6_predictive_checks_diagnostics.py --output-root <run-root>`
 
 The script writes a root predictive manifest, metrics JSON, summary CSV, per-scenario configs/observations/rank records/reports, and plots for PPC observable overlays, PPC summary intervals, SBC rank histograms, and calibration coverage summaries.
+
+## M7 integrated EMB comparison
+
+M7 compares paired legacy and upgraded EMB likelihood behavior on tracked EMB reference-data fixtures before any production posterior claim is made. The local diagnostic keeps legacy and upgraded modes in the same command surface: legacy uses the M1 compatibility wrappers, while upgraded mode uses the full-hierarchy total covariance terms from M5.
+
+The required validation scenarios are:
+
+- `emb_compression_reference`, using `emb/compression/evalkit/data/data_1.csv`;
+- `emb_indentation_reference`, using `emb/indentation/evalkit/data/data_morris_3.40.csv`.
+
+The diagnostic reports posterior interval width ratios, posterior mean shifts in pooled posterior-standard-deviation units, predictive band width ratios, legacy/upgraded residual RMSE, interval coverage, standardized residuals, and covariance trace-share attribution. The report interpretation classifies whether upgraded uncertainty broadened, shifted, or stabilized the comparison relative to legacy behavior.
+
+The reproducible diagnostic entry point is:
+
+`python scripts/qa/noise_m7_emb_comparison_diagnostics.py --output-root <run-root>`
+
+The script writes an EMB comparison manifest, metrics JSON, Markdown report, summary CSV, per-scenario configs/predictions/posterior samples/covariance summaries/reports, and plots for posterior intervals, predictive bands, residual diagnostics, and the metrics table.
+
+M7 evidence carries an explicit evidence class. The default local diagnostic is `validation_fixture` with `production_claim=false`; it is validation evidence for paired workflow plumbing and reporting, not a production EMB posterior campaign.
+
+Gate 06 is a reader over existing evidence, not another generator. Run it with:
+
+`python scripts/qa/noise_gate06_integrated_emb.py --synthetic-manifest <MES-34 manifest> --predictive-manifest <MES-35 manifest> --emb-manifest <MES-37 manifest> --output-root <gate-root>`
+
+Use `--require-production` only when closing a production-posterior claim. Validation fixture evidence must fail that stricter gate rather than masquerading as production evidence.
