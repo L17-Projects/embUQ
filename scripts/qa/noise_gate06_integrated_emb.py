@@ -62,9 +62,10 @@ def _check_manifest(label: str, manifest_path: Path, require_clean_git: bool) ->
     provenance = manifest.get("provenance", {})
     if require_clean_git and provenance.get("git_status_clean") is not True:
         failures.append(f"{label} manifest does not record git_status_clean=true.")
-    for field in ("git_commit", "git_branch"):
-        if provenance.get(field) in (None, ""):
-            failures.append(f"{label} manifest provenance is missing {field}.")
+    if provenance.get("git_commit") in (None, ""):
+        failures.append(f"{label} manifest provenance is missing git_commit.")
+    if provenance.get("git_branch") in (None, ""):
+        warnings.append(f"{label} manifest provenance has an empty git_branch; treating it as detached HEAD.")
     if not manifest.get("commands"):
         failures.append(f"{label} manifest is missing regeneration command metadata.")
     if not manifest.get("required_scenarios"):

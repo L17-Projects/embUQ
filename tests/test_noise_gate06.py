@@ -3,10 +3,18 @@ import subprocess
 import sys
 from pathlib import Path
 
-from scripts.qa.noise_gate06_integrated_emb import _resolve_artifact
+from scripts.qa.noise_gate06_integrated_emb import _resolve_artifact, evaluate_gate06
 
 
-def _write_evidence(root: Path, name: str, *, evidence_class: str | None = None, production_claim: bool = False, clean: bool = True) -> Path:
+def _write_evidence(
+    root: Path,
+    name: str,
+    *,
+    evidence_class: str | None = None,
+    production_claim: bool = False,
+    clean: bool = True,
+    git_branch: str = "feature/test",
+) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     metrics_path = root / f"{name}_metrics.json"
     manifest_path = root / f"{name}_manifest.json"
@@ -17,7 +25,7 @@ def _write_evidence(root: Path, name: str, *, evidence_class: str | None = None,
     manifest = {
         "schema_version": 1,
         "commands": {"regenerate": "python fixture.py"},
-        "provenance": {"git_commit": "abc123", "git_branch": "feature/test", "git_status_clean": clean},
+        "provenance": {"git_commit": "abc123", "git_branch": git_branch, "git_status_clean": clean},
         "required_scenarios": ["scenario"],
         "scenario_artifacts": {"scenario": {"metrics": metrics_path.as_posix()}},
         "artifacts": {"metrics": metrics_path.as_posix()},
@@ -92,6 +100,27 @@ def test_gate06_rejects_fixture_when_production_is_required(tmp_path):
     manifest = json.loads((output_root / "noise_gate06_manifest.json").read_text(encoding="utf-8"))
     assert manifest["pass"] is False
     assert any("require-production" in failure for failure in manifest["failures"])
+
+
+def test_gate06_accepts_detached_head_provenance_with_commit(tmp_path):
+    synthetic = _write_evidence(tmp_path / "synthetic", "synthetic", git_branch="")
+    predictive = _write_evidence(tmp_path / "predictive", "predictive", git_branch="")
+    emb = _write_evidence(
+        tmp_path / "emb",
+        "emb",
+        evidence_class="validation_fixture",
+        production_claim=False,
+        git_branch="",
+    )
+
+    payload = evaluate_gate06(
+        synthetic_manifest=synthetic,
+        predictive_manifest=predictive,
+        emb_manifest=emb,
+    )
+
+    assert payload["pass"] is True
+    assert any("detached HEAD" in warning for warning in payload["warnings"])
 
 
 def test_gate06_resolves_manifest_relative_artifact_before_cwd(tmp_path, monkeypatch):
