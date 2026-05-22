@@ -393,8 +393,16 @@ def test_gate07_resolves_release_manifest_relative_paths_from_other_cwd(tmp_path
         }
     gate06_path = release_root / "gate06.json"
     gate06_path.write_text(json.dumps({"pass": True}), encoding="utf-8")
-    report_path = release_root / "report.md"
-    report_path.write_text("# report\n", encoding="utf-8")
+    release_artifacts = {}
+    for artifact_name, file_name in {
+        "artifact_index": "artifact_index.json",
+        "config_validation": "config_validation.json",
+        "release_manifest": "release.json",
+        "release_report": "report.md",
+    }.items():
+        artifact_path = release_root / file_name
+        artifact_path.write_text("{}\n" if file_name.endswith(".json") else "# report\n", encoding="utf-8")
+        release_artifacts[artifact_name] = file_name
     release_manifest = release_root / "release.json"
     release_manifest.write_text(
         json.dumps(
@@ -409,7 +417,7 @@ def test_gate07_resolves_release_manifest_relative_paths_from_other_cwd(tmp_path
                 },
                 "artifact_index": {"entries": entries},
                 "gate06_manifest": gate06_path.name,
-                "artifacts": {"release_report": report_path.name},
+                "artifacts": release_artifacts,
                 "merge_boundary": "human_review_required",
                 "no_karolina_interaction": True,
                 "karolina_interaction_confirmation": {"operator_confirmed": True},
@@ -432,6 +440,60 @@ def test_gate07_resolves_release_manifest_relative_paths_from_other_cwd(tmp_path
         cwd=other_cwd,
         check=True,
     )
+
+
+def test_gate07_requires_release_artifact_manifest_entries(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    synthetic = _write_evidence(tmp_path / "synthetic", "synthetic")
+    predictive = _write_evidence(tmp_path / "predictive", "predictive")
+    emb = _write_evidence(tmp_path / "emb", "emb")
+    gate06 = tmp_path / "gate06.json"
+    gate06.write_text(json.dumps({"pass": True, "failures": [], "warnings": []}), encoding="utf-8")
+    output_root = tmp_path / "release"
+    subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "scripts/qa/noise_hierarchy_release_readiness.py"),
+            "--synthetic-manifest",
+            str(synthetic),
+            "--predictive-manifest",
+            str(predictive),
+            "--emb-manifest",
+            str(emb),
+            "--gate06-manifest",
+            str(gate06),
+            "--output-root",
+            str(output_root),
+            "--confirm-no-karolina-interaction",
+        ],
+        check=True,
+        cwd=repo_root,
+    )
+    manifest_path = output_root / "noise_release_readiness_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["provenance"]["git_status_clean"] = True
+    manifest.pop("artifacts")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "scripts/qa/noise_gate07_release_checks.py"),
+            "--release-manifest",
+            str(manifest_path),
+            "--output-root",
+            str(tmp_path / "gate07_missing_artifacts"),
+            "--allow-missing-github-checks",
+        ],
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert completed.returncode == 1
+    gate_manifest = json.loads((tmp_path / "gate07_missing_artifacts/noise_gate07_manifest.json").read_text(encoding="utf-8"))
+    assert any("release manifest artifacts" in failure for failure in gate_manifest["failures"])
 
 
 def test_gate07_rejects_forged_incomplete_release_manifest(tmp_path):

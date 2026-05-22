@@ -12,6 +12,12 @@ from typing import Any
 MappingLike = dict[str, Any]
 _REQUIRED_EVIDENCE = {"synthetic_recovery", "predictive_checks", "emb_comparison"}
 _REQUIRED_CONFIG_NAMES = {"legacy", "synthetic_recovery", "predictive_checks", "emb_comparison"}
+_REQUIRED_RELEASE_ARTIFACTS = {
+    "artifact_index",
+    "config_validation",
+    "release_manifest",
+    "release_report",
+}
 _REQUIRED_ARTIFACT_KEYS = {
     "synthetic_recovery": {
         "metrics",
@@ -399,7 +405,14 @@ def evaluate_gate07(
         if gate06_manifest.get("pass") is not True:
             failures.append("Gate06 manifest does not pass.")
 
-    for artifact_name, artifact_path in (release_manifest.get("artifacts") or {}).items():
+    release_artifacts = release_manifest.get("artifacts")
+    if not isinstance(release_artifacts, dict) or not release_artifacts:
+        failures.append("release manifest artifacts are missing.")
+        release_artifacts = {}
+    missing_release_artifacts = sorted(_REQUIRED_RELEASE_ARTIFACTS - set(release_artifacts))
+    if missing_release_artifacts:
+        failures.append(f"release manifest artifacts are missing required entries: {missing_release_artifacts}.")
+    for artifact_name, artifact_path in release_artifacts.items():
         _check_path(artifact_path, failures, f"release artifact {artifact_name}", base_dir=release_base_dir)
 
     provenance = release_manifest.get("provenance", {})
