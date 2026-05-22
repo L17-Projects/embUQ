@@ -14,3 +14,25 @@ def test_bootstrap_env_import_smoke_uses_canonical_env_activation() -> None:
     assert 'source "$ENV_SCRIPT"' in smoke_block
     assert "import meso_uq" in smoke_block
     assert smoke_block.index('source "$ENV_SCRIPT"') < smoke_block.index("import meso_uq")
+
+
+def test_korali_skip_python_deps_keeps_korali_build_deps_enabled() -> None:
+    text = (REPO_ROOT / "scripts/platforms/hpc/bootstrap_env.sh").read_text(encoding="utf-8")
+
+    assert 'korali_args=(--site "$SITE" --python-bin "$env_python")' in text
+    assert 'if [[ "$install_python_deps" -eq 1 ]]; then\n    korali_args+=(--skip-python-build-deps)' in text
+
+
+def test_korali_bootstrap_installs_and_checks_mpi4py_build_dependency() -> None:
+    text = (REPO_ROOT / "scripts/platforms/hpc/bootstrap_korali.sh").read_text(encoding="utf-8")
+
+    assert '"mpi4py>=4.1.1"' in text
+    assert "import mpi4py" in text
+
+
+def test_korali_bootstrap_preserves_venv_python_symlink() -> None:
+    text = (REPO_ROOT / "scripts/platforms/hpc/bootstrap_korali.sh").read_text(encoding="utf-8")
+    path_block = text[text.index('if [[ "$python_bin" == */* ]]; then') : text.index("export PATH=")]
+
+    assert "readlink -f \"$python_bin\"" not in path_block
+    assert 'python_bin="${python_bin_dir}/$(basename "$python_bin")"' in path_block

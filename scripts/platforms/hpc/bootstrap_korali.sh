@@ -136,16 +136,18 @@ fi
 echo "Compile jobs: $build_jobs"
 
 if [[ "$python_bin" == */* ]]; then
-  python_bin_dir="$(cd "$(dirname "$python_bin")" && pwd)"
+  python_bin_dir="$(cd "$(dirname "$python_bin")" && pwd -P)"
+  python_bin="${python_bin_dir}/$(basename "$python_bin")"
 else
-  python_bin_dir="$(dirname "$(command -v "$python_bin")")"
+  python_bin_path="$(command -v "$python_bin")"
+  python_bin_dir="$(cd "$(dirname "$python_bin_path")" && pwd -P)"
+  python_bin="${python_bin_dir}/$(basename "$python_bin_path")"
 fi
-python_bin="$(readlink -f "$python_bin")"
 export PATH="$python_bin_dir${PATH:+:$PATH}"
 export PYTHONNOUSERSITE=1
 
 if [[ "$install_python_build_deps" -eq 1 ]]; then
-  "$python_bin" -m pip install pybind11 meson ninja
+  "$python_bin" -m pip install pybind11 meson ninja "mpi4py>=4.1.1"
 fi
 
 for command in "$python_bin" mpicxx pkg-config meson ninja; do
@@ -154,6 +156,12 @@ for command in "$python_bin" mpicxx pkg-config meson ninja; do
     exit 1
   fi
 done
+
+"$python_bin" - <<'PY'
+import mpi4py
+
+print(f"mpi4py import ok: {mpi4py.__file__}")
+PY
 
 if ! pkg-config --exists gsl; then
   echo "GSL not found via pkg-config. Load GSL/2.7-GCC-12.2.0 first." >&2

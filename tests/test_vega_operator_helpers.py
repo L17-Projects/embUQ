@@ -503,14 +503,16 @@ def test_acceptance_template_uses_public_command() -> None:
 
 
 
-def test_bootstrap_korali_keeps_venv_bin_on_path_before_resolving_python_symlink() -> None:
+def test_bootstrap_korali_preserves_venv_python_path_for_dependency_installs() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     script = repo_root / "scripts" / "platforms" / "hpc" / "bootstrap_korali.sh"
 
     text = script.read_text(encoding="utf-8")
+    path_block = text[text.index('if [[ "$python_bin" == */* ]]; then') : text.index("export PATH=")]
 
-    assert 'python_bin_dir="$(cd "$(dirname "$python_bin")" && pwd)"' in text
-    assert text.index('python_bin_dir=') < text.index('python_bin="$(readlink -f "$python_bin")"')
+    assert 'python_bin_dir="$(cd "$(dirname "$python_bin")" && pwd -P)"' in path_block
+    assert 'python_bin="${python_bin_dir}/$(basename "$python_bin")"' in path_block
+    assert 'python_bin="$(readlink -f "$python_bin")"' not in path_block
     assert 'export PATH="$python_bin_dir${PATH:+:$PATH}"' in text
 
 def test_vega_bootstrap_scripts_resolve_repo_root_after_platforms_move() -> None:

@@ -113,8 +113,22 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     mpi_install = _step_by_name(mpi_steps, "Install MPI stack")
     assert "--no-install-recommends openmpi-bin libopenmpi-dev" in mpi_install["run"]
 
+    korali_cache = _step_by_name(workflow_steps, "Restore Korali runtime cache")
+    assert "workflow-canary-v2-korali" in korali_cache["with"]["key"]
+    assert ".github/workflows/ci.yml" in korali_cache["with"]["key"]
+
     workflow_install = _step_by_name(workflow_steps, "Install workflow canary system packages")
     assert "--no-install-recommends openmpi-bin libopenmpi-dev" in workflow_install["run"]
+
+    workflow_bootstrap = _step_by_name(workflow_steps, "Bootstrap canonical Korali runtime")
+    assert "--system-site-packages" in workflow_bootstrap["run"]
+    assert "--skip-python-deps" in workflow_bootstrap["run"]
+    assert "--with-korali" in workflow_bootstrap["run"]
+
+    workflow_validate = _step_by_name(workflow_steps, "Validate canonical Korali runtime")
+    assert 'source "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"' in workflow_validate["run"]
+    assert "import korali" in workflow_validate["run"]
+    assert "import torch" in workflow_validate["run"]
 
     workflow_summary = _step_by_name(workflow_steps, "Summarize workflow canary outputs")
     workflow_upload = _step_by_name(workflow_steps, "Upload workflow canary artifacts")
