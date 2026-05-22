@@ -26,13 +26,6 @@ def _nonnegative_float(value: float, label: str) -> float:
     return value
 
 
-def _positive_float(value: float, label: str) -> float:
-    value = _finite_float(value, label)
-    if value <= 0.0:
-        raise ValueError(f"{label} must be positive; got {value}.")
-    return value
-
-
 def _finite_vector(values: Sequence[float], label: str) -> tuple[float, ...]:
     result = tuple(_finite_float(value, label) for value in values)
     if not result:
@@ -112,7 +105,7 @@ class GeometryParameterUncertainty:
         if not units:
             raise ValueError(f"geometry parameter '{name}' requires units.")
         sigma = _nonnegative_float(self.sigma, f"geometry parameter '{name}' sigma")
-        nominal = None if self.nominal is None else _positive_float(self.nominal, f"geometry parameter '{name}' nominal")
+        nominal = None if self.nominal is None else _finite_float(self.nominal, f"geometry parameter '{name}' nominal")
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "sigma", sigma)
         object.__setattr__(self, "units", units)

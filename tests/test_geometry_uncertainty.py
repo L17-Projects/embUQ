@@ -77,6 +77,17 @@ def test_geometry_uncertainty_disabled_has_no_numerical_effect():
     assert result.standard_deviation == pytest.approx((0.0, 0.0))
 
 
+def test_geometry_uncertainty_nominal_accepts_signed_finite_metadata():
+    offset = GeometryParameterUncertainty("offset_um", sigma=0.01, units="micrometer", nominal=0.0)
+    signed_shape = GeometryParameterUncertainty("shape_delta", sigma=0.02, units="dimensionless", nominal=-1.5)
+
+    assert offset.nominal == pytest.approx(0.0)
+    assert signed_shape.nominal == pytest.approx(-1.5)
+
+    with pytest.raises(ValueError, match="must be finite"):
+        GeometryParameterUncertainty("bad", sigma=0.01, units="micrometer", nominal=np.nan)
+
+
 def test_geometry_uncertainty_validation_errors_are_explicit():
     with pytest.raises(ValueError, match="requires at least one parameter"):
         GeometryUncertaintyConfig(enabled=True)
