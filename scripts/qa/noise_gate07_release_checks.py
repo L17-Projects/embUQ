@@ -357,10 +357,16 @@ def evaluate_gate07(
     if not isinstance(config_results, list) or not config_results:
         failures.append("config validation results are missing.")
     else:
-        failed_configs = [result.get("path") for result in config_results if result.get("passed") is not True]
+        valid_config_results = []
+        for index, result in enumerate(config_results):
+            if not isinstance(result, dict):
+                failures.append(f"config validation result {index} is not an object.")
+                continue
+            valid_config_results.append(result)
+        failed_configs = [result.get("path") for result in valid_config_results if result.get("passed") is not True]
         if failed_configs:
             failures.append(f"config validation contains failed configs: {failed_configs}.")
-        config_names = {result.get("config_name") for result in config_results}
+        config_names = {result.get("config_name") for result in valid_config_results}
         missing_configs = sorted(_REQUIRED_CONFIG_NAMES - config_names)
         if missing_configs:
             failures.append(f"config validation is missing required config names: {missing_configs}.")
@@ -375,6 +381,9 @@ def evaluate_gate07(
         failures.append(f"artifact index is missing required evidence entries: {missing_entries}.")
     for label in sorted(_REQUIRED_EVIDENCE & set(entries)):
         entry = entries[label]
+        if not isinstance(entry, dict):
+            failures.append(f"artifact index entry {label} is not an object.")
+            continue
         if entry.get("exists") is not True:
             failures.append(f"evidence entry {label} does not exist.")
         entry_path = _check_path(entry.get("path"), failures, f"evidence entry {label}", base_dir=release_base_dir)
@@ -415,7 +424,10 @@ def evaluate_gate07(
     for artifact_name, artifact_path in release_artifacts.items():
         _check_path(artifact_path, failures, f"release artifact {artifact_name}", base_dir=release_base_dir)
 
-    provenance = release_manifest.get("provenance", {})
+    provenance = release_manifest.get("provenance")
+    if not isinstance(provenance, dict):
+        failures.append("release manifest provenance is missing or not an object.")
+        provenance = {}
     if provenance.get("git_status_clean") is not True:
         failures.append("release manifest provenance does not record git_status_clean=true.")
     if not provenance.get("git_commit"):
@@ -454,8 +466,44 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--allow-missing-github-checks", action="store_true", help="Explicitly allow local-only Gate07 validation without GitHub checks.")
     args = parser.parse_args(argv)
     args.output_root.mkdir(parents=True, exist_ok=True)
-    release_manifest = _load_json(args.release_manifest)
-    expected_commit = release_manifest.get("provenance", {}).get("git_commit")
+    try:
+        release_manifest = _load_json(args.release_manifest)
+    except (OSError, json.JSONDecodeError) as exc:
+        payload = {
+            "schema_version": 1,
+            "gate": "NOISE Gate 07 Release checks",
+            "pass": False,
+            "status": "fail",
+            "failures": [f"release manifest could not be read: {exc}."],
+            "warnings": [],
+            "source_commit": None,
+            "merge_boundary": None,
+            "github_checks": {"status": "not_checked", "checks": []},
+            "source_release_manifest": args.release_manifest.as_posix(),
+        }
+        _write_json(args.output_root / "noise_gate07_manifest.json", payload)
+        _write_report(args.output_root / "noise_gate07_report.md", payload)
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 1
+    if not isinstance(release_manifest, dict):
+        payload = {
+            "schema_version": 1,
+            "gate": "NOISE Gate 07 Release checks",
+            "pass": False,
+            "status": "fail",
+            "failures": ["release manifest root is not an object."],
+            "warnings": [],
+            "source_commit": None,
+            "merge_boundary": None,
+            "github_checks": {"status": "not_checked", "checks": []},
+            "source_release_manifest": args.release_manifest.as_posix(),
+        }
+        _write_json(args.output_root / "noise_gate07_manifest.json", payload)
+        _write_report(args.output_root / "noise_gate07_report.md", payload)
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 1
+    provenance = release_manifest.get("provenance")
+    expected_commit = provenance.get("git_commit") if isinstance(provenance, dict) else None
     github_checks, github_failures, github_warnings = _github_evidence_summary(
         pr=args.github_pr,
         run_ids=args.github_run_id,

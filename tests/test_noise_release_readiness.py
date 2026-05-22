@@ -609,3 +609,55 @@ def test_gate07_rejects_forged_incomplete_release_manifest(tmp_path):
     gate_manifest = json.loads((tmp_path / "forged_gate/noise_gate07_manifest.json").read_text(encoding="utf-8"))
     assert any("missing required evidence entries" in failure for failure in gate_manifest["failures"])
     assert any("Gate06 manifest" in failure for failure in gate_manifest["failures"])
+
+
+def test_gate07_rejects_non_mapping_artifact_entry_without_traceback(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    release_manifest = tmp_path / "forged_scalar_entry.json"
+    release_manifest.write_text(
+        json.dumps(
+            {
+                "gate07": {"pass": True},
+                "config_validation": {
+                    "passed": True,
+                    "results": [
+                        {"config_name": name, "passed": True, "path": f"{name}.yaml"}
+                        for name in ("legacy", "synthetic_recovery", "predictive_checks", "emb_comparison")
+                    ],
+                },
+                "artifact_index": {
+                    "entries": {
+                        "synthetic_recovery": "not an object",
+                        "predictive_checks": {},
+                        "emb_comparison": {},
+                    }
+                },
+                "merge_boundary": "human_review_required",
+                "no_karolina_interaction": True,
+                "karolina_interaction_confirmation": {"operator_confirmed": True},
+                "provenance": {"git_commit": "abc123", "git_status_clean": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "scripts/qa/noise_gate07_release_checks.py"),
+            "--release-manifest",
+            str(release_manifest),
+            "--output-root",
+            str(tmp_path / "scalar_entry_gate"),
+            "--allow-missing-github-checks",
+        ],
+        cwd=repo_root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert completed.returncode == 1
+    assert "Traceback" not in completed.stderr
+    gate_manifest = json.loads((tmp_path / "scalar_entry_gate/noise_gate07_manifest.json").read_text(encoding="utf-8"))
+    assert any("artifact index entry synthetic_recovery is not an object" in failure for failure in gate_manifest["failures"])
