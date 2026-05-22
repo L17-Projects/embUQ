@@ -161,7 +161,7 @@ def test_predictive_checks_diagnostics_script_writes_required_artifacts(tmp_path
         "sbc_rank_histogram",
         "calibration_summary",
     ):
-        path = Path(manifest["artifacts"][key])
+        path = output_root / manifest["artifacts"][key]
         assert path.exists()
         assert path.stat().st_size > 0
 

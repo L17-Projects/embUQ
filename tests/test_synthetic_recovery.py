@@ -141,6 +141,6 @@ def test_synthetic_recovery_diagnostics_script_writes_required_artifacts(tmp_pat
         "residual_whitened_hist",
         "covariance_heatmap",
     ):
-        path = Path(manifest["artifacts"][key])
+        path = output_root / manifest["artifacts"][key]
         assert path.exists()
         assert path.stat().st_size > 0

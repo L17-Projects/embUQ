@@ -40,6 +40,10 @@ def _write_json(path: Path, payload: MappingLike) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _artifact_ref(output_root: Path, path: Path) -> str:
+    return path.relative_to(output_root).as_posix()
+
+
 def _git_output(*args: str) -> str | None:
     try:
         completed = subprocess.run(
@@ -535,11 +539,8 @@ def main() -> None:
         "pass": metrics["all_scenarios_passed"],
         "evidence_class": "validation_fixture",
         "production_claim": False,
-        "m6_evidence_expected": {
-            "synthetic_recovery_manifest": "_runs/noise/m6_synthetic_recovery_diagnostics_20260520/synthetic_manifest.json",
-            "predictive_checks_manifest": "_runs/noise/m6_predictive_checks_20260520/predictive_manifest.json",
-        },
-        "m7_evidence": metrics_path.as_posix(),
+        "m6_evidence_expected": "provided to scripts/qa/noise_gate06_integrated_emb.py at gate runtime",
+        "m7_evidence": _artifact_ref(output_root, metrics_path),
         "residual_risk": _known_limitations(),
     }
     gate06_path = output_root / "gate06_integrated_emb_summary.json"
@@ -559,7 +560,15 @@ def main() -> None:
         "thresholds": thresholds.as_dict(),
         "required_scenarios": [item["record"]["inputs"].scenario_id for item in summaries],
         "scenario_artifacts": {item["result"].scenario_id: item["artifacts"] for item in summaries},
-        "artifacts": {"metrics": metrics_path.as_posix(), "summary_csv": summary_csv.as_posix(), "gate06_summary": gate06_path.as_posix(), "report_md": report_path.as_posix(), **plots},
+        "configs": {"primary": "configs/noise/emb_comparison.example.yaml"},
+        "artifacts": {
+            "metrics": _artifact_ref(output_root, metrics_path),
+            "summary_csv": _artifact_ref(output_root, summary_csv),
+            "gate06_summary": _artifact_ref(output_root, gate06_path),
+            "report_md": _artifact_ref(output_root, report_path),
+            **{name: _artifact_ref(output_root, Path(plot_path)) for name, plot_path in plots.items()},
+        },
+        "residual_risk": _known_limitations(),
         "known_limitations": _known_limitations(),
     }
     _write_json(output_root / "emb_comparison_manifest.json", manifest)

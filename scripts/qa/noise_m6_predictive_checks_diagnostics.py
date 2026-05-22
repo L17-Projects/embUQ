@@ -43,6 +43,10 @@ def _nonnegative_interval_errors(centers: Any, lows: Any, highs: Any) -> tuple[n
     return np.maximum(center_values - low_values, 0.0), np.maximum(high_values - center_values, 0.0)
 
 
+def _artifact_ref(output_root: Path, path: Path) -> str:
+    return path.relative_to(output_root).as_posix()
+
+
 def _git_output(*args: str) -> str | None:
     try:
         completed = subprocess.run(
@@ -389,7 +393,13 @@ def main() -> None:
         "thresholds": thresholds.as_dict(),
         "required_scenarios": [record["scenario_id"] for record in records],
         "scenario_artifacts": {item["result"].scenario_id: item["artifacts"] for item in summaries},
-        "artifacts": {"metrics": metrics_path.as_posix(), "summary_csv": summary_csv.as_posix(), **plots},
+        "configs": {"primary": "configs/noise/predictive_checks.example.yaml"},
+        "artifacts": {
+            "metrics": _artifact_ref(output_root, metrics_path),
+            "summary_csv": _artifact_ref(output_root, summary_csv),
+            **{name: _artifact_ref(output_root, Path(plot_path)) for name, plot_path in plots.items()},
+        },
+        "residual_risk": _known_limitations(),
         "known_limitations": _known_limitations(),
     }
     _write_json(output_root / "predictive_manifest.json", manifest)

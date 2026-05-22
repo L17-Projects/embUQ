@@ -5,6 +5,11 @@ metadata:
   name: Gaussian Observation Noise
 spec:
   family: gaussian
+  likelihood:
+    stage: M2
+    components:
+      - additive_noise
+      - relative_noise
   parameters:
     - sigma
   bounds:
