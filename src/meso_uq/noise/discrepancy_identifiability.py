@@ -425,6 +425,7 @@ def evaluate_discrepancy_identifiability(
     max_abs_corr = float(np.max(np.abs(correlation))) if correlation.size else 0.0
     active_count = int(sum(1 for coefficient in coefficient_shrinkage.values() if coefficient.get("active") == 1))
     model_discrepancy_trace_share = covariance_summary["group_trace_shares"].get("model_discrepancy")
+    model_discrepancy_covariance_active = _covariance_group_has_signal(inputs, "model_discrepancy")
 
     total_sigma_stats = _discrepancy_total_sigma_stats(discrepancy, covariance_summary.get("total_covariance"))
     basis_metrics = _basis_metrics(inputs)
@@ -437,6 +438,8 @@ def evaluate_discrepancy_identifiability(
         failures.append("discrepancy is enabled without explicit opt-in.")
     if not inputs.discrepancy_enabled and discrepancy_rms > _EPSILON:
         failures.append("discrepancy is marked disabled but supplies a nonzero discrepancy mean.")
+    if not inputs.discrepancy_enabled and model_discrepancy_covariance_active:
+        failures.append("discrepancy is marked disabled but supplies nonzero model-discrepancy covariance.")
     if discrepancy_rms_over_response > thresholds.fail_discrepancy_rms_over_response:
         failures.append("discrepancy RMS exceeds the response-scale fail threshold.")
     elif discrepancy_rms_over_response > thresholds.warning_discrepancy_rms_over_response:
@@ -636,6 +639,15 @@ def _covariance_summary(inputs: DiscrepancyIdentifiabilityInputs) -> dict[str, A
         "component_mean_diagonal_shares": component_mean_diagonal_shares,
         "group_trace_shares": group_trace_shares,
     }
+
+
+def _covariance_group_has_signal(inputs: DiscrepancyIdentifiabilityInputs, group: str) -> bool:
+    if inputs.covariance_components is None:
+        return False
+    for name, matrix in inputs.covariance_components.items():
+        if _component_group(name) == group and np.max(np.abs(np.asarray(matrix, dtype=float))) > _EPSILON:
+            return True
+    return False
 
 
 def _theta_beta_correlation_summary(inputs: DiscrepancyIdentifiabilityInputs) -> tuple[np.ndarray, float | None, dict[str, tuple[str, ...]]]:

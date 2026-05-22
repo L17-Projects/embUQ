@@ -193,6 +193,20 @@ def test_opt_in_and_disabled_state_are_enforced():
     assert disabled_nonzero.gate_status == "fail"
     assert any("marked disabled" in failure for failure in disabled_nonzero.failures)
 
+    disabled_covariance = evaluate_discrepancy_identifiability(
+        DiscrepancyIdentifiabilityInputs(
+            observations=(1.0, 2.0, 3.0),
+            predictions_without_discrepancy=(1.0, 2.0, 3.0),
+            discrepancy_mean=(0.0, 0.0, 0.0),
+            covariance_components=components,
+            total_covariance=total,
+            discrepancy_enabled=False,
+            discrepancy_opt_in=True,
+        )
+    )
+    assert disabled_covariance.gate_status == "fail"
+    assert any("model-discrepancy covariance" in failure for failure in disabled_covariance.failures)
+
 
 def test_zero_discrepancy_over_zero_total_sigma_is_safe():
     result = evaluate_discrepancy_identifiability(
