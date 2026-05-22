@@ -1,0 +1,28 @@
+schema_version: "1.0"
+kind: noise
+metadata:
+  id: full_hierarchy_covariance
+  name: Full Noise Hierarchy Covariance Assembly
+spec:
+  family: full_hierarchy
+  likelihood:
+    stage: M5
+    components:
+      - additive_noise
+      - relative_noise
+      - contact_alignment
+      - geometry
+      - surrogate_covariance
+      - model_discrepancy
+      - total_covariance
+  total_covariance:
+    jitter: 1.0e-10
+    max_jitter: 1.0e-6
+    included_terms:
+      - observation:additive_relative
+      - observation:correlated_curve
+      - measurement:contact_alignment
+      - measurement:geometry
+      - surrogate:predictive
+      - discrepancy:low_rank
+    diagnostic_children: preserve_not_summed

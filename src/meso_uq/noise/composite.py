@@ -66,8 +66,13 @@ _STAGE_DEFAULTS: Mapping[LikelihoodStage, tuple[LikelihoodComponent, ...]] = {
         LikelihoodComponent.SURROGATE_COVARIANCE,
     ),
     LikelihoodStage.M5: (
-        LikelihoodComponent.TOTAL_COVARIANCE,
+        LikelihoodComponent.ADDITIVE_NOISE,
+        LikelihoodComponent.RELATIVE_NOISE,
+        LikelihoodComponent.CONTACT_ALIGNMENT,
+        LikelihoodComponent.GEOMETRY,
+        LikelihoodComponent.SURROGATE_COVARIANCE,
         LikelihoodComponent.MODEL_DISCREPANCY,
+        LikelihoodComponent.TOTAL_COVARIANCE,
     ),
     LikelihoodStage.M6: (
         LikelihoodComponent.SYNTHETIC_RECOVERY,
