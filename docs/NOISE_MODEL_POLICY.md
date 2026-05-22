@@ -46,3 +46,28 @@ M1 keeps existing EMB and GV likelihood behavior recoverable through shared wrap
 - GV Phase 1 uses the declared multiplicative `sigma` noise model and emits Korali `Standard Deviation` through the shared legacy wrapper.
 
 The staged composite interface names rollout stages `M0` through `M7`. `M0` and `M1` are legacy/baseline compatibility stages; later stages add noise primitives, measurement uncertainty, surrogate covariance, discrepancy, validation diagnostics, and integrated EMB comparison without duplicating legacy variance math in runtime call sites.
+
+
+## M2 noise primitives
+
+M2 adds executable primitives for richer observation-noise and likelihood composition while leaving the M1 legacy wrappers stable.
+
+### Additive plus relative observation noise
+
+The additive/relative primitive is nonnegative by construction and exposes named variance components:
+
+`total_variance_i = additive_sigma^2 + (relative_sigma * max(abs(prediction_i), prediction_scale_floor))^2 + floor_i`
+
+`floor_i` is zero unless `minimum_total_variance` is larger than the raw additive-plus-relative variance. Relative-only configurations with zero predictions may assemble zero variance, but likelihood evaluation must fail unless an additive term or explicit floor makes the total variance positive. This keeps legacy zero-standard-deviation behavior quarantined in M1 while giving M2 a stable finite-likelihood path.
+
+### Correlated curve noise
+
+Correlated curve noise is an optional covariance contribution for curve-indexed residuals. The first supported kernel is squared exponential. Kernel amplitude is a standard deviation; covariance uses `amplitude^2`. Multi-curve inputs are block diagonal in M2, with no cross-curve covariance. Builders record covariance shape, diagonal and correlation ranges, eigenvalue range, condition number, jitter applied, Cholesky status, and curve identifiers.
+
+A disabled or zero-amplitude correlated component returns a zero covariance contribution. Total covariance composition remains responsible for adding diagonal variance and for failing clearly if the final covariance is singular and no jitter policy is supplied.
+
+### Heavy-tail robust likelihood
+
+Robust likelihood is opt-in. The default remains Gaussian and preserves the existing diagonal Normal likelihood when heavy-tail mode is absent. The first robust mode is scaled Student-t with `2 < degrees_of_freedom <= 100`. Diagonal Student-t uses pointwise standard deviations; full-covariance Student-t uses the covariance Cholesky factor and Mahalanobis distance. Robust likelihood rejects nonpositive scales and non-positive-definite covariance instead of silently repairing invalid measurement models.
+
+Korali `Bayesian/Reference` Normal remains the M1 runtime boundary. Full-covariance and scaled heavy-tail likelihoods should attach through an explicit custom likelihood adapter in later integration work rather than overloading the legacy reference fields.

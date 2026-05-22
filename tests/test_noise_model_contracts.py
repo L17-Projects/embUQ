@@ -9,17 +9,26 @@ from pathlib import Path
 import pytest
 
 from meso_uq.noise import (
+    AdditiveRelativeObservationNoiseConfig,
     CompositeLikelihoodSpec,
     build_composite_likelihood,
+    CorrelatedCurveNoiseConfig,
+    CurveGrid,
     DiscrepancyConfig,
+    LikelihoodInputs,
     LikelihoodComponent,
     LikelihoodStage,
     MeasurementErrorConfig,
     PosteriorUncertaintyConfig,
     PosteriorUncertaintyKind,
+    RobustLikelihoodConfig,
     SurrogateErrorConfig,
+    build_additive_relative_observation_noise,
+    build_correlated_curve_covariance,
     build_model_config,
     compose_toy_likelihood,
+    compose_total_covariance,
+    evaluate_observation_likelihood,
     get_model_support,
     legacy_compression_direct_likelihood,
     legacy_compression_surrogate_batch_likelihood,
@@ -255,6 +264,86 @@ def test_composite_likelihood_dispatches_configured_components():
             {"stage": "M2", "components": ["additive_noise", "relative_noise"]},
             {"additive_noise": lambda payload: payload},
         )
+
+
+def test_m2_composite_likelihood_dispatches_executable_noise_primitives():
+    def _observation(payload, *, additive_sigma: float, relative_sigma: float):
+        return build_additive_relative_observation_noise(
+            payload["predictions"],
+            AdditiveRelativeObservationNoiseConfig(
+                additive_sigma=additive_sigma,
+                relative_sigma=relative_sigma,
+            ),
+        )
+
+    def _correlated(payload):
+        return build_correlated_curve_covariance(
+            CurveGrid(tuple(payload["grid"]), "fixture"),
+            CorrelatedCurveNoiseConfig(
+                amplitude=payload["correlated_amplitude"],
+                length_scale=1.0,
+            ),
+        )
+
+    def _heavy_tail(payload):
+        observation = _observation(
+            payload,
+            additive_sigma=payload["additive_sigma"],
+            relative_sigma=payload["relative_sigma"],
+        )
+        total = compose_total_covariance(observation.total_variance, _correlated(payload))
+        return evaluate_observation_likelihood(
+            LikelihoodInputs(
+                observed=tuple(payload["observations"]),
+                predicted=observation.predictions,
+                covariance=total.covariance,
+                variance_components=observation.variance_components,
+            ),
+            RobustLikelihoodConfig(kind="student_t", degrees_of_freedom=4.0),
+        )
+
+    likelihood = build_composite_likelihood(
+        {
+            "stage": "M2",
+            "components": [
+                "additive_noise",
+                "relative_noise",
+                "correlated_curve_noise",
+                "heavy_tail",
+            ],
+        },
+        {
+            "additive_noise": lambda payload: _observation(
+                payload,
+                additive_sigma=payload["additive_sigma"],
+                relative_sigma=0.0,
+            ).variance_components["additive"],
+            "relative_noise": lambda payload: _observation(
+                payload,
+                additive_sigma=0.0,
+                relative_sigma=payload["relative_sigma"],
+            ).variance_components["relative"],
+            "correlated_curve_noise": _correlated,
+            "heavy_tail": _heavy_tail,
+        },
+    )
+
+    result = likelihood.evaluate(
+        {
+            "observations": [2.1, 3.9],
+            "predictions": [2.0, 4.0],
+            "grid": [0.0, 1.0],
+            "additive_sigma": 0.1,
+            "relative_sigma": 0.25,
+            "correlated_amplitude": 0.05,
+        }
+    )
+
+    assert result["additive_noise"] == pytest.approx((0.01, 0.01))
+    assert result["relative_noise"] == pytest.approx((0.25, 1.0))
+    assert result["correlated_curve_noise"].covariance.shape == (2, 2)
+    assert result["heavy_tail"].covariance_mode == "full"
+    assert math.isfinite(result["heavy_tail"].log_likelihood)
 
 
 def test_supported_observables_and_units_contract():
