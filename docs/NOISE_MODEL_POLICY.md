@@ -131,6 +131,26 @@ The builder also supports diagonal coefficient scales with deterministic shrinka
 
 Enabled discrepancy fails early for missing or inconsistent basis rank, nonfinite basis or coefficient covariance, non-symmetric or non-PSD coefficient covariance, zero prior scale, and overflow during covariance assembly. Disabled discrepancy returns a named zero covariance and does not alter lower-stage behavior.
 
+
+### Discrepancy identifiability diagnostics
+
+M5 discrepancy is useful only when it remains visible as an uncertainty layer rather than silently replacing physical parameters. The identifiability diagnostics evaluate saved run artifacts with:
+
+- discrepancy magnitude relative to response scale, residual scale, and total predictive standard deviation;
+- residual variance explained by discrepancy;
+- physical parameter shift in posterior-standard-deviation and relative units;
+- physical-sensitivity versus discrepancy-basis correlation, including a first canonical correlation;
+- prior-to-posterior discrepancy coefficient shrinkage and active coefficient counts;
+- covariance trace and diagonal shares for observation, surrogate, measurement, and model-discrepancy components.
+
+A run with discrepancy enabled must record that it was explicitly opted in. Missing component decomposition is a fail-gate condition because reports must distinguish observation noise, surrogate covariance, measurement covariance, and model discrepancy. Null/noise-only controls pass only when discrepancy remains zero and coefficients shrink toward zero. Negative controls fail when discrepancy can mimic protected physical sensitivities or hide missing physics by explaining systematic residual structure.
+
+The reproducible diagnostic entry point is:
+
+`python scripts/qa/noise_m5_discrepancy_identifiability_diagnostics.py --output-root <run-root>`
+
+The script writes a manifest, metrics JSON, fixture summary CSV, residual decomposition, parameter-shift, theta-beta-correlation, covariance-share, shrinkage, and fixture-gate plots. The manifest records the executed command, Git branch/SHA/status, thresholds, expected-versus-actual fixture gate statuses, artifact paths, and residual-risk notes so the diagnostics can be audited from saved run artifacts.
+
 ### Total covariance assembly
 
 The M5 assembler accepts explicit `CovarianceTerm` objects. Only terms marked `included=True` are numerically summed. Child components from M2-M4 builders are preserved in diagnostics, but are not summed when a parent total is included. This prevents double counting patterns such as including both `measurement:geometry` and `geometry:radius`/`geometry_cross:*` as independent summands.

@@ -36,6 +36,12 @@ from meso_uq.noise.covariance import (
     compose_total_covariance,
     gaussian_log_likelihood_from_covariance,
 )
+from meso_uq.noise.discrepancy_identifiability import (
+    DiscrepancyIdentifiabilityInputs,
+    DiscrepancyIdentifiabilityResult,
+    DiscrepancyIdentifiabilityThresholds,
+    evaluate_discrepancy_identifiability,
+)
 from meso_uq.noise.geometry import (
     GeometryParameterUncertainty,
     GeometrySensitivityInputs,
@@ -115,6 +121,9 @@ __all__ = [
     "CurveGrid",
     "DiscrepancyConfig",
     "DiscrepancyFitResult",
+    "DiscrepancyIdentifiabilityInputs",
+    "DiscrepancyIdentifiabilityResult",
+    "DiscrepancyIdentifiabilityThresholds",
     "DiscrepancyKind",
     "GeometryUncertaintyResult",
     "GeometryUncertaintyConfig",
@@ -166,6 +175,7 @@ __all__ = [
     "compose_total_covariance",
     "compose_toy_likelihood",
     "evaluate_observation_likelihood",
+    "evaluate_discrepancy_identifiability",
     "gaussian_log_likelihood_from_covariance",
     "fit_low_rank_discrepancy_coefficients",
     "get_model_support",

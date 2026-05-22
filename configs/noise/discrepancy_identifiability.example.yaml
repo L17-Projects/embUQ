@@ -1,0 +1,52 @@
+schema_version: "1.0"
+kind: noise
+metadata:
+  id: discrepancy_identifiability
+  name: Discrepancy Identifiability Diagnostics
+spec:
+  family: noise_hierarchy
+  milestone: M5 Model Discrepancy
+  runtime_default:
+    model_discrepancy_enabled: false
+    model_discrepancy_requires_explicit_opt_in: true
+  thresholds:
+    warning_discrepancy_rms_over_response: 0.05
+    fail_discrepancy_rms_over_response: 0.15
+    warning_explained_residual_share: 0.30
+    fail_explained_residual_share: 0.60
+    warning_parameter_shift_sigma: 0.50
+    fail_parameter_shift_sigma: 1.00
+    fail_parameter_shift_requires_discrepancy_rms_over_response: 0.03
+    warning_max_abs_theta_beta_correlation: 0.60
+    fail_max_abs_theta_beta_correlation: 0.80
+    warning_theta_beta_canonical_correlation: 0.75
+    fail_theta_beta_canonical_correlation: 0.90
+    null_fail_discrepancy_rms_over_response: 0.03
+  required_covariance_groups:
+    - observation
+    - measurement
+    - surrogate
+    - model_discrepancy
+  fixtures:
+    - id: identifiable_residual
+      expected_gate_status: pass
+    - id: null_control
+      expected_gate_status: pass
+    - id: noise_only_control
+      expected_gate_status: pass
+    - id: surrogate_covariance_control
+      expected_gate_status: pass
+    - id: parameter_absorption_negative
+      expected_gate_status: fail
+    - id: masked_curvature_negative
+      expected_gate_status: fail
+  artifacts:
+    metrics: identifiability_metrics.json
+    summary_table: fixture_summary.csv
+    plots:
+      - residual_decomposition.png
+      - parameter_shift_gate.png
+      - theta_beta_correlation_heatmap.png
+      - covariance_trace_shares.png
+      - coefficient_shrinkage.png
+      - fixture_gate_summary.png

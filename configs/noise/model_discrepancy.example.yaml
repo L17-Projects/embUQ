@@ -13,6 +13,7 @@ spec:
   model_discrepancy:
     enabled: false
     representation: low_rank
+    requires_explicit_opt_in: true
     basis_source: explicit_matrix
     coefficient_covariance_source: explicit_matrix
     coefficient_scale: 1.0

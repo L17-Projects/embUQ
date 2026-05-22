@@ -13,6 +13,7 @@ from meso_uq.noise import (
     AdditiveRelativeObservationNoiseConfig,
     CompositeLikelihoodSpec,
     build_composite_likelihood,
+    build_composite_likelihood_spec,
     ContactAlignmentInputs,
     ContactAlignmentUncertaintyConfig,
     CorrelatedCurveNoiseConfig,
@@ -480,6 +481,32 @@ def test_m5_default_composite_spec_includes_full_hierarchy_components():
         LikelihoodComponent.MODEL_DISCREPANCY,
         LikelihoodComponent.TOTAL_COVARIANCE,
     )
+
+
+def test_m5_config_examples_keep_discrepancy_disabled_until_explicit_opt_in():
+    import yaml
+
+    repo_root = Path(__file__).resolve().parents[1]
+    for relative_path in (
+        "configs/noise/model_discrepancy.example.yaml",
+        "configs/noise/full_hierarchy.example.yaml",
+    ):
+        payload = yaml.safe_load((repo_root / relative_path).read_text(encoding="utf-8"))
+        model_discrepancy = payload["spec"]["model_discrepancy"]
+        assert model_discrepancy["enabled"] is False
+        assert model_discrepancy["requires_explicit_opt_in"] is True
+        spec = build_composite_likelihood_spec(payload["spec"]["likelihood"])
+        assert LikelihoodComponent.MODEL_DISCREPANCY in spec.components
+
+    inputs = LowRankDiscrepancyInputs(
+        predictions=(1.0, 2.0),
+        basis=((1.0,), (2.0,)),
+        basis_names=("linear",),
+    )
+    result = build_low_rank_model_discrepancy_covariance(inputs, LowRankDiscrepancyConfig())
+    assert result.summary["enabled"] is False
+    assert result.summary["active"] is False
+    assert result.standard_deviation == pytest.approx((0.0, 0.0))
 
 
 def test_m5_composite_likelihood_dispatches_discrepancy_and_shared_total_assembler():
