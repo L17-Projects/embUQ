@@ -93,6 +93,28 @@ def test_sbc_rank_record_uses_midrank_for_ties():
     assert record.as_dict(alpha=0.1)["rank"] == pytest.approx(2.0)
 
 
+def test_pointwise_rank_quantiles_use_midrank_for_ties():
+    result = evaluate_predictive_checks(
+        PredictiveCheckInputs(
+            scenario_id="pointwise_ties",
+            seed=1,
+            observed=(0.0,),
+            predictive_samples=((-1.0,), (0.0,), (0.0,), (1.0,)),
+            sbc_rank_records=(SbcRankRecord("theta", 0.0, (-1.0, 0.0, 0.0, 1.0)),),
+        ),
+        PredictiveCheckThresholds(
+            min_pointwise_interval_coverage=0.0,
+            max_pointwise_rank_edge_fraction=1.0,
+            max_sbc_rank_histogram_l1=2.0,
+            max_sbc_mean_rank_quantile_error=1.0,
+            max_sbc_edge_fraction=1.0,
+            min_sbc_interval_coverage=0.0,
+        ),
+    )
+
+    assert result.ppc_metrics["pointwise_metrics"]["rank_quantiles"] == pytest.approx((0.5,))
+
+
 def test_predictive_check_validation_errors_are_explicit():
     with pytest.raises(ValueError, match="column count"):
         PredictiveCheckInputs(

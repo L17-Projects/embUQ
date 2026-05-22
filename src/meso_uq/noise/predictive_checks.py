@@ -331,7 +331,9 @@ def _pointwise_metrics(observed: np.ndarray, samples: np.ndarray, thresholds: Pr
     lower = np.quantile(samples, thresholds.interval_alpha / 2.0, axis=0)
     upper = np.quantile(samples, 1.0 - thresholds.interval_alpha / 2.0, axis=0)
     covered = np.logical_and(lower <= observed, observed <= upper)
-    ranks = np.sum(samples < observed[None, :], axis=0)
+    less_counts = np.sum(samples < observed[None, :], axis=0)
+    equal_counts = np.sum(samples == observed[None, :], axis=0)
+    ranks = less_counts + 0.5 * equal_counts
     rank_quantiles = (ranks + 0.5) / (samples.shape[0] + 1.0)
     edge = np.logical_or(rank_quantiles <= thresholds.rank_edge_alpha, rank_quantiles >= 1.0 - thresholds.rank_edge_alpha)
     absolute_error = np.abs(np.mean(samples, axis=0) - observed)
