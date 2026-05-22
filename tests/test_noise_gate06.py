@@ -102,6 +102,22 @@ def test_gate06_rejects_fixture_when_production_is_required(tmp_path):
     assert any("require-production" in failure for failure in manifest["failures"])
 
 
+def test_gate06_requires_production_claim_for_production_closeout(tmp_path):
+    synthetic = _write_evidence(tmp_path / "synthetic", "synthetic")
+    predictive = _write_evidence(tmp_path / "predictive", "predictive")
+    emb = _write_evidence(tmp_path / "emb", "emb", evidence_class="production_pass", production_claim=False)
+
+    payload = evaluate_gate06(
+        synthetic_manifest=synthetic,
+        predictive_manifest=predictive,
+        emb_manifest=emb,
+        require_production=True,
+    )
+
+    assert payload["pass"] is False
+    assert any("production_claim=true" in failure for failure in payload["failures"])
+
+
 def test_gate06_accepts_detached_head_provenance_with_commit(tmp_path):
     synthetic = _write_evidence(tmp_path / "synthetic", "synthetic", git_branch="")
     predictive = _write_evidence(tmp_path / "predictive", "predictive", git_branch="")

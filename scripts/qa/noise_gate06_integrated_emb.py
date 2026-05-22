@@ -103,6 +103,8 @@ def evaluate_gate06(
         failures.append(f"emb_comparison evidence_class must be one of {sorted(_ALLOWED_EVIDENCE_CLASSES)}, got {evidence_class!r}.")
     if require_production and evidence_class != "production_pass":
         failures.append("Gate 06 was run with --require-production, but EMB evidence is not production_pass.")
+    if require_production and evidence_class == "production_pass" and not production_claim:
+        failures.append("Gate 06 was run with --require-production, but EMB production_pass evidence does not set production_claim=true.")
     if production_claim and evidence_class != "production_pass":
         failures.append("EMB comparison manifest claims production evidence without evidence_class=production_pass.")
     if evidence_class == "validation_fixture" and not production_claim:
