@@ -225,6 +225,25 @@ def test_missing_covariance_decomposition_is_a_gate_failure():
     assert any("covariance component report is missing" in failure for failure in result.failures)
 
 
+def test_measurement_covariance_group_is_required_by_default():
+    components, total = _components(3)
+    components = {name: matrix for name, matrix in components.items() if not name.startswith("measurement:")}
+
+    result = evaluate_discrepancy_identifiability(
+        DiscrepancyIdentifiabilityInputs(
+            observations=(1.0, 2.0, 3.0),
+            predictions_without_discrepancy=(1.0, 2.0, 3.0),
+            discrepancy_mean=(0.0, 0.0, 0.0),
+            covariance_components=components,
+            total_covariance=total,
+            discrepancy_opt_in=True,
+        )
+    )
+
+    assert result.gate_status == "fail"
+    assert any("measurement" in failure for failure in result.failures)
+
+
 def test_rank_fraction_uses_effective_basis_rank_not_column_count():
     basis = ((1.0, 1.0, 1.0), (2.0, 2.0, 2.0), (3.0, 3.0, 3.0), (4.0, 4.0, 4.0))
     components, total = _components(4)
@@ -279,6 +298,16 @@ def test_identifiability_validation_errors_are_explicit():
             discrepancy_mean=(0.0, 0.0),
             basis=((1.0, 0.0), (0.0, 1.0)),
             coefficient_names=("only_one",),
+        )
+    with pytest.raises(ValueError, match="missing declared parameters"):
+        DiscrepancyIdentifiabilityInputs(
+            observations=(1.0, 2.0),
+            predictions_without_discrepancy=(1.0, 2.0),
+            discrepancy_mean=(0.0, 0.0),
+            parameter_names=("offset", "slope"),
+            parameters_without_discrepancy=(1.0, 0.5),
+            parameters_with_discrepancy=(1.0, 0.5),
+            parameter_sensitivities={"offset": (1.0, 1.0)},
         )
 
 

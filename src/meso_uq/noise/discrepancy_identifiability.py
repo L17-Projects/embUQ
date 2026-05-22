@@ -201,7 +201,7 @@ class DiscrepancyIdentifiabilityInputs:
     expect_discrepancy: bool = True
     negative_control: bool = False
     fixture_id: str = "fixture"
-    required_covariance_groups: tuple[str, ...] = ("observation", "surrogate", "model_discrepancy")
+    required_covariance_groups: tuple[str, ...] = ("observation", "measurement", "surrogate", "model_discrepancy")
 
     def __post_init__(self) -> None:
         observations = _finite_vector(self.observations, "observations")
@@ -273,6 +273,13 @@ class DiscrepancyIdentifiabilityInputs:
             for name, values in sensitivities.items():
                 if len(values) != point_count:
                     raise ValueError(f"parameter sensitivity '{name}' length must match observations.")
+            if parameter_names:
+                missing_sensitivities = [name for name in parameter_names if name not in sensitivities]
+                if missing_sensitivities:
+                    raise ValueError(
+                        "parameter_sensitivities are missing declared parameters: "
+                        f"{', '.join(missing_sensitivities)}."
+                    )
 
         theta_beta_correlation = None
         if self.theta_beta_correlation is not None:
@@ -638,7 +645,7 @@ def _theta_beta_correlation_summary(inputs: DiscrepancyIdentifiabilityInputs) ->
         }
     if inputs.parameter_sensitivities is None or inputs.basis is None:
         return np.zeros((0, 0), dtype=float), None, {"parameter_names": (), "coefficient_names": (), "source": ("missing",)}
-    parameter_names = tuple(inputs.parameter_sensitivities.keys())
+    parameter_names = inputs.parameter_names or tuple(inputs.parameter_sensitivities.keys())
     sensitivity = np.column_stack([np.asarray(inputs.parameter_sensitivities[name], dtype=float) for name in parameter_names])
     basis = np.asarray(inputs.basis, dtype=float)
     correlation = _column_correlations(sensitivity, basis)
