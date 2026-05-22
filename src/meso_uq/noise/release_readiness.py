@@ -258,6 +258,7 @@ def validate_noise_config_document(document: Mapping[str, Any], *, source: str |
     kind = document.get("kind")
     legacy_shape = kind == "noise"
     likelihood_spec = None
+    config_body: Mapping[str, Any] = document
     if legacy_shape:
         metadata = document.get("metadata")
         spec = document.get("spec")
@@ -274,6 +275,7 @@ def validate_noise_config_document(document: Mapping[str, Any], *, source: str |
         if not isinstance(spec, dict):
             errors.append(f"{label}: kind=noise config must define spec.")
             spec = {}
+        config_body = spec
         spec_family = spec.get("family")
         if not isinstance(spec_family, str) or not spec_family:
             errors.append(f"{label}: spec.family must be a non-empty string.")
@@ -303,8 +305,10 @@ def validate_noise_config_document(document: Mapping[str, Any], *, source: str |
         if likelihood_spec is not None and name in _MODE_TO_CONFIG:
             _compare_likelihood_to_mode(label, str(name), likelihood_spec, errors)
 
+    if likelihood_spec is not None and legacy_shape and name in _MODE_TO_CONFIG:
+        _compare_likelihood_to_mode(label, str(name), likelihood_spec, errors)
     if name == "legacy":
-        likelihood = document.get("likelihood")
+        likelihood = config_body.get("likelihood")
         if not isinstance(likelihood, dict):
             errors.append(f"{label}: legacy config must define likelihood.")
         else:
@@ -316,13 +320,13 @@ def validate_noise_config_document(document: Mapping[str, Any], *, source: str |
             if not likelihood.get("legacy_mode"):
                 errors.append(f"{label}: legacy likelihood.legacy_mode is required.")
     if name in _VALIDATION_CONFIGS:
-        if not isinstance(document.get("required_scenarios"), list) or not document.get("required_scenarios"):
+        if not isinstance(config_body.get("required_scenarios"), list) or not config_body.get("required_scenarios"):
             errors.append(f"{label}: {name} config must list required_scenarios.")
-        artifacts = document.get("artifacts")
+        artifacts = config_body.get("artifacts")
         if not isinstance(artifacts, dict) or not artifacts:
             errors.append(f"{label}: {name} config must define artifacts.")
     if name == "emb_comparison":
-        evidence = document.get("evidence")
+        evidence = config_body.get("evidence")
         if not isinstance(evidence, dict):
             errors.append(f"{label}: emb_comparison config must define evidence.")
         else:
