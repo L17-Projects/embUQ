@@ -302,7 +302,7 @@ jobs:
             _ci/vega-runtime/korali/install
             _ci/vega-runtime/korali/env.sh
             extern/korali/subprojects/packagecache
-          key: korali-${{ runner.os }}-py311-${{ hashFiles('extern/korali/**', 'scripts/platforms/hpc/bootstrap_env.sh', 'scripts/platforms/hpc/bootstrap_korali.sh', 'src/meso_uq/vega.py') }}
+          key: workflow-canary-v2-korali-${{ runner.os }}-py311-${{ hashFiles('.github/workflows/ci.yml', 'extern/korali/**', 'scripts/platforms/hpc/bootstrap_env.sh', 'scripts/platforms/hpc/bootstrap_korali.sh', 'src/meso_uq/vega.py') }}
 
       - name: Report Korali cache state
         shell: bash
@@ -327,10 +327,30 @@ jobs:
 
       - name: Bootstrap canonical Korali runtime
         if: steps.korali-cache.outputs.cache-hit != 'true'
-        run: bash scripts/platforms/hpc/bootstrap_env.sh --site vega --with-korali
+        run: |
+          bash scripts/platforms/hpc/bootstrap_env.sh \
+            --site vega \
+            --system-site-packages \
+            --skip-python-deps \
+            --with-korali
 
       - name: Validate canonical Korali runtime
-        run: test -f "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
+        shell: bash
+        run: |
+          test -f "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
+          source "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
+          python - <<'PY'
+          import korali
+          import matplotlib
+          import meso_uq
+          import mpi4py
+          import pandas
+          import torch
+          import yaml
+
+          print(f"canonical env python deps ok: {meso_uq.__file__}")
+          print(f"korali import ok: {korali.__file__}")
+          PY
 
       - name: Run real CPU workflow canary
         shell: bash
