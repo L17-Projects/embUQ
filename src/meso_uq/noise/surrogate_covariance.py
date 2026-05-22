@@ -54,7 +54,17 @@ def _nonnegative_vector(values: Sequence[float], label: str) -> tuple[float, ...
 
 
 def _finite_matrix_snapshot(values: Sequence[Sequence[float]], label: str) -> tuple[tuple[float, ...], ...]:
-    rows = tuple(tuple(_finite_float(value, label) for value in row) for row in values)
+    rows = []
+    try:
+        iterator = iter(values)
+    except TypeError as exc:
+        raise ValueError(f"{label} must be a 2D matrix of finite numeric scalars.") from exc
+    for row in iterator:
+        try:
+            rows.append(tuple(_finite_float(value, label) for value in row))
+        except TypeError as exc:
+            raise ValueError(f"{label} must be a 2D matrix of finite numeric scalars.") from exc
+    rows = tuple(rows)
     if not rows:
         raise ValueError(f"{label} must contain at least one row.")
     return rows

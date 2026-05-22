@@ -126,6 +126,13 @@ def test_surrogate_covariance_inputs_snapshot_nested_payloads():
     assert low_rank.covariance_components["surrogate_predictive_low_rank"][0, 0] == pytest.approx(1.0)
 
 
+def test_surrogate_covariance_inputs_reject_flat_matrix_payloads_with_value_error():
+    with pytest.raises(ValueError, match="2D matrix"):
+        SurrogateCovarianceInputs(predictions=(1.0, 2.0), predictive_covariance=(0.1, 0.2))  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="2D matrix"):
+        SurrogateCovarianceInputs(predictions=(1.0, 2.0), low_rank_factors=(0.1, 0.2))  # type: ignore[arg-type]
+
+
 def test_surrogate_covariance_matches_legacy_bnn_predictive_std_quadrature():
     predictions = (2.0, 4.0)
     sigma = 0.5
