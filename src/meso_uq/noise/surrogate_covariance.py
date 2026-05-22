@@ -112,7 +112,7 @@ def _finite_low_rank_covariance(factors: np.ndarray, label: str) -> np.ndarray:
 
 def _correlation_from_covariance(covariance: np.ndarray) -> np.ndarray:
     diagonal = np.diag(covariance)
-    if np.allclose(diagonal, 0.0):
+    if not np.any(diagonal != 0.0):
         return np.eye(covariance.shape[0], dtype=float)
     scale = np.sqrt(np.maximum(diagonal, 0.0))
     denominator = np.outer(scale, scale)
@@ -133,7 +133,7 @@ def _finite_or_none(value: float) -> float | None:
 
 
 def _cholesky_with_optional_jitter(covariance: np.ndarray, jitter: float, max_jitter: float) -> tuple[np.ndarray | None, float]:
-    if np.allclose(covariance, 0.0):
+    if not np.any(covariance != 0.0):
         return None, 0.0
     symmetric = 0.5 * (covariance + covariance.T)
     try:
@@ -278,8 +278,9 @@ def _build_result(
         covariance = covariance + jitter_added * np.eye(covariance.shape[0], dtype=float)
     correlation = _correlation_from_covariance(covariance)
     eigenvalues = np.linalg.eigvalsh(0.5 * (covariance + covariance.T))
-    condition_number = np.linalg.cond(covariance) if covariance.size and not np.allclose(covariance, 0.0) else float("nan")
-    active = enabled and not np.allclose(covariance, 0.0)
+    has_nonzero_covariance = bool(np.any(covariance != 0.0))
+    condition_number = np.linalg.cond(covariance) if covariance.size and has_nonzero_covariance else float("nan")
+    active = enabled and has_nonzero_covariance
     covariance_components = {name: np.asarray(component, dtype=float) for name, component in finite_components.items()}
     covariance_components[_TOTAL_COMPONENT] = covariance
     variance_components = {name: tuple(float(value) for value in np.diag(component)) for name, component in covariance_components.items()}

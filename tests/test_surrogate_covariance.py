@@ -68,6 +68,23 @@ def test_surrogate_covariance_full_covariance_is_accepted_when_psd():
     assert result.summary["min_eigenvalue"] > 0.0
 
 
+def test_surrogate_covariance_preserves_tiny_full_covariance_structure():
+    result = build_surrogate_covariance(
+        SurrogateCovarianceInputs(
+            predictions=(1.0, 2.0),
+            predictive_covariance=((1.0e-12, 5.0e-13), (5.0e-13, 1.0e-12)),
+        ),
+        SurrogateCovarianceConfig(kind="full"),
+    )
+
+    assert result.summary["active"] is True
+    assert result.summary["cholesky_success"] is True
+    assert result.covariance.cholesky is not None
+    assert result.covariance.correlation[0, 1] == pytest.approx(0.5)
+    assert result.summary["correlation_min"] == pytest.approx(0.5)
+    assert result.summary["condition_number"] == pytest.approx(3.0)
+
+
 def test_surrogate_covariance_low_rank_can_include_diagonal_residual():
     result = build_surrogate_covariance(
         SurrogateCovarianceInputs(
