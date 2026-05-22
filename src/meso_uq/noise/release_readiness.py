@@ -375,10 +375,30 @@ def build_noise_artifact_index(manifests: Mapping[str, str | Path]) -> dict[str,
         if not path.exists():
             entries[label] = {"path": path.as_posix(), "exists": False, "all_scenarios_passed": False}
             continue
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload, payload_error = _read_json_mapping(path)
+        if payload is None:
+            entries[label] = {
+                "path": path.as_posix(),
+                "exists": False,
+                "all_scenarios_passed": False,
+                "read_error": payload_error,
+                "artifact_existence": {},
+            }
+            continue
         artifacts = payload.get("artifacts", {}) if isinstance(payload.get("artifacts"), dict) else {}
         metrics_path = _resolve_artifact(path, artifacts.get("metrics"))
-        metrics = json.loads(metrics_path.read_text(encoding="utf-8")) if metrics_path and metrics_path.exists() else {}
+        metrics: Mapping[str, Any] = {}
+        metrics_error: str | None = None
+        metrics_exists = False
+        if metrics_path is None:
+            metrics_error = "metrics artifact is not declared"
+        elif not metrics_path.exists():
+            metrics_error = f"{metrics_path.as_posix()}: metrics artifact does not exist"
+        else:
+            metrics_exists = True
+            metrics_payload, metrics_error = _read_json_mapping(metrics_path)
+            if metrics_payload is not None:
+                metrics = metrics_payload
         entries[label] = {
             "path": path.as_posix(),
             "exists": True,
@@ -388,8 +408,11 @@ def build_noise_artifact_index(manifests: Mapping[str, str | Path]) -> dict[str,
             "evidence_class": payload.get("evidence_class"),
             "production_claim": payload.get("production_claim"),
             "required_scenarios": payload.get("required_scenarios"),
-            "all_scenarios_passed": metrics.get("all_scenarios_passed"),
+            "all_scenarios_passed": metrics.get("all_scenarios_passed") if metrics_error is None else False,
             "scenario_gate_statuses": metrics.get("scenario_gate_statuses"),
+            "metrics_path": metrics_path.as_posix() if metrics_path else None,
+            "metrics_exists": metrics_exists,
+            "metrics_error": metrics_error,
             "commands": payload.get("commands", {}),
             "configs": payload.get("configs", payload.get("config", {})),
             "residual_risk": payload.get(
@@ -425,6 +448,10 @@ def evaluate_release_gate(
         entry = entries[label]
         if entry.get("exists") is not True:
             failures.append(f"Evidence entry {label} does not exist.")
+        if entry.get("read_error"):
+            failures.append(f"Evidence entry {label} could not be parsed: {entry['read_error']}.")
+        if entry.get("metrics_error"):
+            failures.append(f"Evidence entry {label} metrics could not be parsed: {entry['metrics_error']}.")
         if entry.get("all_scenarios_passed") is not True:
             failures.append(f"Evidence entry {label} does not report all_scenarios_passed=true.")
         statuses = entry.get("scenario_gate_statuses")
@@ -481,6 +508,18 @@ def _summarize_metrics(metrics: Mapping[str, Any]) -> dict[str, Any]:
         elif key in {"scenario_gate_statuses", "thresholds"} and isinstance(value, dict):
             summary[key] = value
     return summary
+
+
+def _read_json_mapping(path: Path) -> tuple[dict[str, Any] | None, str | None]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return None, f"{path.as_posix()}: invalid JSON at line {exc.lineno} column {exc.colno}: {exc.msg}"
+    except OSError as exc:
+        return None, f"{path.as_posix()}: {exc.__class__.__name__}: {exc}"
+    if not isinstance(payload, dict):
+        return None, f"{path.as_posix()}: expected JSON object"
+    return payload, None
 
 
 def _artifact_existence(manifest_path: Path, artifacts: Mapping[str, Any]) -> dict[str, bool]:

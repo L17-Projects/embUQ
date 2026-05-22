@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from meso_uq.noise import (
+    build_noise_artifact_index,
     resolve_noise_mode,
     supported_noise_modes,
     validate_noise_config_document,
@@ -67,6 +68,80 @@ def _write_evidence(root: Path, label: str, *, clean: bool = True) -> Path:
         encoding="utf-8",
     )
     return manifest_path
+
+
+def test_artifact_index_records_malformed_evidence_json(tmp_path):
+    malformed_manifest = tmp_path / "synthetic_manifest.json"
+    malformed_manifest.write_text("{not json", encoding="utf-8")
+
+    index = build_noise_artifact_index({"synthetic_recovery": malformed_manifest})
+
+    entry = index["entries"]["synthetic_recovery"]
+    assert entry["exists"] is False
+    assert entry["all_scenarios_passed"] is False
+    assert "invalid JSON" in entry["read_error"]
+
+
+def test_artifact_index_records_malformed_metrics_json(tmp_path):
+    metrics_path = tmp_path / "metrics.json"
+    metrics_path.write_text("{not json", encoding="utf-8")
+    manifest_path = tmp_path / "synthetic_manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "provenance": {"git_commit": "abc123", "git_status_clean": True},
+                "artifacts": {"metrics": metrics_path.name},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    index = build_noise_artifact_index({"synthetic_recovery": manifest_path})
+
+    entry = index["entries"]["synthetic_recovery"]
+    assert entry["exists"] is True
+    assert entry["metrics_exists"] is True
+    assert entry["all_scenarios_passed"] is False
+    assert "invalid JSON" in entry["metrics_error"]
+
+
+def test_release_readiness_script_reports_malformed_metrics_without_traceback(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    synthetic = _write_evidence(tmp_path / "synthetic", "synthetic")
+    (synthetic.parent / "synthetic_metrics.json").write_text("{not json", encoding="utf-8")
+    predictive = _write_evidence(tmp_path / "predictive", "predictive")
+    emb = _write_evidence(tmp_path / "emb", "emb")
+    gate06 = tmp_path / "gate06.json"
+    gate06.write_text(json.dumps({"pass": True, "failures": [], "warnings": []}), encoding="utf-8")
+    output_root = tmp_path / "release"
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "scripts/qa/noise_hierarchy_release_readiness.py"),
+            "--synthetic-manifest",
+            str(synthetic),
+            "--predictive-manifest",
+            str(predictive),
+            "--emb-manifest",
+            str(emb),
+            "--gate06-manifest",
+            str(gate06),
+            "--output-root",
+            str(output_root),
+            "--confirm-no-karolina-interaction",
+        ],
+        cwd=repo_root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert completed.returncode == 1
+    assert "Traceback" not in completed.stderr
+    manifest = json.loads((output_root / "noise_release_readiness_manifest.json").read_text(encoding="utf-8"))
+    failures = manifest["gate07"]["failures"]
+    assert any("synthetic_recovery metrics could not be parsed" in failure for failure in failures)
 
 
 def test_noise_config_examples_validate():
