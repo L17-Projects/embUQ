@@ -36,6 +36,13 @@ def _write_json(path: Path, payload: MappingLike) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _nonnegative_interval_errors(centers: Any, lows: Any, highs: Any) -> tuple[np.ndarray, np.ndarray]:
+    center_values = np.asarray(centers, dtype=float)
+    low_values = np.asarray(lows, dtype=float)
+    high_values = np.asarray(highs, dtype=float)
+    return np.maximum(center_values - low_values, 0.0), np.maximum(high_values - center_values, 0.0)
+
+
 def _git_output(*args: str) -> str | None:
     try:
         completed = subprocess.run(
@@ -295,8 +302,7 @@ def _write_plots(output_root: Path, summaries: list[MappingLike]) -> dict[str, s
             highs.append(metrics["interval_upper"])
     fig, ax = plt.subplots(figsize=(10.8, 4.2), constrained_layout=True)
     x_values = np.arange(len(labels))
-    lower_error = np.asarray(centers) - np.asarray(lows)
-    upper_error = np.asarray(highs) - np.asarray(centers)
+    lower_error, upper_error = _nonnegative_interval_errors(centers, lows, highs)
     ax.errorbar(x_values, centers, yerr=[lower_error, upper_error], fmt="o", color="tab:blue", label="predictive 90% interval")
     ax.scatter(x_values, observed, marker="x", color="black", label="observed")
     ax.set_xticks(x_values, labels, rotation=65, ha="right", fontsize=7)

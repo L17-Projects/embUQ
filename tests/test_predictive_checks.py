@@ -12,6 +12,7 @@ from meso_uq.noise import (
     SbcRankRecord,
     evaluate_predictive_checks,
 )
+from scripts.qa.noise_m6_predictive_checks_diagnostics import _nonnegative_interval_errors
 
 
 def _tuple_vector(values):
@@ -176,3 +177,14 @@ def test_predictive_checks_diagnostics_metrics_are_reproducible(tmp_path):
     first_metrics = json.loads((first / "predictive_check_metrics.json").read_text(encoding="utf-8"))
     second_metrics = json.loads((second / "predictive_check_metrics.json").read_text(encoding="utf-8"))
     assert first_metrics == second_metrics
+
+
+def test_predictive_summary_interval_errors_are_nonnegative_for_skewed_draws():
+    lower, upper = _nonnegative_interval_errors(
+        centers=(10.0, -10.0, 0.5),
+        lows=(0.0, -1.0, 0.0),
+        highs=(1.0, 0.0, 1.0),
+    )
+
+    assert tuple(lower) == pytest.approx((10.0, 0.0, 0.5))
+    assert tuple(upper) == pytest.approx((0.0, 10.0, 0.5))
