@@ -3,7 +3,7 @@ from pathlib import Path
 import yaml
 
 UPLOAD_ARTIFACT_SHA = "actions/upload-artifact@" "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
-CODECOV_ACTION_SHA = "codecov/codecov-action@" "57e3a136b779b570ffcdbf80b3bdc90e7fab3de2"
+CODECOV_ACTION_SHA = "codecov/codecov-action@" "e79a6962e0d4c0c17b229090214935d2e33f8354"
 RUN_COVERAGE_SCOPE_IF = (
     "success() && github.event_name == 'pull_request' && "
     "steps.coverage-scope.outputs.run_coverage_gate == 'true'"
