@@ -1,0 +1,178 @@
+{
+  "classification_policy": {
+    "allowed_classifications": [
+      "keep",
+      "document",
+      "deprecate",
+      "delete",
+      "false_positive",
+      "needs_owner_review"
+    ],
+    "default_classification": "needs_owner_review",
+    "delete_requires_focused_tests": true,
+    "delete_requires_owner_confirmation": true,
+    "preserve_patterns_until_review": [
+      "scripts/platforms/karolina/**",
+      "scripts/platforms/vega/**",
+      "scripts/workflows/emb/active_learning/**",
+      "gv/*/src/**"
+    ]
+  },
+  "generated_at": "2026-05-26T12:30:00Z",
+  "groups": [
+    {
+      "candidate_count": 1,
+      "classification": "needs_owner_review",
+      "owner": "emb",
+      "recommended_action": "classify-before-change",
+      "subsystem": "emb/compression/evalkit"
+    },
+    {
+      "candidate_count": 4,
+      "classification": "needs_owner_review",
+      "owner": "emb",
+      "recommended_action": "classify-before-change",
+      "subsystem": "emb/compression/src"
+    },
+    {
+      "candidate_count": 1,
+      "classification": "needs_owner_review",
+      "owner": "emb",
+      "recommended_action": "classify-before-change",
+      "subsystem": "emb/indentation/src"
+    },
+    {
+      "candidate_count": 4,
+      "classification": "needs_owner_review",
+      "owner": "gv",
+      "recommended_action": "classify-before-change",
+      "subsystem": "gv/buckling/src"
+    },
+    {
+      "candidate_count": 7,
+      "classification": "needs_owner_review",
+      "owner": "gv",
+      "recommended_action": "classify-before-change",
+      "subsystem": "gv/eigenmodes/src"
+    },
+    {
+      "candidate_count": 7,
+      "classification": "needs_owner_review",
+      "owner": "gv",
+      "recommended_action": "classify-before-change",
+      "subsystem": "gv/shear_flow/src"
+    },
+    {
+      "candidate_count": 6,
+      "classification": "needs_owner_review",
+      "owner": "gv",
+      "recommended_action": "classify-before-change",
+      "subsystem": "gv/stretching/src"
+    },
+    {
+      "candidate_count": 6,
+      "classification": "needs_owner_review",
+      "owner": "gv",
+      "recommended_action": "classify-before-change",
+      "subsystem": "gv/torsion/src"
+    },
+    {
+      "candidate_count": 3,
+      "classification": "needs_owner_review",
+      "owner": "paper-reproduction",
+      "recommended_action": "classify-before-change",
+      "subsystem": "papers/huq_emb"
+    },
+    {
+      "candidate_count": 1,
+      "classification": "needs_owner_review",
+      "owner": "platforms",
+      "recommended_action": "classify-before-change",
+      "subsystem": "scripts/platforms/hpc"
+    },
+    {
+      "candidate_count": 14,
+      "classification": "needs_owner_review",
+      "owner": "platforms",
+      "recommended_action": "preserve-until-platform-owner-review",
+      "subsystem": "scripts/platforms/karolina"
+    },
+    {
+      "candidate_count": 9,
+      "classification": "needs_owner_review",
+      "owner": "platforms",
+      "recommended_action": "preserve-until-platform-owner-review",
+      "subsystem": "scripts/platforms/vega"
+    },
+    {
+      "candidate_count": 4,
+      "classification": "needs_owner_review",
+      "owner": "ci-governance",
+      "recommended_action": "document-entrypoints-or-add-tests",
+      "subsystem": "scripts/qa/ci"
+    },
+    {
+      "candidate_count": 1,
+      "classification": "needs_owner_review",
+      "owner": "noise",
+      "recommended_action": "classify-before-change",
+      "subsystem": "scripts/qa/noise_m2_diagnostics.py"
+    },
+    {
+      "candidate_count": 1,
+      "classification": "needs_owner_review",
+      "owner": "noise",
+      "recommended_action": "classify-before-change",
+      "subsystem": "scripts/qa/noise_m3_measurement_diagnostics.py"
+    },
+    {
+      "candidate_count": 1,
+      "classification": "needs_owner_review",
+      "owner": "noise",
+      "recommended_action": "classify-before-change",
+      "subsystem": "scripts/qa/noise_m4_surrogate_covariance_diagnostics.py"
+    },
+    {
+      "candidate_count": 1,
+      "classification": "needs_owner_review",
+      "owner": "noise",
+      "recommended_action": "classify-before-change",
+      "subsystem": "scripts/qa/noise_m5_full_hierarchy_diagnostics.py"
+    },
+    {
+      "candidate_count": 6,
+      "classification": "needs_owner_review",
+      "owner": "postprocess",
+      "recommended_action": "document-entrypoints-or-add-tests",
+      "subsystem": "scripts/shared/postprocess"
+    },
+    {
+      "candidate_count": 15,
+      "classification": "needs_owner_review",
+      "owner": "emb-workflows",
+      "recommended_action": "preserve-active-learning-and-platform-entrypoints",
+      "subsystem": "scripts/workflows/emb"
+    },
+    {
+      "candidate_count": 5,
+      "classification": "needs_owner_review",
+      "owner": "gv-workflows",
+      "recommended_action": "document-entrypoints-or-add-tests",
+      "subsystem": "scripts/workflows/gv"
+    }
+  ],
+  "manifest_id": "weekly-audit-2026-w21-orphan-triage",
+  "schema_version": "1.0",
+  "source": {
+    "audit_report": "/home/it4i-bbenvegnen/knowledge/vault/02 Projects/MesoUQ/Weekly Health Audits/2026-W21/Weekly MesoUQ Codebase Health Audit - 2026-W21.md",
+    "linear_issue": "MES-264",
+    "linear_project": "MesoUQ Audit Polishing",
+    "weekly_audit": "2026-W21"
+  },
+  "summary": {
+    "candidate_count": 97,
+    "candidate_signal": "no import or text-reference hit in the baseline scan",
+    "interpretation": "candidate signal only, not a deletion decision",
+    "tracked_python_scanned": 397
+  }
+}

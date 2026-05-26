@@ -1,0 +1,54 @@
+{
+  "gates": [
+    {
+      "command": "python scripts/ci/check_docs_links.py",
+      "name": "docs-link-check",
+      "owner": "docs-governance",
+      "review_condition": "update when docs roots or markdown link policy changes",
+      "status": "enforced"
+    },
+    {
+      "command": "python -m pytest tests/test_structural_governance_policy.py tests/test_script_path_governance.py tests/test_repository_governance.py -q",
+      "name": "governance-structural-tests",
+      "owner": "governance",
+      "review_condition": "update when repo policy helpers change",
+      "status": "enforced"
+    },
+    {
+      "command": "python -m pytest tests/test_github_workflows.py -q",
+      "name": "workflow-action-pin-policy",
+      "owner": "ci-governance",
+      "review_condition": "Dependabot action SHA PRs must update workflow policy expectations in the same branch",
+      "status": "enforced"
+    },
+    {
+      "command": null,
+      "name": "ruff",
+      "owner": "python-quality",
+      "review_condition": "adopt only after a scoped baseline and exclude strategy are accepted",
+      "status": "deferred"
+    },
+    {
+      "command": null,
+      "name": "mypy",
+      "owner": "python-quality",
+      "review_condition": "adopt module-by-module after typed public contracts stabilize",
+      "status": "deferred"
+    },
+    {
+      "command": null,
+      "name": "pip-audit",
+      "owner": "dependency-health",
+      "review_condition": "make enforcing only after runtime/HPC dependency false positives are triaged",
+      "status": "advisory"
+    }
+  ],
+  "generated_at": "2026-05-26T12:30:00Z",
+  "manifest_id": "weekly-audit-static-quality-policy",
+  "schema_version": "1.0",
+  "scope": "weekly audit and repository governance gates for Vega, Karolina, and GitHub Linux CI",
+  "source": {
+    "linear_issue": "MES-266",
+    "linear_project": "MesoUQ Audit Polishing"
+  }
+}

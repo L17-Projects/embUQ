@@ -1,0 +1,114 @@
+{
+  "generated_at": "2026-05-26T12:30:00Z",
+  "manifest_id": "weekly-audit-2026-w21-large-tracked-payloads",
+  "policy": {
+    "externalization_requires_checksum_and_retrieval_plan": true,
+    "generated_root_candidates_found": 0,
+    "minimum_documented_bytes": 500000,
+    "removal_requires_reproducibility_plan": true
+  },
+  "schema_version": "1.0",
+  "source": {
+    "linear_issue": "MES-265",
+    "linear_project": "MesoUQ Audit Polishing",
+    "weekly_audit": "2026-W21"
+  },
+  "tracked_payloads": [
+    {
+      "bytes": 23985672,
+      "owner": "emb-indentation-surrogate",
+      "path": "emb/indentation/surrogate/diameters/3.4um/data/samples_all.dat",
+      "retention_policy": "curated-reference-data",
+      "status": "owned",
+      "storage_location": "source_tree"
+    },
+    {
+      "bytes": 11405457,
+      "owner": "emb-indentation-surrogate",
+      "path": "emb/indentation/surrogate/diameters/5.8um/data/samples_all.dat",
+      "retention_policy": "curated-reference-data",
+      "status": "owned",
+      "storage_location": "source_tree"
+    },
+    {
+      "bytes": 11404504,
+      "owner": "emb-indentation-surrogate",
+      "path": "emb/indentation/surrogate/diameters/3.2um/data/samples_all.dat",
+      "retention_policy": "curated-reference-data",
+      "status": "owned",
+      "storage_location": "source_tree"
+    },
+    {
+      "bytes": 4465211,
+      "owner": "emb-compression-surrogate",
+      "path": "emb/compression/surrogate/diameters/2.9um/data/F_Delta.dat",
+      "retention_policy": "curated-reference-data",
+      "status": "owned",
+      "storage_location": "source_tree"
+    },
+    {
+      "bytes": 4059384,
+      "owner": "emb-compression-surrogate",
+      "path": "emb/compression/surrogate/diameters/3.0um/data/F_Delta.dat",
+      "retention_policy": "curated-reference-data",
+      "status": "owned",
+      "storage_location": "source_tree"
+    },
+    {
+      "bytes": 3991728,
+      "owner": "emb-compression-surrogate",
+      "path": "emb/compression/surrogate/diameters/2.1um/data/F_Delta.dat",
+      "retention_policy": "curated-reference-data",
+      "status": "owned",
+      "storage_location": "source_tree"
+    },
+    {
+      "bytes": 2509430,
+      "owner": "korali-vendor",
+      "path": "extern/korali/python/korali/profiler/examples/example_single_4096Nodes.json",
+      "retention_policy": "vendored-source-example",
+      "status": "owned",
+      "storage_location": "source_tree"
+    },
+    {
+      "bytes": 688039,
+      "owner": "emb-compression-geometry",
+      "path": "emb/compression/src/mesh/rigid_coords_reflected.txt",
+      "retention_policy": "curated-reference-geometry",
+      "status": "owned",
+      "storage_location": "source_tree"
+    },
+    {
+      "bytes": 688000,
+      "owner": "emb-compression-geometry",
+      "path": "emb/compression/src/mesh/rigid_coords.txt",
+      "retention_policy": "curated-reference-geometry",
+      "status": "owned",
+      "storage_location": "source_tree"
+    },
+    {
+      "bytes": 661797,
+      "owner": "korali-vendor",
+      "path": "extern/korali/source/auxiliar/json.hpp",
+      "retention_policy": "vendored-source",
+      "status": "owned",
+      "storage_location": "source_tree"
+    },
+    {
+      "bytes": 656330,
+      "owner": "korali-vendor",
+      "path": "extern/korali/python/korali/profiler/examples/example_multiple_512Nodes.json",
+      "retention_policy": "vendored-source-example",
+      "status": "owned",
+      "storage_location": "source_tree"
+    },
+    {
+      "bytes": 539862,
+      "owner": "emb-compression-surrogate",
+      "path": "emb/compression/surrogate/diameters/2.9um/trained/microbubble_force_BEST.pkl",
+      "retention_policy": "curated-surrogate-baseline",
+      "status": "owned",
+      "storage_location": "source_tree"
+    }
+  ]
+}

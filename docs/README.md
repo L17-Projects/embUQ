@@ -32,6 +32,7 @@ Do not document new root-level EMB experiment source trees. Those EMB assets now
 - `MESO_UQ_GPU_VALIDATION_GATE.md` for the GPU closeout evidence contract
 - `CONFIGURATION_POLICY.md` for config contract skeletons and schema expectations
 - `ARTIFACT_POLICY.md` for manifest and artifact ownership rules
+- `AUDIT_POLISHING_POLICY.md` for weekly-audit cleanup triage, large-payload ownership, and static-quality gate decisions
 - `PLATFORM_POLICY.md` for platform-policy direction
 - `SCRIPT_PATH_POLICY.md` for canonical script paths and compatibility aliases
 - `COMPATIBILITY_SHIMS.md` for legacy wrapper warning and retirement policy

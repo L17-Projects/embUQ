@@ -65,6 +65,13 @@ Cleanup policy is conservative:
   - `configs/platforms/generic_slurm.example.yaml`
   - `docs/ARTIFACT_POLICY.md`
 
+
+## Large tracked payload ownership
+
+Large tracked scientific/reference payloads must have an owner, retention policy, storage location, and status before they are moved or removed. The weekly audit ownership manifest lives at `configs/audit_polishing/large_tracked_payloads.example.json`.
+
+Size alone is not a deletion criterion. Curated reference data, reference geometry, vendored source, and release-critical baselines stay tracked until an owner approves an externalization or regeneration plan with checksums and verification commands.
+
 ## Governance direction
 
 - Do not broad-delete generated roots under this policy slice.
