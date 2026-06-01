@@ -142,6 +142,17 @@ def test_vega_sbatch_scripts_use_rebuilt_openmpi_module() -> None:
     assert "OpenMPI/4.1.4-GCC-12.2.0" in validation_matrix.read_text(encoding="utf-8")
 
 
+def test_vega_gpu_sbatch_scripts_exclude_known_bad_gpu_node() -> None:
+    sbatch_root = REPO_ROOT / "scripts" / "platforms" / "vega" / "sbatch"
+    offenders = []
+    for path in sorted(sbatch_root.rglob("*.sbatch")):
+        text = path.read_text(encoding="utf-8")
+        if "#SBATCH --gres=gpu:1" in text and "#SBATCH --exclude=gn10" not in text:
+            offenders.append(path.relative_to(REPO_ROOT).as_posix())
+
+    assert offenders == []
+
+
 def test_tracked_files_do_not_reintroduce_split_site_env_paths() -> None:
     retired_tokens = [
         f"{site}/{env_name}"

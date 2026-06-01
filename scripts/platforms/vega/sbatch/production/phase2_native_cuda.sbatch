@@ -3,6 +3,7 @@
 #SBATCH --ntasks=1
 #SBATCH --mem=64000
 #SBATCH --gres=gpu:1
+#SBATCH --exclude=gn10
 #SBATCH --time=06:00:00
 
 set -eo pipefail

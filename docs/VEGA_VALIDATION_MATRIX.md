@@ -74,6 +74,11 @@ The canned template is:
 
 It targets the Vega `dev` partition and therefore keeps the wall clock at 30 minutes or less. For longer non-smoke operator runs, copy the template and adjust the partition/time budget explicitly.
 
+Vega GPU templates currently exclude `gn10` by default because that node reproduced a
+CUDA/PyTorch initialization failure while peer nodes passed the same canonical runtime
+probe. Keep the exclusion in place until Vega support clears the node and the matrix is
+rerun without it.
+
 Submit the template from the repo root, or set `REPO_ROOT=/abs/path/to/clone` explicitly when calling `sbatch`.
 
 It assumes:

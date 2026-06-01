@@ -67,8 +67,9 @@ The first Karolina canary, job `4394149`, failed usefully: it caught unsanitized
 CPU env and an overly strict default `mpio` HDF5 check. The wrappers now sanitize the
 environment before preflight and default to serial HDF5 smoke.
 
-Vega remains a required closeout gate. The project is not dual-HPC complete until the
-same canary passes on Vega.
+Vega has passed the same canary under the canonical site runtime. Vega GPU submissions
+must keep the `gn10` exclusion until support clears that node or an equivalent
+operator-reviewed policy replaces it.
 
 ## Karolina Array Packing Guard
 

@@ -135,6 +135,13 @@ REPO_ROOT=$(pwd) sbatch scripts/platforms/vega/sbatch/production/complete_reduce
 Useful production overrides:
 - `GPU_PARTITION=dev` to run GPU phases on `dev`
 - `PHASE3B_MEM_ARG="--mem=8000"` when `--exclusive` is too strict on `dev`
+- `MESOUQ_VEGA_GPU_EXCLUDE_NODES=<nodes>` to override the default `gn10` GPU-node
+  exclusion in production child submissions after operator review; set it to an empty
+  string only after support clears the node
 - `RUN_TAG=<tag>` to control output/log folder naming
+
+Direct Vega GPU sbatch templates also carry `#SBATCH --exclude=gn10` while the Vega
+support escalation for that node remains open. Remove or override it only after a clean
+control rerun shows CUDA/PyTorch and the validation matrix pass without the exclusion.
 
 When submitting with `sbatch`, run from the repo root or set `REPO_ROOT` explicitly, and set `MESOUQ_SITE_RUNTIME_ROOT` so the batch job can resolve the canonical site runtime.
