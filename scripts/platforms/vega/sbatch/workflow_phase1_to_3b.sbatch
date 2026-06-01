@@ -13,6 +13,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64000
 #SBATCH --gres=gpu:1
+#SBATCH --exclude=gn10
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
 

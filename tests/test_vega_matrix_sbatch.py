@@ -59,6 +59,7 @@ def test_karolina_validation_matrix_template_uses_only_karolina_runtime_paths() 
 def test_vega_validation_matrix_template_matches_workflow_only_defaults() -> None:
     text = (SBATCH_DIR / "validation_matrix.sbatch").read_text(encoding="utf-8")
 
+    assert "#SBATCH --exclude=gn10" in text
     assert 'RUN_MAP_MIRHEO="${RUN_MAP_MIRHEO:-false}"' in text
     assert 'MAP_MIRHEO_N_DISPLACEMENTS="${MAP_MIRHEO_N_DISPLACEMENTS:-1}"' in text
     assert 'SKIP_RELEASE_MANIFEST="${SKIP_RELEASE_MANIFEST:-true}"' in text

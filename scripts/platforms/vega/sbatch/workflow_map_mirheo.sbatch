@@ -12,6 +12,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --gres=gpu:1
+#SBATCH --exclude=gn10
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
 

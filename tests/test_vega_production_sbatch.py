@@ -99,16 +99,34 @@ def test_complete_orchestrators_set_config_path(template: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# --exclude="" guard on child sbatch calls (prevents accidental node exclusion)
+# Vega GPU bad-node policy: GPU child jobs must not clear the known exclusion.
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("template", COMPLETE_ORCHESTRATORS)
-def test_complete_orchestrators_use_exclude_empty(template: str) -> None:
+def test_complete_orchestrators_apply_gpu_exclusion_policy(template: str) -> None:
     text = _read(template)
-    assert (
-        '--exclude=""' in text
-    ), f'{template}: child sbatch calls must include --exclude="" to prevent stale exclusions'
+    assert 'VEGA_GPU_EXCLUDE_NODES="${MESOUQ_VEGA_GPU_EXCLUDE_NODES-gn10}"' in text
+    assert text.count('"${VEGA_GPU_EXCLUDE_ARG[@]}"') == 4
+    assert text.count('--exclude=""') == 1, (
+        f"{template}: only the CPU fallback child job should clear GPU exclusions"
+    )
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "phase1_gpu.sbatch",
+        "phase2_native_cuda.sbatch",
+        "phase3b_gpu.sbatch",
+        "propagation_phase3b.sbatch",
+        "validation_phase1_to_3b.sbatch",
+        "validation_propagation.sbatch",
+    ],
+)
+def test_direct_gpu_production_templates_exclude_known_bad_vega_node(template: str) -> None:
+    text = _read(template)
+    assert "#SBATCH --exclude=gn10" in text
 
 
 # ---------------------------------------------------------------------------
