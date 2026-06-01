@@ -13,6 +13,7 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 
 from meso_uq.active_learning.emb_34um_dnn_causal_validation_protocol import (
+    EMB_34UM_DNN_CAUSAL_BOUNDS,
     EMB_34UM_DNN_CAUSAL_FORCE_GRID,
     EMB_34UM_DNN_CAUSAL_FORBIDDEN_SELECTOR_TOKENS,
     validate_dnn_causal_ensemble_size,
@@ -34,6 +35,8 @@ class DnnSurrogateLongRow:
     curve_id: str
     ka_log10: float
     kb_log10: float
+    radp: float | None
+    shell_th: float | None
     force: float
     force_norm: float
     observable: float
@@ -48,8 +51,8 @@ class Emb34umDnnSurrogateFit:
     ensemble_member_count: int
     train_runtime_seconds: float
     score_runtime_seconds: float
-    feature_mean: tuple[float, float, float]
-    feature_scale: tuple[float, float, float]
+    feature_mean: tuple[float, ...]
+    feature_scale: tuple[float, ...]
     target_mean: float
     target_scale: float
     force_min: float
@@ -172,6 +175,69 @@ def _coerce_ka_kb(row: Mapping[str, Any], *, row_index: int) -> tuple[float, flo
     return ka, kb
 
 
+def _coerce_d4_geometry_value(
+    row: Mapping[str, Any],
+    *,
+    key: str,
+    row_index: int,
+    low: float,
+    high: float,
+) -> float | None:
+    raw_value = None
+    parameters = row.get("parameters")
+    if isinstance(parameters, Mapping) and key in parameters:
+        raw_value = parameters.get(key)
+    if raw_value is None and key in row:
+        raw_value = row.get(key)
+    if raw_value is None:
+        return None
+    value = _coerce_positive_float(raw_value, label=f"{_row_label(row_index)}.{key}")
+    if not (low <= value <= high):
+        raise ValueError(f"{_row_label(row_index)}.{key} must be within [{low}, {high}].")
+    return value
+
+
+def _coerce_d4_geometry(row: Mapping[str, Any], *, row_index: int) -> tuple[float | None, float | None]:
+    radp = _coerce_d4_geometry_value(
+        row,
+        key="radp",
+        row_index=row_index,
+        low=EMB_34UM_DNN_CAUSAL_BOUNDS["radp"][0],
+        high=EMB_34UM_DNN_CAUSAL_BOUNDS["radp"][1],
+    )
+    shell_th = _coerce_d4_geometry_value(
+        row,
+        key="shell_th",
+        row_index=row_index,
+        low=EMB_34UM_DNN_CAUSAL_BOUNDS["shell_th"][0],
+        high=EMB_34UM_DNN_CAUSAL_BOUNDS["shell_th"][1],
+    )
+    if (radp is None) != (shell_th is None):
+        raise ValueError(f"{_row_label(row_index)} must provide both radp and shell_th together.")
+    return radp, shell_th
+
+
+def _row_feature_count(row: DnnSurrogateLongRow) -> int:
+    if row.radp is None and row.shell_th is None:
+        return 3
+    if row.radp is not None and row.shell_th is not None:
+        return 5
+    raise ValueError(
+        f"completed row {row.curve_id} has incomplete D4 geometry fields. "
+        "Both radp and shell_th must be present when either is provided."
+    )
+
+
+def _row_features(row: DnnSurrogateLongRow) -> tuple[float, ...]:
+    base = (
+        row.ka_log10,
+        row.kb_log10,
+    )
+    if row.radp is not None and row.shell_th is not None:
+        return base + (row.radp, row.shell_th, row.force_norm)
+    return base + (row.force_norm,)
+
+
 def _coerce_force_grid_from_row(row: Mapping[str, Any], *, row_index: int) -> tuple[float, ...]:
     for key in ("force_grid", "force", "forces", "axis", "force_axis"):
         if key in row:
@@ -250,6 +316,7 @@ def convert_completed_curves_to_long_rows(
     for index, raw_row in enumerate(source_rows, start=1):
         row = _coerce_mapping(raw_row, label=_row_label(index))
         ka, kb = _coerce_ka_kb(row, row_index=index)
+        radp, shell_th = _coerce_d4_geometry(row, row_index=index)
         row_force_grid = _coerce_force_grid_from_row(row, row_index=index)
         observable = _coerce_observable(row, row_index=index)
 
@@ -276,6 +343,8 @@ def convert_completed_curves_to_long_rows(
                     curve_id=curve_id,
                     ka_log10=ka_log10,
                     kb_log10=kb_log10,
+                    radp=radp,
+                    shell_th=shell_th,
                     force=float(force),
                     force_norm=_normalize_force(float(force), force_min=force_min, force_max=force_max),
                     observable=float(value),
@@ -291,7 +360,12 @@ def convert_completed_curves_to_long_rows(
 def _rows_to_arrays(rows: Sequence[DnnSurrogateLongRow]) -> tuple[np.ndarray, np.ndarray, tuple[str, ...]]:
     if not rows:
         raise ValueError("rows must not be empty.")
-    x = np.asarray([(row.ka_log10, row.kb_log10, row.force_norm) for row in rows], dtype=float)
+    expected_feature_count = _row_feature_count(rows[0])
+    x = np.asarray([_row_features(row) for row in rows], dtype=float)
+    if x.ndim != 2:
+        raise ValueError("training rows contain mixed D2/D4 feature dimensions.")
+    if x.shape[1] != expected_feature_count:
+        raise ValueError("training rows contain mixed D2/D4 feature dimensions.")
     y = np.asarray([row.observable for row in rows], dtype=float)
     curve_ids = tuple(row.curve_id for row in rows)
     return x, y, curve_ids
@@ -300,7 +374,7 @@ def _rows_to_arrays(rows: Sequence[DnnSurrogateLongRow]) -> tuple[np.ndarray, np
 def _scaler_from_rows(
     features: np.ndarray,
     targets: np.ndarray,
-) -> tuple[tuple[float, float, float], tuple[float, float, float], float, float]:
+) -> tuple[tuple[float, ...], tuple[float, ...], float, float]:
     feature_mean = tuple(float(value) for value in features.mean(axis=0))
     feature_scale = features.std(axis=0)
     feature_scale[feature_scale == 0.0] = 1.0
@@ -314,8 +388,8 @@ def _scaler_from_rows(
 def _normalize_features(
     features: np.ndarray,
     *,
-    feature_mean: tuple[float, float, float],
-    feature_scale: tuple[float, float, float],
+    feature_mean: tuple[float, ...],
+    feature_scale: tuple[float, ...],
 ) -> np.ndarray:
     return (features - np.asarray(feature_mean, dtype=float)) / np.asarray(feature_scale, dtype=float)
 
@@ -359,13 +433,15 @@ def _train_test_split_indices(count: int, seed: int, *, validation_fraction: flo
     return indices[:-validation_count], indices[-validation_count:]
 
 
-def _build_dnn_model(seed: int) -> Any:
+def _build_dnn_model(seed: int, *, feature_count: int) -> Any:
     import torch
 
     from meso_uq.surrogate.model import MLP, init_weights
 
     torch.manual_seed(int(seed))
-    model = MLP(3, 1, [64, 64])
+    if feature_count not in {3, 5}:
+        raise ValueError("only 3- or 5-dimensional feature inputs are supported.")
+    model = MLP(feature_count, 1, [64, 64])
     model.apply(init_weights)
     return model
 
@@ -373,8 +449,8 @@ def _build_dnn_model(seed: int) -> Any:
 def _save_checkpoint(
     model: Any,
     *,
-    feature_mean: tuple[float, float, float],
-    feature_scale: tuple[float, float, float],
+    feature_mean: tuple[float, ...],
+    feature_scale: tuple[float, ...],
     target_mean: float,
     target_scale: float,
     path: Path,
@@ -392,7 +468,9 @@ def _save_checkpoint(
     )
 
 
-def _load_checkpoint(path: Path) -> tuple[Any, tuple[float, float, float], tuple[float, float, float], float, float]:
+def _load_checkpoint(
+    path: Path,
+) -> tuple[Any, tuple[float, ...], tuple[float, ...], float, float]:
     from meso_uq.surrogate.model import load_model_states
 
     model, xshift, xscale, yshift, yscale = load_model_states(str(path))
@@ -412,8 +490,8 @@ def _train_single_member(
     architecture: str,
     output_root: Path,
     index: int,
-    feature_mean: tuple[float, float, float],
-    feature_scale: tuple[float, float, float],
+    feature_mean: tuple[float, ...],
+    feature_scale: tuple[float, ...],
     target_mean: float,
     target_scale: float,
     validation_fraction: float,
@@ -448,7 +526,7 @@ def _train_single_member(
 
     resolved_device = torch.device(device)
     torch.manual_seed(int(seed))
-    model = _build_dnn_model(seed).to(resolved_device)
+    model = _build_dnn_model(seed, feature_count=len(feature_mean)).to(resolved_device)
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=float(learning_rate))
 
@@ -527,7 +605,7 @@ def _predict_member_rows(model: Any, rows: np.ndarray, *, scaler: Any) -> np.nda
 
 def _load_ensemble_members(
     fit: Emb34umDnnSurrogateFit,
-) -> tuple[tuple[Any, tuple[float, float, float], tuple[float, float, float], float, float], ...]:
+) -> tuple[tuple[Any, tuple[float, ...], tuple[float, ...], float, float], ...]:
     if not fit.ensemble_checkpoints:
         raise ValueError("ensemble_checkpoints is empty.")
     return tuple(_load_checkpoint(Path(path)) for path in fit.ensemble_checkpoints)
@@ -539,6 +617,8 @@ def load_ensemble_member_predictions(
     *,
     ka: float,
     kb: float,
+    radp: float | None = None,
+    shell_th: float | None = None,
 ) -> tuple[tuple[float, ...], tuple[tuple[float, ...], ...]]:
     members = _load_ensemble_members(fit)
     force_axis = tuple(float(value) for value in force_values)
@@ -547,13 +627,36 @@ def load_ensemble_member_predictions(
 
     ka_log10 = math.log10(_coerce_positive_float(ka, label="ka"))
     kb_log10 = math.log10(_coerce_positive_float(kb, label="kb"))
+    feature_count = len(fit.feature_mean)
+    if (radp is None) != (shell_th is None):
+        raise ValueError("radp and shell_th must be provided together.")
+    if feature_count == 3:
+        if radp is not None and shell_th is not None:
+            raise ValueError(
+                "D4 geometry was supplied to a 3-feature D2 surrogate fit. "
+                "Use an explicit legacy D2 context without radp/shell_th or retrain the fit with D4 rows."
+            )
+        base_features = (ka_log10, kb_log10)
+    elif feature_count == 5:
+        if radp is None or shell_th is None:
+            raise ValueError(
+                "radp and shell_th are required for D4 surrogate predictions. "
+                "Pass both and ensure training rows also included both fields."
+            )
+        base_features = (
+            ka_log10,
+            kb_log10,
+            _coerce_positive_float(radp, label="radp"),
+            _coerce_positive_float(shell_th, label="shell_th"),
+        )
+    else:
+        raise ValueError("surrogate feature count must be 3 (d2) or 5 (d4).")
+
+    if len(fit.feature_scale) != feature_count or len(fit.feature_mean) != feature_count:
+        raise ValueError("fit feature scaler dimension mismatch.")
     x = np.asarray(
         [
-            (
-                ka_log10,
-                kb_log10,
-                _normalize_force(force, force_min=fit.force_min, force_max=fit.force_max),
-            )
+            base_features + (_normalize_force(force, force_min=fit.force_min, force_max=fit.force_max),)
             for force in force_axis
         ],
         dtype=float,
@@ -588,7 +691,37 @@ def predict_candidate_curves(
         row = _coerce_mapping(raw_row, label=f"candidate_records[{index}]")
         ka = _coerce_positive_float(row.get("ka", row.get("Yt", 1.0)), label=f"candidate_records[{index}].ka")
         kb = _coerce_positive_float(row.get("kb", row.get("kb_scale", 1.0)), label=f"candidate_records[{index}].kb")
-        curve, _ = load_ensemble_member_predictions(fit, force_axis, ka=ka, kb=kb)
+        radp = row.get("radp")
+        shell_th = row.get("shell_th")
+        parameters = row.get("parameters")
+        if isinstance(parameters, Mapping):
+            if radp is None:
+                radp = parameters.get("radp")
+            if shell_th is None:
+                shell_th = parameters.get("shell_th")
+        if (radp is None) != (shell_th is None):
+            raise ValueError(
+                f"candidate_records[{index}] must provide both radp and shell_th together."
+            )
+        if len(fit.feature_mean) == 5:
+            if radp is None or shell_th is None:
+                raise ValueError(
+                    f"candidate_records[{index}] must include both radp and shell_th for D4 scoring."
+                )
+        elif radp is not None and shell_th is not None:
+            raise ValueError(
+                f"candidate_records[{index}] supplied D4 geometry to a 3-feature D2 surrogate fit."
+            )
+        curve, _ = load_ensemble_member_predictions(
+            fit,
+            force_axis,
+            ka=ka,
+            kb=kb,
+            radp=radp if radp is None else _coerce_positive_float(radp, label=f"candidate_records[{index}].radp"),
+            shell_th=(
+                shell_th if shell_th is None else _coerce_positive_float(shell_th, label=f"candidate_records[{index}].shell_th")
+            ),
+        )
         predictions.append(curve)
     return tuple(predictions)
 

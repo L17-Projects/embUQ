@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=mesouq-emb-dnn-select
 #SBATCH --account=eu-26-17
-#SBATCH --partition=qgpu
-#SBATCH --time=01:00:00
+#SBATCH --partition=qgpu_exp
+#SBATCH --time=00:12:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -33,6 +33,8 @@ PYTHON_BIN="${PYTHON_BIN:-$(command -v python)}"
 COMPLETED_ROWS="${COMPLETED_ROWS:-}"
 CANDIDATE_POOL="${CANDIDATE_POOL:-}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-}"
+CANDIDATE_SPACE="${CANDIDATE_SPACE:-d4}"
+ACQUISITION_SCORE_MODE="${ACQUISITION_SCORE_MODE:-curve_error}"
 DEVICE="${DEVICE:-cuda}"
 EPOCHS="${EPOCHS:-200}"
 BATCH_SIZE="${BATCH_SIZE:-128}"
@@ -65,6 +67,8 @@ CMD=(
   "--learning-rate" "${LEARNING_RATE}"
   "--validation-fraction" "${VALIDATION_FRACTION}"
   "--top-n" "${TOP_N}"
+  "--candidate-space" "${CANDIDATE_SPACE}"
+  "--acquisition-score-mode" "${ACQUISITION_SCORE_MODE}"
   "--diversity-weight" "${DIVERSITY_WEIGHT}"
   "--seed-offset" "${SEED_OFFSET}"
 )

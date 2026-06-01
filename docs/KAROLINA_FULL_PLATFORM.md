@@ -23,6 +23,21 @@ The site-neutral runtime helper resolves Karolina bootstrap state under `MESOUQ_
 - `${MESOUQ_SITE_RUNTIME_ROOT}/mirheo`
 - `${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools`
 
+The supported activation contract is site-neutral:
+
+```bash
+export MESOUQ_SITE=karolina
+export MESOUQ_SITE_RUNTIME_ROOT=<karolina-runtime-root>
+source scripts/platforms/hpc/site_env.sh
+mesouq_activate_site_env karolina "$PWD"
+```
+
+After activation, `python`, `PYTHON_BIN`, `MESOUQ_ENV_ROOT`,
+`MESOUQ_ENV_SCRIPT`, and `MESOUQ_GV_ENV_SCRIPT` all resolve through the
+canonical `${MESOUQ_SITE_RUNTIME_ROOT}/env` environment. Non-canonical
+`MESOUQ_ENV_ROOT`, `MESOUQ_ENV_SCRIPT`, or `MESOUQ_GV_ENV_SCRIPT` overrides are
+rejected by `site_env.sh`.
+
 `MESOUQ_PROVENANCE_ROOT` is explicit and site-aware. On Karolina it should point to scratch-accessible provenance staging that matches the chosen isolated runtime/run tag, and generated runtime env scripts export the resolved value.
 
 ## Slurm policy
@@ -49,13 +64,15 @@ Do not expect `/ceph/hpc/home/eubrieucb` to be mounted on Karolina. That path is
 
 ## Runtime env-script contract
 
-Generated GV runtime commands must source the explicit `MESOUQ_GV_ENV_SCRIPT` when set. Otherwise they resolve the site runtime root:
+Generated GV runtime commands source the canonical env script:
 
 ```bash
 "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
 ```
 
-If no override is set, `MESOUQ_SITE_RUNTIME_ROOT` is required and the canonical script is resolved under that root. Vega compatibility is preserved through `get_vega_paths()`, but resolved paths now come from the canonical site runtime root.
+`MESOUQ_SITE_RUNTIME_ROOT` is required and the canonical script is resolved
+under that root. Vega compatibility is preserved through `get_vega_paths()`,
+but resolved paths now come from the canonical site runtime root.
 
 GV geometry tooling is staged under:
 

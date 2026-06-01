@@ -8,6 +8,8 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64000
 #SBATCH --gpus=1
+#SBATCH --exclusive
+#SBATCH --exclude=acn05,acn13,acn14
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
 
@@ -27,6 +29,19 @@ if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
 fi
 export REPO_ROOT
 
+EXECUTION_MODE="${EXECUTION_MODE:-execute}"
+MESOUQ_DPD_ARRAY_LAUNCH_STAGGER_SECONDS="${MESOUQ_DPD_ARRAY_LAUNCH_STAGGER_SECONDS:-4}"
+if [[ "${EXECUTION_MODE}" == "execute" && -n "${SLURM_ARRAY_TASK_ID:-}" ]]; then
+  if [[ "${SLURM_ARRAY_TASK_ID}" =~ ^[0-9]+$ && "${MESOUQ_DPD_ARRAY_LAUNCH_STAGGER_SECONDS}" =~ ^[0-9]+$ ]]; then
+    STAGGER_SLOT=$((10#${SLURM_ARRAY_TASK_ID} % 8))
+    STAGGER_SLEEP=$((STAGGER_SLOT * 10#${MESOUQ_DPD_ARRAY_LAUNCH_STAGGER_SECONDS}))
+    if [[ "${STAGGER_SLEEP}" -gt 0 ]]; then
+      echo "Staggering DPD array launch by ${STAGGER_SLEEP}s before Karolina environment load."
+      sleep "${STAGGER_SLEEP}"
+    fi
+  fi
+fi
+
 if [[ -z "${MESOUQ_SITE_RUNTIME_ROOT:-}" ]]; then
   echo "MESOUQ_SITE_RUNTIME_ROOT must be set before using this Karolina sbatch script." >&2
   exit 2
@@ -39,7 +54,6 @@ export PYTHONPATH="${REPO_ROOT}:${REPO_ROOT}/src:${REPO_ROOT}/emb/indentation:${
 
 TIMESTAMP="${TIMESTAMP:-}"
 MODE="${MODE:-}"
-EXECUTION_MODE="${EXECUTION_MODE:-execute}"
 SCRATCH_ROOT="${SCRATCH_ROOT:-}"
 VAULT_ROOT="${VAULT_ROOT:-}"
 RUN_ID_PREFIX="${RUN_ID_PREFIX:-emb-34um-final-gate}"
@@ -62,6 +76,12 @@ if [[ -z "${PYTHON_EXECUTABLE}" || ! -x "${PYTHON_EXECUTABLE}" ]]; then
 fi
 export PYTHON_EXECUTABLE
 RUNNER_SCRIPT="${RUNNER_SCRIPT:-${REPO_ROOT}/scripts/workflows/emb/active_learning/run_emb_34um_final_gate_candidate.py}"
+PREFLIGHT_SCRIPT="${PREFLIGHT_SCRIPT:-${REPO_ROOT}/scripts/workflows/dpd/run_dpd_production_preflight.py}"
+DPD_PREFLIGHT_HELPER="${DPD_PREFLIGHT_HELPER:-${REPO_ROOT}/scripts/workflows/dpd/dpd_production_preflight.sh}"
+DPD_PREFLIGHT="${DPD_PREFLIGHT:-1}"
+DPD_PREFLIGHT_MIN_FREE_BYTES="${DPD_PREFLIGHT_MIN_FREE_BYTES:-1000000000}"
+DPD_PREFLIGHT_HDF5_DRIVER="${DPD_PREFLIGHT_HDF5_DRIVER:-serial}"
+DPD_PREFLIGHT_HDF5_SMOKE_TEST="${DPD_PREFLIGHT_HDF5_SMOKE_TEST:-1}"
 
 if [[ -z "${TIMESTAMP}" ]]; then
   echo "TIMESTAMP is required." >&2
@@ -102,7 +122,17 @@ echo "Run-id prefix: ${RUN_ID_PREFIX}"
 echo "Concurrent jobs: ${CONCURRENT_JOBS}"
 echo "Retry limit: ${RETRY_LIMIT}"
 echo "Python executable: ${PYTHON_EXECUTABLE}"
+echo "Runner script: ${RUNNER_SCRIPT}"
+echo "Preflight script: ${PREFLIGHT_SCRIPT}"
+echo "Preflight helper: ${DPD_PREFLIGHT_HELPER}"
 echo "Vault root: ${VAULT_ROOT}"
+
+# These EMB runs use two MPI ranks on one Karolina node. Avoid OpenMPI's
+# openib BTL, which can crash in libibverbs during MPI initialization on
+# Karolina GPU nodes and is not needed for same-node Mirheo execution.
+export OMPI_MCA_btl="${MESOUQ_KAROLINA_OMPI_MCA_BTL:-self,vader,tcp}"
+export OMPI_MCA_btl_openib_warn_default_gid_prefix="${OMPI_MCA_btl_openib_warn_default_gid_prefix:-0}"
+echo "OpenMPI BTL: ${OMPI_MCA_btl}"
 
 if [[ -n "${BATCH_DIR_OVERRIDE}" ]]; then
   BATCH_DIR="${BATCH_DIR_OVERRIDE}"
@@ -161,6 +191,15 @@ if [[ ! -f "${RUNNER_SCRIPT}" ]]; then
   echo "Runner script missing: ${RUNNER_SCRIPT}" >&2
   exit 2
 fi
+if [[ ! -f "${PREFLIGHT_SCRIPT}" ]]; then
+  echo "Preflight script missing: ${PREFLIGHT_SCRIPT}" >&2
+  exit 2
+fi
+if [[ ! -f "${DPD_PREFLIGHT_HELPER}" ]]; then
+  echo "DPD preflight helper missing: ${DPD_PREFLIGHT_HELPER}" >&2
+  exit 2
+fi
+source "${DPD_PREFLIGHT_HELPER}"
 
 if [[ -n "${SLURM_ARRAY_TASK_ID:-}" ]]; then
   TASK_INDEX="${SLURM_ARRAY_TASK_ID}"
@@ -191,6 +230,9 @@ PY
 echo "Array task index: ${TASK_INDEX}"
 echo "Candidate manifest: ${CANDIDATE_MANIFEST}"
 
+mesouq_sanitize_nested_srun_cpu_env
+mesouq_run_dpd_production_preflight
+
 "${PYTHON_EXECUTABLE}" "${RUNNER_SCRIPT}" \
   --candidate-manifest "${CANDIDATE_MANIFEST}" \
   --dry-run
@@ -206,12 +248,14 @@ SRUN_ENV=(
   "LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}"
   "PYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}"
   "REPO_ROOT=${REPO_ROOT}"
+  "OMPI_MCA_btl=${OMPI_MCA_btl}"
+  "OMPI_MCA_btl_openib_warn_default_gid_prefix=${OMPI_MCA_btl_openib_warn_default_gid_prefix}"
 )
 
 attempt=0
 while [[ "${attempt}" -le "${RETRY_LIMIT}" ]]; do
   echo "Running candidate attempt ${attempt}/${RETRY_LIMIT}"
-  if srun --ntasks=2 /usr/bin/env "${SRUN_ENV[@]}" "${PYTHON_EXECUTABLE}" "${RUNNER_SCRIPT}" \
+  if srun --ntasks=2 --kill-on-bad-exit=1 /usr/bin/env "${SRUN_ENV[@]}" "${PYTHON_EXECUTABLE}" "${RUNNER_SCRIPT}" \
     --candidate-manifest "${CANDIDATE_MANIFEST}" \
     --retry-attempt "${attempt}" \
     "${DRY_RUN_FLAG[@]}"; then

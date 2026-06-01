@@ -3,11 +3,11 @@
 # Source this file in sbatch scripts: source scripts/platforms/karolina/env_karolina.sh
 
 source /apps/all/Lmod/8.7.37/lmod/lmod/init/bash
-module purge || true
-module load CUDA/12.4.0
-module load HDF5/1.14.0-gompi-2022b
-module load GSL/2.7-GCC-12.3.0
-module load Eigen/3.4.0-GCCcore-12.2.0
+module --force purge || module purge || true
+module load NVHPC/24.1-CUDA-12.4.0
+module load OpenMPI/4.1.6-NVHPC-24.1-CUDA-12.4.0
+module load HDF5/1.14.3-NVHPC-24.1-CUDA-12.4.0
+module load UCC-CUDA/1.3.0-GCCcore-12.2.0-CUDA-12.4.0
 module load Python/3.10.8-GCCcore-12.2.0
 module load CMake/3.24.3-GCCcore-12.2.0
 
@@ -21,10 +21,15 @@ fi
 export MESOUQ_SITE_RUNTIME_ROOT
 export MESOUQ_RUNS_ROOT="${MESOUQ_RUNS_ROOT:-${MESOUQ_SCRATCH_ROOT}/runs}"
 export MESOUQ_PROVENANCE_ROOT="${MESOUQ_PROVENANCE_ROOT:-${MESOUQ_SCRATCH_ROOT}/provenance}"
+export MESOUQ_HDF5_PARALLEL_PREFIX="${MESOUQ_HDF5_PARALLEL_PREFIX:-${MESOUQ_SITE_RUNTIME_ROOT}/hdf5-1.14.3-parallel-nvhpc24.1-ompi4.1.6}"
+export HDF5_ROOT="${MESOUQ_HDF5_PARALLEL_PREFIX}"
+export HDF5_DIR="${MESOUQ_HDF5_PARALLEL_PREFIX}"
+export HDF5_MPI=ON
 
 export PARTITION="${PARTITION:-qgpu}"
 export NGPUS="${NGPUS:-1}"
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
+export PATH="${MESOUQ_HDF5_PARALLEL_PREFIX}/bin${PATH:+:${PATH}}"
+export LD_LIBRARY_PATH="${MESOUQ_HDF5_PARALLEL_PREFIX}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 
 for _mesouq_env_script in \
   "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh" \

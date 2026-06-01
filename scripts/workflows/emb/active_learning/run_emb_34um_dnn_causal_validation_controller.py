@@ -6,9 +6,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
-import math
 import os
-import random
 import re
 import shlex
 import subprocess
@@ -32,6 +30,10 @@ if str(_REPO_ROOT) not in sys.path:
 if str(_SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(_SRC_ROOT))
 
+from meso_uq.active_learning.emb_34um_dnn_acquisition import (  # noqa: E402
+    EMB_34UM_DNN_D4_CANDIDATE_POOL_DEFAULT_REQUESTED_SIZE,
+    build_d4_candidate_pool,
+)
 from meso_uq.active_learning.emb_34um_dnn_causal_validation_design import (  # noqa: E402
     EMB_34UM_DNN_CAUSAL_VALIDATION_BATCH_SUMMARY_FILENAME,
     EMB_34UM_DNN_CAUSAL_VALIDATION_COMMAND_INVENTORY_FILENAME,
@@ -41,8 +43,16 @@ from meso_uq.active_learning.emb_34um_dnn_causal_validation_design import (  # n
 )
 from meso_uq.active_learning.emb_34um_dnn_causal_validation_protocol import (  # noqa: E402
     EMB_34UM_DNN_CAUSAL_BOUNDS,
+    EMB_34UM_DNN_CAUSAL_B1_VALUE,
+    EMB_34UM_DNN_CAUSAL_B2_VALUE,
+    EMB_34UM_DNN_CAUSAL_BPRESS_VALUE,
+    EMB_34UM_DNN_CAUSAL_A3_VALUE,
+    EMB_34UM_DNN_CAUSAL_A4_VALUE,
+    EMB_34UM_DNN_CAUSAL_AL_REPLACEMENT_RESERVE_SIZE,
+    EMB_34UM_DNN_CAUSAL_DPD_WALLTIME_TARGET_DEFAULT,
     EMB_34UM_DNN_CAUSAL_ENSEMBLE_SIZE,
     EMB_34UM_DNN_CAUSAL_FORCE_GRID,
+    EMB_34UM_DNN_CAUSAL_RETRY_LIMIT_DEFAULT,
 )
 from meso_uq.active_learning.emb_34um_dnn_causal_validation_report import (  # noqa: E402
     EMB_34UM_DNN_CAUSAL_VALIDATION_REPORT_FILENAME,
@@ -60,10 +70,14 @@ from meso_uq.active_learning.emb_34um_dnn_causal_validation_metrics import (  # 
 
 CONTROLLER_SCHEMA_VERSION = "meso_uq.active_learning.emb_34um_dnn_causal_validation_controller.v2"
 CONTROLLER_MANIFEST_FILENAME = "emb_34um_dnn_causal_validation_controller_manifest.json"
+AL_TRAIN_SCORE_SELECT_CANDIDATE_SPACE = "d4"
+AL_TRAIN_SCORE_SELECT_ACQUISITION_SCORE_MODE = "curve_error"
 DEFAULT_EXECUTION_MODE = "render-only"
 SUPPORTED_EXECUTION_MODES = frozenset({"render-only", "dry-run", "execute"})
 INGEST_ROWS_FILENAME = EMB_34UM_DNN_CAUSAL_VALIDATION_METRIC_ROWS_FILENAME
 INGEST_REPORT_FILENAME = EMB_34UM_DNN_CAUSAL_VALIDATION_METRIC_REPORT_FILENAME
+PILOT_VALIDATION_SUMMARY_FILENAME = "emb_34um_dnn_causal_validation_pilot_summary.json"
+CANDIDATE_POOL_GENERATION_FILENAME = "candidate_pool_generation.json"
 
 _STEP_PATTERN = re.compile(r"^(?:al|lhs)-step-(\d+)$")
 
@@ -73,6 +87,23 @@ def _load_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"{path} must contain a JSON object.")
     return payload
+
+
+def _load_json_list(path: Path) -> list[dict[str, Any]]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, list):
+        raise ValueError(f"{path} must contain a JSON list.")
+    normalized: list[dict[str, Any]] = []
+    for item in payload:
+        if not isinstance(item, Mapping):
+            raise ValueError(f"{path} items must be JSON objects.")
+        normalized.append(dict(item))
+    return normalized
+
+
+def _candidate_space_midpoint(key: str) -> float:
+    low, high = EMB_34UM_DNN_CAUSAL_BOUNDS[key]
+    return (float(low) + float(high)) / 2.0
 
 
 def _load_prepare_module() -> Any:
@@ -174,14 +205,23 @@ def _build_prepare_stage_command(
     execution_mode: str,
     command_inventory: Mapping[str, Any],
     cycle_count: int,
+    active_replicate_count: int,
 ) -> str:
     prepare_script = _REPO_ROOT / "scripts" / "workflows" / "emb" / "active_learning" / "prepare_emb_34um_dnn_causal_validation.py"
     timestamp = str(design_manifest.get("timestamp", campaign_root.name))
     scratch_root = Path(str(design_manifest.get("scratch_root", campaign_root.parent)))
     run_id_prefix = str(design_manifest.get("run_id_prefix", "emb-34um-dnn-causal-validation"))
-    walltime = str(command_inventory.get("walltime", "01:00:00"))
+    walltime = str(command_inventory.get("walltime", EMB_34UM_DNN_CAUSAL_DPD_WALLTIME_TARGET_DEFAULT))
     concurrent_jobs = int(command_inventory.get("concurrent_jobs", 30))
-    retry_limit = int(command_inventory.get("retry_limit", 3))
+    retry_limit = int(command_inventory.get("retry_limit", EMB_34UM_DNN_CAUSAL_RETRY_LIMIT_DEFAULT))
+    policy = design_manifest.get("policy", {})
+    protocol = design_manifest.get("protocol", {})
+    policy_map = policy if isinstance(policy, Mapping) else {}
+    protocol_map = protocol if isinstance(protocol, Mapping) else {}
+    max_replicate_count = _coerce_positive_int(
+        policy_map.get("max_replicate_count", protocol_map.get("max_replicate_count", active_replicate_count)),
+        label="max_replicate_count",
+    )
     force_grid = design_manifest.get("force_grid_source")
     vault_root_timestamp = str(design_manifest.get("vault_root_timestamp", "")).strip()
     vault_root = Path(vault_root_timestamp).parent if vault_root_timestamp else campaign_root.parent / "vault"
@@ -206,6 +246,10 @@ def _build_prepare_stage_command(
         _quoted(run_id_prefix),
         "--cycle-count",
         str(cycle_count),
+        "--active-replicate-count",
+        str(active_replicate_count),
+        "--max-replicate-count",
+        str(max_replicate_count),
         "--include-coverage-plot-requirements",
     ]
     if isinstance(force_grid, str) and force_grid and force_grid != "protocol_default":
@@ -255,6 +299,7 @@ def _build_al_train_score_select_command(
     candidate_count: int,
     execution_mode: str,
 ) -> str:
+    selection_count = int(candidate_count) + int(EMB_34UM_DNN_CAUSAL_AL_REPLACEMENT_RESERVE_SIZE)
     input_root = _selection_inputs_root(campaign_root, replica=replica, step=step)
     completed_rows = input_root / "completed_rows.json"
     candidate_pool = input_root / "candidate_pool.json"
@@ -264,7 +309,7 @@ def _build_al_train_score_select_command(
         return " ".join(
             [
                 "sbatch --parsable",
-                "--export="
+                "--export=ALL,"
                 f"REPO_ROOT={_quoted(_REPO_ROOT)},"
                 f"COMPLETED_ROWS={_quoted(completed_rows)},"
                 f"CANDIDATE_POOL={_quoted(candidate_pool)},"
@@ -274,7 +319,9 @@ def _build_al_train_score_select_command(
                 "BATCH_SIZE=128,"
                 "LEARNING_RATE=0.001,"
                 "VALIDATION_FRACTION=0.1,"
-                f"TOP_N={int(candidate_count)},"
+                f"TOP_N={selection_count},"
+                f"CANDIDATE_SPACE={AL_TRAIN_SCORE_SELECT_CANDIDATE_SPACE},"
+                f"ACQUISITION_SCORE_MODE={AL_TRAIN_SCORE_SELECT_ACQUISITION_SCORE_MODE},"
                 "TIMING_CANARY=1",
                 _quoted(wrapper),
             ]
@@ -292,7 +339,11 @@ def _build_al_train_score_select_command(
         "--output-root",
         _quoted(output_root),
         "--top-n",
-        str(int(candidate_count)),
+        str(selection_count),
+        "--candidate-space",
+        AL_TRAIN_SCORE_SELECT_CANDIDATE_SPACE,
+        "--acquisition-score-mode",
+        AL_TRAIN_SCORE_SELECT_ACQUISITION_SCORE_MODE,
         "--timing-canary",
     ]
     if execution_mode in {"render-only", "dry-run"}:
@@ -332,14 +383,15 @@ def _build_final_ingest_command(*, campaign_root: Path, execution_mode: str) -> 
         return " ".join(
             [
                 "sbatch --parsable",
-                "--export="
+                "--export=ALL,"
                 f"REPO_ROOT={_quoted(_REPO_ROOT)},"
                 f"CAMPAIGN_ROOT={_quoted(campaign_root)},"
                 f"OUTPUT_ROOT={_quoted(campaign_root / 'ingest')},"
                 f"ANALYZE_OUTPUT_ROOT={_quoted(campaign_root / 'analyze')},"
                 "DEVICE=cuda,"
                 "DRY_RUN=0,"
-                "RUN_ANALYZE=1",
+                "RUN_ANALYZE=1,"
+                "ALLOW_BLOCKED=1",
                 _quoted(wrapper),
             ]
         )
@@ -372,6 +424,36 @@ def _build_final_analyze_command(*, campaign_root: Path, execution_mode: str) ->
             "--output-root",
             _quoted(output_root),
             "--allow-blocked",
+        ]
+    )
+
+
+def _pilot_validation_summary_path(*, campaign_root: Path, design_manifest: Mapping[str, Any]) -> Path:
+    configured = design_manifest.get("pilot_validation_summary_path")
+    if isinstance(configured, str) and configured.strip():
+        configured_path = Path(configured.strip())
+        if configured_path.is_absolute():
+            return configured_path
+        return (campaign_root / configured_path).resolve()
+    return campaign_root / "pilot" / "validation" / PILOT_VALIDATION_SUMMARY_FILENAME
+
+
+def _build_pilot_verify_command(
+    *,
+    campaign_root: Path,
+    summary_path: Path,
+    execution_mode: str,
+) -> str:
+    script = _REPO_ROOT / "scripts" / "workflows" / "emb" / "active_learning" / "analyze_emb_34um_dnn_causal_validation_pilot.py"
+    return " ".join(
+        [
+            f"EXECUTION_MODE={_quoted(execution_mode)}",
+            _python_exec(),
+            _quoted(script),
+            "--campaign-root",
+            _quoted(campaign_root),
+            "--output-root",
+            _quoted(summary_path.parent),
         ]
     )
 
@@ -414,9 +496,22 @@ def _load_result_row(output_root: Path) -> dict[str, Any]:
         raise ValueError(f"{result_path} does not expose ka/kb.")
     if len(force_grid) != len(target_curve) or not force_grid:
         raise ValueError(f"{result_path} force grid and target curve must be non-empty with equal length.")
+    parameters: dict[str, float] = {
+        "ka": float(params["ka"]),
+        "kb": float(params["kb"]),
+    }
+    if "radp" in params:
+        parameters["radp"] = float(params["radp"])
+    elif "radp" in payload:
+        parameters["radp"] = float(payload["radp"])
+    if "shell_th" in params:
+        parameters["shell_th"] = float(params["shell_th"])
+    elif "shell_th" in payload:
+        parameters["shell_th"] = float(payload["shell_th"])
+
     return {
         "curve_id": str(payload.get("candidate_id") or output_root.name),
-        "parameters": {"ka": float(params["ka"]), "kb": float(params["kb"])},
+        "parameters": parameters,
         "force_grid": list(force_grid),
         "target_curve": list(target_curve),
     }
@@ -430,8 +525,8 @@ def _stage_batch_summary_roots(summary_path: Path) -> tuple[Path, ...]:
     return tuple(Path(str(item)) for item in roots)
 
 
-def _existing_points(completed_rows: list[dict[str, Any]]) -> list[tuple[float, float]]:
-    points: list[tuple[float, float]] = []
+def _existing_points(completed_rows: list[dict[str, Any]]) -> list[tuple[float, ...]]:
+    points: list[tuple[float, ...]] = []
     for row in completed_rows:
         parameters = row.get("parameters")
         if not isinstance(parameters, Mapping):
@@ -439,8 +534,27 @@ def _existing_points(completed_rows: list[dict[str, Any]]) -> list[tuple[float, 
         ka = float(parameters.get("ka", 0.0))
         kb = float(parameters.get("kb", 0.0))
         if ka > 0.0 and kb > 0.0:
-            points.append((ka, kb))
+            if "radp" in parameters and "shell_th" in parameters:
+                points.append((ka, kb, float(parameters["radp"]), float(parameters["shell_th"])))
+            else:
+                points.append((ka, kb))
     return points
+
+
+def _candidate_pool_key(point: tuple[float, ...]) -> tuple[float, ...]:
+    if len(point) >= 4:
+        return (
+            round(float(point[0]), 12),
+            round(float(point[1]), 12),
+            round(float(point[2]), 12),
+            round(float(point[3]), 12),
+        )
+    if len(point) >= 2:
+        return (
+            round(float(point[0]), 12),
+            round(float(point[1]), 12),
+        )
+    raise ValueError("Candidate points must contain at least ka and kb.")
 
 
 def _generate_candidate_pool(
@@ -448,34 +562,26 @@ def _generate_candidate_pool(
     replica: int,
     step: int,
     pool_size: int,
-    existing_points: list[tuple[float, float]],
-) -> list[dict[str, Any]]:
-    ka_bounds = EMB_34UM_DNN_CAUSAL_BOUNDS["ka"]
-    kb_bounds = EMB_34UM_DNN_CAUSAL_BOUNDS["kb"]
-    log10_ka_min = math.log10(float(ka_bounds[0]))
-    log10_ka_max = math.log10(float(ka_bounds[1]))
-    log10_kb_min = math.log10(float(kb_bounds[0]))
-    log10_kb_max = math.log10(float(kb_bounds[1]))
-    existing_set = {(round(point[0], 12), round(point[1], 12)) for point in existing_points}
-    rng = random.Random(replica * 10_000 + step)
-    pool: list[dict[str, Any]] = []
-    attempts = 0
-    while len(pool) < pool_size and attempts < pool_size * 50:
-        attempts += 1
-        ka = 10.0 ** (log10_ka_min + rng.random() * (log10_ka_max - log10_ka_min))
-        kb = 10.0 ** (log10_kb_min + rng.random() * (log10_kb_max - log10_kb_min))
-        key = (round(ka, 12), round(kb, 12))
-        if key in existing_set:
-            continue
-        candidate_id = f"rep{replica:03d}-step{step:02d}-pool-{len(pool) + 1:04d}"
-        pool.append({"candidate_id": candidate_id, "ka": float(ka), "kb": float(kb)})
-        existing_set.add(key)
-    if len(pool) < pool_size:
-        raise ValueError(
-            f"Unable to generate {pool_size} unique candidate points for replica={replica} step={step}; "
-            f"generated {len(pool)}."
-        )
-    return pool
+    existing_points: list[tuple[float, ...]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    seed = replica * 10_000 + 33_000 + step
+    pool, metadata = build_d4_candidate_pool(
+        requested_size=pool_size,
+        seed=seed,
+        generator="auto",
+        existing_points=existing_points,
+    )
+    tagged_pool = []
+    for index, row in enumerate(pool, start=1):
+        payload = dict(row)
+        payload["candidate_id"] = f"rep{replica:03d}-step{step:02d}-pool-{index:06d}"
+        tagged_pool.append(payload)
+    metadata = {
+        "candidate_pool_generator": "auto",
+        "acquisition_score_mode": AL_TRAIN_SCORE_SELECT_ACQUISITION_SCORE_MODE,
+        **dict(metadata),
+    }
+    return tagged_pool, metadata
 
 
 def _write_al_selection_inputs(*, campaign_root: Path, replica: int, step: int) -> dict[str, str]:
@@ -505,24 +611,55 @@ def _write_al_selection_inputs(*, campaign_root: Path, replica: int, step: int) 
     inputs_root.mkdir(parents=True, exist_ok=True)
     completed_path = inputs_root / "completed_rows.json"
     candidate_pool_path = inputs_root / "candidate_pool.json"
+    candidate_pool_generation_path = inputs_root / CANDIDATE_POOL_GENERATION_FILENAME
     completed_path.write_text(json.dumps(completed_rows, indent=2, sort_keys=True), encoding="utf-8")
 
-    pool_size = 500
+    pool_size = EMB_34UM_DNN_D4_CANDIDATE_POOL_DEFAULT_REQUESTED_SIZE
     existing_points = _existing_points(completed_rows)
-    candidate_pool = _generate_candidate_pool(
+    candidate_pool, candidate_pool_metadata = _generate_candidate_pool(
         replica=replica,
         step=step,
         pool_size=pool_size,
         existing_points=existing_points,
     )
     candidate_pool_path.write_text(json.dumps(candidate_pool, indent=2, sort_keys=True), encoding="utf-8")
+    candidate_pool_generation_path.write_text(
+        json.dumps(candidate_pool_metadata, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
 
     return {
         "completed_rows_path": str(completed_path),
         "candidate_pool_path": str(candidate_pool_path),
+        "candidate_pool_generation_path": str(candidate_pool_generation_path),
         "candidate_count": str(target_candidate_count),
         "candidate_pool_count": str(pool_size),
     }
+
+
+def _candidate_pool_for_stage(*, campaign_root: Path, replica: int, step: int) -> dict[str, dict[str, Any]]:
+    candidate_pool = _load_json_list(_selection_inputs_root(campaign_root, replica=replica, step=step) / "candidate_pool.json")
+    pool_by_id: dict[str, dict[str, Any]] = {}
+    for record in candidate_pool:
+        candidate_id = str(record.get("candidate_id", "")).strip()
+        if candidate_id:
+            pool_by_id[candidate_id] = record
+    return pool_by_id
+
+
+def _selected_row_d4_fields(*, pool_row: Mapping[str, Any] | None) -> tuple[float, float, dict[str, Any]]:
+    if pool_row is None:
+        raise ValueError("Selected AL candidate is missing its source candidate_pool row; D4 geometry cannot be inferred.")
+    missing = [key for key in ("radp", "shell_th") if key not in pool_row]
+    if missing:
+        raise ValueError(f"Selected AL candidate pool row is missing D4 fields: {missing}.")
+    radp = float(pool_row["radp"])
+    shell_th = float(pool_row["shell_th"])
+    runtime_fingerprint = dict(pool_row.get("runtime_fingerprint", {}))
+    runtime_fingerprint.setdefault("radp", radp)
+    runtime_fingerprint.setdefault("shell_th", shell_th)
+    runtime_fingerprint.setdefault("bpress", EMB_34UM_DNN_CAUSAL_BPRESS_VALUE)
+    return radp, shell_th, runtime_fingerprint
 
 
 def _render_selected_candidates_for_stage(
@@ -551,11 +688,18 @@ def _render_selected_candidates_for_stage(
     candidate_rows = selected_points[:target_count]
     if not candidate_rows:
         raise ValueError(f"No selected candidates available for replica={replica} step={step}.")
+    candidate_pool = _candidate_pool_for_stage(campaign_root=campaign_root, replica=replica, step=step)
 
     candidate_records: list[dict[str, Any]] = []
     for order, row in enumerate(candidate_rows, start=1):
         ka = float(row["ka"])
         kb = float(row["kb"])
+        candidate_pool_id = str(row.get("candidate_pool_id", ""))
+        candidate_pool_candidate_id = str(row.get("candidate_id", ""))
+        pool_row = candidate_pool.get(candidate_pool_id) if candidate_pool_id else None
+        if pool_row is None and candidate_pool_candidate_id:
+            pool_row = candidate_pool.get(candidate_pool_candidate_id)
+        radp, shell_th, runtime_fingerprint = _selected_row_d4_fields(pool_row=pool_row)
         candidate_id = f"{run_id_prefix}-rep{replica:03d}-al-step{step:02d}-c{order:03d}"
         candidate_records.append(
             {
@@ -564,12 +708,19 @@ def _render_selected_candidates_for_stage(
                 "experiment": "indentation",
                 "ka": ka,
                 "kb": kb,
+                "radp": radp,
+                "shell_th": shell_th,
                 "selection_seed": replica * 10_000 + step,
                 "selection_mode": "dnn_causal_fresh_only",
                 "selection_source": "dnn_ensemble_disagreement_diversity",
                 "selection_status": "rendered",
+                "b1": EMB_34UM_DNN_CAUSAL_B1_VALUE,
+                "b2": EMB_34UM_DNN_CAUSAL_B2_VALUE,
+                "a3": EMB_34UM_DNN_CAUSAL_A3_VALUE,
+                "a4": EMB_34UM_DNN_CAUSAL_A4_VALUE,
+                "runtime_fingerprint": runtime_fingerprint,
                 "selection_payload": {
-                    "candidate_pool_id": str(row.get("candidate_id", "")),
+                    "candidate_pool_id": str(row.get("candidate_pool_id", row.get("candidate_id", ""))),
                     "acquisition_score": float(row.get("acquisition_score", 0.0)),
                     "ensemble_disagreement": float(row.get("ensemble_disagreement", 0.0)),
                     "diversity_term": float(row.get("diversity_term", 0.0)),
@@ -578,22 +729,32 @@ def _render_selected_candidates_for_stage(
         )
 
     reserve_rows = selected_points[target_count:]
-    reserve_payload = [
-        {
-            "candidate_pool_id": str(row.get("candidate_id", "")),
-            "ka": float(row["ka"]),
-            "kb": float(row["kb"]),
-            "acquisition_score": float(row.get("acquisition_score", 0.0)),
-            "ensemble_disagreement": float(row.get("ensemble_disagreement", 0.0)),
-            "diversity_term": float(row.get("diversity_term", 0.0)),
-        }
-        for row in reserve_rows
-        if isinstance(row, Mapping) and "ka" in row and "kb" in row
-    ]
+    reserve_payload: list[dict[str, Any]] = []
+    for row in reserve_rows:
+        if not isinstance(row, Mapping) or "ka" not in row or "kb" not in row:
+            continue
+        candidate_pool_id = str(row.get("candidate_pool_id", row.get("candidate_id", "")))
+        pool_row = candidate_pool.get(candidate_pool_id) if candidate_pool_id else None
+        radp, shell_th, runtime_fingerprint = _selected_row_d4_fields(pool_row=pool_row)
+        reserve_payload.append(
+            {
+                "candidate_pool_id": candidate_pool_id,
+                "ka": float(row["ka"]),
+                "kb": float(row["kb"]),
+                "radp": radp,
+                "shell_th": shell_th,
+                "bpress": EMB_34UM_DNN_CAUSAL_BPRESS_VALUE,
+                "runtime_fingerprint": runtime_fingerprint,
+                "acquisition_score": float(row.get("acquisition_score", 0.0)),
+                "ensemble_disagreement": float(row.get("ensemble_disagreement", 0.0)),
+                "diversity_term": float(row.get("diversity_term", 0.0)),
+            }
+        )
 
     selection_manifest_path = stage_root / EMB_34UM_DNN_CAUSAL_VALIDATION_SELECTION_MANIFEST_FILENAME
     selection_summary_path = stage_root / EMB_34UM_DNN_CAUSAL_VALIDATION_SELECTION_BATCH_SUMMARY_FILENAME
     runtime_batch_summary_path = stage_root / EMB_34UM_DNN_CAUSAL_VALIDATION_BATCH_SUMMARY_FILENAME
+    walltime, concurrent_jobs, retry_limit = _resolve_stage_runtime_controls(design_manifest)
 
     if execution_mode == "execute":
         prepare = _load_prepare_module()
@@ -603,9 +764,9 @@ def _render_selected_candidates_for_stage(
             batch_root=stage_root,
             run_id=f"{run_id_prefix}-rep{replica:03d}-al-step{step:02d}",
             batch_id=f"rep{replica:03d}-al-step-{step:02d}",
-            walltime="01:00:00",
-            concurrent_jobs=30,
-            retry_limit=3,
+            walltime=walltime,
+            concurrent_jobs=concurrent_jobs,
+            retry_limit=retry_limit,
         )
     else:
         runtime_batch_summary_path.parent.mkdir(parents=True, exist_ok=True)
@@ -636,6 +797,11 @@ def _render_selected_candidates_for_stage(
         "train_score_select_manifest_path": str(train_manifest_path),
         "train_score_select_report_path": str(_selection_training_report_path(campaign_root, replica=replica, step=step)),
         "batch_summary_path": str(runtime_batch_summary_path),
+        "scheduler_controls": {
+            "walltime": walltime,
+            "concurrent_jobs": concurrent_jobs,
+            "retry_limit": retry_limit,
+        },
     }
     selection_manifest_path.parent.mkdir(parents=True, exist_ok=True)
     selection_manifest_path.write_text(json.dumps(selection_manifest, indent=2, sort_keys=True), encoding="utf-8")
@@ -690,6 +856,103 @@ def _infer_replicas(entries: tuple[dict[str, Any], ...]) -> list[int]:
     return replicas
 
 
+def _coerce_positive_int(value: object, *, label: str) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} must be an integer.") from exc
+    if number < 1:
+        raise ValueError(f"{label} must be positive.")
+    return number
+
+
+def _coerce_nonnegative_int(value: object, *, label: str) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} must be an integer.") from exc
+    if number < 0:
+        raise ValueError(f"{label} must be non-negative.")
+    return number
+
+
+def _resolve_active_replicas(
+    *,
+    design_manifest: Mapping[str, Any],
+    entries: tuple[dict[str, Any], ...],
+) -> list[int]:
+    policy = design_manifest.get("policy", {})
+    protocol = design_manifest.get("protocol", {})
+    policy_map = policy if isinstance(policy, Mapping) else {}
+    protocol_map = protocol if isinstance(protocol, Mapping) else {}
+    replicas_from_entries = _infer_replicas(entries)
+
+    raw_count = (
+        policy_map.get("active_replicate_count")
+        if "active_replicate_count" in policy_map
+        else protocol_map.get("active_replicate_count")
+    )
+    if raw_count is None:
+        raw_count = policy_map.get("replicate_count")
+    if raw_count is None:
+        raw_count = protocol_map.get("replicate_count")
+    if raw_count is None:
+        return replicas_from_entries
+
+    active_replicate_count = _coerce_positive_int(raw_count, label="active_replicate_count")
+    explicit_replicas = policy_map.get("replicates")
+    if isinstance(explicit_replicas, list):
+        declared_replicas = sorted({int(item) for item in explicit_replicas if int(item) > 0})
+        available_replicas = [replica for replica in declared_replicas if replica in set(replicas_from_entries)]
+        if not available_replicas:
+            available_replicas = declared_replicas
+    else:
+        available_replicas = replicas_from_entries
+    if not available_replicas:
+        available_replicas = replicas_from_entries
+    active_replicas = available_replicas[:active_replicate_count]
+    if not active_replicas:
+        raise ValueError("No active replicas available from campaign manifest.")
+    return active_replicas
+
+
+def _filter_entries_for_active_replicas(
+    entries: tuple[dict[str, Any], ...],
+    *,
+    active_replicas: list[int],
+) -> tuple[dict[str, Any], ...]:
+    active_set = {int(replica) for replica in active_replicas}
+    return tuple(
+        entry
+        for entry in entries
+        if int(entry.get("replica", 0)) == 0 or int(entry.get("replica", 0)) in active_set
+    )
+
+
+def _resolve_stage_runtime_controls(design_manifest: Mapping[str, Any]) -> tuple[str, int, int]:
+    command_inventory = design_manifest.get("command_inventory", {})
+    policy = design_manifest.get("policy", {})
+    protocol = design_manifest.get("protocol", {})
+    command_inventory_map = command_inventory if isinstance(command_inventory, Mapping) else {}
+    policy_map = policy if isinstance(policy, Mapping) else {}
+    protocol_map = protocol if isinstance(protocol, Mapping) else {}
+    walltime = str(
+        command_inventory_map.get(
+            "walltime",
+            policy_map.get(
+                "dpd_walltime_target",
+                protocol_map.get("dpd_walltime_target", EMB_34UM_DNN_CAUSAL_DPD_WALLTIME_TARGET_DEFAULT),
+            ),
+        )
+    )
+    concurrent_jobs = _coerce_positive_int(command_inventory_map.get("concurrent_jobs", 30), label="concurrent_jobs")
+    retry_limit = _coerce_nonnegative_int(
+        command_inventory_map.get("retry_limit", EMB_34UM_DNN_CAUSAL_RETRY_LIMIT_DEFAULT),
+        label="retry_limit",
+    )
+    return walltime, concurrent_jobs, retry_limit
+
+
 def _infer_cycle_count(entries: tuple[dict[str, Any], ...]) -> int:
     cycles = [int(_entry_step(str(entry["mode"])) or 0) for entry in entries if str(entry["mode"]).startswith(("al-step-", "lhs-step-"))]
     return max(cycles) if cycles else 1
@@ -720,11 +983,14 @@ def build_emb_34um_dnn_causal_validation_controller(
 
     raw_entries = _coerce_stage_entries(command_inventory.get("entries", []))
     entries = tuple(_entry_record(entry) for entry in raw_entries)
+    active_replicas = _resolve_active_replicas(design_manifest=design_manifest, entries=entries)
+    entries = _filter_entries_for_active_replicas(entries, active_replicas=active_replicas)
     entries_by_mode = _group_entries(entries)
-    replicas = _infer_replicas(entries)
+    replicas = sorted(active_replicas)
     cycle_count = _infer_cycle_count(entries)
+    pilot_summary_path = _pilot_validation_summary_path(campaign_root=campaign_root, design_manifest=design_manifest)
 
-    stage_order = ["prepare_design", "unseen_test_submit", "shared_initial_submit"]
+    stage_order = ["prepare_design", "pilot_submit", "pilot_verify", "unseen_test_submit", "shared_initial_submit"]
     for step in range(1, cycle_count + 1):
         stage_order.extend(
             [
@@ -742,6 +1008,7 @@ def build_emb_34um_dnn_causal_validation_controller(
         execution_mode=execution_mode,
         command_inventory=command_inventory,
         cycle_count=cycle_count,
+        active_replicate_count=len(replicas),
     )
     stages: list[dict[str, Any]] = []
     stages.append(
@@ -758,6 +1025,35 @@ def build_emb_34um_dnn_causal_validation_controller(
         )
     )
 
+    pilot_submit = _build_stage_submit_commands(entries_by_mode.get("pilot", []), execution_mode=execution_mode)
+    stages.append(
+        _build_stage(
+            name="pilot_submit",
+            description="Submit pilot scheduler arrays.",
+            command_type="submission",
+            commands=pilot_submit,
+            dependencies=["prepare_design"],
+            expected_output_roots=[entry["batch_summary_path"] for entry in entries_by_mode.get("pilot", [])],
+        )
+    )
+
+    stages.append(
+        _build_stage(
+            name="pilot_verify",
+            description="Analyze pilot outputs and emit the pilot validation decision summary.",
+            command_type="verification",
+            commands=[
+                _build_pilot_verify_command(
+                    campaign_root=campaign_root,
+                    summary_path=pilot_summary_path,
+                    execution_mode=execution_mode,
+                )
+            ],
+            dependencies=["pilot_submit"],
+            expected_output_roots=[str(pilot_summary_path)],
+        )
+    )
+
     unseen_submit = _build_stage_submit_commands(entries_by_mode.get("unseen_test", []), execution_mode=execution_mode)
     stages.append(
         _build_stage(
@@ -765,7 +1061,7 @@ def build_emb_34um_dnn_causal_validation_controller(
             description="Submit unseen test scheduler arrays.",
             command_type="submission",
             commands=unseen_submit,
-            dependencies=["prepare_design"],
+            dependencies=["pilot_verify"],
             expected_output_roots=[entry["batch_summary_path"] for entry in entries_by_mode.get("unseen_test", [])],
         )
     )
@@ -777,7 +1073,7 @@ def build_emb_34um_dnn_causal_validation_controller(
             description="Submit shared initial scheduler arrays.",
             command_type="submission",
             commands=shared_submit,
-            dependencies=["prepare_design"],
+            dependencies=["pilot_verify"],
             expected_output_roots=[entry["batch_summary_path"] for entry in entries_by_mode.get("shared_initial", [])],
         )
     )
@@ -929,6 +1225,7 @@ def build_emb_34um_dnn_causal_validation_controller(
         "stage_order": stage_order,
         "stages": stages,
         "replicas": replicas,
+        "active_replicate_count": len(replicas),
         "cycle_count": cycle_count,
         "command_inventory": {
             "count": len(entries),
@@ -939,6 +1236,11 @@ def build_emb_34um_dnn_causal_validation_controller(
             "stages": [{"name": stage["name"], "commands": [item["command"] for item in stage["commands"]]} for stage in stages],
         },
         "parallel_arrays": [dict(entry) for entry in entries],
+        "pilot_validation": {
+            "required": True,
+            "stage_name": "pilot_verify",
+            "summary_path": str(pilot_summary_path),
+        },
         "submission": {
             "submitted": False,
             "submission_commands": [],

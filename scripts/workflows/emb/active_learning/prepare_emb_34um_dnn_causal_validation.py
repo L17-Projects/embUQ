@@ -43,7 +43,11 @@ from meso_uq.active_learning.emb_34um_dnn_causal_validation_design import (
     build_emb_34um_dnn_causal_validation_campaign_manifest,
 )
 from meso_uq.active_learning.emb_34um_dnn_causal_validation_protocol import (
+    EMB_34UM_DNN_CAUSAL_DPD_WALLTIME_TARGET_DEFAULT,
     EMB_34UM_DNN_CAUSAL_FORCE_GRID,
+    EMB_34UM_DNN_CAUSAL_MAX_REPLICATE_COUNT,
+    EMB_34UM_DNN_CAUSAL_PRIMARY_REPLICATE_COUNT,
+    EMB_34UM_DNN_CAUSAL_RETRY_LIMIT_DEFAULT,
 )
 from meso_uq.active_learning.emb_34um_dpd_adapter import EMB_34UM_DPD_SCHEMA_VERSION
 
@@ -143,7 +147,15 @@ def _build_candidates_for_batch(
                     "experiment": str(record["experiment"]),
                     "ka": float(record["ka"]),
                     "kb": float(record["kb"]),
+                    "radp": float(record["radp"]),
+                    "shell_th": float(record["shell_th"]),
+                    "b1": float(record.get("b1", 0.0)),
+                    "b2": float(record.get("b2", 0.0)),
+                    "a3": float(record.get("a3", 0.0)),
+                    "a4": float(record.get("a4", 0.0)),
+                    "bpress": float(record.get("bpress", -91.0)),
                     "force_grid": list(force_grid),
+                    "runtime_fingerprint": dict(record.get("runtime_fingerprint", {})),
                 },
                 metadata={
                     k: v
@@ -207,6 +219,45 @@ def _write_placeholder_batch_summary(
     summary_path = batch_root / EMB_34UM_DNN_CAUSAL_VALIDATION_BATCH_SUMMARY_FILENAME
     _write_json(summary_path, payload)
     return payload
+
+
+_COVERAGE_PROJECTION_SPECS: tuple[dict[str, str], ...] = (
+    {
+        "mode": "log10(ka)-vs-log10(kb)",
+        "x_key": "ka",
+        "y_key": "kb",
+        "x_label": "log10(ka)",
+        "y_label": "log10(kb)",
+    },
+    {
+        "mode": "log10(ka)-vs-log10(radp)",
+        "x_key": "ka",
+        "y_key": "radp",
+        "x_label": "log10(ka)",
+        "y_label": "log10(radp)",
+    },
+    {
+        "mode": "log10(kb)-vs-log10(shell_th)",
+        "x_key": "kb",
+        "y_key": "shell_th",
+        "x_label": "log10(kb)",
+        "y_label": "log10(shell_th)",
+    },
+    {
+        "mode": "log10(radp)-vs-log10(shell_th)",
+        "x_key": "radp",
+        "y_key": "shell_th",
+        "x_label": "log10(radp)",
+        "y_label": "log10(shell_th)",
+    },
+)
+
+_COVERAGE_PROJECTION_INDEX = {
+    "ka": 0,
+    "kb": 1,
+    "radp": 2,
+    "shell_th": 3,
+}
 
 
 def _render_batch(
@@ -283,6 +334,9 @@ def _render_batch(
 
 def _iter_batch_stages(manifest: Mapping[str, Any]) -> tuple[tuple[str, Mapping[str, Any]], ...]:
     stages: list[tuple[str, Mapping[str, Any]]]=[]
+    pilot = manifest.get("pilot")
+    if isinstance(pilot, Mapping):
+        stages.append(("pilot", pilot))
     stages.append(("unseen_test", manifest["unseen_test"]))
 
     for seed_payload in manifest.get("seeds", ()):
@@ -297,23 +351,35 @@ def _iter_batch_stages(manifest: Mapping[str, Any]) -> tuple[tuple[str, Mapping[
 
 
 def _stage_output_root(manifest_root: Path, stage_key: str) -> Path:
+    if stage_key == "pilot":
+        return manifest_root / stage_key
     if stage_key == "unseen_test":
         return manifest_root / stage_key
     mode = Path(stage_key)
     return manifest_root / mode.parent / mode.name
 
 
-def _gather_points(manifest: Mapping[str, Any]) -> dict[str, list[tuple[float, float]]]:
-    points: dict[str, list[tuple[float, float]]] = {
+def _gather_points(manifest: Mapping[str, Any]) -> dict[str, list[tuple[float, float, float, float]]]:
+    points: dict[str, list[tuple[float, float, float, float]]] = {
+        "pilot": [],
         "unseen_test": [],
         "shared_initial": [],
         "lhs": [],
-        "al_placeholder": [],
+        "al_placeholders": [],
     }
+    pilot_records = manifest.get("pilot", {}).get("candidate_records", ())
+    for raw in pilot_records:
+        if isinstance(raw, Mapping):
+            points["pilot"].append(
+                (float(raw["ka"]), float(raw["kb"]), float(raw["radp"]), float(raw["shell_th"]))
+            )
+
     unseen_records = manifest.get("unseen_test", {}).get("candidate_records", ())
     for raw in unseen_records:
         if isinstance(raw, Mapping):
-            points["unseen_test"].append((float(raw["ka"]), float(raw["kb"])))
+            points["unseen_test"].append(
+                (float(raw["ka"]), float(raw["kb"]), float(raw["radp"]), float(raw["shell_th"]))
+            )
 
     for seed_payload in manifest.get("seeds", ()):
         if not isinstance(seed_payload, Mapping):
@@ -321,7 +387,9 @@ def _gather_points(manifest: Mapping[str, Any]) -> dict[str, list[tuple[float, f
         shared_records = seed_payload.get("shared_initial", {}).get("candidate_records", ())
         for raw in shared_records:
             if isinstance(raw, Mapping):
-                points["shared_initial"].append((float(raw["ka"]), float(raw["kb"])))
+                points["shared_initial"].append(
+                    (float(raw["ka"]), float(raw["kb"]), float(raw["radp"]), float(raw["shell_th"]))
+                )
 
         lhs_steps = seed_payload.get("lhs_steps", ())
         for lhs in lhs_steps:
@@ -329,7 +397,9 @@ def _gather_points(manifest: Mapping[str, Any]) -> dict[str, list[tuple[float, f
                 continue
             for raw in lhs.get("candidate_records", ()):
                 if isinstance(raw, Mapping):
-                    points["lhs"].append((float(raw["ka"]), float(raw["kb"])))
+                    points["lhs"].append(
+                        (float(raw["ka"]), float(raw["kb"]), float(raw["radp"]), float(raw["shell_th"]))
+                    )
 
         al_steps = seed_payload.get("al_steps", ())
         for step_payload in al_steps:
@@ -337,7 +407,7 @@ def _gather_points(manifest: Mapping[str, Any]) -> dict[str, list[tuple[float, f
                 continue
             placeholders = int(step_payload.get("candidate_count", 0))
             if placeholders:
-                points["al_placeholder"].append((0.0, 0.0))
+                points["al_placeholders"].extend([(0.0, 0.0, 0.0, 0.0)] * placeholders)
     return points
 
 
@@ -348,6 +418,7 @@ def _write_coverage_plot_requirements_only(
     force_grid_size: int,
 ) -> tuple[Path, Path]:
     points_by_stage = _gather_points(manifest)
+    point_counts = {stage: len(points) for stage, points in points_by_stage.items()}
     plot_path = campaign_root / EMB_34UM_DNN_CAUSAL_VALIDATION_COVERAGE_PLOT_FILENAME
     sidecar_path = campaign_root / EMB_34UM_DNN_CAUSAL_VALIDATION_COVERAGE_PLOT_SIDECAR_FILENAME
 
@@ -355,32 +426,34 @@ def _write_coverage_plot_requirements_only(
     try:
         import matplotlib.pyplot as plt  # type: ignore
 
-        fig, axis = plt.subplots(1, 1, figsize=(7.0, 5.0))
-        for stage, points in points_by_stage.items():
-            if not points:
-                continue
-            if stage == "al_placeholder":
-                continue
-            axis.scatter(
-                [math.log10(p[0]) for p in points],
-                [math.log10(p[1]) for p in points],
-                s=8,
-                alpha=0.8,
-                label=stage,
-            )
-        if points_by_stage["al_placeholder"]:
-            axis.text(
-                0.02,
-                0.98,
-                f"AL placeholders: {len(points_by_stage['al_placeholder'])} cycles pending",
-                transform=axis.transAxes,
-                va="top",
-            )
-        axis.set_xlabel("log10(ka)")
-        axis.set_ylabel("log10(kb)")
-        axis.set_title("EMB 3.4um DNN causal validation coverage")
-        axis.grid(True, alpha=0.25)
-        axis.legend(loc="best")
+        fig, axes = plt.subplots(2, 2, figsize=(10.0, 8.0))
+        axes_flat = tuple(axes.ravel())
+        for axis, spec in zip(axes_flat, _COVERAGE_PROJECTION_SPECS, strict=True):
+            x_index = _COVERAGE_PROJECTION_INDEX[spec["x_key"]]
+            y_index = _COVERAGE_PROJECTION_INDEX[spec["y_key"]]
+            for stage, points in points_by_stage.items():
+                if stage == "al_placeholders" or not points:
+                    continue
+                axis.scatter(
+                    [math.log10(point[x_index]) for point in points],
+                    [math.log10(point[y_index]) for point in points],
+                    s=8,
+                    alpha=0.8,
+                    label=stage,
+                )
+            if point_counts["al_placeholders"]:
+                axis.text(
+                    0.02,
+                    0.98,
+                    f"AL placeholders: {point_counts['al_placeholders']} cycles pending",
+                    transform=axis.transAxes,
+                    va="top",
+                )
+            axis.set_xlabel(spec["x_label"])
+            axis.set_ylabel(spec["y_label"])
+            axis.set_title(spec["mode"])
+            axis.grid(True, alpha=0.25)
+            axis.legend(loc="best")
         fig.tight_layout()
         fig.savefig(plot_path, dpi=120)
         plt.close(fig)
@@ -388,17 +461,23 @@ def _write_coverage_plot_requirements_only(
         plot_path.write_bytes(_fallback_png())
         state["status"] = "fallback_png"
 
+    projection_modes = [
+        {
+            "mode": spec["mode"],
+            "x_label": spec["x_label"],
+            "y_label": spec["y_label"],
+            "point_counts": dict(point_counts),
+        }
+        for spec in _COVERAGE_PROJECTION_SPECS
+    ]
     state.update(
         {
             "required": True,
             "mode": "log10(ka)-vs-log10(kb)",
+            "projection_count": len(projection_modes),
+            "projection_modes": projection_modes,
             "force_grid_size": force_grid_size,
-            "point_counts": {
-                "unseen_test": len(points_by_stage["unseen_test"]),
-                "shared_initial": len(points_by_stage["shared_initial"]),
-                "lhs": len(points_by_stage["lhs"]),
-                "al_placeholders": len(points_by_stage["al_placeholder"]),
-            },
+            "point_counts": point_counts,
             "plot_path": str(plot_path),
         }
     )
@@ -413,6 +492,8 @@ def prepare_emb_34um_dnn_causal_validation(
     vault_root: Path,
     force_grid_path: Path | None,
     walltime: str,
+    active_replicate_count: int,
+    max_replicate_count: int,
     concurrent_jobs: int,
     retry_limit: int,
     run_id_prefix: str,
@@ -436,6 +517,8 @@ def prepare_emb_34um_dnn_causal_validation(
         vault_root_timestamp=vault_root_timestamp,
         force_grid=force_grid,
         cycle_count=cycle_count,
+        active_replicate_count=active_replicate_count,
+        max_replicate_count=max_replicate_count,
         walltime=walltime,
         concurrent_jobs=concurrent_jobs,
         retry_limit=retry_limit,
@@ -486,6 +569,25 @@ def prepare_emb_34um_dnn_causal_validation(
             manifest=manifest,
             force_grid_size=len(force_grid),
         )
+        manifest["validation_plot"]["projection_count"] = 4
+        manifest["validation_plot"]["projection_modes"] = [spec["mode"] for spec in _COVERAGE_PROJECTION_SPECS]
+        manifest["validation_plot"]["projection_point_counts"] = {
+            "pilot": len(manifest.get("pilot", {}).get("candidate_records", [])),
+            "unseen_test": len(manifest["unseen_test"]["candidate_records"]),
+            "shared_initial": sum(
+                len(seed_payload["shared_initial"]["candidate_records"]) for seed_payload in manifest.get("seeds", ())
+            ),
+            "lhs": sum(
+                len(step_payload["candidate_records"])
+                for seed_payload in manifest.get("seeds", ())
+                for step_payload in seed_payload.get("lhs_steps", ())
+            ),
+            "al_placeholders": sum(
+                int(step_payload.get("candidate_count", 0))
+                for seed_payload in manifest.get("seeds", ())
+                for step_payload in seed_payload.get("al_steps", ())
+            ),
+        }
         manifest["validation_plot"]["coverage_plot"] = str(plot_path)
         manifest["validation_plot"]["coverage_plot_sidecar"] = str(sidecar_path)
 
@@ -508,9 +610,21 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional path to an exact 8-point force-grid file. Defaults to the protocol force grid.",
     )
-    parser.add_argument("--walltime", default="01:00:00")
+    parser.add_argument("--walltime", default=EMB_34UM_DNN_CAUSAL_DPD_WALLTIME_TARGET_DEFAULT)
+    parser.add_argument(
+        "--active-replicate-count",
+        type=int,
+        default=EMB_34UM_DNN_CAUSAL_PRIMARY_REPLICATE_COUNT,
+        help="Active replicate count for this run (default primary protocol count).",
+    )
+    parser.add_argument(
+        "--max-replicate-count",
+        type=int,
+        default=EMB_34UM_DNN_CAUSAL_MAX_REPLICATE_COUNT,
+        help="Protocol maximum replicate count (kept for explicit manifest recording).",
+    )
     parser.add_argument("--concurrent-jobs", type=int, default=30)
-    parser.add_argument("--retry-limit", type=int, default=3)
+    parser.add_argument("--retry-limit", type=int, default=EMB_34UM_DNN_CAUSAL_RETRY_LIMIT_DEFAULT)
     parser.add_argument("--run-id-prefix", default="emb-34um-dnn-causal-validation")
     parser.add_argument("--cycle-count", type=int, default=5)
     parser.add_argument("--include-coverage-plot-requirements", action="store_true")
@@ -526,6 +640,8 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
         vault_root=Path(args.vault_root),
         force_grid_path=Path(args.force_grid) if args.force_grid else None,
         walltime=args.walltime,
+        active_replicate_count=args.active_replicate_count,
+        max_replicate_count=args.max_replicate_count,
         concurrent_jobs=args.concurrent_jobs,
         retry_limit=args.retry_limit,
         run_id_prefix=args.run_id_prefix,

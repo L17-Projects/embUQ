@@ -10,13 +10,17 @@ import random
 import numpy as np
 
 from meso_uq.active_learning.contracts import Candidate
+from meso_uq.active_learning.emb_34um_dnn_causal_validation_protocol import (
+    EMB_34UM_DNN_CAUSAL_BOUNDS,
+    EMB_34UM_DNN_CAUSAL_LOW_CORNER_EXCLUSION,
+    is_dnn_causal_low_corner_excluded,
+)
 
 EMB_34UM_FINAL_GATE_DESIGN_SCHEMA_VERSION = "meso_uq.active_learning.emb_34um_final_gate_design.v1"
 
 EMB_34UM_FINAL_GATE_ACTIVE_VARIABLES = ("ka", "kb")
 EMB_34UM_FINAL_GATE_BOUNDS = {
-    "ka": (1e2, 6e5),
-    "kb": (400.0, 70000.0),
+    name: EMB_34UM_DNN_CAUSAL_BOUNDS[name] for name in EMB_34UM_FINAL_GATE_ACTIVE_VARIABLES
 }
 EMB_34UM_FINAL_GATE_LOG_SPACE = True
 EMB_34UM_FINAL_GATE_FAMILY = "emb"
@@ -149,6 +153,37 @@ def _scale_unit_points(
     )
 
 
+def _build_allowed_unit_pool(
+    *,
+    count: int,
+    seed: int,
+    use_log_space: bool,
+) -> tuple[tuple[tuple[float, float], ...], tuple[tuple[float, float], ...]]:
+    if count <= 0:
+        return (), ()
+
+    raw_count = count
+    while raw_count <= count * 1_000:
+        unit_points = _build_sobol_like_sequence(raw_count, seed)
+        physical_points = _scale_unit_points(unit_points, use_log_space=use_log_space)
+        allowed = [
+            (unit_point, physical_point)
+            for unit_point, physical_point in zip(unit_points, physical_points)
+            if not is_dnn_causal_low_corner_excluded(physical_point[0], physical_point[1])
+        ]
+        if len(allowed) >= count:
+            selected = allowed[:count]
+            return (
+                tuple(unit_point for unit_point, _ in selected),
+                tuple(physical_point for _, physical_point in selected),
+            )
+        raw_count *= 2
+
+    raise ValueError(
+        f"Unable to build {count} EMB 3.4um final-gate points outside the low-ka/low-kb exclusion."
+    )
+
+
 def _distance(lhs: tuple[float, float], rhs: tuple[float, float]) -> float:
     return math.dist(lhs, rhs)
 
@@ -270,6 +305,7 @@ def _build_candidate(*, run_id: str, round_index: int, order: int, source: str, 
             "order": order,
             "selection_source": source,
             "selection_policy": "sobol_maximin" if source == EMB_34UM_FINAL_GATE_SOURCE_INITIAL else "ensemble_disagreement_diversity",
+            "exclusion_policy": dict(EMB_34UM_DNN_CAUSAL_LOW_CORNER_EXCLUSION),
         },
     )
 
@@ -303,8 +339,11 @@ def build_emb_34um_final_gate_design_round(
 
     previous = _coerce_and_validate_points(existing_points)
 
-    unit_pool = _build_sobol_like_sequence(candidate_pool_size, seed)
-    physical_pool = _scale_unit_points(unit_pool, use_log_space=use_log_space)
+    unit_pool, physical_pool = _build_allowed_unit_pool(
+        count=candidate_pool_size,
+        seed=seed,
+        use_log_space=use_log_space,
+    )
     if use_log_space:
         selection_pool = tuple(_to_log_space(point) for point in physical_pool)
         reference = tuple(_to_log_space(point) for point in previous)
@@ -416,6 +455,7 @@ def build_emb_34um_final_gate_design_round(
                 name: [float(lower), float(upper)] for name, (lower, upper) in EMB_34UM_FINAL_GATE_BOUNDS.items()
             },
             "use_log_space": bool(use_log_space),
+            "exclusion_policy": dict(EMB_34UM_DNN_CAUSAL_LOW_CORNER_EXCLUSION),
             "selected_source_distribution": source_counts,
             "candidate_pool_size": candidate_pool_size,
             "batch_size": batch_size,
@@ -450,8 +490,11 @@ def build_emb_34um_final_gate_validation_design(
     design_size = _coerce_positive_int(design_size, label="design_size")
     validation_seed = seed + seed_offset
 
-    unit_points = _build_sobol_like_sequence(design_size, validation_seed)
-    physical_points = _scale_unit_points(unit_points, use_log_space=use_log_space)
+    unit_points, physical_points = _build_allowed_unit_pool(
+        count=design_size,
+        seed=validation_seed,
+        use_log_space=use_log_space,
+    )
     scaled_selection = tuple(_to_log_space(point) for point in physical_points) if use_log_space else physical_points
     selected_indices = _select_maximin(
         unit_candidates=scaled_selection,
@@ -487,6 +530,7 @@ def build_emb_34um_final_gate_validation_design(
                 name: [float(lower), float(upper)] for name, (lower, upper) in EMB_34UM_FINAL_GATE_BOUNDS.items()
             },
             "use_log_space": bool(use_log_space),
+            "exclusion_policy": dict(EMB_34UM_DNN_CAUSAL_LOW_CORNER_EXCLUSION),
             "source": EMB_34UM_FINAL_GATE_SOURCE_VALIDATION,
             "selection_seed": validation_seed,
             "candidate_count": design_size,

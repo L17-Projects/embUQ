@@ -38,6 +38,9 @@ EMB_34UM_DNN_CAUSAL_VALIDATION_INGESTION_SUMMARY_FILENAME = (
 EMB_34UM_DNN_CAUSAL_VALIDATION_COMPLETED_ROWS_FILENAME = (
     "emb_34um_dnn_causal_validation_completed_rows.json"
 )
+EMB_34UM_DNN_CAUSAL_VALIDATION_REPLACEMENT_BATCH_SUMMARY_FILENAME = (
+    "emb_34um_dnn_causal_validation_replacement_batch_summary.json"
+)
 
 DEFAULT_STATUS_FILENAMES = (
     "emb_34um_runtime_status.json",
@@ -51,6 +54,7 @@ _STAGE_PATTERN = re.compile(
     r"^replica-(?P<replicate>\d{3})/(?P<stage>shared_initial|al-step-\d{2}|lhs-step-\d{2})$"
 )
 _CYCLE_PATTERN = re.compile(r"-(?P<cycle>\d{2})$")
+_PRODUCTION_BRANCHES = frozenset({"unseen_test", "shared_initial", "lhs", "al"})
 
 
 @dataclass(frozen=True)
@@ -127,11 +131,26 @@ def _as_bool(value: object, *, default: bool = False) -> bool:
     return default
 
 
+def _is_empty_marker(value: object) -> bool:
+    if value in (None, ""):
+        return True
+    if isinstance(value, str) and value.strip().lower() in {"", "none", "null"}:
+        return True
+    return False
+
+
 def _first_nonempty(*values: object) -> object | None:
     for value in values:
-        if value not in (None, ""):
+        if not _is_empty_marker(value):
             return value
     return None
+
+
+def _coerce_candidate_space(value: object, *, label: str, default: str = "d4") -> str:
+    text = str(default if value in (None, "") else value).strip().lower()
+    if text not in {"d2", "d4"}:
+        raise ValueError(f"{label} must be 'd2' or 'd4'.")
+    return text
 
 
 def _runtime_status_from_output_root(
@@ -279,8 +298,34 @@ def _candidate_stage_context(
         branch = "lhs" if stage.startswith("lhs-step-") else "al"
         return {"stage": stage, "branch": branch, "replicate": replicate, "cycle": cycle}
 
+    if relative == "pilot" or relative.startswith("pilot/"):
+        mode = str(summary_payload.get("mode", summary_payload.get("stage", ""))).strip().lower()
+        replicate_value = _first_nonempty(summary_payload.get("replica"), summary_payload.get("seed"), 0)
+        cycle_value = _first_nonempty(summary_payload.get("cycle"), 0)
+        try:
+            replicate = int(replicate_value)
+        except (TypeError, ValueError):
+            replicate = 0
+        try:
+            cycle = int(cycle_value)
+        except (TypeError, ValueError):
+            cycle = 0
+        cycle_match = _CYCLE_PATTERN.search(mode)
+        if cycle_match:
+            cycle = int(cycle_match.group("cycle"))
+        return {"stage": mode or relative, "branch": "pilot", "replicate": replicate, "cycle": cycle}
+
     mode = str(summary_payload.get("mode", summary_payload.get("stage", ""))).strip().lower()
-    cycle = 0
+    replicate_value = _first_nonempty(summary_payload.get("replica"), summary_payload.get("seed"), 0)
+    cycle_value = _first_nonempty(summary_payload.get("cycle"), 0)
+    try:
+        replicate = int(replicate_value)
+    except (TypeError, ValueError):
+        replicate = 0
+    try:
+        cycle = int(cycle_value)
+    except (TypeError, ValueError):
+        cycle = 0
     cycle_match = _CYCLE_PATTERN.search(mode)
     if cycle_match:
         cycle = int(cycle_match.group("cycle"))
@@ -294,7 +339,17 @@ def _candidate_stage_context(
         branch = "unseen_test"
     else:
         branch = "unknown"
-    return {"stage": mode or relative, "branch": branch, "replicate": 0, "cycle": cycle}
+    return {"stage": mode or relative, "branch": branch, "replicate": replicate, "cycle": cycle}
+
+
+def _campaign_stream_for_summary(*, campaign_root: Path, summary_path: Path) -> str:
+    try:
+        relative_parts = summary_path.parent.relative_to(campaign_root).parts
+    except ValueError:
+        return "production"
+    if relative_parts and str(relative_parts[0]).strip().lower() == "pilot":
+        return "pilot"
+    return "production"
 
 
 def _candidate_id(candidate: Mapping[str, Any], request_payload: Mapping[str, Any]) -> str:
@@ -308,6 +363,7 @@ def _candidate_id(candidate: Mapping[str, Any], request_payload: Mapping[str, An
 def _extract_candidate_record(
     *,
     campaign_root: Path,
+    campaign_stream: str,
     summary_path: Path,
     summary_payload: Mapping[str, Any],
     candidate_manifest_path: Path,
@@ -345,6 +401,30 @@ def _extract_candidate_record(
     )
     ka = _coerce_float(parameters.get("ka"), label=f"{candidate_id}.ka")
     kb = _coerce_float(parameters.get("kb"), label=f"{candidate_id}.kb")
+    runtime_fingerprint = _coerce_mapping(
+        _first_nonempty(normalized_payload.get("fingerprint"), request_payload.get("fingerprint"), {}) or {},
+        label=f"{candidate_id}.fingerprint",
+    )
+    candidate_space = _coerce_candidate_space(
+        _first_nonempty(
+            normalized_payload.get("candidate_space"),
+            request_payload.get("candidate_space"),
+            candidate_manifest.get("candidate_space"),
+            metadata.get("candidate_space"),
+        ),
+        label=f"{candidate_id}.candidate_space",
+    )
+    radp_value = _first_nonempty(parameters.get("radp"), runtime_fingerprint.get("radp"))
+    shell_th_value = _first_nonempty(parameters.get("shell_th"), runtime_fingerprint.get("shell_th"))
+    radp = _coerce_float(radp_value, label=f"{candidate_id}.radp") if radp_value is not None else None
+    shell_th = _coerce_float(shell_th_value, label=f"{candidate_id}.shell_th") if shell_th_value is not None else None
+    if (radp is None) != (shell_th is None):
+        raise ValueError(f"{candidate_id} must provide both radp and shell_th together.")
+    if candidate_space == "d4" and (radp is None or shell_th is None):
+        raise ValueError(
+            f"{candidate_id} is missing D4 runtime geometry; provide both radp and shell_th "
+            "or mark the record explicitly as candidate_space='d2'."
+        )
 
     force_grid_raw = _first_nonempty(
         normalized_payload.get("force_grid"),
@@ -416,23 +496,19 @@ def _extract_candidate_record(
         ),
         default=False,
     )
-    replacement_for = str(
-        _first_nonempty(
-            candidate_manifest.get("replacement_for"),
-            metadata.get("replacement_for"),
-            runtime.get("replacement_for"),
-            "",
-        )
-    ).strip()
+    replacement_for_value = _first_nonempty(
+        candidate_manifest.get("replacement_for"),
+        metadata.get("replacement_for"),
+        runtime.get("replacement_for"),
+    )
+    replacement_for = "" if replacement_for_value is None else str(replacement_for_value).strip()
     if not replacement_for:
-        replacement_for = str(
-            _first_nonempty(
-                candidate_manifest.get("failed_candidate_id"),
-                metadata.get("failed_candidate_id"),
-                runtime.get("failed_candidate_id"),
-                "",
-            )
-        ).strip()
+        failed_candidate_value = _first_nonempty(
+            candidate_manifest.get("failed_candidate_id"),
+            metadata.get("failed_candidate_id"),
+            runtime.get("failed_candidate_id"),
+        )
+        replacement_for = "" if failed_candidate_value is None else str(failed_candidate_value).strip()
     if replacement_for:
         replacement = True
 
@@ -447,16 +523,18 @@ def _extract_candidate_record(
     if not reason_codes and status != "completed":
         reason_codes.append("unknown_ingestion_failure")
 
-    return {
+    record = {
         "candidate_id": candidate_id,
         "candidate_path": str(candidate_manifest_path),
         "candidate_manifest_path": str(candidate_manifest_path),
         "batch_summary_path": str(summary_path),
+        "campaign_stream": str(campaign_stream),
         "output_root": str(output_root),
         "stage": stage,
         "branch": branch,
         "replicate": replicate,
         "cycle": cycle,
+        "candidate_space": candidate_space,
         "ka": ka,
         "kb": kb,
         "force_grid": list(curve_force_grid),
@@ -478,11 +556,38 @@ def _extract_candidate_record(
             "f_delta_row_index": f_delta_row_index,
         },
     }
+    if radp is not None:
+        record["radp"] = radp
+    if shell_th is not None:
+        record["shell_th"] = shell_th
+    return record
+
+
+def _is_production_completed_record(record: Mapping[str, Any]) -> bool:
+    if str(record.get("status", "")).strip().lower() != "completed":
+        return False
+    if str(record.get("campaign_stream", "production")).strip().lower() != "production":
+        return False
+    return str(record.get("branch", "")).strip().lower() in _PRODUCTION_BRANCHES
 
 
 def _completed_row(record: Mapping[str, Any]) -> dict[str, Any]:
+    candidate_space = _coerce_candidate_space(record.get("candidate_space"), label="record.candidate_space")
     ka = _coerce_float(record.get("ka"), label="record.ka")
     kb = _coerce_float(record.get("kb"), label="record.kb")
+    radp = _coerce_float(record.get("radp"), label="record.radp") if record.get("radp") is not None else None
+    shell_th = (
+        _coerce_float(record.get("shell_th"), label="record.shell_th")
+        if record.get("shell_th") is not None
+        else None
+    )
+    if (radp is None) != (shell_th is None):
+        raise ValueError("completed record must provide both radp and shell_th together.")
+    if candidate_space == "d4" and (radp is None or shell_th is None):
+        raise ValueError(
+            "completed record is missing D4 runtime geometry; provide both radp and shell_th "
+            "or mark the record explicitly as candidate_space='d2'."
+        )
     force_grid = tuple(
         _coerce_float(item, label="record.force_grid")
         for item in _coerce_sequence(record.get("force_grid", ()), label="record.force_grid")
@@ -495,7 +600,7 @@ def _completed_row(record: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("completed record force_grid and force_curve lengths must match.")
     validate_dnn_causal_force_grid(force_grid)
     validate_dnn_causal_ensemble_size(EMB_34UM_DNN_CAUSAL_ENSEMBLE_SIZE)
-    return {
+    completed = {
         "curve_id": str(record.get("candidate_id", "")),
         "candidate_id": str(record.get("candidate_id", "")),
         "candidate_path": str(record.get("candidate_path", "")),
@@ -505,6 +610,7 @@ def _completed_row(record: Mapping[str, Any]) -> dict[str, Any]:
         "stage": str(record.get("stage", "")),
         "replicate": _coerce_int(record.get("replicate", 0), label="record.replicate"),
         "cycle": _coerce_int(record.get("cycle", 0), label="record.cycle"),
+        "candidate_space": candidate_space,
         "ka": ka,
         "kb": kb,
         "parameters": {"ka": ka, "kb": kb},
@@ -520,16 +626,64 @@ def _completed_row(record: Mapping[str, Any]) -> dict[str, Any]:
         "schema_version": EMB_34UM_DNN_CAUSAL_VALIDATION_COMPLETED_ROWS_SCHEMA_VERSION,
         "ensemble_size": EMB_34UM_DNN_CAUSAL_ENSEMBLE_SIZE,
     }
+    if radp is not None:
+        completed["radp"] = radp
+        completed["parameters"]["radp"] = radp
+    if shell_th is not None:
+        completed["shell_th"] = shell_th
+        completed["parameters"]["shell_th"] = shell_th
+    return completed
 
 
 def _summary_paths(campaign_root: Path) -> tuple[Path, ...]:
-    paths = sorted(campaign_root.glob(f"**/{EMB_34UM_DNN_CAUSAL_VALIDATION_BATCH_SUMMARY_FILENAME}"))
-    return tuple(path for path in paths if path.is_file())
+    paths: list[Path] = []
+    for filename in (
+        EMB_34UM_DNN_CAUSAL_VALIDATION_BATCH_SUMMARY_FILENAME,
+        EMB_34UM_DNN_CAUSAL_VALIDATION_REPLACEMENT_BATCH_SUMMARY_FILENAME,
+    ):
+        paths.extend(path for path in sorted(campaign_root.glob(f"**/{filename}")) if path.is_file())
+    seen: set[str] = set()
+    unique: list[Path] = []
+    for path in sorted(paths):
+        key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(path)
+    return tuple(unique)
 
 
 def _candidate_manifest_paths(summary_payload: Mapping[str, Any]) -> tuple[Path, ...]:
-    paths = _coerce_sequence(summary_payload.get("rendered_candidate_manifests", ()), label="rendered_candidate_manifests")
-    return tuple(Path(str(item)) for item in paths)
+    paths: list[Path] = []
+    seen: set[str] = set()
+    if "rendered_candidate_manifests" in summary_payload:
+        rendered_paths = _coerce_sequence(summary_payload.get("rendered_candidate_manifests"), label="rendered_candidate_manifests")
+        for item in rendered_paths:
+            text = str(item).strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            paths.append(Path(text))
+
+    if "replacement_records" in summary_payload:
+        replacement_records = _coerce_sequence(summary_payload.get("replacement_records"), label="replacement_records")
+        for item in replacement_records:
+            if not isinstance(item, Mapping):
+                continue
+            text = str(
+                _first_nonempty(
+                    item.get("replacement_candidate_manifest_path"),
+                    item.get("candidate_manifest_path"),
+                    item.get("manifest_path"),
+                    "",
+                )
+            ).strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            paths.append(Path(text))
+
+    return tuple(paths)
 
 
 def _resolve_campaign_manifest_path(
@@ -562,10 +716,19 @@ def _build_ingestion_payloads(
 
     summary_paths = _summary_paths(resolved_root)
     records: list[dict[str, Any]] = []
+    seen_candidate_manifest_paths: set[str] = set()
     for summary_path in summary_paths:
         summary_payload = _read_json(summary_path)
+        campaign_stream = _campaign_stream_for_summary(
+            campaign_root=resolved_root,
+            summary_path=summary_path,
+        )
         manifest_paths = _candidate_manifest_paths(summary_payload)
         for candidate_manifest_path in manifest_paths:
+            candidate_manifest_key = str(candidate_manifest_path)
+            if candidate_manifest_key in seen_candidate_manifest_paths:
+                continue
+            seen_candidate_manifest_paths.add(candidate_manifest_key)
             if not candidate_manifest_path.is_file():
                 records.append(
                     {
@@ -573,6 +736,7 @@ def _build_ingestion_payloads(
                         "candidate_path": str(candidate_manifest_path),
                         "candidate_manifest_path": str(candidate_manifest_path),
                         "batch_summary_path": str(summary_path),
+                        "campaign_stream": campaign_stream,
                         "output_root": "",
                         "stage": _candidate_stage_context(
                             campaign_root=resolved_root,
@@ -616,6 +780,7 @@ def _build_ingestion_payloads(
             records.append(
                 _extract_candidate_record(
                     campaign_root=resolved_root,
+                    campaign_stream=campaign_stream,
                     summary_path=summary_path,
                     summary_payload=summary_payload,
                     candidate_manifest_path=candidate_manifest_path,
@@ -623,7 +788,7 @@ def _build_ingestion_payloads(
                 )
             )
 
-    completed_rows = tuple(_completed_row(record) for record in records if record.get("status") == "completed")
+    completed_rows = tuple(_completed_row(record) for record in records if _is_production_completed_record(record))
 
     status_counts = {
         "completed": sum(1 for row in records if row.get("status") == "completed"),
@@ -650,6 +815,18 @@ def _build_ingestion_payloads(
             bucket[status] += 1
         bucket["total"] += 1
 
+    stream_counts: dict[str, dict[str, int]] = {}
+    for row in records:
+        stream = str(row.get("campaign_stream", "production")).strip().lower() or "production"
+        bucket = stream_counts.setdefault(
+            stream,
+            {"completed": 0, "failed": 0, "partial": 0, "missing": 0, "total": 0},
+        )
+        status = str(row.get("status", ""))
+        if status in bucket:
+            bucket[status] += 1
+        bucket["total"] += 1
+
     blockers: list[str] = []
     if not summary_paths:
         blockers.append("No batch summaries were found under the campaign root.")
@@ -661,6 +838,16 @@ def _build_ingestion_payloads(
         counts = branch_counts.get(required_branch)
         if counts and counts["total"] > 0 and counts["completed"] == 0:
             blockers.append(f"branch={required_branch} has discovered candidates but zero completed curves.")
+    unknown_production_completed = [
+        row for row in records
+        if str(row.get("campaign_stream", "production")).strip().lower() == "production"
+        and str(row.get("status", "")).strip().lower() == "completed"
+        and str(row.get("branch", "")).strip().lower() not in _PRODUCTION_BRANCHES
+    ]
+    if unknown_production_completed:
+        blockers.append(
+            "Production completed rows include unsupported branches; check stage naming and campaign manifests."
+        )
 
     ingestion_manifest = {
         "schema_version": EMB_34UM_DNN_CAUSAL_VALIDATION_INGESTION_SCHEMA_VERSION,
@@ -689,6 +876,10 @@ def _build_ingestion_payloads(
         "branch_counts": [
             {"branch": branch, **counts}
             for branch, counts in sorted(branch_counts.items())
+        ],
+        "stream_counts": [
+            {"stream": stream, **counts}
+            for stream, counts in sorted(stream_counts.items())
         ],
         "blockers": blockers,
         "status": "blocked" if blockers else "passed",

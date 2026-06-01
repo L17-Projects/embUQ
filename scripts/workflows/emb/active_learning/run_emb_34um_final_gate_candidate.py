@@ -18,6 +18,22 @@ from typing import Any
 EMB_34UM_REQUEST_SCHEMA_VERSION = "meso_uq.dpd_sampling.emb_34um_request.v1"
 EMB_34UM_DIAMETER_UM = 3.4
 DEFAULT_DT_SCALE_FACTOR = 0.5
+EMB_34UM_FORCE_GRID = tuple((5000.0 * index / 7.0) for index in range(8))
+TRANSIENT_OUTPUT_NAMES = (
+    "out_hierarchical",
+    "F_Delta.dat",
+    "emb_34um_result.json",
+    "emb_34um_runtime_status.json",
+)
+
+
+def _compute_box_dimensions(radp: float, *, explicit_cubic: bool = False) -> tuple[float, float, float]:
+    if explicit_cubic:
+        box = float(math.ceil(2.0 * radp + 10.0))
+        return (box, box, box)
+    lx = float(math.ceil(2.0 * radp + 6.0))
+    lz = float(math.ceil(2.0 * radp + 10.0))
+    return (lx, lx, lz)
 
 
 def _repo_root() -> Path:
@@ -102,7 +118,8 @@ _EMB_DEFAULTS_PATH = (
 )
 _DEFAULT_EMB_FINGERPRINT = {
     "fscale": 0.0074,
-    "shell_th": 5.0e-9,
+    "radp": 6.60,
+    "shell_th": 3.75e-9,
 }
 
 
@@ -171,9 +188,54 @@ def _coerce_force_grid(values: Any, *, candidate_id: str) -> tuple[float, ...]:
     grid = tuple(_coerce_float(value, field_name="force_grid item") for value in values)
     if not grid:
         raise ValueError(f"Candidate {candidate_id!r} force_grid must not be empty.")
+    if len(grid) != len(EMB_34UM_FORCE_GRID):
+        raise ValueError(
+            f"Candidate {candidate_id!r} force_grid must contain {len(EMB_34UM_FORCE_GRID)} points "
+            f"from 0 to 5000, got {len(grid)}."
+        )
+    if grid != tuple(sorted(grid)):
+        raise ValueError(f"Candidate {candidate_id!r} force_grid must be sorted ascending and deterministic.")
+    for actual, expected in zip(grid, EMB_34UM_FORCE_GRID):
+        if not math.isclose(actual, expected, rel_tol=1e-12, abs_tol=1e-9):
+            raise ValueError(
+                f"Candidate {candidate_id!r} force_grid must be exactly eight evenly spaced points from 0 to 5000."
+            )
     if any(value < 0.0 for value in grid):
         raise ValueError(f"Candidate {candidate_id!r} force_grid must be non-negative.")
     return grid
+
+
+def _request_runtime_fingerprint(request: Emb34umCandidateRequest) -> dict[str, Any]:
+    runtime_fingerprint = dict(request.fingerprint)
+    request_parameters = request.request_payload.get("parameters")
+    if isinstance(request_parameters, Mapping):
+        for key in ("radp", "shell_th", "bpress", "L", "Lx", "Ly", "Lz"):
+            if key not in runtime_fingerprint and key in request_parameters:
+                runtime_fingerprint[key] = request_parameters[key]
+
+    if "radp" not in runtime_fingerprint and "radp" in request.parameters:
+        runtime_fingerprint["radp"] = request.parameters["radp"]
+    if "shell_th" not in runtime_fingerprint and "shell_th" in request.parameters:
+        runtime_fingerprint["shell_th"] = request.parameters["shell_th"]
+    if "bpress" not in runtime_fingerprint and "bpress" in request.parameters:
+        runtime_fingerprint["bpress"] = request.parameters["bpress"]
+
+    runtime_fingerprint.setdefault("fscale", _DEFAULT_EMB_FINGERPRINT["fscale"])
+    runtime_fingerprint.setdefault("shell_th", _DEFAULT_EMB_FINGERPRINT["shell_th"])
+    runtime_fingerprint.setdefault("numsteps", 5000)
+    runtime_fingerprint.setdefault("numsteps_eq", 10000)
+    runtime_fingerprint.setdefault("direct_stiffness_override", True)
+    runtime_fingerprint.setdefault("bpress", -91.0)
+
+    if "radp" in runtime_fingerprint and not {"Lx", "Ly", "Lz"} <= runtime_fingerprint.keys():
+        explicit_cubic = "L" in runtime_fingerprint
+        target_box = _compute_box_dimensions(float(runtime_fingerprint["radp"]), explicit_cubic=explicit_cubic)
+        runtime_fingerprint.setdefault("Lx", target_box[0])
+        runtime_fingerprint.setdefault("Ly", target_box[1])
+        runtime_fingerprint.setdefault("Lz", target_box[2])
+        runtime_fingerprint.setdefault("L", target_box[2])
+
+    return runtime_fingerprint
 
 
 def _coerce_parameters(values: Any, *, candidate_id: str) -> tuple[dict[str, float], float | None]:
@@ -233,6 +295,19 @@ def _coerce_parameters(values: Any, *, candidate_id: str) -> tuple[dict[str, flo
     )
 
 
+def _validate_direct_ka_kb_bounds(*, parameters: Mapping[str, float], candidate_id: str) -> None:
+    from meso_uq.active_learning.emb_34um_dnn_causal_validation_protocol import EMB_34UM_DNN_CAUSAL_BOUNDS
+
+    for key in ("ka", "kb"):
+        lower, upper = EMB_34UM_DNN_CAUSAL_BOUNDS[key]
+        value = _coerce_float(parameters[key], field_name=f"parameters.{key}")
+        if not (float(lower) <= value <= float(upper)):
+            raise ValueError(
+                f"Candidate {candidate_id!r} parameters.{key}={value} "
+                f"is outside bounds [{lower}, {upper}]."
+            )
+
+
 def load_candidate_request(candidate_manifest_path: str | Path) -> Emb34umCandidateRequest:
     path = Path(candidate_manifest_path)
     manifest = json.loads(path.read_text(encoding="utf-8"))
@@ -269,10 +344,47 @@ def load_candidate_request(candidate_manifest_path: str | Path) -> Emb34umCandid
     if retry_limit < 0:
         raise ValueError("request_payload.retry_limit must be non-negative.")
 
+    request_parameters = request_payload.get("parameters")
     parameters, compatibility_yt = _coerce_parameters(
-        request_payload.get("parameters"),
+        request_parameters,
         candidate_id=candidate_id,
     )
+    runtime_source: dict[str, Any] = {}
+    if compatibility_yt is None:
+        _validate_direct_ka_kb_bounds(parameters=parameters, candidate_id=candidate_id)
+    if compatibility_yt is None and isinstance(request_parameters, Mapping):
+        fingerprint_source = request_payload.get("fingerprint", {})
+        if isinstance(fingerprint_source, Mapping):
+            runtime_source.update(fingerprint_source)
+        runtime_source.update(request_parameters)
+        missing_runtime_fields = [key for key in ("radp", "shell_th") if key not in runtime_source]
+        if missing_runtime_fields:
+            raise ValueError(
+                f"Candidate {candidate_id!r} is missing D4 runtime parameters {missing_runtime_fields}; "
+                "provide both 'radp' and 'shell_th' unless using explicit legacy/D2 Yt compatibility."
+            )
+        from meso_uq.active_learning.emb_34um_dnn_causal_validation_protocol import EMB_34UM_DNN_CAUSAL_BOUNDS
+
+        for key in ("radp", "shell_th"):
+            lower, upper = EMB_34UM_DNN_CAUSAL_BOUNDS[key]
+            value = _coerce_float(runtime_source[key], field_name=f"runtime_fingerprint.{key}")
+            if not (float(lower) <= value <= float(upper)):
+                raise ValueError(
+                    f"Candidate {candidate_id!r} runtime_fingerprint.{key}={value} "
+                    f"is outside bounds [{lower}, {upper}]."
+                )
+    from meso_uq.active_learning.emb_34um_dnn_causal_validation_protocol import is_dnn_causal_low_corner_excluded
+
+    if is_dnn_causal_low_corner_excluded(
+        parameters["ka"],
+        parameters["kb"],
+        runtime_source.get("radp"),
+        runtime_source.get("shell_th"),
+    ):
+        raise ValueError(
+            f"Candidate {candidate_id!r} is in the EMB 3.4um runtime-risk timeout region "
+            "and must not be submitted."
+        )
 
     return Emb34umCandidateRequest(
         candidate_manifest_path=path,
@@ -372,6 +484,39 @@ def _write_status_manifest(
         path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def _is_relative_to(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def _remove_path(path: Path) -> None:
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+    elif path.exists() or path.is_symlink():
+        path.unlink()
+
+
+def _clean_transient_candidate_outputs(request: Emb34umCandidateRequest) -> None:
+    request.output_root.mkdir(parents=True, exist_ok=True)
+    output_root = request.output_root.resolve()
+    targets = [request.output_root / name for name in TRANSIENT_OUTPUT_NAMES]
+    if _is_relative_to(request.expected_hdf5_path, output_root):
+        targets.append(request.expected_hdf5_path)
+
+    seen: set[Path] = set()
+    for target in targets:
+        resolved = target.resolve(strict=False)
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if not _is_relative_to(target, output_root):
+            continue
+        _remove_path(target)
+
+
 def _setup_indentation_init_dir(
     request: Emb34umCandidateRequest,
     *,
@@ -398,13 +543,25 @@ def _setup_indentation_init_dir(
             emb_defaults = yaml.load(stream, Loader=yaml.CLoader)
         validate_training_baseline(emb_defaults, str(defaults_path))
 
-        fingerprint = request.fingerprint
+        fingerprint = _request_runtime_fingerprint(request)
         dt_multiplier = dt_scale_factor**retry_attempt
         numsteps_multiplier = 1.0 / dt_multiplier
-        target_box_extent = float(fingerprint.get("L", 25.0))
-        target_radp = float(fingerprint.get("radp", 6.8))
+        target_radp = float(fingerprint.get("radp", _DEFAULT_EMB_FINGERPRINT["radp"]))
         target_numsteps = int(float(fingerprint.get("numsteps", emb_defaults.get("numsteps", 5000))))
         target_numsteps_eq = int(float(fingerprint.get("numsteps_eq", emb_defaults.get("numsteps_eq", 10000))))
+        target_shell_th = float(fingerprint.get("shell_th", emb_defaults.get("shell_th", 5.0e-9)))
+        direct_stiffness_override = bool(fingerprint.get("direct_stiffness_override", True))
+        target_bpress = float(fingerprint.get("bpress", emb_defaults.get("bpress", 0.0)))
+
+        if {"Lx", "Ly", "Lz"} <= fingerprint.keys():
+            target_box = (
+                float(fingerprint.get("Lx", 25.0)),
+                float(fingerprint.get("Ly", 25.0)),
+                float(fingerprint.get("Lz", 25.0)),
+            )
+        else:
+            explicit_cubic = "L" in fingerprint
+            target_box = _compute_box_dimensions(target_radp, explicit_cubic=explicit_cubic)
 
         parameter_dir = init_dir / "parameter"
         for parameter_file in parameter_dir.glob("parameters-default*.yaml"):
@@ -412,12 +569,12 @@ def _setup_indentation_init_dir(
                 params = yaml.load(stream, Loader=yaml.CLoader) or {}
             validate_training_baseline(params, str(parameter_file))
 
-            params["Lx"] = target_box_extent
-            params["Ly"] = target_box_extent
-            params["Lz"] = target_box_extent
+            params["Lx"], params["Ly"], params["Lz"] = target_box
             params["radp"] = target_radp
             params["fscale"] = float(fingerprint.get("fscale", params.get("fscale", 0.0074)))
-            params["shell_th"] = float(fingerprint.get("shell_th", params.get("shell_th", 5.0e-9)))
+            params["shell_th"] = target_shell_th
+            params["direct_stiffness_override"] = direct_stiffness_override
+            params["bpress"] = target_bpress
             if "dt" in params:
                 params["dt"] = float(params["dt"]) * dt_multiplier
             if "dt_eq" in params:
@@ -448,6 +605,23 @@ def _write_outputs(
     diameters = np.asarray(sample["Reference Evaluations"], dtype=float)
     std = np.asarray(sample.get("Standard Deviation", []), dtype=float)
     params = np.asarray(request.parameter_vector, dtype=float)
+    runtime_fingerprint = _request_runtime_fingerprint(request)
+    radp = float(runtime_fingerprint.get("radp", _DEFAULT_EMB_FINGERPRINT["radp"]))
+    shell_th = float(runtime_fingerprint.get("shell_th", _DEFAULT_EMB_FINGERPRINT["shell_th"]))
+    bpress = float(runtime_fingerprint.get("bpress", -91.0))
+    if {"Lx", "Ly", "Lz"} <= runtime_fingerprint.keys():
+        box_dimensions = {
+            "Lx": float(runtime_fingerprint["Lx"]),
+            "Ly": float(runtime_fingerprint["Ly"]),
+            "Lz": float(runtime_fingerprint["Lz"]),
+        }
+    else:
+        target_box = _compute_box_dimensions(radp, explicit_cubic="L" in runtime_fingerprint)
+        box_dimensions = {"Lx": target_box[0], "Ly": target_box[1], "Lz": target_box[2]}
+        runtime_fingerprint.setdefault("Lx", target_box[0])
+        runtime_fingerprint.setdefault("Ly", target_box[1])
+        runtime_fingerprint.setdefault("Lz", target_box[2])
+        runtime_fingerprint.setdefault("L", target_box[2])
 
     result_payload = {
         "candidate_id": request.candidate_id,
@@ -459,6 +633,11 @@ def _write_outputs(
         "standard_deviation": std.tolist(),
         "retry_attempt": retry_attempt,
         "evaluation_mode": "mirheo_emb_34um_final_gate",
+        "runtime_fingerprint": runtime_fingerprint,
+        "radp": radp,
+        "shell_th": shell_th,
+        "bpress": bpress,
+        "box_dimensions": box_dimensions,
     }
     if runtime_seconds is not None:
         result_payload["runtime_seconds"] = float(runtime_seconds)
@@ -471,6 +650,12 @@ def _write_outputs(
         h5.attrs["candidate_id"] = request.candidate_id
         h5.attrs["diameter_um"] = EMB_34UM_DIAMETER_UM
         h5.attrs["evaluation_mode"] = "mirheo_emb_34um_final_gate"
+        h5.attrs["radp"] = radp
+        h5.attrs["shell_th"] = shell_th
+        h5.attrs["bpress"] = bpress
+        h5.attrs["Lx"] = box_dimensions["Lx"]
+        h5.attrs["Ly"] = box_dimensions["Ly"]
+        h5.attrs["Lz"] = box_dimensions["Lz"]
         h5.create_dataset("parameter_vector", data=params)
         h5.create_dataset("force_grid", data=forces)
         h5.create_dataset("vertical_diameter", data=diameters)
@@ -503,6 +688,7 @@ def run_candidate_once(
         return
 
     if rank == 0:
+        _clean_transient_candidate_outputs(request)
         _write_status_manifest(request, status="running", retry_attempt=retry_attempt)
         request.output_root.mkdir(parents=True, exist_ok=True)
     comm.Barrier()

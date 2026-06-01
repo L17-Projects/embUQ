@@ -51,6 +51,7 @@ from meso_uq.active_learning.emb_34um_causal_validation_design import (  # noqa:
 )
 
 from meso_uq.active_learning import emb_34um_causal_validation_design as _causal_design  # noqa: E402
+from meso_uq.active_learning.emb_34um_dpd_adapter import EMB_34UM_RUNTIME_FINGERPRINT  # noqa: E402
 
 
 CONTROLLER_SCHEMA_VERSION = "meso_uq.active_learning.emb_34um_causal_validation_controller.v3"
@@ -400,6 +401,10 @@ def _coerce_mapping(payload: Any, *, label: str) -> dict[str, Any]:
     if not isinstance(payload, Mapping):
         raise ValueError(f"{label} must be a mapping.")
     return dict(payload)
+
+
+def _runtime_fingerprint_with_defaults(source: Mapping[str, Any] | None) -> dict[str, Any]:
+    return {**dict(EMB_34UM_RUNTIME_FINGERPRINT), **dict(source or {})}
 
 
 def _coerce_candidate_float(value: Any, label: str) -> float:
@@ -1026,7 +1031,7 @@ def _selection_candidates_from_scored_rows(
                 "ka": float(row["ka"]),
                 "kb": float(row["kb"]),
                 "force_grid": list(force_grid),
-                "runtime_fingerprint": dict(manifest.get("runtime_fingerprint", {})),
+                "runtime_fingerprint": _runtime_fingerprint_with_defaults(manifest.get("runtime_fingerprint")),
             },
             metadata={
                 "seed": seed,
@@ -1089,7 +1094,7 @@ def _selection_candidates_from_scored_rows(
                 "ka": float(row["ka"]),
                 "kb": float(row["kb"]),
                 "force_grid": list(force_grid),
-                "runtime_fingerprint": dict(manifest.get("runtime_fingerprint", {})),
+                "runtime_fingerprint": _runtime_fingerprint_with_defaults(manifest.get("runtime_fingerprint")),
             },
             metadata={
                 "seed": seed,
@@ -1370,7 +1375,7 @@ def _build_lhs_replacement_candidates_from_mode(
                 "ka": ka,
                 "kb": kb,
                 "force_grid": list(force_grid),
-                "runtime_fingerprint": dict(design_manifest.get("runtime_fingerprint", {})),
+                "runtime_fingerprint": _runtime_fingerprint_with_defaults(design_manifest.get("runtime_fingerprint")),
             },
             metadata=metadata,
         )
@@ -1509,7 +1514,7 @@ def _build_replacement_candidates_from_reserve(*, campaign_root: Path, seed: int
     run_id_prefix, walltime, concurrent_jobs, retry_limit = _load_design_command_inventory_payload(campaign_root=campaign_root)
     design_manifest = _load_design_manifest(campaign_root=campaign_root)
     vault_root_timestamp = Path(str(design_manifest.get("vault_root_timestamp", campaign_root)))
-    runtime_fingerprint = dict(design_manifest.get("runtime_fingerprint", {}))
+    runtime_fingerprint = _runtime_fingerprint_with_defaults(design_manifest.get("runtime_fingerprint"))
 
     replacement_root = stage_root / "replacement"
     batch_index = len(prior_batches) + 1

@@ -60,6 +60,36 @@ _SURROGATE_CACHE: Dict[Tuple[str, float, str, str], Any] = {}
 _DUMP_FLAG: bool | None = None
 
 
+def _validate_finite_position_array(
+    positions: np.ndarray,
+    *,
+    force_index: int,
+    force_value: float,
+    path: str,
+) -> np.ndarray:
+    array = np.asarray(positions)
+    if array.ndim != 2 or array.shape[1] < 3:
+        raise RuntimeError(
+            "Mirheo produced an invalid EMB position array "
+            f"for force_index={force_index}, force={force_value}, path={path!r}, shape={array.shape}."
+        )
+    if array.shape[0] == 0:
+        raise RuntimeError(
+            "Mirheo produced an empty EMB position array "
+            f"for force_index={force_index}, force={force_value}, path={path!r}."
+        )
+    finite = np.isfinite(array)
+    if not bool(finite.all()):
+        nan_count = int(np.isnan(array).sum())
+        inf_count = int(np.isinf(array).sum())
+        raise RuntimeError(
+            "Mirheo produced non-finite EMB coordinates "
+            f"for force_index={force_index}, force={force_value}, path={path!r}, "
+            f"nan_count={nan_count}, inf_count={inf_count}."
+        )
+    return array
+
+
 def _get_worker_comm():
     if korali is not None:
         try:
@@ -439,12 +469,24 @@ def compute_indentation(  # pragma: no cover
         xyzpath = simu_path + "/particles/"
         xyz_files = np.sort(os.listdir(xyzpath))
         xyz_files = fnmatch.filter(xyz_files, "emb*.h5")
+        if len(xyz_files) == 0:
+            raise RuntimeError(
+                f"Mirheo produced no EMB particle dumps for force_index={n_ref}, "
+                f"force={float(Xi)}, path={xyzpath!r}."
+            )
 
         time_steps = []
         pos_top = []
         pos_bot = []
         for xyz in xyz_files:
-            r = h5py.File(xyzpath + xyz, "r")["position"][:]
+            xyz_file = xyzpath + xyz
+            with h5py.File(xyz_file, "r") as h5_file:
+                r = _validate_finite_position_array(
+                    h5_file["position"][:],
+                    force_index=n_ref,
+                    force_value=float(Xi),
+                    path=xyz_file,
+                )
             pos_top.append(r[ind_max, 2])
             pos_bot.append(r[ind_min, 2])
             time_steps.append(cnt)
@@ -455,6 +497,12 @@ def compute_indentation(  # pragma: no cover
 
         final_dist = float(np.mean(pos_top[-pts_sampling:] - pos_bot[-pts_sampling:]))
         std_dist = float(np.std(pos_top[-pts_sampling:] - pos_bot[-pts_sampling:]))
+        if not (np.isfinite(final_dist) and np.isfinite(std_dist)):
+            raise RuntimeError(
+                "Mirheo produced non-finite EMB diameter statistics "
+                f"for force_index={n_ref}, force={float(Xi)}, "
+                f"short_diameter={final_dist}, std={std_dist}."
+            )
 
         if rank == 0:
             dated_print(

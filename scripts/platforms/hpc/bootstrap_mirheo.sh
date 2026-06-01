@@ -158,7 +158,7 @@ runtime_python="$ENV_ROOT/bin/python"
 
 if [[ "$install_python_deps" -eq 1 ]]; then
   "$runtime_python" -m pip install --upgrade pip
-  "$runtime_python" -m pip install h5py MDAnalysis
+  "$runtime_python" -m pip install h5py MDAnalysis PyYAML pydantic
 fi
 
 for command in "$runtime_python" mpicxx nvcc cmake make; do
@@ -181,8 +181,9 @@ cmake_args=(
   -DCMAKE_INSTALL_PREFIX="$MIRHEO_PREFIX"
   -DPYBIND11_FINDPYTHON=ON
   -DPython_EXECUTABLE="$runtime_python"
-  -DMIR_DOUBLE_PRECISION=OFF
-  -DMIR_MEMBRANE_DOUBLE=OFF
+  -DMIR_DOUBLE_PRECISION=ON
+  -DMIR_MEMBRANE_DOUBLE=ON
+  -DMIR_ROD_DOUBLE=ON
   -DMIR_ENABLE_STACKTRACE=OFF
   -DMIR_BUILD_TESTS=OFF
 )

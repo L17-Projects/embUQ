@@ -81,7 +81,10 @@ if [[ "${DRY_RUN}" == "1" ]]; then
 fi
 
 echo "Running metrics: ${METRIC_CMD[*]}"
+set +e
 "${METRIC_CMD[@]}"
+METRIC_STATUS=$?
+set -e
 
 if [[ "${RUN_ANALYZE}" == "1" ]]; then
   ROWS_PATH="${OUTPUT_ROOT}/emb_34um_dnn_causal_validation_rows.json"
@@ -97,3 +100,5 @@ if [[ "${RUN_ANALYZE}" == "1" ]]; then
   echo "Running analysis: ${ANALYZE_CMD[*]}"
   "${ANALYZE_CMD[@]}"
 fi
+
+exit "${METRIC_STATUS}"

@@ -14,20 +14,166 @@ EMB_34UM_DNN_CAUSAL_VALIDATION_SCHEMA_VERSION = EMB_34UM_DNN_CAUSAL_SCHEMA_VERSI
 
 EMB_34UM_DNN_CAUSAL_EXPERIMENT = "indentation"
 EMB_34UM_DNN_CAUSAL_FAMILY = "emb"
-EMB_34UM_DNN_CAUSAL_ACTIVE_VARIABLES = ("ka", "kb")
-EMB_34UM_DNN_CAUSAL_BOUNDS = {"ka": (1e2, 6e5), "kb": (400.0, 70000.0)}
+EMB_34UM_DNN_CAUSAL_ACTIVE_VARIABLES = ("ka", "kb", "radp", "shell_th")
+EMB_34UM_DNN_CAUSAL_BOUNDS = {
+    "ka": (1e3, 1e5),
+    "kb": (2e3, 2e4),
+    "radp": (6.45, 6.60),
+    "shell_th": (3.75e-9, 4.0e-9),
+}
 EMB_34UM_DNN_CAUSAL_PARAMETER_SPACE = "log10"
+EMB_34UM_DNN_CAUSAL_OPERATIONAL_DOMAIN = {
+    "name": "emb_34um_d4_safe_box_failfast_v3",
+    "status": "pilot_required_before_production",
+    "purpose": "AL-vs-LHS causal comparison in an operationally stable D4 subdomain.",
+    "basis": (
+        "Narrowed on 2026-05-26 after Karolina pilot timeouts at thin-shell and "
+        "extreme ka/kb/radp combinations, then narrowed again after a completed "
+        "pilot at radp=6.70 and shell_th=3.5e-9 produced a non-finite final "
+        "force-curve value, then expanded the low-ka/low-kb exclusion after "
+        "a completed V2 pilot timed out at ka=3162.2776601683795 and "
+        "kb=3556.558820077846. The causal comparison only requires a stable "
+        "AL/LHS sampling domain, not the widest physical prior."
+    ),
+    "quarantine_policy": "failed_or_timed_out_candidates_are_replaced_by_next_successful_candidate",
+    "metrics_policy": "final_metrics_use_successful_curves_and_successful_replacements_only",
+}
+EMB_34UM_DNN_CAUSAL_LOW_CORNER_EXCLUSION = {
+    "name": "emb_34um_d4_runtime_risk_exclusion_v4",
+    "enabled": True,
+    "ka_upper_exclusive": 5000.0,
+    "kb_upper_exclusive": 5000.0,
+    "confirmed_timeout_region": {"ka_max": 3162.2776601683795, "kb_max": 3556.558820077846},
+    "observed_slow_or_timeout_points": [
+        {"ka": 189.530, "kb": 453.441, "date": "2026-05-22"},
+        {"ka": 136.956, "kb": 736.554, "date": "2026-05-22"},
+        {"ka": 3162.2776601683795, "kb": 3556.558820077846, "date": "2026-05-26"},
+        {
+            "ka": 1272.145949837055,
+            "kb": 9011.372292672091,
+            "radp": 6.489854540732141,
+            "shell_th": 3.9170402720459855e-9,
+            "date": "2026-05-27",
+            "runtime_seconds": 1223,
+            "slurm_state": "TIMEOUT",
+        },
+        {
+            "ka": 22432.81994559314,
+            "kb": 2436.648543412221,
+            "radp": 6.584751551356739,
+            "shell_th": 3.844815260086293e-9,
+            "date": "2026-05-27",
+            "runtime_seconds": 721,
+            "slurm_state": "TIMEOUT",
+        },
+    ],
+    "additional_4d_timeout_regions": [
+        {
+            "name": "random500_curve_error_c030_timeout_neighborhood",
+            "ka_min_inclusive": 1200.0,
+            "ka_max_exclusive": 1325.0,
+            "kb_min_inclusive": 8500.0,
+            "kb_max_exclusive": 9300.0,
+            "radp_min_inclusive": 6.47,
+            "radp_max_exclusive": 6.505,
+            "shell_th_min_inclusive": 3.88e-9,
+            "shell_th_max_exclusive": 3.94e-9,
+            "confirmed_timeout_point": {
+                "candidate_id": "emb-34um-acquisition-real-dpd-random500_curve_error-c030",
+                "ka": 1272.145949837055,
+                "kb": 9011.372292672091,
+                "radp": 6.489854540732141,
+                "shell_th": 3.9170402720459855e-9,
+                "slurm_job": "4390713_29",
+                "elapsed": "00:20:23",
+            },
+            "nearby_successful_replacement": {
+                "candidate_id": "emb-34um-acquisition-real-dpd-random500_curve_error-c031",
+                "ka": 1358.7312744799053,
+                "kb": 9561.356860131997,
+                "radp": 6.506801087377002,
+                "shell_th": 3.95994097350211e-9,
+                "slurm_job": "4390837_0",
+                "elapsed": "00:02:52",
+            },
+        },
+        {
+            "name": "final_gate_unseen_c014_timeout_neighborhood",
+            "ka_min_inclusive": 22000.0,
+            "ka_max_exclusive": 23000.0,
+            "kb_min_inclusive": 2300.0,
+            "kb_max_exclusive": 2600.0,
+            "radp_min_inclusive": 6.58,
+            "radp_max_exclusive": 6.59,
+            "shell_th_min_inclusive": 3.84e-9,
+            "shell_th_max_exclusive": 3.85e-9,
+            "confirmed_timeout_point": {
+                "candidate_id": "emb-34um-final-al-vs-lhs-causal-gate-rep001-unseen-test-c00-014",
+                "ka": 22432.81994559314,
+                "kb": 2436.648543412221,
+                "radp": 6.584751551356739,
+                "shell_th": 3.844815260086293e-9,
+                "slurm_job": "4391573_13",
+                "elapsed": "00:12:01",
+            },
+            "nearby_successful_neighbors": [
+                {
+                    "candidate_id": "emb-34um-final-al-vs-lhs-causal-gate-rep001-unseen-test-c00-013",
+                    "ka": 18904.735,
+                    "kb": 2095.531,
+                    "radp": 6.571402,
+                    "shell_th": 3.82656498446e-9,
+                },
+                {
+                    "candidate_id": "emb-34um-final-al-vs-lhs-causal-gate-rep001-unseen-test-c00-015",
+                    "ka": 26619.331,
+                    "kb": 2833.294,
+                    "radp": 6.598102,
+                    "shell_th": 3.86306553571e-9,
+                },
+            ],
+        },
+    ],
+    "basis": (
+        "Karolina EMB 3.4um indentation DPD production timeout diagnostics from 2026-05-21, "
+        "2026-05-22, 2026-05-26, and 2026-05-27. The policy keeps the original low-ka/low-kb "
+        "2D exclusion and adds narrow 4D timeout neighborhoods for the 2026-05-27 c030 "
+        "and final-gate unseen c014 timeouts while preserving nearby successful points."
+    ),
+}
 
-EMB_34UM_DNN_CAUSAL_REPLICATE_COUNT = 5
-EMB_34UM_DNN_CAUSAL_REPLICATES = tuple(range(1, EMB_34UM_DNN_CAUSAL_REPLICATE_COUNT + 1))
-EMB_34UM_DNN_CAUSAL_SHARED_INITIAL_SIZE = 100
-EMB_34UM_DNN_CAUSAL_UNSEEN_TEST_SIZE = 100
+EMB_34UM_DNN_CAUSAL_PRIMARY_REPLICATE_COUNT = 3
+EMB_34UM_DNN_CAUSAL_MAX_REPLICATE_COUNT = 5
+# Backward-compatible alias for callers that still import replicate_count.
+EMB_34UM_DNN_CAUSAL_REPLICATE_COUNT = EMB_34UM_DNN_CAUSAL_PRIMARY_REPLICATE_COUNT
+EMB_34UM_DNN_CAUSAL_REPLICATES = tuple(
+    range(1, EMB_34UM_DNN_CAUSAL_MAX_REPLICATE_COUNT + 1)
+)
+EMB_34UM_DNN_CAUSAL_SHARED_INITIAL_SIZE = 200
+EMB_34UM_DNN_CAUSAL_UNSEEN_TEST_SIZE = 300
 EMB_34UM_DNN_CAUSAL_STEP_SIZE = 100
+EMB_34UM_DNN_CAUSAL_AL_REPLACEMENT_RESERVE_SIZE = 50
 EMB_34UM_DNN_CAUSAL_MIN_CYCLES = 5
-EMB_34UM_DNN_CAUSAL_MAX_CYCLES = 10
+EMB_34UM_DNN_CAUSAL_MAX_CYCLES = 5
+EMB_34UM_DNN_CAUSAL_PILOT_SIZE = 32
+EMB_34UM_DNN_CAUSAL_FRESH_ONLY = True
+EMB_34UM_DNN_CAUSAL_PRIMARY_STATISTIC = "AL_error_minus_LHS_error"
+EMB_34UM_DNN_CAUSAL_PRIMARY_STATISTIC_TARGET = "relative_L2"
+EMB_34UM_DNN_CAUSAL_FINAL_CI_UPPER_BOUND_THRESHOLD = 0.0
+EMB_34UM_DNN_CAUSAL_MIN_FINAL_RELATIVE_IMPROVEMENT = 0.10
+
+# Fixed pressure control used by EMB indentation campaign defaults.
+EMB_34UM_DNN_CAUSAL_BPRESS_VALUE = -91.0
 
 EMB_34UM_DNN_CAUSAL_FORCE_GRID = tuple(5000.0 * index / 7.0 for index in range(8))
 EMB_34UM_DNN_CAUSAL_FORCE_GRID_POLICY = "linspace_0_5000_8_including_endpoints"
+EMB_34UM_DNN_CAUSAL_FORCE_COUNT = len(EMB_34UM_DNN_CAUSAL_FORCE_GRID)
+EMB_34UM_DNN_CAUSAL_FORCE_MIN = EMB_34UM_DNN_CAUSAL_FORCE_GRID[0]
+EMB_34UM_DNN_CAUSAL_FORCE_MAX = EMB_34UM_DNN_CAUSAL_FORCE_GRID[-1]
+
+EMB_34UM_DNN_CAUSAL_DPD_WALLTIME_TARGET = "00:12:00"
+EMB_34UM_DNN_CAUSAL_DPD_WALLTIME_TARGET_DEFAULT = EMB_34UM_DNN_CAUSAL_DPD_WALLTIME_TARGET
+EMB_34UM_DNN_CAUSAL_RETRY_LIMIT_DEFAULT = 0
 
 EMB_34UM_DNN_CAUSAL_LHS_SOURCE = "fresh_dpd"
 EMB_34UM_DNN_CAUSAL_TEST_SET_SOURCE = "fresh_dpd_shared_unseen"
@@ -169,8 +315,10 @@ def validate_dnn_causal_cycle_count(cycle_count: object) -> int:
 
 def validate_dnn_causal_replicate_count(replicate_count: object) -> int:
     value = _coerce_positive_int(replicate_count, label="replicate_count")
-    if value != EMB_34UM_DNN_CAUSAL_REPLICATE_COUNT:
-        raise ValueError(f"replicate_count is fixed at {EMB_34UM_DNN_CAUSAL_REPLICATE_COUNT}.")
+    if value > EMB_34UM_DNN_CAUSAL_MAX_REPLICATE_COUNT:
+        raise ValueError(
+            f"replicate_count must be within [1, {EMB_34UM_DNN_CAUSAL_MAX_REPLICATE_COUNT}]."
+        )
     return value
 
 
@@ -243,22 +391,98 @@ def validate_dnn_causal_timing_canary(payload: Mapping[str, Any] | None) -> dict
     )
 
 
+def is_dnn_causal_low_corner_excluded(
+    ka: object,
+    kb: object,
+    radp: object | None = None,
+    shell_th: object | None = None,
+) -> bool:
+    """Return True for EMB 3.4um indentation runtime-risk points."""
+
+    if not EMB_34UM_DNN_CAUSAL_LOW_CORNER_EXCLUSION["enabled"]:
+        return False
+    ka_value = _coerce_float(ka, label="ka")
+    kb_value = _coerce_float(kb, label="kb")
+    if (
+        ka_value < float(EMB_34UM_DNN_CAUSAL_LOW_CORNER_EXCLUSION["ka_upper_exclusive"])
+        and kb_value < float(EMB_34UM_DNN_CAUSAL_LOW_CORNER_EXCLUSION["kb_upper_exclusive"])
+    ):
+        return True
+
+    if radp is None or shell_th is None:
+        return False
+
+    radp_value = _coerce_float(radp, label="radp")
+    shell_th_value = _coerce_float(shell_th, label="shell_th")
+    for region in EMB_34UM_DNN_CAUSAL_LOW_CORNER_EXCLUSION.get("additional_4d_timeout_regions", ()):
+        if (
+            float(region["ka_min_inclusive"]) <= ka_value < float(region["ka_max_exclusive"])
+            and float(region["kb_min_inclusive"]) <= kb_value < float(region["kb_max_exclusive"])
+            and float(region["radp_min_inclusive"]) <= radp_value < float(region["radp_max_exclusive"])
+            and float(region["shell_th_min_inclusive"]) <= shell_th_value < float(region["shell_th_max_exclusive"])
+        ):
+            return True
+    return False
+
+
+def validate_dnn_causal_walltime_target(value: object) -> str:
+    walltime = _coerce_text(value, label="dpd_walltime_target")
+    if walltime.count(":") != 2:
+        raise ValueError("dpd_walltime_target must be HH:MM:SS.")
+    return walltime
+
+
 def dnn_causal_training_curve_count(*, cycle_count: int) -> int:
     cycles = validate_dnn_causal_cycle_count(cycle_count)
-    return EMB_34UM_DNN_CAUSAL_SHARED_INITIAL_SIZE + cycles * EMB_34UM_DNN_CAUSAL_STEP_SIZE
+    return dnn_causal_branch_curve_count(cycle_count=cycles)
+
+
+def dnn_causal_curves_per_replicate(*, cycle_count: int) -> int:
+    cycles = validate_dnn_causal_cycle_count(cycle_count)
+    return EMB_34UM_DNN_CAUSAL_SHARED_INITIAL_SIZE + 2 * cycles * EMB_34UM_DNN_CAUSAL_STEP_SIZE
 
 
 def dnn_causal_branch_curve_count(*, cycle_count: int) -> int:
-    return dnn_causal_training_curve_count(cycle_count=cycle_count)
+    return dnn_causal_curves_per_replicate(cycle_count=cycle_count)
 
 
-def dnn_causal_total_dpd_curve_count(*, cycle_count: int) -> int:
+def dnn_causal_total_dpd_curve_count(
+    *,
+    cycle_count: int,
+    active_replicate_count: int | None = None,
+    replicate_count: int | None = None,
+) -> int:
     cycles = validate_dnn_causal_cycle_count(cycle_count)
-    per_replicate = (
-        EMB_34UM_DNN_CAUSAL_SHARED_INITIAL_SIZE
-        + 2 * cycles * EMB_34UM_DNN_CAUSAL_STEP_SIZE
+    if active_replicate_count is None:
+        active_replicates = (
+            validate_dnn_causal_replicate_count(replicate_count)
+            if replicate_count is not None
+            else EMB_34UM_DNN_CAUSAL_PRIMARY_REPLICATE_COUNT
+        )
+    else:
+        active_replicates = validate_dnn_causal_replicate_count(active_replicate_count)
+        if replicate_count is not None:
+            compatibility_count = validate_dnn_causal_replicate_count(replicate_count)
+            if compatibility_count != active_replicates:
+                raise ValueError("active_replicate_count and replicate_count must match when both are provided.")
+    per_replicate = dnn_causal_curves_per_replicate(cycle_count=cycles)
+    return EMB_34UM_DNN_CAUSAL_UNSEEN_TEST_SIZE + active_replicates * per_replicate
+
+
+def dnn_causal_total_dpd_curve_count_with_pilot(
+    *,
+    cycle_count: int,
+    active_replicate_count: int | None = None,
+    replicate_count: int | None = None,
+) -> int:
+    return (
+        dnn_causal_total_dpd_curve_count(
+            cycle_count=cycle_count,
+            active_replicate_count=active_replicate_count,
+            replicate_count=replicate_count,
+        )
+        + EMB_34UM_DNN_CAUSAL_PILOT_SIZE
     )
-    return EMB_34UM_DNN_CAUSAL_UNSEEN_TEST_SIZE + EMB_34UM_DNN_CAUSAL_REPLICATE_COUNT * per_replicate
 
 
 def dnn_causal_training_row_count(*, curve_count: int) -> int:
@@ -277,7 +501,18 @@ def validate_dnn_causal_protocol_payload(payload: Mapping[str, Any]) -> "Emb34um
 
     return Emb34umDnnCausalValidationProtocol(
         cycle_count=payload.get("cycle_count", EMB_34UM_DNN_CAUSAL_MIN_CYCLES),
-        replicate_count=payload.get("replicate_count", EMB_34UM_DNN_CAUSAL_REPLICATE_COUNT),
+        primary_replicate_count=payload.get(
+            "primary_replicate_count",
+            EMB_34UM_DNN_CAUSAL_PRIMARY_REPLICATE_COUNT,
+        ),
+        max_replicate_count=payload.get(
+            "max_replicate_count",
+            EMB_34UM_DNN_CAUSAL_MAX_REPLICATE_COUNT,
+        ),
+        active_replicate_count=payload.get(
+            "active_replicate_count",
+            payload.get("replicate_count", EMB_34UM_DNN_CAUSAL_PRIMARY_REPLICATE_COUNT),
+        ),
         force_grid=payload.get("force_grid", EMB_34UM_DNN_CAUSAL_FORCE_GRID),
         lhs_source=payload.get("lhs_source", EMB_34UM_DNN_CAUSAL_LHS_SOURCE),
         selector_backend=payload.get("selector_backend", EMB_34UM_DNN_CAUSAL_SELECTOR_BACKEND),
@@ -287,18 +522,25 @@ def validate_dnn_causal_protocol_payload(payload: Mapping[str, Any]) -> "Emb34um
         ),
         ensemble_size=payload["ensemble_size"],
         timing_canary=payload["timing_canary"],
+        dpd_walltime_target=payload.get(
+            "dpd_walltime_target",
+            EMB_34UM_DNN_CAUSAL_DPD_WALLTIME_TARGET_DEFAULT,
+        ),
     )
 
 
 @dataclass(frozen=True)
 class Emb34umDnnCausalValidationProtocol:
     cycle_count: int = EMB_34UM_DNN_CAUSAL_MIN_CYCLES
-    replicate_count: int = EMB_34UM_DNN_CAUSAL_REPLICATE_COUNT
+    primary_replicate_count: int = EMB_34UM_DNN_CAUSAL_PRIMARY_REPLICATE_COUNT
+    max_replicate_count: int = EMB_34UM_DNN_CAUSAL_MAX_REPLICATE_COUNT
+    active_replicate_count: int = EMB_34UM_DNN_CAUSAL_PRIMARY_REPLICATE_COUNT
     force_grid: tuple[float, ...] = EMB_34UM_DNN_CAUSAL_FORCE_GRID
     lhs_source: str = EMB_34UM_DNN_CAUSAL_LHS_SOURCE
     selector_backend: str = EMB_34UM_DNN_CAUSAL_SELECTOR_BACKEND
     uncertainty_source: str = EMB_34UM_DNN_CAUSAL_RECOMMENDED_UNCERTAINTY_SOURCE
     ensemble_size: int = EMB_34UM_DNN_CAUSAL_ENSEMBLE_SIZE
+    dpd_walltime_target: str = EMB_34UM_DNN_CAUSAL_DPD_WALLTIME_TARGET_DEFAULT
     timing_canary: Mapping[str, Any] = field(
         default_factory=lambda: {
             "required": EMB_34UM_DNN_CAUSAL_TIMING_CANARY_REQUIRED,
@@ -310,9 +552,35 @@ class Emb34umDnnCausalValidationProtocol:
         object.__setattr__(self, "cycle_count", validate_dnn_causal_cycle_count(self.cycle_count))
         object.__setattr__(
             self,
-            "replicate_count",
-            validate_dnn_causal_replicate_count(self.replicate_count),
+            "primary_replicate_count",
+            _coerce_positive_int(
+                self.primary_replicate_count,
+                label="primary_replicate_count",
+            ),
         )
+        object.__setattr__(
+            self,
+            "max_replicate_count",
+            _coerce_positive_int(
+                self.max_replicate_count,
+                label="max_replicate_count",
+            ),
+        )
+        if self.primary_replicate_count != EMB_34UM_DNN_CAUSAL_PRIMARY_REPLICATE_COUNT:
+            raise ValueError(
+                f"primary_replicate_count is fixed at {EMB_34UM_DNN_CAUSAL_PRIMARY_REPLICATE_COUNT}."
+            )
+        if self.max_replicate_count != EMB_34UM_DNN_CAUSAL_MAX_REPLICATE_COUNT:
+            raise ValueError(
+                f"max_replicate_count is fixed at {EMB_34UM_DNN_CAUSAL_MAX_REPLICATE_COUNT}."
+            )
+        object.__setattr__(
+            self,
+            "active_replicate_count",
+            validate_dnn_causal_replicate_count(self.active_replicate_count),
+        )
+        if self.active_replicate_count > self.max_replicate_count:
+            raise ValueError("active_replicate_count must not exceed max_replicate_count.")
         object.__setattr__(
             self,
             "force_grid",
@@ -339,6 +607,11 @@ class Emb34umDnnCausalValidationProtocol:
             "timing_canary",
             validate_dnn_causal_timing_canary(dict(self.timing_canary)),
         )
+        object.__setattr__(
+            self,
+            "dpd_walltime_target",
+            validate_dnn_causal_walltime_target(self.dpd_walltime_target),
+        )
 
     @property
     def rows_per_curve(self) -> int:
@@ -346,7 +619,15 @@ class Emb34umDnnCausalValidationProtocol:
 
     @property
     def total_dpd_curve_count(self) -> int:
-        return dnn_causal_total_dpd_curve_count(cycle_count=self.cycle_count)
+        return dnn_causal_total_dpd_curve_count(
+            cycle_count=self.cycle_count,
+            active_replicate_count=self.active_replicate_count,
+        )
+
+    @property
+    def replicate_count(self) -> int:
+        """Backward-compatible alias for active_replicate_count."""
+        return self.active_replicate_count
 
     @property
     def fixed_coefficients(self) -> dict[str, float]:
@@ -357,6 +638,12 @@ class Emb34umDnnCausalValidationProtocol:
             "a4": EMB_34UM_DNN_CAUSAL_A4_VALUE,
         }
 
+    @property
+    def fixed_controls(self) -> dict[str, float]:
+        return {
+            "bpress": EMB_34UM_DNN_CAUSAL_BPRESS_VALUE,
+        }
+
     def as_manifest(self) -> dict[str, Any]:
         return {
             "schema_version": EMB_34UM_DNN_CAUSAL_SCHEMA_VERSION,
@@ -365,22 +652,41 @@ class Emb34umDnnCausalValidationProtocol:
             "active_variables": list(EMB_34UM_DNN_CAUSAL_ACTIVE_VARIABLES),
             "bounds": {name: list(bounds) for name, bounds in EMB_34UM_DNN_CAUSAL_BOUNDS.items()},
             "parameter_space": EMB_34UM_DNN_CAUSAL_PARAMETER_SPACE,
+            "operational_domain": dict(EMB_34UM_DNN_CAUSAL_OPERATIONAL_DOMAIN),
+            "exclusion_policy": dict(EMB_34UM_DNN_CAUSAL_LOW_CORNER_EXCLUSION),
+            "low_corner_exclusion": dict(EMB_34UM_DNN_CAUSAL_LOW_CORNER_EXCLUSION),
             "fixed_coefficients": self.fixed_coefficients,
-            "replicates": list(EMB_34UM_DNN_CAUSAL_REPLICATES),
-            "replicate_count": self.replicate_count,
+            "fixed_controls": self.fixed_controls,
+            "primary_replicate_count": self.primary_replicate_count,
+            "max_replicate_count": self.max_replicate_count,
+            "active_replicate_count": self.active_replicate_count,
+            "replicate_count": self.active_replicate_count,
+            "replicates": list(range(1, self.active_replicate_count + 1)),
             "shared_initial_size": EMB_34UM_DNN_CAUSAL_SHARED_INITIAL_SIZE,
             "unseen_test_size": EMB_34UM_DNN_CAUSAL_UNSEEN_TEST_SIZE,
             "step_size": EMB_34UM_DNN_CAUSAL_STEP_SIZE,
             "min_cycles": EMB_34UM_DNN_CAUSAL_MIN_CYCLES,
             "max_cycles": EMB_34UM_DNN_CAUSAL_MAX_CYCLES,
+            "pilot_size": EMB_34UM_DNN_CAUSAL_PILOT_SIZE,
+            "fresh_only": EMB_34UM_DNN_CAUSAL_FRESH_ONLY,
+            "primary_statistic": EMB_34UM_DNN_CAUSAL_PRIMARY_STATISTIC,
+            "primary_statistic_target": EMB_34UM_DNN_CAUSAL_PRIMARY_STATISTIC_TARGET,
+            "final_ci_upper_bound_threshold": EMB_34UM_DNN_CAUSAL_FINAL_CI_UPPER_BOUND_THRESHOLD,
+            "min_final_relative_improvement": EMB_34UM_DNN_CAUSAL_MIN_FINAL_RELATIVE_IMPROVEMENT,
             "cycle_count": self.cycle_count,
             "force_grid": list(self.force_grid),
+            "force_count": EMB_34UM_DNN_CAUSAL_FORCE_COUNT,
+            "force_min": EMB_34UM_DNN_CAUSAL_FORCE_MIN,
+            "force_max": EMB_34UM_DNN_CAUSAL_FORCE_MAX,
             "force_grid_policy": EMB_34UM_DNN_CAUSAL_FORCE_GRID_POLICY,
             "lhs_source": self.lhs_source,
             "test_set_source": EMB_34UM_DNN_CAUSAL_TEST_SET_SOURCE,
             "selector_backend": self.selector_backend,
             "uncertainty_source": self.uncertainty_source,
             "ensemble_size": self.ensemble_size,
+            "dpd_walltime_target": self.dpd_walltime_target,
+            "dpd_walltime_target_default": EMB_34UM_DNN_CAUSAL_DPD_WALLTIME_TARGET_DEFAULT,
+            "retry_limit_default": EMB_34UM_DNN_CAUSAL_RETRY_LIMIT_DEFAULT,
             "timing_canary": dict(self.timing_canary),
             "rows_per_curve": self.rows_per_curve,
             "branch_training_curve_count_at_final_cycle": dnn_causal_branch_curve_count(

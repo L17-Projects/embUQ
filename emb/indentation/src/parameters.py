@@ -3,6 +3,28 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+import math
+
+
+def compute_box_dimensions(radp: float, *, explicit_cubic: bool = False) -> tuple[float, float, float]:
+    """Compute deterministic EMB domain extents from membrane radius.
+
+    Non-cubic mode mirrors the requested final-gate rendering box: x/y are
+    constrained tighter than z to reduce simulation volume while preserving
+    clearance around the vesicle.
+    """
+
+    radius = float(radp)
+    if not math.isfinite(radius):
+        raise ValueError("radp must be finite.")
+    if radius <= 0.0:
+        raise ValueError("radp must be positive.")
+    if explicit_cubic:
+        box = float(math.ceil(2.0 * radius + 10.0))
+        return (box, box, box)
+    lx = float(math.ceil(2.0 * radius + 6.0))
+    lz = float(math.ceil(2.0 * radius + 10.0))
+    return (lx, lx, lz)
 
 
 def write_parameters(source_path, simu_path, simnum):

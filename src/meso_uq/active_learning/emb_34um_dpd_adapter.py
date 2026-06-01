@@ -7,6 +7,11 @@ from typing import Any, Mapping, Sequence
 
 import yaml
 
+from meso_uq.active_learning.emb_34um_dnn_causal_validation_protocol import (
+    EMB_34UM_DNN_CAUSAL_BPRESS_VALUE,
+    EMB_34UM_DNN_CAUSAL_FORCE_GRID,
+    EMB_34UM_DNN_CAUSAL_RETRY_LIMIT_DEFAULT,
+)
 from meso_uq.mirheo.baseline import validate_training_baseline
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -17,22 +22,95 @@ EMB_34UM_DPD_SCHEMA_VERSION = "meso_uq.dpd_sampling.emb_34um_request.v1"
 EMB_34UM_DIMENSION_BOUNDS: Mapping[str, tuple[float, float]] = {
     "ka": (1e2, 6e5),
     "kb": (400.0, 70000.0),
+    "radp": (1.0, 100.0),
+    "shell_th": (1.0e-12, 1.0e-6),
 }
 EMB_34UM_PARAMETER_NAMES = ("ka", "kb")
-EMB_34UM_RETRY_LIMIT = 3
+EMB_34UM_RETRY_LIMIT = EMB_34UM_DNN_CAUSAL_RETRY_LIMIT_DEFAULT
 EMB_34UM_CANARY_FORCE_POINT_COUNT = 3
+EMB_34UM_FORCE_GRID = tuple(float(value) for value in EMB_34UM_DNN_CAUSAL_FORCE_GRID)
 EMB_34UM_PLATFORM_DEFAULTS: Mapping[str, Any] = {
     "platform": "karolina",
     "walltime": "00:30:00",
     "gpu_count": 1,
 }
+_DEFAULT_RUNTIME_RADP = 6.80
+_DEFAULT_RUNTIME_SHELL_TH = 5.0e-9
+_expected_fscale = 0.0074
+_expected_numsteps = 5000
+_expected_numsteps_eq = 10000
+
+
+def _coerce_float(value: Any, *, name: str, candidate_id: str) -> float:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Candidate {candidate_id!r} has non-numeric {name!r}: {value!r}.") from exc
+    if not math.isfinite(numeric):
+        raise ValueError(f"Candidate {candidate_id!r} has non-finite {name!r} value {numeric!r}.")
+    return float(numeric)
+
+
+def _coerce_bool(value: Any, *, name: str, candidate_id: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        if value.strip().lower() in {"1", "true", "yes", "on"}:
+            return True
+        if value.strip().lower() in {"0", "false", "no", "off"}:
+            return False
+    raise ValueError(f"Candidate {candidate_id!r} has non-boolean {name!r}: {value!r}.")
+
+
+def _coerce_bounded_float(
+    value: Any,
+    *,
+    name: str,
+    candidate_id: str,
+    low: float,
+    high: float,
+) -> float:
+    numeric = _coerce_float(value=value, name=name, candidate_id=candidate_id)
+    if not (low <= numeric <= high):
+        raise ValueError(
+            f"Candidate {candidate_id!r} has {name}={numeric} outside bounds [{low}, {high}]."
+        )
+    return numeric
+
+
+def _compute_box_dimensions(radp: float, *, explicit_cubic: bool = False) -> tuple[float, float, float]:
+    if explicit_cubic:
+        box = float(math.ceil(2.0 * radp + 10.0))
+        return (box, box, box)
+    lx = float(math.ceil(2.0 * radp + 6.0))
+    return (lx, lx, float(math.ceil(2.0 * radp + 10.0)))
+
+
+def _coerce_force_grid(values: Sequence[float], *, candidate_id: str) -> tuple[float, ...]:
+    normalized = tuple(_coerce_float(value=value, name="force_grid item", candidate_id=candidate_id) for value in values)
+    if not normalized:
+        raise ValueError(f"Candidate {candidate_id!r} force_grid must be non-empty.")
+    if normalized != tuple(sorted(normalized)):
+        raise ValueError(f"force_grid for candidate {candidate_id!r} must be sorted ascending and deterministic.")
+    if len(set(normalized)) != len(normalized):
+        raise ValueError(f"force_grid for candidate {candidate_id!r} must not contain duplicate values.")
+    if any(value < 0.0 for value in normalized):
+        raise ValueError(f"force_grid for candidate {candidate_id!r} must be non-negative.")
+    return normalized
+
+
 EMB_34UM_RUNTIME_FINGERPRINT: Mapping[str, Any] = {
-    "radp": 6.80,
-    "L": 25,
-    "fscale": 0.0074,
-    "shell_th": 5.0e-9,
-    "numsteps": 5000,
-    "numsteps_eq": 10000,
+    "radp": _DEFAULT_RUNTIME_RADP,
+    "shell_th": _DEFAULT_RUNTIME_SHELL_TH,
+    "fscale": _expected_fscale,
+    "numsteps": _expected_numsteps,
+    "numsteps_eq": _expected_numsteps_eq,
+    "Lx": _compute_box_dimensions(_DEFAULT_RUNTIME_RADP)[0],
+    "Ly": _compute_box_dimensions(_DEFAULT_RUNTIME_RADP)[1],
+    "Lz": _compute_box_dimensions(_DEFAULT_RUNTIME_RADP)[2],
+    "L": _compute_box_dimensions(_DEFAULT_RUNTIME_RADP)[2],
+    "direct_stiffness_override": True,
+    "bpress": EMB_34UM_DNN_CAUSAL_BPRESS_VALUE,
 }
 
 
@@ -177,7 +255,7 @@ def _validate_emb_34um_parameters(
 def _coerce_sequence(values: Sequence[float], *, candidate_id: str, field_name: str) -> tuple[float, ...]:
     if not values:
         raise ValueError(f"{field_name} must be a non-empty sequence for candidate {candidate_id!r}.")
-    normalized = tuple(_coerce_parameter(value, name=field_name, candidate_id=candidate_id) for value in values)
+    normalized = tuple(_coerce_float(value=value, name=field_name, candidate_id=candidate_id) for value in values)
     if len(normalized) != len(set(normalized)):
         raise ValueError(f"{field_name} for candidate {candidate_id!r} contains duplicate values.")
     if any(value < 0.0 for value in normalized):
@@ -185,6 +263,15 @@ def _coerce_sequence(values: Sequence[float], *, candidate_id: str, field_name: 
     if normalized != tuple(sorted(normalized)):
         raise ValueError(f"{field_name} for candidate {candidate_id!r} must be sorted ascending and deterministic.")
     return normalized
+
+
+def _has_explicit_d4_geometry(payload: Mapping[str, Any]) -> bool:
+    if {"radp", "shell_th"} <= payload.keys():
+        return True
+    runtime_fingerprint = payload.get("runtime_fingerprint")
+    if isinstance(runtime_fingerprint, Mapping) and {"radp", "shell_th"} <= runtime_fingerprint.keys():
+        return True
+    return False
 
 
 def _coerce_experiment(payload: Mapping[str, Any], *, candidate_id: str) -> str:
@@ -262,6 +349,8 @@ def load_emb_34um_force_grid(*, data_path: str | Path | None = None) -> tuple[fl
 
     source = Path(data_path) if data_path is not None else _EMB_TRAINING_DATA_PATH
     if not source.exists():
+        if data_path is None:
+            return EMB_34UM_FORCE_GRID
         raise FileNotFoundError(f"Could not locate 3.4um training table at {source!s}")
 
     force_grid: tuple[float, ...] | None = None
@@ -285,7 +374,7 @@ def derive_emb_34um_force_grid(
     canary: bool = False,
     data_path: str | Path | None = None,
 ) -> tuple[float, ...]:
-    grid = load_emb_34um_force_grid(data_path=data_path)
+    grid = EMB_34UM_FORCE_GRID if data_path is None else load_emb_34um_force_grid(data_path=data_path)
     if not canary:
         return grid
     indices = _canonical_canary_indices(len(grid), EMB_34UM_CANARY_FORCE_POINT_COUNT)
@@ -293,7 +382,15 @@ def derive_emb_34um_force_grid(
 
 
 def is_emb_34um_full_request_payload(payload: Mapping[str, Any]) -> bool:
-    return "kb" in payload and ("ka" in payload or "Yt" in payload)
+    if "kb" not in payload:
+        return False
+    if "Yt" in payload and "ka" not in payload:
+        return True
+    return "ka" in payload and _has_explicit_d4_geometry(payload)
+
+
+def _is_legacy_d2_payload(payload: Mapping[str, Any], *, runtime_source: Mapping[str, Any]) -> bool:
+    return "Yt" in payload and "ka" not in payload
 
 
 def _resolve_runtime_fingerprint(
@@ -303,53 +400,141 @@ def _resolve_runtime_fingerprint(
     payload: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     defaults = _load_default_parameters(path=defaults_path)
-    base: dict[str, float | int | str] = {
-        "fscale": defaults.get("fscale", EMB_34UM_RUNTIME_FINGERPRINT["fscale"]),
-        "shell_th": defaults.get("shell_th", EMB_34UM_RUNTIME_FINGERPRINT["shell_th"]),
-        "numsteps": defaults.get("numsteps", EMB_34UM_RUNTIME_FINGERPRINT["numsteps"]),
-        "numsteps_eq": defaults.get("numsteps_eq", EMB_34UM_RUNTIME_FINGERPRINT["numsteps_eq"]),
-        "radp": EMB_34UM_RUNTIME_FINGERPRINT["radp"],
-        "L": EMB_34UM_RUNTIME_FINGERPRINT["L"],
-    }
+    if not isinstance(payload, Mapping):
+        raise ValueError(f"Candidate {candidate_id!r} payload must be a mapping.")
 
-    runtime_overrides = payload.get("runtime_fingerprint", {}) if isinstance(payload, Mapping) else {}
-    if not isinstance(runtime_overrides, Mapping):
+    runtime_source = dict(payload.get("runtime_fingerprint", {}) if payload.get("runtime_fingerprint", {}) is not None else {})
+    if not isinstance(runtime_source, Mapping):
         raise ValueError(f"Candidate {candidate_id!r} runtime_fingerprint must be a mapping.")
+    for key in (
+        "radp",
+        "shell_th",
+        "fscale",
+        "numsteps",
+        "numsteps_eq",
+        "L",
+        "Lx",
+        "Ly",
+        "Lz",
+        "direct_stiffness_override",
+        "bpress",
+    ):
+        if key in payload and key not in runtime_source:
+            runtime_source[key] = payload[key]
 
-    overrides = {}
-    for key in EMB_34UM_RUNTIME_FINGERPRINT:
-        if key in runtime_overrides:
-            overrides[key] = runtime_overrides[key]
-        elif isinstance(payload, Mapping) and key in payload:
-            overrides[key] = payload[key]
-    for key in EMB_34UM_RUNTIME_FINGERPRINT:
-        if key in overrides:
-            base[key] = overrides[key]
+    legacy_d2 = _is_legacy_d2_payload(payload, runtime_source=runtime_source)
+    if not legacy_d2:
+        missing = [key for key in ("radp", "shell_th") if key not in runtime_source]
+        if missing:
+            raise ValueError(
+                f"Candidate {candidate_id!r} is missing D4 runtime parameters {missing}; provide both 'radp' and 'shell_th' "
+                "unless using explicit legacy Yt/kb input."
+            )
+
+    radp = _coerce_bounded_float(
+        runtime_source.get("radp", _DEFAULT_RUNTIME_RADP),
+        name="radp",
+        candidate_id=candidate_id,
+        low=EMB_34UM_DIMENSION_BOUNDS["radp"][0],
+        high=EMB_34UM_DIMENSION_BOUNDS["radp"][1],
+    )
+    shell_th = _coerce_bounded_float(
+        runtime_source.get("shell_th", _DEFAULT_RUNTIME_SHELL_TH),
+        name="shell_th",
+        candidate_id=candidate_id,
+        low=EMB_34UM_DIMENSION_BOUNDS["shell_th"][0],
+        high=EMB_34UM_DIMENSION_BOUNDS["shell_th"][1],
+    )
+    fscale = _coerce_float(
+        value=runtime_source.get("fscale", defaults.get("fscale", EMB_34UM_RUNTIME_FINGERPRINT["fscale"])),
+        name="fscale",
+        candidate_id=candidate_id,
+    )
+    numsteps = int(
+        _coerce_float(
+            value=runtime_source.get("numsteps", defaults.get("numsteps", EMB_34UM_RUNTIME_FINGERPRINT["numsteps"])),
+            name="numsteps",
+            candidate_id=candidate_id,
+        )
+    )
+    numsteps_eq = int(
+        _coerce_float(
+            value=runtime_source.get(
+                "numsteps_eq", defaults.get("numsteps_eq", EMB_34UM_RUNTIME_FINGERPRINT["numsteps_eq"])
+            ),
+            name="numsteps_eq",
+            candidate_id=candidate_id,
+        )
+    )
+    direct_stiffness_override = _coerce_bool(
+        value=runtime_source.get(
+            "direct_stiffness_override", EMB_34UM_RUNTIME_FINGERPRINT["direct_stiffness_override"]
+        ),
+        name="direct_stiffness_override",
+        candidate_id=candidate_id,
+    )
+    bpress = _coerce_float(
+        value=runtime_source.get("bpress", EMB_34UM_RUNTIME_FINGERPRINT["bpress"]),
+        name="bpress",
+        candidate_id=candidate_id,
+    )
+
+    if not math.isclose(fscale, EMB_34UM_RUNTIME_FINGERPRINT["fscale"]):
+        raise ValueError(
+            f"Candidate {candidate_id!r} runtime_fingerprint.fscale mismatch; "
+            f"expected {EMB_34UM_RUNTIME_FINGERPRINT['fscale']}."
+        )
+    if numsteps != EMB_34UM_RUNTIME_FINGERPRINT["numsteps"]:
+        raise ValueError(
+            f"Candidate {candidate_id!r} runtime_fingerprint.numsteps mismatch; "
+            f"expected {EMB_34UM_RUNTIME_FINGERPRINT['numsteps']}."
+        )
+    if numsteps_eq != EMB_34UM_RUNTIME_FINGERPRINT["numsteps_eq"]:
+        raise ValueError(
+            f"Candidate {candidate_id!r} runtime_fingerprint.numsteps_eq mismatch; "
+            f"expected {EMB_34UM_RUNTIME_FINGERPRINT['numsteps_eq']}."
+        )
+    if direct_stiffness_override != EMB_34UM_RUNTIME_FINGERPRINT["direct_stiffness_override"]:
+        raise ValueError("runtime_fingerprint.direct_stiffness_override must be true.")
+    if not math.isclose(bpress, EMB_34UM_RUNTIME_FINGERPRINT["bpress"]):
+        raise ValueError(
+            f"Candidate {candidate_id!r} runtime_fingerprint.bpress mismatch; "
+            f"expected {EMB_34UM_RUNTIME_FINGERPRINT['bpress']}."
+        )
+
+    explicit_cubic = "L" in runtime_source
+    if explicit_cubic:
+        _coerce_float(value=runtime_source["L"], name="L", candidate_id=candidate_id)
+        Lx, Ly, Lz = _compute_box_dimensions(radp, explicit_cubic=True)
+    else:
+        Lx, Ly, Lz = _compute_box_dimensions(radp, explicit_cubic=False)
 
     runtime_payload = {
-        "radp": float(base["radp"]),
-        "L": float(base["L"]),
-        "fscale": float(base["fscale"]),
-        "shell_th": float(base["shell_th"]),
-        "numsteps": int(float(base["numsteps"])),
-        "numsteps_eq": int(float(base["numsteps_eq"])),
+        "radp": float(radp),
+        "shell_th": float(shell_th),
+        "fscale": float(fscale),
+        "numsteps": numsteps,
+        "numsteps_eq": numsteps_eq,
+        "Lx": float(Lx),
+        "Ly": float(Ly),
+        "Lz": float(Lz),
+        "direct_stiffness_override": True,
+        "bpress": float(bpress),
     }
+
+    # Preserve the legacy cubic-extent key as a compatibility artifact while
+    # moving runtime payloads to explicit box dimensions.
+    runtime_payload["L"] = float(Lz)
 
     validate_training_baseline(
         {
             "fscale": runtime_payload["fscale"],
-            "shell_th": runtime_payload["shell_th"],
+            "shell_th": defaults.get("shell_th", EMB_34UM_RUNTIME_FINGERPRINT["shell_th"]),
             "numsteps": runtime_payload["numsteps"],
             "numsteps_eq": runtime_payload["numsteps_eq"],
         },
         source_label="emb_34um_runtime",
     )
-
-    if runtime_payload["radp"] != EMB_34UM_RUNTIME_FINGERPRINT["radp"]:
-        raise ValueError("Expected radp override mismatch in EMB fingerprint metadata.")
-    if runtime_payload["L"] != EMB_34UM_RUNTIME_FINGERPRINT["L"]:
-        raise ValueError("Expected L override mismatch in EMB fingerprint metadata.")
-
     return runtime_payload
 
 
@@ -357,14 +542,20 @@ def _build_parameter_payload(
     *,
     ka: float,
     kb: float,
+    radp: float,
+    shell_th: float,
+    bpress: float,
 ) -> dict[str, float]:
     payload = {
         "ka": ka,
         "kb": kb,
+        "radp": radp,
+        "shell_th": shell_th,
         "b1": 0.0,
         "b2": 0.0,
         "a3": 0.0,
         "a4": 0.0,
+        "bpress": bpress,
     }
     return payload
 
@@ -385,14 +576,13 @@ def build_emb_34um_request(
 
     payload_force_grid = payload.get("force_grid")
     if force_grid is not None:
-        requested_grid = _coerce_sequence(force_grid, candidate_id=candidate_id, field_name="force_grid")
+        requested_grid = _coerce_force_grid(force_grid, candidate_id=candidate_id)
     elif payload_force_grid is not None:
-        requested_grid = _coerce_sequence(payload_force_grid, candidate_id=candidate_id, field_name="force_grid")
+        requested_grid = _coerce_force_grid(payload_force_grid, candidate_id=candidate_id)
     else:
-        requested_grid = derive_emb_34um_force_grid(
-            canary=_coerce_canary(payload, candidate_id=candidate_id),
-            data_path=data_path,
-        )
+        requested_grid = derive_emb_34um_force_grid(canary=False, data_path=data_path)
+        if _coerce_canary(payload, candidate_id=candidate_id):
+            requested_grid = derive_emb_34um_force_grid(canary=True, data_path=data_path)
     runtime_fingerprint = _resolve_runtime_fingerprint(
         candidate_id=candidate_id,
         payload=payload,
@@ -410,7 +600,13 @@ def build_emb_34um_request(
         campaign_root=base_root,
         force_grid=tuple(requested_grid),
         force_grid_is_canary=_coerce_canary(payload, candidate_id=candidate_id),
-        parameters=_build_parameter_payload(ka=ka, kb=kb),
+        parameters=_build_parameter_payload(
+            ka=ka,
+            kb=kb,
+            radp=float(runtime_fingerprint["radp"]),
+            shell_th=float(runtime_fingerprint["shell_th"]),
+            bpress=float(runtime_fingerprint["bpress"]),
+        ),
         runtime_fingerprint=runtime_fingerprint,
         expected_hdf5_dataset_id=dataset_id,
         expected_hdf5_path=expected_hdf5_path,

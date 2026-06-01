@@ -50,6 +50,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--learning-rate", type=float, default=1.0e-3)
     parser.add_argument("--validation-fraction", type=float, default=0.1)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--allow-blocked",
+        action="store_true",
+        help="Exit successfully after writing artifacts even when the protocol completeness gate blocks the report.",
+    )
     return parser
 
 
@@ -94,7 +99,9 @@ def main(argv: list[str] | None = None) -> int:
         train_kwargs=train_kwargs,
     )
     print(json.dumps({"rows_path": str(artifacts.rows_path), "report_path": str(artifacts.report_path)}, sort_keys=True))
-    return 0 if artifacts.report_payload.get("passed") else 1
+    if artifacts.report_payload.get("passed") or args.allow_blocked:
+        return 0
+    return 1
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -59,6 +59,7 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     expected_timeouts = {
         "package-and-tests": 15,
         "docs": 5,
+        "platform-interface-gate": 10,
         "mpi-smoke": 20,
         "retraining-canary": 15,
         "workflow-canary": 20,
@@ -107,6 +108,20 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     assert workflow["jobs"]["mpi-smoke"]["if"] == FULL_CI_JOB_IF
     assert workflow["jobs"]["retraining-canary"]["if"] == FULL_CI_JOB_IF
     assert workflow["jobs"]["workflow-canary"]["if"] == FULL_CI_JOB_IF
+
+    platform_gate = workflow["jobs"]["platform-interface-gate"]
+    assert platform_gate["strategy"]["fail-fast"] is False
+    assert platform_gate["strategy"]["matrix"]["site"] == ["vega", "karolina"]
+    platform_steps = platform_gate["steps"]
+    platform_check = _step_by_name(platform_steps, "Run Vega/Karolina platform-interface gate")
+    assert platform_check["env"] == {"MESOUQ_SITE": "${{ matrix.site }}"}
+    platform_run = platform_check["run"]
+    assert "tests/test_hpc_shared_script_governance.py" in platform_run
+    assert "tests/test_script_path_governance.py" in platform_run
+    assert "tests/test_karolina_validation_matrix.py" in platform_run
+    assert "tests/test_vega_matrix_sbatch.py" in platform_run
+    assert "tests/unit/test_gv_platform_routing.py" in platform_run
+    assert "tests/unit/test_dpd_production_preflight.py" in platform_run
 
     workflow_steps = workflow["jobs"]["workflow-canary"]["steps"]
     mpi_steps = workflow["jobs"]["mpi-smoke"]["steps"]

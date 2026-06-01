@@ -17,6 +17,14 @@ from meso_uq.dpd_sampling.contracts import (
     DPD_SAMPLING_RENDER_SCHEMA_VERSION,
     DPD_SAMPLING_VALIDATION_SCHEMA_VERSION,
 )
+from meso_uq.dpd_sampling.preflight import (
+    DPD_PRODUCTION_PREFLIGHT_SCHEMA_VERSION,
+    DPDProductionPreflightConfig,
+    default_preflight_manifest_path,
+    output_root_from_candidate_manifest,
+    run_dpd_production_preflight,
+    write_preflight_manifest,
+)
 
 __all__ = [
     "build_dpd_sampling_batch",
@@ -32,4 +40,10 @@ __all__ = [
     "DPD_SAMPLING_BATCH_SCHEMA_VERSION",
     "DPD_SAMPLING_RENDER_SCHEMA_VERSION",
     "DPD_SAMPLING_VALIDATION_SCHEMA_VERSION",
+    "DPD_PRODUCTION_PREFLIGHT_SCHEMA_VERSION",
+    "DPDProductionPreflightConfig",
+    "default_preflight_manifest_path",
+    "output_root_from_candidate_manifest",
+    "run_dpd_production_preflight",
+    "write_preflight_manifest",
 ]

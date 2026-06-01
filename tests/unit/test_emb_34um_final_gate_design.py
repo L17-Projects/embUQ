@@ -29,6 +29,10 @@ from meso_uq.active_learning import (  # noqa: E402
     Emb34umFinalGateValidationResult,
 )
 from meso_uq.active_learning.emb_34um_final_gate_design import _select_acquisition
+from meso_uq.active_learning.emb_34um_dnn_causal_validation_protocol import (
+    EMB_34UM_DNN_CAUSAL_BOUNDS,
+    is_dnn_causal_low_corner_excluded,
+)
 
 
 def _as_points(candidates: tuple) -> list[tuple[float, float]]:
@@ -43,11 +47,23 @@ def _assert_bounds(points: list[tuple[float, float]]) -> None:
         assert kb_min <= kb <= kb_max
 
 
+def _assert_bounds_with_margin(points: list[tuple[float, float]], *, margin: float = 1e-6) -> None:
+    ka_min, ka_max = EMB_34UM_FINAL_GATE_BOUNDS["ka"]
+    kb_min, kb_max = EMB_34UM_FINAL_GATE_BOUNDS["kb"]
+    for ka, kb in points:
+        assert ka_min + margin <= ka <= ka_max - margin
+        assert kb_min + margin <= kb <= kb_max - margin
+
+
 def _coerce_source_counts(round_result: Emb34umFinalGateDesignResult) -> Mapping[str, int]:
     return {source: round_result.selected_sources().count(source) for source in set(round_result.selected_sources())}
 
 
 def test_round_one_design_emits_30_initial_maximin_points_and_is_deterministic() -> None:
+    assert EMB_34UM_FINAL_GATE_BOUNDS == {
+        name: EMB_34UM_DNN_CAUSAL_BOUNDS[name] for name in EMB_34UM_FINAL_GATE_ACTIVE_VARIABLES
+    }
+
     first = build_emb_34um_final_gate_design_round(
         run_id="emb-34um-final-gate-test",
         round_index=1,
@@ -74,6 +90,7 @@ def test_round_one_design_emits_30_initial_maximin_points_and_is_deterministic()
     ]
     assert _as_points(first.round_pool) == _as_points(second.round_pool)
     _assert_bounds(_as_points(first.candidates))
+    _assert_bounds_with_margin(_as_points(first.candidates), margin=1e-3)
     assert set(first.selected_sources()) == {EMB_34UM_FINAL_GATE_SOURCE_INITIAL}
 
     for candidate in first.candidates:
@@ -106,6 +123,7 @@ def test_round_two_design_honors_6explore_24acquisition_split() -> None:
     assert source_counts.get(EMB_34UM_FINAL_GATE_SOURCE_ACQUISITION) == 24
     assert round_two.selected_sources().count(EMB_34UM_FINAL_GATE_SOURCE_INITIAL) == 0
     _assert_bounds(_as_points(round_two.candidates))
+    _assert_bounds_with_margin(_as_points(round_two.candidates), margin=1e-3)
     assert len(set(_as_points(round_two.candidates))) == len(round_two.candidates)
     assert round_two.manifest["candidate_pool_size"] == 100
 
@@ -137,6 +155,7 @@ def test_validation_design_is_independent_sobol_maximin_design() -> None:
         candidate.candidate_id for candidate in validation_repeat.candidates
     ]
     _assert_bounds(_as_points(validation.candidates))
+    _assert_bounds_with_margin(_as_points(validation.candidates), margin=1e-3)
     assert set(_as_points(validation.candidates)).isdisjoint(set(_as_points(round_design.candidates)))
 
     for candidate in validation.candidates:
@@ -175,6 +194,28 @@ def test_validation_and_round_manifests_expose_expected_controls_metadata() -> N
     assert round_one.manifest["active_variables"] == ["ka", "kb"]
     assert set(round_one.manifest["parameter_bounds"]) == {"ka", "kb"}
     assert set(validation.manifest["parameter_bounds"]) == {"ka", "kb"}
+    assert round_one.manifest["exclusion_policy"]["name"] == "emb_34um_d4_runtime_risk_exclusion_v4"
+    assert validation.manifest["exclusion_policy"]["name"] == "emb_34um_d4_runtime_risk_exclusion_v4"
+
+
+def test_final_gate_designs_avoid_low_ka_low_kb_timeout_corner() -> None:
+    assert is_dnn_causal_low_corner_excluded(189.530, 453.441)
+    assert is_dnn_causal_low_corner_excluded(136.956, 736.554)
+
+    round_one = build_emb_34um_final_gate_design_round(
+        run_id="emb-34um-final-gate-test",
+        round_index=1,
+        seed=101,
+    )
+    validation = build_emb_34um_final_gate_validation_design(
+        run_id="emb-34um-final-gate-test",
+        seed=101,
+    )
+
+    all_round_points = _as_points(round_one.round_pool) + _as_points(round_one.candidates)
+    all_validation_points = _as_points(validation.candidates)
+    assert not any(is_dnn_causal_low_corner_excluded(ka, kb) for ka, kb in all_round_points)
+    assert not any(is_dnn_causal_low_corner_excluded(ka, kb) for ka, kb in all_validation_points)
 
 
 def test_rejected_previous_points_and_seed_must_be_valid() -> None:

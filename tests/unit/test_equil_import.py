@@ -22,6 +22,14 @@ def test_indentation_equil_module_exists():
     assert path.exists(), f"emb/indentation/src/equil.py not found at {path}"
 
 
+def test_indentation_internal_lj_minimum_is_below_cutoff():
+    """The internal LJ minimum must stay strictly below Mirheo's cutoff."""
+    path = Path(__file__).resolve().parents[2] / "emb" / "indentation" / "src" / "equil.py"
+    text = path.read_text(encoding="utf-8")
+    assert "lj_int_cutoff = lj_fac * rc" in text
+    assert "lj_int_sigma = 0.99 * lj_int_cutoff / (2 ** (1 / 6))" in text
+
+
 def test_compression_equil_config_lookup_reaches_repo_root_from_moved_source_dir():
     """The moved emb/compression/src driver needs one more parent than compression/src."""
     path = Path(__file__).resolve().parents[2] / "emb" / "compression" / "src" / "equil.py"

@@ -190,6 +190,46 @@ jobs:
       - name: Validate docs links
         run: python scripts/ci/check_docs_links.py
 
+  platform-interface-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        site: [vega, karolina]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+
+      - name: Install test extras
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+
+      - name: Run Vega/Karolina platform-interface gate
+        env:
+          MESOUQ_SITE: ${{ matrix.site }}
+        run: |
+          python -m pytest -q \
+            tests/test_hpc_shared_script_governance.py \
+            tests/test_script_path_governance.py \
+            tests/test_repository_governance.py \
+            tests/test_karolina_validation_matrix.py \
+            tests/test_vega_matrix_sbatch.py \
+            tests/test_validation_matrix.py \
+            tests/unit/test_hpc_paths.py \
+            tests/unit/test_platform_configs.py \
+            tests/unit/test_platform_policies.py \
+            tests/unit/test_gv_platform_routing.py \
+            tests/unit/test_dpd_production_preflight.py
+
   bnn-backend-canary:
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci'))
     runs-on: ubuntu-latest

@@ -38,14 +38,18 @@ _bootstrap_paths()
 import numpy as np
 
 from meso_uq.active_learning.emb_34um_dnn_acquisition import (
+    EMB_34UM_DNN_ACQUISITION_SCORE_MODES,
     compute_disagreement_distribution,
     score_candidate_pool,
     select_greedy_diversity,
 )
 from meso_uq.active_learning.emb_34um_dnn_causal_validation_protocol import (
     EMB_34UM_DNN_CAUSAL_ENSEMBLE_SIZE,
+    EMB_34UM_DNN_CAUSAL_BOUNDS,
     EMB_34UM_DNN_CAUSAL_FORCE_GRID,
+    EMB_34UM_DNN_CAUSAL_LOW_CORNER_EXCLUSION,
     EMB_34UM_DNN_CAUSAL_TIMING_CANARY_POINT_COUNT,
+    is_dnn_causal_low_corner_excluded,
     validate_dnn_causal_ensemble_size,
     validate_dnn_causal_force_grid,
     validate_dnn_causal_timing_canary,
@@ -69,6 +73,16 @@ EMB_34UM_DNN_TRAIN_SCORE_SELECT_SELECTION_PLOT_FILENAME = "emb_34um_dnn_train_sc
 EMB_34UM_DNN_TRAIN_SCORE_SELECT_DISTRIBUTION_PLOT_FILENAME = "emb_34um_dnn_train_score_select_disagreement_hist.png"
 EMB_34UM_DNN_TRAIN_SCORE_SELECT_LOSS_PLOT_FILENAME = "emb_34um_dnn_train_score_select_member_losses.png"
 EMB_34UM_DNN_TRAIN_SCORE_SELECT_TIMING_PLOT_FILENAME = "emb_34um_dnn_train_score_select_timing_canary.png"
+EMB_34UM_DNN_TRAIN_SCORE_SELECT_KA_RADP_PLOT_FILENAME = "emb_34um_dnn_train_score_select_ka_radp.png"
+EMB_34UM_DNN_TRAIN_SCORE_SELECT_KB_SHELL_TH_PLOT_FILENAME = (
+    "emb_34um_dnn_train_score_select_kb_shell_th.png"
+)
+EMB_34UM_DNN_TRAIN_SCORE_SELECT_RADP_SHELL_TH_PLOT_FILENAME = (
+    "emb_34um_dnn_train_score_select_radp_shell_th.png"
+)
+EMB_34UM_DNN_TRAIN_SCORE_SELECT_CURVE_ERROR_PLOT_FILENAME = (
+    "emb_34um_dnn_train_score_select_curve_error_risk.png"
+)
 
 
 def _load_json_list(path: Path, *, label: str) -> list[dict[str, Any]]:
@@ -83,22 +97,211 @@ def _load_json_list(path: Path, *, label: str) -> list[dict[str, Any]]:
     return normalized
 
 
-def _coerce_existing_points(raw: str | None) -> tuple[tuple[float, float], ...]:
+def _coerce_float(value: object, *, label: str) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} must be numeric.") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"{label} must be finite.")
+    return number
+
+
+def _coerce_positive_float(value: object, *, label: str) -> float:
+    number = _coerce_float(value, label=label)
+    if number <= 0.0:
+        raise ValueError(f"{label} must be positive.")
+    return number
+
+
+def _coerce_bounded_positive(
+    value: object,
+    *,
+    key: str,
+    source: str,
+) -> float:
+    low, high = EMB_34UM_DNN_CAUSAL_BOUNDS[key]
+    number = _coerce_positive_float(value, label=f"{source}.{key}")
+    if not (low <= number <= high):
+        raise ValueError(f"{source}.{key} must be within [{low}, {high}].")
+    return number
+
+
+def _coerce_candidate_space(value: str | None) -> str:
+    normalized = "d4" if value is None else str(value).strip().lower()
+    if normalized not in {"d2", "d4"}:
+        raise ValueError("--candidate-space must be either d2 or d4.")
+    return normalized
+
+
+def _candidate_param(row: Mapping[str, Any], key: str, *, index: int, source: str, default: object = None) -> float:
+    value = None
+    parameters = row.get("parameters")
+    if isinstance(parameters, Mapping) and key in parameters:
+        value = parameters.get(key)
+    if value is None and default is not None:
+        value = default
+    if value is None and key in row:
+        value = row.get(key)
+    if value is None:
+        raise ValueError(f"{source} is missing {key!r}.")
+    return _coerce_float(value, label=f"{source}.{key}") if key in ("ka", "kb", "radp", "shell_th") else float(value)
+
+
+def _coerce_raw_candidate_point(
+    row: Mapping[str, Any],
+    *,
+    index: int,
+    candidate_space: str,
+) -> tuple[float, ...]:
+    ka = _coerce_positive_float(_candidate_param(row, "ka", index=index, source="candidate", default=row.get("Yt", None)), label=f"candidate_records[{index}].ka")
+    kb = _coerce_positive_float(_candidate_param(row, "kb", index=index, source="candidate", default=row.get("kb_scale", row.get("mu", None))), label=f"candidate_records[{index}].kb")
+    if candidate_space == "d2":
+        return (ka, kb)
+    radp = _coerce_bounded_positive(
+        _candidate_param(row, "radp", index=index, source="candidate"),
+        key="radp",
+        source=f"candidate_records[{index}]",
+    )
+    shell_th = _coerce_bounded_positive(
+        _candidate_param(row, "shell_th", index=index, source="candidate"),
+        key="shell_th",
+        source=f"candidate_records[{index}]",
+    )
+    return (ka, kb, radp, shell_th)
+
+
+def _normalize_candidate_point_values(
+    point: tuple[float, ...],
+    *,
+    candidate_space: str,
+) -> tuple[float, ...]:
+    ka = math.log10(point[0])
+    kb = math.log10(point[1])
+    if candidate_space == "d2":
+        return (ka, kb)
+    return (
+        ka,
+        kb,
+        (point[2] - EMB_34UM_DNN_CAUSAL_BOUNDS["radp"][0])
+        / (EMB_34UM_DNN_CAUSAL_BOUNDS["radp"][1] - EMB_34UM_DNN_CAUSAL_BOUNDS["radp"][0]),
+        (point[3] - EMB_34UM_DNN_CAUSAL_BOUNDS["shell_th"][0])
+        / (EMB_34UM_DNN_CAUSAL_BOUNDS["shell_th"][1] - EMB_34UM_DNN_CAUSAL_BOUNDS["shell_th"][0]),
+    )
+
+
+def _normalize_unit(values: Sequence[float]) -> list[float]:
+    if not values:
+        return []
+    minimum = float(min(values))
+    maximum = float(max(values))
+    width = maximum - minimum
+    if math.isclose(width, 0.0):
+        return [0.0 for _ in values]
+    return [float((value - minimum) / width) for value in values]
+
+
+def _coerce_existing_points(
+    raw: str | None,
+    *,
+    candidate_space: str,
+) -> tuple[tuple[float, ...], ...]:
     if raw is None:
         return ()
     payload = json.loads(raw)
     if not isinstance(payload, list):
         raise ValueError("--existing-points must decode to a JSON list.")
-    points: list[tuple[float, float]] = []
+    points: list[tuple[float, ...]] = []
     for index, item in enumerate(payload, start=1):
-        if not isinstance(item, (list, tuple)) or len(item) != 2:
-            raise ValueError(f"existing_points[{index}] must be a [ka, kb] pair.")
-        ka = float(item[0])
-        kb = float(item[1])
-        if ka <= 0.0 or kb <= 0.0:
-            raise ValueError("existing point coordinates must be positive.")
-        points.append((ka, kb))
+        if not isinstance(item, (list, tuple)):
+            raise ValueError(f"existing_points[{index}] must be a list or tuple.")
+        if candidate_space == "d2":
+            if len(item) != 2:
+                raise ValueError(f"existing_points[{index}] must be a [ka, kb] pair.")
+            ka = _coerce_positive_float(item[0], label=f"existing_points[{index}][0]")
+            kb = _coerce_positive_float(item[1], label=f"existing_points[{index}][1]")
+            points.append((ka, kb))
+            continue
+        if len(item) != 4:
+            raise ValueError(f"existing_points[{index}] must be a [ka, kb, radp, shell_th] tuple in d4.")
+        ka = _coerce_positive_float(item[0], label=f"existing_points[{index}][0]")
+        kb = _coerce_positive_float(item[1], label=f"existing_points[{index}][1]")
+        radp = _coerce_bounded_positive(
+            item[2],
+            key="radp",
+            source=f"existing_points[{index}]",
+        )
+        shell_th = _coerce_bounded_positive(
+            item[3],
+            key="shell_th",
+            source=f"existing_points[{index}]",
+        )
+        points.append((ka, kb, radp, shell_th))
     return tuple(points)
+
+
+def _existing_points_from_completed_rows(
+    completed_rows: Sequence[Mapping[str, Any]],
+    *,
+    candidate_space: str,
+) -> tuple[tuple[float, ...], ...]:
+    points: list[tuple[float, ...]] = []
+    for index, row in enumerate(completed_rows, start=1):
+        ka, kb, *rest = _coerce_raw_candidate_point(row, index=index, candidate_space=candidate_space)
+        point: tuple[float, ...]
+        if candidate_space == "d2":
+            point = (ka, kb)
+        else:
+            if not rest:
+                raise ValueError(f"completed_rows[{index}].parameters must contain radp and shell_th for d4.")
+            point = (ka, kb, rest[0], rest[1])
+        points.append(point)
+    return tuple(points)
+
+
+def _point_key(point: Sequence[float]) -> tuple[float, ...]:
+    return tuple(round(float(value), 12) for value in point)
+
+
+def _exclude_existing_points_from_candidate_pool(
+    candidate_pool: Sequence[Mapping[str, Any]],
+    *,
+    existing_points: Sequence[tuple[float, ...]],
+    candidate_space: str,
+) -> tuple[tuple[dict[str, Any], ...], tuple[str, ...]]:
+    existing_keys = {_point_key(point) for point in existing_points}
+    if not existing_keys:
+        return tuple(dict(item) for item in candidate_pool), ()
+
+    filtered: list[dict[str, Any]] = []
+    skipped_ids: list[str] = []
+    for index, raw_row in enumerate(candidate_pool, start=1):
+        row = dict(raw_row)
+        point = _coerce_raw_candidate_point(row, index=index, candidate_space=candidate_space)
+        key = _point_key(point)
+        if key in existing_keys:
+            skipped_ids.append(str(row.get("candidate_id", f"candidate-{index:04d}")))
+            continue
+        filtered.append(row)
+    return tuple(filtered), tuple(skipped_ids)
+
+
+def _validate_candidate_pool_exclusion(candidate_pool: Sequence[Mapping[str, Any]]) -> None:
+    blocked = [
+        str(row.get("candidate_id", index))
+        for index, row in enumerate(candidate_pool, start=1)
+        if is_dnn_causal_low_corner_excluded(
+            row.get("ka", row.get("parameters", {}).get("ka")),
+            row.get("kb", row.get("parameters", {}).get("kb")),
+            row.get("radp", row.get("parameters", {}).get("radp")),
+            row.get("shell_th", row.get("parameters", {}).get("shell_th")),
+        )
+    ]
+    if blocked:
+        raise ValueError(
+            "candidate_pool contains EMB 3.4um runtime-risk timeout candidates: "
+            + ", ".join(blocked[:10])
+        )
 
 
 def _coerce_force_grid_arg(raw: str | None) -> tuple[float, ...]:
@@ -127,7 +330,11 @@ def _write_placeholder_png(path: Path, *, width: int = 8, height: int = 8) -> No
     path.write_bytes(payload)
 
 
-def _plot_candidate_heatmap(path: Path, scored: Sequence[Mapping[str, Any]], selected: Sequence[Mapping[str, Any]]) -> None:
+def _plot_candidate_heatmap(
+    path: Path,
+    scored: Sequence[Mapping[str, Any]],
+    selected: Sequence[Mapping[str, Any]],
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if not scored:
         _write_placeholder_png(path)
@@ -161,6 +368,111 @@ def _plot_candidate_heatmap(path: Path, scored: Sequence[Mapping[str, Any]], sel
     axis.set_xlabel("ka")
     axis.set_ylabel("kb")
     axis.set_title("DNN candidate score heatmap")
+    figure.tight_layout()
+    figure.savefig(path, dpi=140)
+    plt.close(figure)
+
+
+def _plot_curve_error_risk(
+    path: Path,
+    scored: Sequence[Mapping[str, Any]],
+    selected: Sequence[Mapping[str, Any]],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not scored:
+        _write_placeholder_png(path)
+        return
+    try:
+        import matplotlib.pyplot as plt
+    except Exception:
+        _write_placeholder_png(path)
+        return
+
+    ka = [10.0 ** float(item["candidate_log10_point"][0]) for item in scored]
+    kb = [10.0 ** float(item["candidate_log10_point"][1]) for item in scored]
+    risk = [float(item.get("predicted_curve_relative_l2_error", 0.0)) for item in scored]
+
+    figure, axis = plt.subplots(figsize=(8, 5))
+    scatter = axis.scatter(ka, kb, c=risk, s=28, cmap="magma")
+    if selected:
+        selected_ka = [10.0 ** float(item["candidate_log10_point"][0]) for item in selected]
+        selected_kb = [10.0 ** float(item["candidate_log10_point"][1]) for item in selected]
+        axis.scatter(
+            selected_ka,
+            selected_kb,
+            edgecolors="#2ca02c",
+            facecolors="none",
+            s=90,
+            linewidth=1.2,
+        )
+    figure.colorbar(scatter, ax=axis, label="predicted curve relative L2 error")
+    axis.set_xscale("log")
+    axis.set_yscale("log")
+    axis.set_xlabel("ka")
+    axis.set_ylabel("kb")
+    axis.set_title("DNN predicted curve-error risk")
+    figure.tight_layout()
+    figure.savefig(path, dpi=140)
+    plt.close(figure)
+
+
+def _extract_candidate_parameter_value(
+    row: Mapping[str, Any],
+    key: str,
+    *,
+    label: str,
+) -> float:
+    parameters = row.get("parameters")
+    if isinstance(parameters, Mapping) and key in parameters:
+        return _coerce_float(parameters[key], label=label)
+    if key in row:
+        return _coerce_float(row[key], label=label)
+    raise ValueError(f"{label} is missing.")
+
+
+def _plot_candidate_pair_scatter(
+    path: Path,
+    scored: Sequence[Mapping[str, Any]],
+    selected: Sequence[Mapping[str, Any]],
+    *,
+    x_key: str,
+    y_key: str,
+    x_label: str,
+    y_label: str,
+    x_transform=lambda value: value,
+    y_transform=lambda value: value,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not scored:
+        _write_placeholder_png(path)
+        return
+    try:
+        import matplotlib.pyplot as plt
+    except Exception:
+        _write_placeholder_png(path)
+        return
+
+    xs = [x_transform(_extract_candidate_parameter_value(item, x_key, label=f"{x_key}")) for item in scored]
+    ys = [y_transform(_extract_candidate_parameter_value(item, y_key, label=f"{y_key}")) for item in scored]
+    scores = [float(item.get("acquisition_score", 0.0)) for item in scored]
+
+    figure, axis = plt.subplots(figsize=(8, 5))
+    scatter = axis.scatter(xs, ys, c=scores, s=28, cmap="viridis")
+    if selected:
+        selected_x = [x_transform(_extract_candidate_parameter_value(item, x_key, label=f"{x_key}")) for item in selected]
+        selected_y = [y_transform(_extract_candidate_parameter_value(item, y_key, label=f"{y_key}")) for item in selected]
+        axis.scatter(
+            selected_x,
+            selected_y,
+            edgecolors="#d62728",
+            facecolors="none",
+            s=90,
+            linewidth=1.2,
+        )
+    figure.colorbar(scatter, ax=axis, label="acquisition score")
+    axis.set_xlabel(x_label)
+    axis.set_ylabel(y_label)
+    axis.set_title("DNN candidate score pair")
     figure.tight_layout()
     figure.savefig(path, dpi=140)
     plt.close(figure)
@@ -253,11 +565,18 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--architecture", default=EMB_34UM_DNN_SURROGATE_FIXED_ARCHITECTURE)
     parser.add_argument("--top-n", type=int, default=100)
     parser.add_argument("--diversity-weight", type=float, default=EMB_34UM_DNN_SURROGATE_DIVERSITY_WEIGHT)
+    parser.add_argument(
+        "--acquisition-score-mode",
+        default="disagreement",
+        choices=EMB_34UM_DNN_ACQUISITION_SCORE_MODES,
+        help="Candidate base score: legacy ensemble disagreement or full-curve relative-L2 risk.",
+    )
+    parser.add_argument("--candidate-space", default="d4", choices=("d2", "d4"))
     parser.add_argument("--force-grid", default=None, help="Optional JSON list override for the force grid.")
     parser.add_argument("--timing-canary", action="store_true")
     parser.add_argument("--timing-canary-point-count", type=int, default=EMB_34UM_DNN_CAUSAL_TIMING_CANARY_POINT_COUNT)
     parser.add_argument("--timing-canary-override-reason", default="")
-    parser.add_argument("--existing-points", default=None, help="JSON list of existing [ka, kb] points.")
+    parser.add_argument("--existing-points", default=None, help="JSON list of existing D2 [ka, kb] or D4 [ka, kb, radp, shell_th] points.")
     parser.add_argument("--seed-offset", type=int, default=0)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--dry-run", action="store_true", help="Skip Torch training and use deterministic synthetic scoring.")
@@ -274,7 +593,16 @@ def _build_synthetic_fit(
     architecture: str,
     device: str,
 ) -> Emb34umDnnSurrogateFit:
-    features = np.asarray([(row.ka_log10, row.kb_log10, row.force_norm) for row in train_rows], dtype=float)
+    has_d4_rows = any(row.radp is not None or row.shell_th is not None for row in train_rows)
+    if has_d4_rows:
+        if any(row.radp is None or row.shell_th is None for row in train_rows):
+            raise ValueError("synthetic DNN fit cannot mix D2 and D4 training rows.")
+        features = np.asarray(
+            [(row.ka_log10, row.kb_log10, float(row.radp), float(row.shell_th), row.force_norm) for row in train_rows],
+            dtype=float,
+        )
+    else:
+        features = np.asarray([(row.ka_log10, row.kb_log10, row.force_norm) for row in train_rows], dtype=float)
     targets = np.asarray([row.observable for row in train_rows], dtype=float)
     feature_mean = tuple(float(item) for item in features.mean(axis=0))
     feature_scale_arr = features.std(axis=0)
@@ -329,47 +657,102 @@ def _build_synthetic_fit(
 def _synthetic_score_candidates(
     candidate_pool: Sequence[Mapping[str, Any]],
     *,
-    existing_points: Sequence[tuple[float, float]],
+    existing_points: Sequence[tuple[float, ...]],
+    candidate_space: str,
     diversity_weight: float,
     force_grid: Sequence[float],
+    acquisition_score_mode: str,
 ) -> tuple[dict[str, Any], ...]:
-    existing_log10 = [(math.log10(ka), math.log10(kb)) for ka, kb in existing_points]
-    scored: list[dict[str, Any]] = []
-    ka_values = [math.log10(float(row["ka"])) for row in candidate_pool]
-    kb_values = [math.log10(float(row["kb"])) for row in candidate_pool]
-    ka_center = float(sum(ka_values) / len(ka_values))
-    kb_center = float(sum(kb_values) / len(kb_values))
+    candidate_space = _coerce_candidate_space(candidate_space)
+    if not candidate_pool:
+        return ()
 
+    scored: list[dict[str, Any]] = []
+    normalized_points: list[tuple[float, ...]] = []
     for index, raw_row in enumerate(candidate_pool, start=1):
         row = dict(raw_row)
-        ka_log10 = math.log10(float(row["ka"]))
-        kb_log10 = math.log10(float(row["kb"]))
-        disagreement = abs(ka_log10 - ka_center) + abs(kb_log10 - kb_center)
-        disagreement /= max(1.0, max(abs(v - ka_center) for v in ka_values) + max(abs(v - kb_center) for v in kb_values))
-        diversity_term = (
-            min(math.dist((ka_log10, kb_log10), point) for point in existing_log10)
-            if existing_log10
+        row["candidate_index"] = index
+        point = _coerce_raw_candidate_point(row, index=index, candidate_space=candidate_space)
+        normalized_points.append(_normalize_candidate_point_values(point, candidate_space=candidate_space))
+
+    if normalized_points:
+        centroid = tuple(sum(values) / len(values) for values in zip(*normalized_points))
+    else:
+        centroid = ()
+    raw_disagreements = [math.dist(point, centroid) for point in normalized_points]
+
+    normalized_existing = tuple(
+        _normalize_candidate_point_values(point, candidate_space=candidate_space)
+        for point in existing_points
+    )
+    raw_diversity = [
+        (
+            min(math.dist(point, existing_point) for existing_point in normalized_existing)
+            if normalized_existing
             else 0.0
         )
-        row["candidate_index"] = index
-        row["candidate_log10_point"] = (ka_log10, kb_log10)
-        row["ensemble_disagreement"] = float(disagreement)
-        row["diversity_term"] = float(diversity_term)
-        row["acquisition_score"] = float(disagreement + diversity_weight * diversity_term)
+        for point in normalized_points
+    ]
+
+    if candidate_space == "d4":
+        disagreement_norm = _normalize_unit(raw_disagreements)
+        diversity_norm = _normalize_unit(raw_diversity)
+    else:
+        disagreement_norm = raw_disagreements
+        diversity_norm = raw_diversity
+    raw_curve_risk = [
+        float(raw_disagreement / max(1.0e-12, 0.1 + abs(point[0]) + abs(point[1])))
+        for point, raw_disagreement in zip(normalized_points, raw_disagreements)
+    ]
+    curve_risk_norm = _normalize_unit(raw_curve_risk)
+
+    for row, normalized_disagreement, normalized_diversity, normalized_point, raw_disagreement, raw_curve_error_risk in zip(
+        candidate_pool,
+        disagreement_norm,
+        diversity_norm,
+        normalized_points,
+        raw_disagreements,
+        raw_curve_risk,
+    ):
+        row = dict(row)
+        row["candidate_log10_point"] = normalized_point
+        row["ensemble_disagreement"] = float(raw_disagreement)
+        row["ensemble_disagreement_norm"] = float(normalized_disagreement)
+        row["predicted_curve_relative_l2_error"] = float(raw_curve_error_risk)
+        row["predicted_curve_relative_l2_error_norm"] = float(
+            curve_risk_norm[len(scored)] if curve_risk_norm else 0.0
+        )
+        row["curve_uncertainty_l2"] = float(raw_disagreement)
+        row["predicted_curve_l2"] = float(max(1.0e-12, 0.1 + abs(normalized_point[0]) + abs(normalized_point[1])))
+        row["diversity_term"] = float(normalized_diversity)
+        if acquisition_score_mode == "curve_error":
+            base_score = float(row["predicted_curve_relative_l2_error_norm"])
+            base_field = "predicted_curve_relative_l2_error"
+        else:
+            base_score = float(normalized_disagreement)
+            base_field = "ensemble_disagreement"
+        row["acquisition_score_mode"] = acquisition_score_mode
+        row["acquisition_base_field"] = base_field
+        row["acquisition_base_score"] = float(base_score)
+        row["acquisition_score"] = float(base_score + float(diversity_weight) * normalized_diversity)
+        ka_log10, kb_log10 = float(normalized_point[0]), float(normalized_point[1])
         row["predicted_curve"] = tuple(
-            float(0.5 * disagreement + 0.05 * step + 0.01 * ka_log10 - 0.01 * kb_log10)
+            float(0.5 * base_score + 0.05 * step + 0.01 * ka_log10 - 0.01 * kb_log10)
             for step, _ in enumerate(force_grid)
         )
         scored.append(row)
 
+    # Preserve deterministic ranking for legacy and new space behavior.
     scored.sort(
         key=lambda item: (
             -float(item["acquisition_score"]),
-            -float(item["ensemble_disagreement"]),
+            -float(item["ensemble_disagreement_norm"] if candidate_space == "d4" else item["ensemble_disagreement"]),
             float(item["candidate_log10_point"][0]),
             float(item["candidate_log10_point"][1]),
         )
     )
+    for index, item in enumerate(scored, start=1):
+        item["candidate_index"] = index
     return tuple(scored)
 
 
@@ -429,6 +812,7 @@ def _fit_payload(fit: Emb34umDnnSurrogateFit, *, score_runtime_seconds: float) -
 
 def _selection_summary(scored: Sequence[Mapping[str, Any]], selected: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     disagreement_values = [float(item["ensemble_disagreement"]) for item in scored]
+    curve_error_values = [float(item.get("predicted_curve_relative_l2_error", 0.0)) for item in scored]
     acquisition_values = [float(item["acquisition_score"]) for item in scored]
     diversity_values = [float(item["diversity_term"]) for item in selected]
     return {
@@ -438,6 +822,11 @@ def _selection_summary(scored: Sequence[Mapping[str, Any]], selected: Sequence[M
             "min": min(disagreement_values) if disagreement_values else 0.0,
             "max": max(disagreement_values) if disagreement_values else 0.0,
             "mean": float(np.mean(disagreement_values)) if disagreement_values else 0.0,
+        },
+        "predicted_curve_relative_l2_error": {
+            "min": min(curve_error_values) if curve_error_values else 0.0,
+            "max": max(curve_error_values) if curve_error_values else 0.0,
+            "mean": float(np.mean(curve_error_values)) if curve_error_values else 0.0,
         },
         "acquisition_score": {
             "min": min(acquisition_values) if acquisition_values else 0.0,
@@ -457,7 +846,10 @@ def _build_manifest(
     args: argparse.Namespace,
     fit: Emb34umDnnSurrogateFit,
     completed_rows: Sequence[Mapping[str, Any]],
+    existing_points: Sequence[tuple[float, ...]],
+    existing_points_source: str,
     candidate_pool: Sequence[Mapping[str, Any]],
+    skipped_existing_candidate_ids: Sequence[str],
     scored: Sequence[Mapping[str, Any]],
     selected: Sequence[Mapping[str, Any]],
     train_runtime_seconds: float,
@@ -468,12 +860,29 @@ def _build_manifest(
     return {
         "schema_version": EMB_34UM_DNN_TRAIN_SCORE_SELECT_SCHEMA_VERSION,
         "selector_backend": fit.backend,
+        "candidate_space": args.candidate_space,
         "fit": _fit_payload(fit, score_runtime_seconds=score_runtime_seconds),
-        "selection": _selection_summary(scored, selected),
+        "selection": {
+            **_selection_summary(scored, selected),
+            "acquisition_score_mode": args.acquisition_score_mode,
+            "skipped_existing_candidate_count": len(skipped_existing_candidate_ids),
+            "skipped_existing_candidate_ids": list(skipped_existing_candidate_ids),
+        },
         "candidate_pool": [dict(item) for item in candidate_pool],
+        "exclusion_policy": dict(EMB_34UM_DNN_CAUSAL_LOW_CORNER_EXCLUSION),
         "candidate_scores": _jsonable_rows(scored),
         "selected_points": _jsonable_rows(selected),
         "completed_curve_count": len(completed_rows),
+        "existing_points": {
+            "source": existing_points_source,
+            "count": len(existing_points),
+            "used_for_diversity": True,
+            "diversity_weight": float(args.diversity_weight),
+            "points": [
+                [float(item) for item in point]
+                for point in existing_points
+            ],
+        },
         "train_runtime_seconds": float(train_runtime_seconds),
         "score_runtime_seconds": float(score_runtime_seconds),
         "timing_canary": timing_payload,
@@ -498,6 +907,7 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--top-n must be positive.")
     if args.diversity_weight < 0.0:
         raise ValueError("--diversity-weight must be non-negative.")
+    candidate_space = _coerce_candidate_space(args.candidate_space)
 
     output_root = Path(args.output_root)
     output_root.mkdir(parents=True, exist_ok=True)
@@ -506,9 +916,25 @@ def main(argv: list[str] | None = None) -> int:
     candidate_pool = _load_json_list(Path(args.candidate_pool), label="candidate_pool")
     if not candidate_pool:
         raise ValueError("candidate_pool must not be empty.")
+    _validate_candidate_pool_exclusion(candidate_pool)
 
     force_grid = _coerce_force_grid_arg(args.force_grid)
-    existing_points = _coerce_existing_points(args.existing_points)
+    if args.existing_points is None:
+        existing_points = _existing_points_from_completed_rows(
+            completed_rows,
+            candidate_space=candidate_space,
+        )
+        existing_points_source = "completed_rows"
+    else:
+        existing_points = _coerce_existing_points(args.existing_points, candidate_space=candidate_space)
+        existing_points_source = "cli_existing_points"
+    candidate_pool, skipped_existing_candidate_ids = _exclude_existing_points_from_candidate_pool(
+        candidate_pool,
+        existing_points=existing_points,
+        candidate_space=candidate_space,
+    )
+    if not candidate_pool:
+        raise ValueError("candidate_pool has no novel points after excluding already completed points.")
     ensemble_seeds = tuple(args.ensemble_seed) if args.ensemble_seed else None
 
     timing_canary_config = None
@@ -564,8 +990,10 @@ def main(argv: list[str] | None = None) -> int:
         scored = _synthetic_score_candidates(
             candidate_pool,
             existing_points=existing_points,
+            candidate_space=candidate_space,
             diversity_weight=float(args.diversity_weight),
             force_grid=force_grid,
+            acquisition_score_mode=args.acquisition_score_mode,
         )
     else:
         scored = tuple(
@@ -575,7 +1003,9 @@ def main(argv: list[str] | None = None) -> int:
                 candidate_records=candidate_pool,
                 force_grid=force_grid,
                 existing_points=existing_points,
+                candidate_space=candidate_space,
                 diversity_weight=float(args.diversity_weight),
+                acquisition_score_mode=args.acquisition_score_mode,
             )
         )
     score_runtime_seconds = perf_counter() - score_start
@@ -585,13 +1015,17 @@ def main(argv: list[str] | None = None) -> int:
         scored,
         count=min(args.top_n, len(scored)),
         existing_points=existing_points,
+        candidate_space=candidate_space,
         diversity_weight=float(args.diversity_weight),
+        acquisition_score_mode=args.acquisition_score_mode,
     )
 
     heatmap_path = output_root / EMB_34UM_DNN_TRAIN_SCORE_SELECT_SELECTION_PLOT_FILENAME
+    curve_error_path = output_root / EMB_34UM_DNN_TRAIN_SCORE_SELECT_CURVE_ERROR_PLOT_FILENAME
     distribution_path = output_root / EMB_34UM_DNN_TRAIN_SCORE_SELECT_DISTRIBUTION_PLOT_FILENAME
     loss_path = output_root / EMB_34UM_DNN_TRAIN_SCORE_SELECT_LOSS_PLOT_FILENAME
     _plot_candidate_heatmap(heatmap_path, scored, selected)
+    _plot_curve_error_risk(curve_error_path, scored, selected)
     _plot_distribution(distribution_path, selected)
     _plot_losses(loss_path, fit)
 
@@ -621,18 +1055,58 @@ def main(argv: list[str] | None = None) -> int:
 
     plot_paths = {
         "candidate_score_heatmap": str(heatmap_path),
+        "curve_error_risk": str(curve_error_path),
         "selected_overlay": str(heatmap_path),
         "disagreement_distribution": str(distribution_path),
         "member_losses": str(loss_path),
     }
     if args.timing_canary:
         plot_paths["timing_canary"] = str(timing_plot_path)
+    if candidate_space == "d4":
+        ka_radp_path = output_root / EMB_34UM_DNN_TRAIN_SCORE_SELECT_KA_RADP_PLOT_FILENAME
+        kb_shell_th_path = output_root / EMB_34UM_DNN_TRAIN_SCORE_SELECT_KB_SHELL_TH_PLOT_FILENAME
+        radp_shell_th_path = output_root / EMB_34UM_DNN_TRAIN_SCORE_SELECT_RADP_SHELL_TH_PLOT_FILENAME
+        _plot_candidate_pair_scatter(
+            ka_radp_path,
+            scored,
+            selected,
+            x_key="ka",
+            y_key="radp",
+            x_label="ka",
+            y_label="radp",
+            x_transform=math.log10,
+        )
+        _plot_candidate_pair_scatter(
+            kb_shell_th_path,
+            scored,
+            selected,
+            x_key="kb",
+            y_key="shell_th",
+            x_label="kb",
+            y_label="shell_th",
+            x_transform=math.log10,
+        )
+        _plot_candidate_pair_scatter(
+            radp_shell_th_path,
+            scored,
+            selected,
+            x_key="radp",
+            y_key="shell_th",
+            x_label="radp",
+            y_label="shell_th",
+        )
+        plot_paths["ka_radp"] = str(ka_radp_path)
+        plot_paths["kb_shell_th"] = str(kb_shell_th_path)
+        plot_paths["radp_shell_th"] = str(radp_shell_th_path)
 
     manifest = _build_manifest(
         args=args,
         fit=fit,
         completed_rows=completed_rows,
+        existing_points=existing_points,
+        existing_points_source=existing_points_source,
         candidate_pool=candidate_pool,
+        skipped_existing_candidate_ids=skipped_existing_candidate_ids,
         scored=scored,
         selected=selected,
         train_runtime_seconds=train_runtime_seconds,

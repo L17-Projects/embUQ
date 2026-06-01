@@ -388,6 +388,7 @@ def test_vega_sbatch_templates_expose_model_family_and_profile_axes() -> None:
     template_dir = repo_root / "scripts" / "platforms" / "vega" / "sbatch"
     templates = sorted(template_dir.glob("*.sbatch"))
     fixed_scope_templates = {
+        "dpd_production_preflight_canary.sbatch",
         "gv_paper_figure_replay.sbatch",
         "train_dnn_arch_array.sbatch",
         "train_dnn_surrogates.sbatch",

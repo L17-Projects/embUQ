@@ -6,13 +6,18 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+from meso_uq.active_learning.emb_34um_dnn_causal_validation_protocol import (  # noqa: E402
+    EMB_34UM_DNN_CAUSAL_DPD_WALLTIME_TARGET_DEFAULT,
+    EMB_34UM_DNN_CAUSAL_MAX_REPLICATE_COUNT,
+    EMB_34UM_DNN_CAUSAL_PRIMARY_REPLICATE_COUNT,
+)
 
 
 def _load_module(path: Path, name: str):
@@ -30,6 +35,8 @@ def _write_json(path: Path, payload: dict[str, object]) -> None:
 
 
 def _seed_minimal_campaign(campaign_root: Path) -> None:
+    parameters = {"ka": 1.0e3, "kb": 2.0e3, "radp": 6.5, "shell_th": 3.75e-9}
+    fingerprint = {"radp": 6.5, "shell_th": 3.75e-9, "bpress": -91.0}
     manifest_path = campaign_root / "emb_34um_dnn_causal_validation_manifest.json"
     _write_json(
         manifest_path,
@@ -46,17 +53,22 @@ def _seed_minimal_campaign(campaign_root: Path) -> None:
         {
             "candidate_id": "unseen-001",
             "output_root": str(output_root),
+            "candidate_space": "d4",
             "normalized_payload": {
                 "candidate_id": "unseen-001",
                 "output_root": str(output_root),
-                "parameters": {"ka": 1.0e3, "kb": 2.0e3},
+                "candidate_space": "d4",
+                "parameters": parameters,
+                "fingerprint": fingerprint,
                 "force_grid": [5000.0 * index / 7.0 for index in range(8)],
             },
             "rendered_payload": {
                 "request_payload": {
                     "candidate_id": "unseen-001",
                     "output_root": str(output_root),
-                    "parameters": {"ka": 1.0e3, "kb": 2.0e3},
+                    "candidate_space": "d4",
+                    "parameters": parameters,
+                    "fingerprint": fingerprint,
                     "force_grid": [5000.0 * index / 7.0 for index in range(8)],
                 }
             },
@@ -133,8 +145,11 @@ def test_metric_dnn_cli_writes_analyze_rows_from_completed_rows(tmp_path: Path) 
             "branch": branch,
             "replicate": replicate,
             "cycle": cycle,
+            "candidate_space": "d4",
             "ka": ka,
             "kb": kb,
+            "radp": 6.5,
+            "shell_th": 3.75e-9,
             "force_grid": force_grid,
             "reference_curve": [0.1 + 0.01 * index + 1.0e-6 * ka + 1.0e-7 * kb for index in range(8)],
         }
@@ -161,6 +176,7 @@ def test_metric_dnn_cli_writes_analyze_rows_from_completed_rows(tmp_path: Path) 
             "--output-root",
             str(output_root),
             "--dry-run",
+            "--allow-blocked",
         ]
     )
 
@@ -190,3 +206,34 @@ def test_metric_sbatch_runs_metric_cli_and_analysis_on_gpu_node() -> None:
     assert "run_emb_34um_dnn_causal_validation_metrics.py" in text
     assert "analyze_emb_34um_dnn_causal_validation.py" in text
     assert "emb_34um_dnn_causal_validation_rows.json" in text
+    assert "METRIC_STATUS=$?" in text
+    assert text.index("METRIC_STATUS=$?") < text.index("Running analysis:")
+    assert 'exit "${METRIC_STATUS}"' in text
+
+
+def test_train_score_select_sbatch_forwards_d4_candidate_space_by_default() -> None:
+    script_path = (
+        REPO_ROOT
+        / "scripts"
+        / "platforms"
+        / "karolina"
+        / "sbatch"
+        / "emb_34um_dnn_train_score_select.sbatch"
+    )
+    text = script_path.read_text(encoding="utf-8")
+
+    assert 'CANDIDATE_SPACE="${CANDIDATE_SPACE:-d4}"' in text or "CANDIDATE_SPACE=${CANDIDATE_SPACE:-d4}" in text
+    assert "--candidate-space" in text and "CANDIDATE_SPACE" in text
+    assert "emb_34um_dnn_train_score_select.py" in text
+
+
+def test_prepare_cli_defaults_use_reduced_protocol_targets() -> None:
+    module = _load_module(
+        REPO_ROOT / "scripts" / "workflows" / "emb" / "active_learning" / "prepare_emb_34um_dnn_causal_validation.py",
+        "prepare_emb_34um_dnn_causal_validation_cli",
+    )
+    parser = module.build_parser()
+    args = parser.parse_args(["--timestamp", "20260522_010101"])
+    assert args.walltime == EMB_34UM_DNN_CAUSAL_DPD_WALLTIME_TARGET_DEFAULT
+    assert args.active_replicate_count == EMB_34UM_DNN_CAUSAL_PRIMARY_REPLICATE_COUNT
+    assert args.max_replicate_count == EMB_34UM_DNN_CAUSAL_MAX_REPLICATE_COUNT

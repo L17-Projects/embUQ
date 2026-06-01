@@ -93,6 +93,12 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     print(artifacts.report_path)
+    sidecar_json_path = getattr(artifacts, "artifact_sidecar_json_path", None)
+    sidecar_csv_path = getattr(artifacts, "artifact_sidecar_csv_path", None)
+    if sidecar_json_path is not None:
+        print(sidecar_json_path)
+    if sidecar_csv_path is not None:
+        print(sidecar_csv_path)
     print(f"status={artifacts.report['status']}")
     if artifacts.report["decision"]["passed"] or args.allow_blocked:
         return 0

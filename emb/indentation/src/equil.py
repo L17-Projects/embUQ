@@ -246,12 +246,16 @@ def run_equil(
         max_force=10.0,
         aware_mode="Object",
     )
+    lj_int_cutoff = lj_fac * rc
+    # Keep the LJ minimum strictly below the cutoff; Mirheo rejects equality for
+    # some mesh-derived cutoffs after floating-point rounding.
+    lj_int_sigma = 0.99 * lj_int_cutoff / (2 ** (1 / 6))
     lj_int = mir.Interactions.Pairwise(
         "lj_int",
-        lj_fac * rc,
+        lj_int_cutoff,
         kind="RepulsiveLJ",
         epsilon=10000.0,
-        sigma=lj_fac * rc / (2 ** (1 / 6)),
+        sigma=lj_int_sigma,
         max_force=100000.0,
     )
 

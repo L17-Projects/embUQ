@@ -24,6 +24,9 @@ This document is the final-gate contract for the active-learning production slic
 - **Final gate evidence shape:** AL prefixes `30`, `60`, `90` curves; LHS prefixes `30`, `60`, `90` curves.
 - **Labeling policy:** fresh DPD labels only.
 - **Force grid input:** `samples_all.dat` only.
+- **Runtime preflight:** every fresh-DPD production array must pass the scratch-backed DPD production preflight described in
+  [`DPD_PRODUCTION_PREFLIGHT.md`](DPD_PRODUCTION_PREFLIGHT.md).
+- **Dual-HPC closeout:** Karolina production may proceed under Karolina preflight evidence, but project closeout remains blocked until the same preflight canary passes on Vega.
 
 ## Required validation plots (every step)
 
@@ -51,6 +54,11 @@ Final acceptance requires all plots above to be present and the following gating
 - `exploration_vs_acquisition` and `disagreement_acquisition_map` must show non-starved acquisition in target regions.
 - `failure_quarantine_replacement` must document each quarantine, retry action, and replacement decision.
 - `al_vs_lhs_relative_l2` must show AL improvement against each LHS prefix (30, 60, 90) where possible.
+- no failed or interrupted DPD candidate output may be used as training, scoring, or held-out evidence;
+- Slurm-accounted `TIMEOUT` candidates must be quarantined/replaced; Slurm-accounted scheduler interruptions such as
+  `CANCELLED`, `PREEMPTED`, `NODE_FAIL`, or `REVOKED` must be retried as the same candidate;
+- replacement batches must be generated through the resume helper, resumed only for missing replacement indices, and recorded in the campaign manifests;
+- the project cannot be marked dual-HPC complete until the Vega preflight canary passes.
 
 ## Production runtime fingerprint
 

@@ -126,6 +126,7 @@ from meso_uq.active_learning.emb_34um_final_gate_design import (  # noqa: E402
     build_emb_34um_final_gate_design_round,
     build_emb_34um_final_gate_validation_design,
 )
+from meso_uq.active_learning.emb_34um_dpd_adapter import EMB_34UM_RUNTIME_FINGERPRINT  # noqa: E402
 
 
 def _load_force_grid(path: Path) -> tuple[float, ...]:
@@ -264,9 +265,17 @@ def _attach_force_grid(
     }
     if extra_metadata:
         metadata.update(dict(extra_metadata))
+    runtime_fingerprint = {
+        **dict(EMB_34UM_RUNTIME_FINGERPRINT),
+        **dict(candidate.parameters.get("runtime_fingerprint", {})),
+    }
     return Candidate(
         candidate_id=candidate.candidate_id,
-        parameters={**dict(candidate.parameters), "force_grid": list(force_grid_payload)},
+        parameters={
+            **dict(candidate.parameters),
+            "force_grid": list(force_grid_payload),
+            "runtime_fingerprint": runtime_fingerprint,
+        },
         metadata=metadata,
     )
 
@@ -324,6 +333,7 @@ def _build_canary_candidates(run_id: str, *, force_grid: tuple[float, ...]) -> t
                 "kb": CANARY_KB,
                 "canary": True,
                 "force_grid": list(force_grid_payload),
+                "runtime_fingerprint": dict(EMB_34UM_RUNTIME_FINGERPRINT),
             },
             metadata={
                 "campaign": "canary",
@@ -360,6 +370,7 @@ def _build_lhs_candidates(run_id: str, *, force_grid: tuple[float, ...]) -> tupl
                     "ka": float(f"{ka:.6g}"),
                     "kb": float(f"{kb:.6g}"),
                     "force_grid": list(force_grid_payload),
+                    "runtime_fingerprint": dict(EMB_34UM_RUNTIME_FINGERPRINT),
                 },
                 metadata={
                     "campaign": "lhs",
@@ -426,6 +437,7 @@ def _build_benchmark_candidates(run_id: str, *, force_grid: tuple[float, ...]) -
                     "ka": float(f"{ka:.6g}"),
                     "kb": float(f"{kb:.6g}"),
                     "force_grid": list(force_grid_payload),
+                    "runtime_fingerprint": dict(EMB_34UM_RUNTIME_FINGERPRINT),
                 },
                 metadata={
                     "campaign": "benchmark",
@@ -502,7 +514,7 @@ def _submission_command(
             "sbatch --parsable "
             f"--time={shlex.quote(walltime)} "
             f"--array={array_spec} "
-            "--export="
+            "--export=ALL,"
             f"TIMESTAMP={shlex.quote(timestamp)},"
             f"SCRATCH_ROOT={shlex.quote(str(scratch_root))},"
             f"VAULT_ROOT={shlex.quote(str(vault_root))},"

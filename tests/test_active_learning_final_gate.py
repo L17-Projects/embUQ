@@ -63,6 +63,9 @@ def test_final_gate_document_contains_core_run_and_gate_requirements() -> None:
     assert "AL prefixes" in doc
     assert "LHS prefixes" in doc
     assert "fresh DPD labels only" in doc
+    assert "scratch-backed DPD production preflight" in doc
+    assert "DPD_PRODUCTION_PREFLIGHT.md" in doc
+    assert "Vega preflight canary" in doc
     assert "samples_all.dat" in doc
     assert "runtime-per-curve" in doc
     assert "ka/kb" in doc

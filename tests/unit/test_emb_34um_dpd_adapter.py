@@ -54,10 +54,19 @@ def test_load_emb_34um_force_grid_rejects_inconsistent_rows(tmp_path: Path) -> N
 
 def test_build_emb_34um_request_builds_payload_and_rejects_bad_dimensions(tmp_path: Path) -> None:
     root = tmp_path / "campaign"
-    expected_ka = adapter._legacy_yt_to_ka(3.0e7, defaults=adapter._load_default_parameters(), candidate_id="candidate-emb")
+    radp = 6.60
+    shell_th = 3.75e-9
+    expected_lx, expected_ly, expected_lz = adapter._compute_box_dimensions(radp)
     artifacts = adapter.build_emb_34um_request(
         candidate_id="candidate-emb",
-        payload={"ka": expected_ka, "kb": 1000.0, "experiment": "indentation"},
+        payload={
+            "ka": 60_000.0,
+            "kb": 2_000.0,
+            "radp": radp,
+            "shell_th": shell_th,
+            "bpress": adapter.EMB_34UM_RUNTIME_FINGERPRINT["bpress"],
+            "experiment": "indentation",
+        },
         campaign_root=root,
     )
     request_payload = artifacts.normalized_request_payload()
@@ -65,22 +74,30 @@ def test_build_emb_34um_request_builds_payload_and_rejects_bad_dimensions(tmp_pa
     assert request_payload["schema_version"] == adapter.EMB_34UM_DPD_SCHEMA_VERSION
     assert request_payload["request_type"] == "emb_34um_full_force_sweep"
     assert request_payload["candidate_id"] == "candidate-emb"
-    assert request_payload["parameters"]["ka"] == expected_ka
-    assert request_payload["parameters"]["kb"] == 1000.0
+    assert request_payload["parameters"]["ka"] == 60_000.0
+    assert request_payload["parameters"]["kb"] == 2_000.0
     assert request_payload["parameters"]["b1"] == 0.0
     assert request_payload["parameters"]["b2"] == 0.0
     assert request_payload["parameters"]["a3"] == 0.0
     assert request_payload["parameters"]["a4"] == 0.0
+    assert request_payload["parameters"]["radp"] == radp
+    assert request_payload["parameters"]["shell_th"] == shell_th
+    assert request_payload["parameters"]["bpress"] == adapter.EMB_34UM_RUNTIME_FINGERPRINT["bpress"]
     assert request_payload["retry_limit"] == adapter.EMB_34UM_RETRY_LIMIT
-    assert request_payload["force_grid_count"] == 15
-    assert request_payload["fingerprint"]["radp"] == adapter.EMB_34UM_RUNTIME_FINGERPRINT["radp"]
-    assert request_payload["fingerprint"]["L"] == float(adapter.EMB_34UM_RUNTIME_FINGERPRINT["L"])
+    assert request_payload["force_grid_count"] == len(adapter.EMB_34UM_FORCE_GRID)
+    assert request_payload["fingerprint"]["radp"] == radp
+    assert request_payload["fingerprint"]["shell_th"] == shell_th
+    assert request_payload["fingerprint"]["Lx"] == expected_lx
+    assert request_payload["fingerprint"]["Ly"] == expected_ly
+    assert request_payload["fingerprint"]["Lz"] == expected_lz
+    assert request_payload["fingerprint"]["direct_stiffness_override"] is True
+    assert request_payload["fingerprint"]["bpress"] == adapter.EMB_34UM_RUNTIME_FINGERPRINT["bpress"]
     assert request_payload["platform_defaults"]["platform"] == "karolina"
 
     with pytest.raises(ValueError, match="outside bounds"):
         adapter.build_emb_34um_request(
             candidate_id="too-low-yt",
-            payload={"Yt": 1.0, "kb": 1000.0, "experiment": "indentation"},
+            payload={"Yt": 1.0, "kb": 2000.0, "experiment": "indentation"},
             campaign_root=root,
         )
     with pytest.raises(ValueError, match="outside bounds"):
@@ -102,19 +119,96 @@ def test_build_emb_34um_request_compatibility_allows_legacy_yt_input(tmp_path: P
     expected_ka = adapter._legacy_yt_to_ka(2.5e7, defaults=adapter._load_default_parameters(), candidate_id="legacy")
     artifacts = adapter.build_emb_34um_request(
         candidate_id="candidate-legacy",
-        payload={"Yt": 2.5e7, "kb": 1000.0, "experiment": "indentation"},
+        payload={"Yt": 2.5e7, "kb": 2000.0, "experiment": "indentation"},
         campaign_root=root,
     )
 
     request_payload = artifacts.normalized_request_payload()
     assert request_payload["parameters"]["ka"] == expected_ka
-    assert request_payload["parameters"]["kb"] == 1000.0
+    assert request_payload["parameters"]["kb"] == 2000.0
+
+
+def test_build_emb_34um_request_rejects_d4_payloads_missing_radp_or_shell_th(tmp_path: Path) -> None:
+    root = tmp_path / "campaign"
+    bad_runtime = {
+        "fscale": adapter.EMB_34UM_RUNTIME_FINGERPRINT["fscale"],
+        "numsteps": adapter.EMB_34UM_RUNTIME_FINGERPRINT["numsteps"],
+        "numsteps_eq": adapter.EMB_34UM_RUNTIME_FINGERPRINT["numsteps_eq"],
+        "direct_stiffness_override": adapter.EMB_34UM_RUNTIME_FINGERPRINT["direct_stiffness_override"],
+    }
+
+    with pytest.raises(ValueError, match="missing D4 runtime parameters"):
+        adapter.build_emb_34um_request(
+            candidate_id="candidate-d4-missing-radp",
+            payload={"ka": 2.0e4, "kb": 3.0e3, "runtime_fingerprint": bad_runtime, "experiment": "indentation"},
+            campaign_root=root,
+        )
+
+    with pytest.raises(ValueError, match="missing D4 runtime parameters"):
+        adapter.build_emb_34um_request(
+            candidate_id="candidate-d4-missing-shell-th",
+            payload={
+                "ka": 2.0e4,
+                "kb": 3.0e3,
+                "radp": 6.60,
+                "runtime_fingerprint": bad_runtime,
+                "experiment": "indentation",
+            },
+            campaign_root=root,
+        )
+
+
+def test_build_emb_34um_request_allows_legacy_d2_without_d4_geometry(tmp_path: Path) -> None:
+    root = tmp_path / "campaign"
+    artifacts = adapter.build_emb_34um_request(
+        candidate_id="candidate-legacy-d2",
+        payload={
+            "Yt": 3.0e7,
+            "kb": 4_500.0,
+            "experiment": "indentation",
+        },
+        campaign_root=root,
+    )
+    request_payload = artifacts.normalized_request_payload()
+    assert request_payload["fingerprint"]["radp"] == adapter.EMB_34UM_RUNTIME_FINGERPRINT["radp"]
+    assert request_payload["fingerprint"]["shell_th"] == adapter.EMB_34UM_RUNTIME_FINGERPRINT["shell_th"]
+
+
+def test_build_emb_34um_request_preserves_d4_runtime_parameters(tmp_path: Path) -> None:
+    radp = 6.60
+    shell_th = 3.75e-9
+    expected_lx, expected_ly, expected_lz = adapter._compute_box_dimensions(radp)
+
+    artifacts = adapter.build_emb_34um_request(
+        candidate_id="candidate-d4",
+        payload={
+            "ka": 2.0e4,
+            "kb": 3.0e3,
+            "radp": radp,
+            "shell_th": shell_th,
+            "bpress": adapter.EMB_34UM_RUNTIME_FINGERPRINT["bpress"],
+            "experiment": "indentation",
+        },
+        campaign_root=tmp_path / "campaign",
+    )
+
+    request_payload = artifacts.normalized_request_payload()
+    assert request_payload["parameters"]["radp"] == radp
+    assert request_payload["parameters"]["shell_th"] == shell_th
+    assert request_payload["parameters"]["bpress"] == adapter.EMB_34UM_RUNTIME_FINGERPRINT["bpress"]
+    assert request_payload["fingerprint"]["radp"] == radp
+    assert request_payload["fingerprint"]["shell_th"] == shell_th
+    assert request_payload["fingerprint"]["Lx"] == expected_lx
+    assert request_payload["fingerprint"]["Ly"] == expected_ly
+    assert request_payload["fingerprint"]["Lz"] == expected_lz
+    assert request_payload["fingerprint"]["direct_stiffness_override"] is True
 
 
 def test_build_emb_34um_request_rejects_wrong_fingerprint_defaults(monkeypatch, tmp_path: Path) -> None:
     def _bad_defaults(path: Path | None = None) -> dict[str, object]:
         return {
             "fscale": 0.01,
+            "radp": adapter.EMB_34UM_RUNTIME_FINGERPRINT["radp"],
             "shell_th": adapter.EMB_34UM_RUNTIME_FINGERPRINT["shell_th"],
             "numsteps": adapter.EMB_34UM_RUNTIME_FINGERPRINT["numsteps"],
             "numsteps_eq": adapter.EMB_34UM_RUNTIME_FINGERPRINT["numsteps_eq"],
@@ -122,9 +216,15 @@ def test_build_emb_34um_request_rejects_wrong_fingerprint_defaults(monkeypatch, 
 
     monkeypatch.setattr(adapter, "_load_default_parameters", _bad_defaults)
 
-    with pytest.raises(ValueError, match="expected fscale"):
+    with pytest.raises(ValueError, match="fscale mismatch"):
         adapter.build_emb_34um_request(
             candidate_id="bad-fingerprint",
-            payload={"ka": 1e3, "kb": 1000.0, "experiment": "indentation"},
+            payload={
+                "ka": 1e3,
+                "kb": 2000.0,
+                "radp": adapter.EMB_34UM_RUNTIME_FINGERPRINT["radp"],
+                "shell_th": adapter.EMB_34UM_RUNTIME_FINGERPRINT["shell_th"],
+                "experiment": "indentation",
+            },
             campaign_root=tmp_path,
         )

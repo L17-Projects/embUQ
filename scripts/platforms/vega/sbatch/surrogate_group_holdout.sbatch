@@ -40,7 +40,7 @@ RUPTURE_RATIO="${RUPTURE_RATIO:-2.0}"
 module purge
 module load \
   Python/3.10.8-GCCcore-12.2.0 \
-  openmpi/4.1.2.1 \
+  OpenMPI/4.1.4-GCC-12.2.0 \
   CUDA/12.2.2
 
 ENV_ROOT="${MESOUQ_ENV_ROOT:-${MESOUQ_SITE_RUNTIME_ROOT:?Set MESOUQ_SITE_RUNTIME_ROOT before using this sbatch script.}/env}"

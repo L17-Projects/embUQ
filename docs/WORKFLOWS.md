@@ -130,6 +130,17 @@ The `scripts/platforms/vega/` and `scripts/platforms/karolina/` Python entrypoin
 
 These helpers expose experiment, model family, run profile, and stage explicitly so the operator surface does not overload the word `reduced`.
 
+DPD production arrays use the shared preflight gate in
+[`DPD_PRODUCTION_PREFLIGHT.md`](DPD_PRODUCTION_PREFLIGHT.md). The canonical canary
+entrypoint is:
+
+```bash
+bash scripts/platforms/hpc/sbatch/dpd_production_preflight_canary.sbatch --site vega|karolina
+```
+
+The dispatcher must be run with `bash`; it submits the site-specific Slurm template with
+`sbatch` after resolving `--site` or `MESOUQ_SITE`.
+
 The production complete scripts orchestrate:
 1. Phase 1 on GPU (GPU-batched surrogate, Sequential Korali conduit)
 2. Phase 2 with `phase2_backend=native-cuda` by default for `production` lanes

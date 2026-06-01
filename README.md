@@ -160,20 +160,23 @@ To test the implementation on Vega from a fresh clone, the shortest supported pa
 module purge
 module load \
   Python/3.10.8-GCCcore-12.2.0 \
-  openmpi/4.1.2.1 \
+  OpenMPI/4.1.4-GCC-12.2.0 \
   CUDA/12.2.2 \
   GSL/2.7-GCC-12.2.0 \
   Eigen/3.4.0-GCCcore-12.2.0
 
+export MESOUQ_SITE=vega
+export MESOUQ_SITE_RUNTIME_ROOT="${PWD}/_vega"
 bash scripts/platforms/hpc/bootstrap_env.sh --site vega
-source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
+source scripts/platforms/hpc/site_env.sh
+mesouq_activate_site_env vega "$PWD"
 python -m pip install --upgrade pip
 pip install -e ".[test,mpi]"
 pip install pybind11 meson ninja
 
 python scripts/platforms/hpc/doctor_hpc.py --site vega
 bash scripts/platforms/hpc/bootstrap_korali.sh --site vega --jobs 8
-source ${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh
+mesouq_activate_site_env vega "$PWD"
 python scripts/platforms/hpc/doctor_hpc.py --site vega --strict
 
 REPO_ROOT=$(pwd) sbatch scripts/platforms/vega/sbatch/validation_matrix.sbatch

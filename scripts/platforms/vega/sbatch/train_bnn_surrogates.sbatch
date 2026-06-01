@@ -41,7 +41,7 @@ for sel in ${SELECTIONS}; do ONLY_ARGS="${ONLY_ARGS} --only ${sel}"; done
 module purge
 module load \
   Python/3.10.8-GCCcore-12.2.0 \
-  openmpi/4.1.2.1 \
+  OpenMPI/4.1.4-GCC-12.2.0 \
   CUDA/12.2.2 \
   GSL/2.7-GCC-12.2.0 \
   Eigen/3.4.0-GCCcore-12.2.0
