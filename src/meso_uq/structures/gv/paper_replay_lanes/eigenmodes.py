@@ -81,6 +81,9 @@ _REFERENCE_DIR = Path(__file__).resolve().parents[1] / "references"
 _FIGURE8G_REFERENCE_CSV = _REFERENCE_DIR / "eigenmodes_fig8g_digitized.csv"
 _FIGURE8G_MEAN_ABS_TOLERANCE = 1.0
 _FIGURE8G_MAX_ABS_TOLERANCE = 5.0
+_FIGURE8G_SPAN_COMPRESSION_THRESHOLD = 0.75
+_FIGURE8G_SPAN_EXPANSION_THRESHOLD = 1.25
+_FIGURE8G_EDGE_SCALE_MISMATCH_THRESHOLD = 0.75
 _MODE_WINDOW_METADATA_CHANNELS = (
     "raw_eigenpair_count",
     "final_mode_count",
@@ -1152,10 +1155,15 @@ def evaluate_eigenmodes_figure8g_acceptance_from_channels(
         raise ValueError(
             f"Figure 8(g) acceptance requires {_EXACT_MODE_COUNT} modes; got {count}."
         )
-    delta = np.asarray(frequency[:count], dtype=float) - np.asarray(reference[:count], dtype=float)
+    runtime_frequency = np.asarray(frequency[:count], dtype=float)
+    reference_frequency = np.asarray(reference[:count], dtype=float)
+    if not np.all(np.isfinite(runtime_frequency)) or not np.all(np.isfinite(reference_frequency)):
+        raise ValueError("Figure 8(g) acceptance requires finite runtime and reference frequencies.")
+    delta = runtime_frequency - reference_frequency
     abs_delta = np.abs(delta)
     mean_abs = float(np.mean(abs_delta))
     max_abs = float(np.max(abs_delta))
+    passed = bool(mean_abs <= mean_abs_tolerance and max_abs <= max_abs_tolerance)
     return {
         "reference": str(reference_csv),
         "mode_count": count,
@@ -1163,13 +1171,220 @@ def evaluate_eigenmodes_figure8g_acceptance_from_channels(
         "max_abs_error_tau_inv": max_abs,
         "mean_abs_tolerance_tau_inv": float(mean_abs_tolerance),
         "max_abs_tolerance_tau_inv": float(max_abs_tolerance),
-        "passed": bool(mean_abs <= mean_abs_tolerance and max_abs <= max_abs_tolerance),
+        "passed": passed,
+        "diagnostics": _figure8g_acceptance_diagnostics(
+            runtime_frequency=runtime_frequency,
+            reference_frequency=reference_frequency,
+            delta=delta,
+            abs_delta=abs_delta,
+            passed=passed,
+            mean_abs_error=mean_abs,
+            max_abs_error=max_abs,
+            mean_abs_tolerance=float(mean_abs_tolerance),
+            max_abs_tolerance=float(max_abs_tolerance),
+        ),
         "tolerance_rationale": (
             "Archive-backed MesoUQ replay matched digitized Figure 8(g) with mean absolute error "
             "about 0.067 tau^-1 and max absolute error about 0.143 tau^-1; operational reruns "
             "get wider stochastic tolerance but must remain near the paper spectrum."
         ),
     }
+
+
+def _figure8g_acceptance_diagnostics(
+    *,
+    runtime_frequency: np.ndarray,
+    reference_frequency: np.ndarray,
+    delta: np.ndarray,
+    abs_delta: np.ndarray,
+    passed: bool,
+    mean_abs_error: float,
+    max_abs_error: float,
+    mean_abs_tolerance: float,
+    max_abs_tolerance: float,
+) -> dict[str, Any]:
+    runtime_span = _figure8g_frequency_span(runtime_frequency)
+    reference_span = _figure8g_frequency_span(reference_frequency)
+    span_ratio = _safe_ratio(runtime_span["span_tau_inv"], reference_span["span_tau_inv"])
+    scalar_fit = _figure8g_scalar_fit(runtime_frequency, reference_frequency)
+    affine_fit = _figure8g_affine_fit(runtime_frequency, reference_frequency)
+    edge_ratios = {
+        "min_frequency_ratio": _safe_ratio(runtime_span["min_tau_inv"], reference_span["min_tau_inv"]),
+        "max_frequency_ratio": _safe_ratio(runtime_span["max_tau_inv"], reference_span["max_tau_inv"]),
+    }
+    classification = _classify_figure8g_failure(
+        passed=passed,
+        span_ratio=span_ratio,
+        edge_ratios=edge_ratios,
+        scalar_fit=scalar_fit,
+        affine_fit=affine_fit,
+        mean_abs_error=mean_abs_error,
+        mean_abs_tolerance=mean_abs_tolerance,
+    )
+    return {
+        "observed_error_summary_tau_inv": {
+            "mean_signed_error_tau_inv": float(np.mean(delta)),
+            "mean_abs_error_tau_inv": float(mean_abs_error),
+            "max_abs_error_tau_inv": float(max_abs_error),
+        },
+        "runtime_frequency_span_tau_inv": runtime_span,
+        "reference_frequency_span_tau_inv": reference_span,
+        "runtime_to_reference_span_ratio": span_ratio,
+        "edge_frequency_ratios": edge_ratios,
+        "per_mode_delta_tau_inv": [
+            {
+                "mode_index": int(index),
+                "runtime_frequency_tau_inv": float(runtime),
+                "reference_frequency_tau_inv": float(reference),
+                "signed_delta_tau_inv": float(signed),
+                "absolute_delta_tau_inv": float(absolute),
+            }
+            for index, (runtime, reference, signed, absolute) in enumerate(
+                zip(runtime_frequency, reference_frequency, delta, abs_delta, strict=True)
+            )
+        ],
+        "best_scalar_scale_fit": scalar_fit,
+        "best_affine_fit": affine_fit,
+        "failure_classification": classification,
+        "classification_thresholds": {
+            "span_compression_ratio": _FIGURE8G_SPAN_COMPRESSION_THRESHOLD,
+            "span_expansion_ratio": _FIGURE8G_SPAN_EXPANSION_THRESHOLD,
+            "edge_scale_mismatch_ratio": _FIGURE8G_EDGE_SCALE_MISMATCH_THRESHOLD,
+            "mean_abs_tolerance_tau_inv": float(mean_abs_tolerance),
+            "max_abs_tolerance_tau_inv": float(max_abs_tolerance),
+        },
+    }
+
+
+def _figure8g_frequency_span(values: np.ndarray) -> dict[str, float]:
+    return {
+        "min_tau_inv": float(np.min(values)),
+        "max_tau_inv": float(np.max(values)),
+        "span_tau_inv": float(np.max(values) - np.min(values)),
+        "first_mode_tau_inv": float(values[0]),
+        "last_mode_tau_inv": float(values[-1]),
+    }
+
+
+def _figure8g_scalar_fit(runtime_frequency: np.ndarray, reference_frequency: np.ndarray) -> dict[str, Any]:
+    denominator = float(np.dot(reference_frequency, reference_frequency))
+    if denominator == 0.0:
+        return {
+            "model": "runtime_frequency_tau_inv ~= scale * reference_frequency_tau_inv",
+            "scale": None,
+            "mean_abs_residual_tau_inv": None,
+            "max_abs_residual_tau_inv": None,
+        }
+    scale = float(np.dot(runtime_frequency, reference_frequency) / denominator)
+    residual = runtime_frequency - scale * reference_frequency
+    return {
+        "model": "runtime_frequency_tau_inv ~= scale * reference_frequency_tau_inv",
+        "scale": scale,
+        "mean_abs_residual_tau_inv": float(np.mean(np.abs(residual))),
+        "max_abs_residual_tau_inv": float(np.max(np.abs(residual))),
+    }
+
+
+def _figure8g_affine_fit(runtime_frequency: np.ndarray, reference_frequency: np.ndarray) -> dict[str, Any]:
+    design = np.column_stack((reference_frequency, np.ones(reference_frequency.size, dtype=float)))
+    slope, intercept = np.linalg.lstsq(design, runtime_frequency, rcond=None)[0]
+    fitted = slope * reference_frequency + intercept
+    residual = runtime_frequency - fitted
+    centered = runtime_frequency - np.mean(runtime_frequency)
+    total_sum_squares = float(np.dot(centered, centered))
+    residual_sum_squares = float(np.dot(residual, residual))
+    r_squared = None if total_sum_squares == 0.0 else float(1.0 - residual_sum_squares / total_sum_squares)
+    return {
+        "model": "runtime_frequency_tau_inv ~= slope * reference_frequency_tau_inv + intercept_tau_inv",
+        "slope": float(slope),
+        "intercept_tau_inv": float(intercept),
+        "mean_abs_residual_tau_inv": float(np.mean(np.abs(residual))),
+        "max_abs_residual_tau_inv": float(np.max(np.abs(residual))),
+        "r_squared": r_squared,
+    }
+
+
+def _classify_figure8g_failure(
+    *,
+    passed: bool,
+    span_ratio: float | None,
+    edge_ratios: Mapping[str, float | None],
+    scalar_fit: Mapping[str, Any],
+    affine_fit: Mapping[str, Any],
+    mean_abs_error: float,
+    mean_abs_tolerance: float,
+) -> dict[str, Any]:
+    if passed:
+        return {
+            "primary": "matched",
+            "labels": ["matched"],
+            "reason": "Figure 8(g) spectrum is within configured mean/max absolute-error tolerances.",
+        }
+
+    labels: list[str] = []
+    reason_parts: list[str] = []
+    if span_ratio is not None:
+        if span_ratio < _FIGURE8G_SPAN_COMPRESSION_THRESHOLD:
+            labels.append("compressed_spectrum")
+            reason_parts.append("runtime frequency span is compressed relative to the digitized reference")
+        elif span_ratio > _FIGURE8G_SPAN_EXPANSION_THRESHOLD:
+            labels.append("expanded_spectrum")
+            reason_parts.append("runtime frequency span is expanded relative to the digitized reference")
+
+    min_ratio = edge_ratios.get("min_frequency_ratio")
+    max_ratio = edge_ratios.get("max_frequency_ratio")
+    if (
+        min_ratio is not None
+        and max_ratio is not None
+        and min_ratio < _FIGURE8G_EDGE_SCALE_MISMATCH_THRESHOLD
+        and max_ratio < _FIGURE8G_EDGE_SCALE_MISMATCH_THRESHOLD
+    ):
+        labels.append("windowing_scale_mismatch")
+        reason_parts.append("both runtime spectrum edges sit below the paper frequency window")
+
+    affine_slope = affine_fit.get("slope")
+    affine_intercept = affine_fit.get("intercept_tau_inv")
+    affine_mean_residual = affine_fit.get("mean_abs_residual_tau_inv")
+    if (
+        isinstance(affine_slope, float)
+        and isinstance(affine_intercept, float)
+        and isinstance(affine_mean_residual, float)
+        and 0.85 <= affine_slope <= 1.15
+        and abs(affine_intercept) > mean_abs_tolerance
+        and affine_mean_residual < 0.5 * mean_abs_error
+    ):
+        labels.append("offset")
+        reason_parts.append("an affine intercept explains most of the mismatch")
+
+    scalar_scale = scalar_fit.get("scale")
+    if isinstance(scalar_scale, float) and (scalar_scale < 0.85 or scalar_scale > 1.15):
+        labels.append("scalar_scale_mismatch")
+
+    labels = list(dict.fromkeys(labels))
+    if "compressed_spectrum" in labels:
+        primary = "compressed_spectrum"
+    elif "offset" in labels:
+        primary = "offset"
+    elif "windowing_scale_mismatch" in labels:
+        primary = "windowing_scale_mismatch"
+    elif "expanded_spectrum" in labels:
+        primary = "expanded_spectrum"
+    elif "scalar_scale_mismatch" in labels:
+        primary = "scalar_scale_mismatch"
+    else:
+        primary = "shape_mismatch"
+        reason_parts.append("mismatch is not explained by the configured span, edge, scalar, or offset heuristics")
+    return {
+        "primary": primary,
+        "labels": labels or [primary],
+        "reason": "; ".join(reason_parts),
+    }
+
+
+def _safe_ratio(numerator: float, denominator: float) -> float | None:
+    if denominator == 0.0:
+        return None
+    return float(numerator / denominator)
 
 
 def _load_figure8g_reference(path: str | Path) -> np.ndarray:

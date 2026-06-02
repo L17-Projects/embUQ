@@ -61,6 +61,14 @@ def _paper_exact_channels(**overrides: object) -> dict[str, object]:
     return channels
 
 
+def _figure8g_reference_csv(tmp_path: Path, values: np.ndarray) -> Path:
+    path = tmp_path / "figure8g_reference.csv"
+    rows = ["mode_index,omega_tau_inv"]
+    rows.extend(f"{index},{float(value)}" for index, value in enumerate(values))
+    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    return path
+
+
 class _FakeFigure:
     def text(self, *args, **kwargs) -> None:
         return None
@@ -282,6 +290,19 @@ def test_postprocess_eigenmodes_records_figure8g_acceptance_for_runtime_window()
     acceptance = result.provenance["figure8g_acceptance"]
     assert acceptance["passed"] is True
     assert acceptance["mean_abs_error_tau_inv"] == pytest.approx(0.0)
+    diagnostics = acceptance["diagnostics"]
+    assert diagnostics["failure_classification"]["primary"] == "matched"
+    assert diagnostics["runtime_to_reference_span_ratio"] == pytest.approx(1.0)
+    assert diagnostics["best_scalar_scale_fit"]["scale"] == pytest.approx(1.0)
+    assert diagnostics["best_affine_fit"]["slope"] == pytest.approx(1.0)
+    assert diagnostics["best_affine_fit"]["intercept_tau_inv"] == pytest.approx(0.0, abs=1e-12)
+    assert diagnostics["per_mode_delta_tau_inv"][0] == {
+        "mode_index": 0,
+        "runtime_frequency_tau_inv": pytest.approx(float(reference[0])),
+        "reference_frequency_tau_inv": pytest.approx(float(reference[0])),
+        "signed_delta_tau_inv": pytest.approx(0.0),
+        "absolute_delta_tau_inv": pytest.approx(0.0),
+    }
     assert result.selected_modes["final_mode_indices"] == list(range(30))
     assert result.selected_modes["selected_paper_mode_indices"] == list(range(30))
     assert result.selected_modes["selected_raw_mode_indices"] == list(range(10, 40))
@@ -316,7 +337,56 @@ def test_postprocess_eigenmodes_flags_raw_head_low_frequency_modes() -> None:
     acceptance = result.provenance["figure8g_acceptance"]
     assert acceptance["passed"] is False
     assert acceptance["mean_abs_error_tau_inv"] > 20.0
+    classification = acceptance["diagnostics"]["failure_classification"]
+    assert classification["primary"] == "compressed_spectrum"
+    assert "windowing_scale_mismatch" in classification["labels"]
     assert result.selected_modes["selected_raw_mode_indices"] == list(range(30))
+
+
+def test_eigenmodes_figure8g_acceptance_diagnoses_compressed_spectrum(tmp_path: Path) -> None:
+    reference = np.linspace(10.0, 39.0, 30)
+    runtime = 0.5 * reference
+
+    acceptance = eigenmodes_module.evaluate_eigenmodes_figure8g_acceptance_from_channels(
+        {"frequency": runtime},
+        reference_csv=_figure8g_reference_csv(tmp_path, reference),
+        mean_abs_tolerance=0.1,
+        max_abs_tolerance=0.5,
+    )
+
+    diagnostics = acceptance["diagnostics"]
+    assert acceptance["passed"] is False
+    assert diagnostics["runtime_frequency_span_tau_inv"]["span_tau_inv"] == pytest.approx(14.5)
+    assert diagnostics["reference_frequency_span_tau_inv"]["span_tau_inv"] == pytest.approx(29.0)
+    assert diagnostics["runtime_to_reference_span_ratio"] == pytest.approx(0.5)
+    assert diagnostics["best_scalar_scale_fit"]["scale"] == pytest.approx(0.5)
+    assert diagnostics["best_affine_fit"]["slope"] == pytest.approx(0.5)
+    assert diagnostics["best_affine_fit"]["intercept_tau_inv"] == pytest.approx(0.0, abs=1e-12)
+    assert diagnostics["per_mode_delta_tau_inv"][0]["signed_delta_tau_inv"] == pytest.approx(-5.0)
+    assert diagnostics["per_mode_delta_tau_inv"][0]["absolute_delta_tau_inv"] == pytest.approx(5.0)
+    assert diagnostics["failure_classification"]["primary"] == "compressed_spectrum"
+    assert "windowing_scale_mismatch" in diagnostics["failure_classification"]["labels"]
+
+
+def test_eigenmodes_figure8g_acceptance_diagnoses_offset(tmp_path: Path) -> None:
+    reference = np.linspace(10.0, 39.0, 30)
+    runtime = reference + 3.0
+
+    acceptance = eigenmodes_module.evaluate_eigenmodes_figure8g_acceptance_from_channels(
+        {"frequency": runtime},
+        reference_csv=_figure8g_reference_csv(tmp_path, reference),
+        mean_abs_tolerance=0.1,
+        max_abs_tolerance=0.5,
+    )
+
+    diagnostics = acceptance["diagnostics"]
+    assert acceptance["passed"] is False
+    assert diagnostics["runtime_to_reference_span_ratio"] == pytest.approx(1.0)
+    assert diagnostics["best_affine_fit"]["slope"] == pytest.approx(1.0)
+    assert diagnostics["best_affine_fit"]["intercept_tau_inv"] == pytest.approx(3.0)
+    assert diagnostics["best_affine_fit"]["mean_abs_residual_tau_inv"] == pytest.approx(0.0, abs=1e-12)
+    assert diagnostics["failure_classification"]["primary"] == "offset"
+    assert "offset" in diagnostics["failure_classification"]["labels"]
 
 
 @pytest.mark.parametrize(
