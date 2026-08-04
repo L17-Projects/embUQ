@@ -195,9 +195,28 @@ The equivalent Vega wrappers are under `scripts/platforms/vega/sbatch`. Both
 sites delegate to the same neutral Python runners and retain identical
 scientific configuration.
 
+## Manuscript replay
+
+Compile the immutable editor submission into a fresh scratch directory with
+the frozen TinyTeX toolchain. The command verifies the submission manifest,
+preserves the submitted clean and marked PDFs as baselines, resolves the
+bibliographies and cross-references, and requires matching page counts and
+extracted text for the two main-manuscript PDFs:
+
+```bash
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/compile_manuscript.py \
+  --build-root "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/manuscript_$(date +%Y%m%dT%H%M%S)" \
+  --pdflatex "${MESOUQ_SCRATCH_ROOT}/runs/jcp_june02_repro_audit_20260628/tinytex-local/bin/x86_64-linux/pdflatex" \
+  --bibtex "${MESOUQ_SCRATCH_ROOT}/runs/jcp_june02_repro_audit_20260628/tinytex-local/bin/x86_64-linux/bibtex"
+```
+
+The build directory must be absent or empty. A machine-readable
+`uq_emb_manuscript_replay_receipt.json` records every command, output hash,
+page count, baseline comparison, and wall time.
+
 ## Remaining command surface
 
 The closeout will add the remaining frozen commands for data preparation, DNN
-training, acoustic-surrogate fitting, direct DPD validation, figures, and
-manuscript compilation. Those commands delegate shared behavior to neutral
-MesoUQ workflow code and preserve both `--site karolina` and `--site vega`.
+training, acoustic-surrogate fitting, direct DPD validation, and figures.
+Those commands delegate shared behavior to neutral MesoUQ workflow code and
+preserve both `--site karolina` and `--site vega`.
