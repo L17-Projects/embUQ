@@ -87,6 +87,10 @@ def verify(
     accepted_index = materializer._load_accepted_manifest(accepted_manifest, accepted_root)
     if payload.get("accepted_artifact_manifest_sha256") != accepted_index["sha256"]:
         raise ValueError("Replay plan accepted-manifest hash does not match the locked manifest")
+    if payload.get("accepted_artifact_verification") != accepted_index["verification"]:
+        raise ValueError(
+            "Replay plan accepted-artifact verification does not match the complete locked root"
+        )
     provenance = payload.get("provenance") or {}
     current_provenance = materializer.runtime_provenance(
         repo_root=materializer.REPO_ROOT,
@@ -226,6 +230,7 @@ def verify(
         "site": payload.get("site"),
         "accepted_artifact_manifest": str(accepted_manifest),
         "accepted_artifact_manifest_sha256": accepted_index["sha256"],
+        "accepted_artifact_verification": accepted_index["verification"],
         "git_commit": provenance.get("git_commit"),
         "bubble_count": len(loaded),
         "planned_command_count": len(loaded) * 2,

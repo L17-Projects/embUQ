@@ -189,7 +189,8 @@ separate acoustic datasets with one row each.
 After copying the two Vega receipts to Karolina, compare the complete forward
 arrays with `rtol=1e-6` and `atol=1e-8`, while ignoring only location, scheduler,
 interpreter-path, and timing fields. The comparison also requires identical
-reference-input digests, semantic configuration digests, and Git commits:
+reference-input digests, semantic configuration digests, Git commits, and
+complete artifact hash/count/size records:
 
 ```bash
 /usr/bin/python3.11 scripts/workflows/emb/uq_emb/compare_forward_canaries.py \
@@ -396,10 +397,10 @@ mesouq_activate_site_env "${MESOUQ_SITE}" "${MESOUQ_REPO_ROOT}"
 source "${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/env.sh"
 ```
 
-Run the sub-minute readiness verifier in that activated environment. It checks
-each accepted source against the locked manifest, reconstructs and compares all
-12 canonical commands, checks the materialized hashes, and loads each acoustic
-input through the frozen breathing runner. It never launches Mirheo:
+Run the readiness verifier in that activated environment. It verifies the full
+accepted artifact root against its locked inventory, reconstructs and compares
+all 12 canonical commands, checks the materialized hashes, and loads each
+acoustic input through the frozen breathing runner. It never launches Mirheo:
 
 ```bash
 "${GV_PYTHON}" scripts/workflows/emb/uq_emb/verify_direct_dpd_replay_plan.py \

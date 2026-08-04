@@ -33,7 +33,10 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from replay_provenance import runtime_provenance  # noqa: E402
+from replay_provenance import (  # noqa: E402
+    runtime_provenance,
+    verify_locked_artifact_root,
+)
 
 MECHANICAL_RUNNER = REPO_ROOT / "scripts/platforms/hpc/run_map_mirheo.py"
 SONOVUE_ACOUSTIC_RUNNER = (
@@ -93,6 +96,10 @@ def _load_accepted_manifest(manifest_path: Path, accepted_root: Path) -> dict[st
     files = payload.get("files")
     if not isinstance(files, list) or not files:
         raise ValueError(f"Accepted artifact manifest has no files: {manifest_path}")
+    verification = verify_locked_artifact_root(
+        root=accepted_root,
+        manifest_path=manifest_path,
+    )
     records: dict[str, dict[str, Any]] = {}
     for record in files:
         relative = str(record.get("path", ""))
@@ -104,6 +111,7 @@ def _load_accepted_manifest(manifest_path: Path, accepted_root: Path) -> dict[st
         "sha256": _sha256(manifest_path),
         "root": accepted_root,
         "records": records,
+        "verification": verification,
     }
 
 
@@ -645,6 +653,7 @@ def materialize_direct_dpd_replay(
         "accepted_artifact_root": str(accepted_root),
         "accepted_artifact_manifest": str(Path(accepted_index["path"])),
         "accepted_artifact_manifest_sha256": str(accepted_index["sha256"]),
+        "accepted_artifact_verification": accepted_index["verification"],
         "site": site,
         "python_bin": python_bin,
         "provenance": runtime_provenance(

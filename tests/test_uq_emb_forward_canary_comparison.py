@@ -41,16 +41,27 @@ def _receipt(
         "device": "cuda",
         "wall_seconds": 1.0 if site == "karolina" else 2.0,
         "config_path": f"{root}/config.yaml",
-        "config_sha256": site * 8,
+        "config_sha256": ("3" if site == "karolina" else "4") * 64,
         "config_semantic_sha256": "b" * 64,
         "materialization_receipt": f"{root}/config.materialization.json",
-        "materialization_receipt_sha256": site * 16,
+        "materialization_receipt_sha256": ("5" if site == "karolina" else "6") * 64,
+        "source_config_sha256": "7" * 64,
+        "accepted_manifest_sha256": "1" * 64,
+        "dependency_manifest_sha256": "2" * 64,
         "accepted_source_verification": {
             "status": "PASS",
             "root": f"{root}/accepted",
             "manifest": f"{root}/accepted.json",
             "manifest_sha256": "1" * 64,
             "file_count": 1,
+            "logical_size_bytes": 7680,
+            "members": [
+                {
+                    "path": f"{root}/accepted/config.yaml",
+                    "sha256": "7" * 64,
+                    "size_bytes": 7680,
+                }
+            ],
         },
         "dependency_verification": {
             "status": "PASS",
@@ -59,6 +70,13 @@ def _receipt(
             "manifest_sha256": "2" * 64,
             "file_count": 200,
             "logical_size_bytes": 67044794,
+        },
+        "acoustic_artifacts": {
+            "artifact_path": {
+                "path": f"{root}/acoustic_bank.json",
+                "sha256": "8" * 64,
+                "size_bytes": 1024,
+            }
         },
         "provenance": {
             "git_commit": "c" * 40,
@@ -72,6 +90,7 @@ def _receipt(
         "datasets": [
             {
                 "dataset_name": "indentation_3.2um",
+                "experiment": "indentation",
                 "shape": [1, 3],
                 "prediction_min": prediction,
                 "prediction_max": 2.0,
@@ -84,6 +103,13 @@ def _receipt(
                 "reference_input_sha256": "e" * 64,
                 "parameter_batch": [[1.0, 2.0, 3.0, 4.0]],
                 "parameter_batch_sha256": "f" * 64,
+                "artifacts": [
+                    {
+                        "path": f"{root}/model.pkl",
+                        "sha256": "a" * 64,
+                        "size_bytes": 2048,
+                    }
+                ],
                 "path": f"{root}/model.pkl",
                 "sha256": "a" * 64,
                 "data_file": f"{root}/data.dat",
@@ -158,4 +184,41 @@ def test_comparison_rejects_different_git_commits(tmp_path: Path) -> None:
     _write(vega, vega_payload)
 
     with pytest.raises(ValueError, match="same Git commit"):
+        module.compare_receipts(karolina, vega, expected_agent="sonovue")
+
+
+def test_comparison_rejects_symmetric_integrity_field_omission(tmp_path: Path) -> None:
+    module = _load_module()
+    karolina = tmp_path / "karolina.json"
+    vega = tmp_path / "vega.json"
+    payloads = (
+        _receipt("karolina", "/scratch"),
+        _receipt("vega", "/ceph"),
+    )
+    for payload in payloads:
+        payload.pop("source_config_sha256")
+        for verification_key in (
+            "accepted_source_verification",
+            "dependency_verification",
+        ):
+            verification = payload[verification_key]
+            verification.pop("manifest_sha256")
+            verification.pop("file_count")
+            verification.pop("logical_size_bytes")
+        for member in payload["accepted_source_verification"]["members"]:
+            member.pop("sha256")
+            member.pop("size_bytes")
+        for artifact in payload["acoustic_artifacts"].values():
+            artifact.pop("sha256")
+            artifact.pop("size_bytes")
+        for dataset in payload["datasets"]:
+            dataset.pop("parameter_batch_sha256")
+            dataset.pop("reference_input_sha256")
+            for artifact in dataset["artifacts"]:
+                artifact.pop("sha256")
+                artifact.pop("size_bytes")
+    _write(karolina, payloads[0])
+    _write(vega, payloads[1])
+
+    with pytest.raises(ValueError, match="source_config_sha256"):
         module.compare_receipts(karolina, vega, expected_agent="sonovue")

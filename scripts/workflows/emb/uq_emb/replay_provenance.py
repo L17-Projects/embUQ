@@ -130,11 +130,14 @@ def verify_locked_manifest_members(
         if int(record.get("size_bytes", -1)) != size or record.get("sha256") != digest:
             raise ValueError(f"Consumed locked artifact content mismatch: {path}")
         verified.append({"path": str(path), "size_bytes": size, "sha256": digest})
+    logical_size = sum(int(item["size_bytes"]) for item in verified)
     return {
         "status": "PASS",
         "root": str(root),
         "manifest": str(manifest_path),
         "manifest_sha256": sha256(manifest_path),
+        "file_count": len(verified),
+        "logical_size_bytes": logical_size,
         "members": verified,
     }
 

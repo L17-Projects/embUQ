@@ -156,6 +156,23 @@ def _mechanical_artifacts(experiment: ExperimentSpec, diameter_um: float) -> lis
     ]
 
 
+def _acoustic_artifact(path: Path, expected_sha256: str) -> dict[str, Any]:
+    path = path.expanduser().resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"Acoustic artifact is missing: {path}")
+    actual_sha256 = _sha256(path)
+    if actual_sha256 != expected_sha256:
+        raise ValueError(
+            f"Acoustic artifact hash mismatch for {path}: "
+            f"expected {expected_sha256}, got {actual_sha256}"
+        )
+    return {
+        "path": str(path),
+        "sha256": actual_sha256,
+        "size_bytes": path.stat().st_size,
+    }
+
+
 def _evaluate_dataset(
     config: Mapping[str, Any],
     experiment: ExperimentSpec,
@@ -313,10 +330,10 @@ def run_forward_canary(
         "phase1_contract_mode": config.get("phase1_contract_mode"),
         "acoustic_forward_model": preflight.get("forward_model"),
         "acoustic_artifacts": {
-            path_key: {
-                "path": str(evaluator[path_key]),
-                "sha256": str(evaluator[sha_key]),
-            }
+            path_key: _acoustic_artifact(
+                Path(str(evaluator[path_key])),
+                str(evaluator[sha_key]),
+            )
             for path_key, sha_key in (
                 ("artifact_path", "artifact_sha256"),
                 ("bank_build_report_path", "bank_build_report_sha256"),

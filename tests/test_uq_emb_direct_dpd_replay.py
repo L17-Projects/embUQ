@@ -129,6 +129,7 @@ def _accepted_root(tmp_path: Path) -> Path:
         if bubble == "d2":
             setup_path = acoustic / "../d2_near_map_0p1482pct/setup_manifest.json"
         _write_json(setup_path.resolve(), setup)
+    _write_json(root / "unselected/audit_only.json", {"purpose": "whole-root verification"})
     return root
 
 
@@ -258,3 +259,29 @@ def test_materializer_rejects_source_mutated_after_manifest(tmp_path: Path) -> N
         assert "mismatch" in str(exc)
     else:  # pragma: no cover
         raise AssertionError("Expected a mutated accepted source to fail")
+
+
+@pytest.mark.parametrize("action", ("mutate", "remove", "add"))
+def test_materializer_rejects_whole_root_drift_in_unselected_artifacts(
+    tmp_path: Path,
+    action: str,
+) -> None:
+    module = _module()
+    accepted_root = _accepted_root(tmp_path)
+    accepted_manifest = _accepted_manifest(tmp_path, accepted_root)
+    unselected = accepted_root / "unselected/audit_only.json"
+    if action == "mutate":
+        unselected.write_text('{"purpose":"changed"}\n', encoding="utf-8")
+    elif action == "remove":
+        unselected.unlink()
+    else:
+        (accepted_root / "unselected/unexpected.txt").write_text("extra\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Locked UQ_EMB artifact (inventory|content) mismatch"):
+        module.materialize_direct_dpd_replay(
+            accepted_root=accepted_root,
+            accepted_manifest=accepted_manifest,
+            output_root=tmp_path / "replay",
+            site="karolina",
+            python_bin="/usr/bin/python3.11",
+        )

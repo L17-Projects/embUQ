@@ -58,12 +58,109 @@ def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _mapping(payload: dict[str, Any], key: str, context: str) -> dict[str, Any]:
+    value = payload.get(key)
+    if not isinstance(value, dict):
+        raise ValueError(f"Missing integrity mapping {context}.{key}")
+    return value
+
+
+def _sha256_field(payload: dict[str, Any], key: str, context: str) -> str:
+    value = str(payload.get(key, ""))
+    if len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
+        raise ValueError(f"Missing or invalid integrity field {context}.{key}")
+    return value
+
+
+def _integer_field(payload: dict[str, Any], key: str, context: str) -> int:
+    value = payload.get(key)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"Missing or invalid integrity field {context}.{key}")
+    return value
+
+
+def _validate_integrity_fields(payload: dict[str, Any], context: str) -> None:
+    for key in (
+        "config_sha256",
+        "config_semantic_sha256",
+        "materialization_receipt_sha256",
+        "source_config_sha256",
+        "accepted_manifest_sha256",
+        "dependency_manifest_sha256",
+    ):
+        _sha256_field(payload, key, context)
+
+    accepted = _mapping(payload, "accepted_source_verification", context)
+    accepted_context = f"{context}.accepted_source_verification"
+    if accepted.get("status") != "PASS":
+        raise ValueError(f"Integrity verification did not pass: {accepted_context}")
+    _sha256_field(accepted, "manifest_sha256", accepted_context)
+    accepted_count = _integer_field(accepted, "file_count", accepted_context)
+    accepted_size = _integer_field(accepted, "logical_size_bytes", accepted_context)
+    members = accepted.get("members")
+    if not isinstance(members, list) or not members:
+        raise ValueError(f"Missing integrity members in {accepted_context}")
+    member_size = 0
+    for index, member in enumerate(members):
+        if not isinstance(member, dict):
+            raise ValueError(f"Invalid integrity member {accepted_context}.members[{index}]")
+        member_context = f"{accepted_context}.members[{index}]"
+        _sha256_field(member, "sha256", member_context)
+        member_size += _integer_field(member, "size_bytes", member_context)
+    if accepted_count != len(members) or accepted_size != member_size:
+        raise ValueError(f"Integrity totals differ from members in {accepted_context}")
+
+    dependencies = _mapping(payload, "dependency_verification", context)
+    dependency_context = f"{context}.dependency_verification"
+    if dependencies.get("status") != "PASS":
+        raise ValueError(f"Integrity verification did not pass: {dependency_context}")
+    _sha256_field(dependencies, "manifest_sha256", dependency_context)
+    if _integer_field(dependencies, "file_count", dependency_context) == 0:
+        raise ValueError(f"Integrity file count is empty in {dependency_context}")
+    if _integer_field(dependencies, "logical_size_bytes", dependency_context) == 0:
+        raise ValueError(f"Integrity byte count is empty in {dependency_context}")
+
+    acoustic_artifacts = _mapping(payload, "acoustic_artifacts", context)
+    if not acoustic_artifacts:
+        raise ValueError(f"Missing acoustic artifact integrity records in {context}")
+    for name, artifact in acoustic_artifacts.items():
+        if not isinstance(artifact, dict):
+            raise ValueError(f"Invalid acoustic artifact record {context}.{name}")
+        artifact_context = f"{context}.acoustic_artifacts.{name}"
+        _sha256_field(artifact, "sha256", artifact_context)
+        _integer_field(artifact, "size_bytes", artifact_context)
+
+    datasets = payload.get("datasets")
+    if not isinstance(datasets, list) or not datasets:
+        raise ValueError(f"Missing datasets in {context}")
+    for index, dataset in enumerate(datasets):
+        if not isinstance(dataset, dict):
+            raise ValueError(f"Invalid dataset record {context}.datasets[{index}]")
+        dataset_context = f"{context}.datasets[{index}]"
+        _sha256_field(dataset, "parameter_batch_sha256", dataset_context)
+        _sha256_field(dataset, "reference_input_sha256", dataset_context)
+        artifacts = dataset.get("artifacts")
+        if not isinstance(artifacts, list):
+            raise ValueError(f"Missing artifact list in {dataset_context}")
+        if dataset.get("experiment") in {"compression", "indentation"} and not artifacts:
+            raise ValueError(f"Missing mechanical artifact integrity records in {dataset_context}")
+        for artifact_index, artifact in enumerate(artifacts):
+            if not isinstance(artifact, dict):
+                raise ValueError(
+                    f"Invalid artifact record {dataset_context}.artifacts[{artifact_index}]"
+                )
+            artifact_context = f"{dataset_context}.artifacts[{artifact_index}]"
+            _sha256_field(artifact, "sha256", artifact_context)
+            _integer_field(artifact, "size_bytes", artifact_context)
+
+
 def _load_receipt(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if payload.get("schema_version") != "mesouq.uq_emb.forward_canary.v1":
         raise ValueError(f"Unsupported forward-canary schema in {path}")
     if payload.get("status") != "passed":
         raise ValueError(f"Forward canary did not pass: {path}")
+    _validate_integrity_fields(payload, str(path))
     return payload
 
 
