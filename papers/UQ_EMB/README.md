@@ -166,6 +166,17 @@ Replace `definity` with `sonovue` for the second agent. The Definity receipt mus
 show one grouped acoustic dataset with 14 reference rows. SonoVue must show three
 separate acoustic datasets with one row each.
 
+After copying the two Vega receipts to Karolina, compare the scientific payload
+while ignoring only site paths, config hashes, and timing fields:
+
+```bash
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/compare_forward_canaries.py \
+  --agent definity \
+  --karolina "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/canaries/karolina_definity.json" \
+  --vega "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/canaries/vega_definity.json" \
+  --output "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/canaries/definity_cross_site.json"
+```
+
 ## HBI replay
 
 Print and record the exact accepted Phase 1, native-CUDA Phase 2, and Phase 3b
