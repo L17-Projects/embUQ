@@ -107,9 +107,35 @@ export MESOUQ_WORKSPACE_ROOT=/home/it4i-bbenvegnen/workspace
   --manifest papers/UQ_EMB/manifests/frozen_runtime_dependencies_202607.files.json
 ```
 
-## Planned command surface
+## HBI configuration materialization
 
-The closeout adds separate, frozen commands for data preparation, DNN training,
-acoustic-surrogate fitting, 10k/50k HBI, direct DPD validation, figures, and
-manuscript compilation. Those commands will delegate shared behavior to neutral
-MesoUQ workflow code and preserve both `--site karolina` and `--site vega`.
+The accepted SonoVue and grouped Definity 50k configurations are immutable
+inputs in `accepted_production_outputs_202607`. Materialize a 10k replay config
+against the verified external dependencies without changing its scientific
+settings:
+
+```bash
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/materialize_hbi_config.py \
+  --agent definity \
+  --artifact-root "${MESOUQ_UQ_EMB_ARTIFACT_ROOT}" \
+  --manifest-root papers/UQ_EMB/manifests \
+  --output-dir "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/configs" \
+  --run-root "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/definity_10k" \
+  --population 10000
+```
+
+Use `--agent sonovue` for SonoVue and `--population 50000` for an exact-size
+production replay. The command verifies the frozen source config, polynomial
+bank, bank report, independent-audit receipt, and promotion contract by SHA-256.
+It rewrites only external runtime paths, output location, and the three
+population fields. A JSON sidecar records every rewrite. The grouped Definity
+`source3` configuration is authoritative and remains grouped during
+materialization.
+
+## Remaining command surface
+
+The closeout will add separate frozen commands for data preparation, DNN
+training, acoustic-surrogate fitting, HBI execution, direct DPD validation,
+figures, and manuscript compilation. Those commands delegate shared behavior to
+neutral MesoUQ workflow code and preserve both `--site karolina` and
+`--site vega`.

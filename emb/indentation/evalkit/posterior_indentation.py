@@ -38,6 +38,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional in lightweight test e
     MPI = _FallbackMPI()
 
 from emb.indentation.evalkit.tools import dated_print
+from meso_uq.experiments import load_experiments
 from meso_uq.noise.legacy import (
     legacy_indentation_adjusted_batch_likelihood,
     legacy_indentation_direct_standard_deviation,
@@ -129,12 +130,25 @@ def _resolve_surrogate_runtime(config: Dict[str, Any]) -> Tuple[str, int, int]:
     return resolve_legacy_surrogate_runtime(config).as_tuple()
 
 
+def _resolve_surrogate_trained_dir(project_root: str, diameter_um: float) -> Path:
+    try:
+        config = _load_config(project_root)
+    except FileNotFoundError:
+        return resolve_legacy_surrogate_trained_dir(
+            project_root, "indentation", diameter_um
+        )
+
+    for experiment in load_experiments(config, Path(project_root)):
+        if experiment.name == "indentation" and diameter_um in experiment.diameters:
+            return experiment.surrogate_dir / f"{diameter_um}um" / "trained"
+
+    return resolve_legacy_surrogate_trained_dir(project_root, "indentation", diameter_um)
+
+
 def _build_surrogate(
     project_root: str, diameter_um: float, device: str = "cpu", backend: str = "dnn"
 ) -> Any:
-    surrogate_path = os.fspath(
-        resolve_legacy_surrogate_trained_dir(project_root, "indentation", diameter_um)
-    )
+    surrogate_path = os.fspath(_resolve_surrogate_trained_dir(project_root, diameter_um))
     if backend == "dnn":
         from emb.indentation.surrogate.evaluate import Surrogate
 

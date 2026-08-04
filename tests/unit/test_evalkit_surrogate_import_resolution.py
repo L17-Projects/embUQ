@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import types
+from pathlib import Path
 
 from emb.compression.evalkit import posterior_compression
 from emb.indentation.evalkit import posterior_indentation
@@ -50,3 +51,27 @@ def test_evalkits_resolve_modality_specific_surrogate_modules(monkeypatch):
     assert comp_bnn.tag == "compression-bnn"
     assert ind_dnn.tag == "indentation-dnn"
     assert ind_bnn.tag == "indentation-bnn"
+
+
+def test_indentation_surrogate_uses_configured_external_directory(
+    monkeypatch, tmp_path: Path
+) -> None:
+    external_root = tmp_path / "mechanical_surrogates" / "sonovue"
+    monkeypatch.setattr(
+        posterior_indentation,
+        "_load_config",
+        lambda _root: {
+            "structure": "emb",
+            "experiments": [
+                {
+                    "name": "indentation",
+                    "diameters": [3.2],
+                    "surrogate_dir": str(external_root),
+                }
+            ],
+        },
+    )
+
+    resolved = posterior_indentation._resolve_surrogate_trained_dir("/repo", 3.2)
+
+    assert resolved == external_root / "3.2um" / "trained"

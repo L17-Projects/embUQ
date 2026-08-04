@@ -82,6 +82,153 @@ def test_experiment_data_file_uses_explicit_data_files_with_string_key(tmp_path:
     assert exp.data_file(2.1) == explicit
 
 
+def test_experiment_phase1_prior_overrides_use_diameter_keys(tmp_path: Path):
+    config = {
+        "emb_diameters": [3.2, 3.4],
+        "prior_d0": [0.0, 0.5],
+        "prior_sigma": [0.0, 1.0],
+        "experiments": [
+            {
+                "name": "indentation",
+                "enabled": True,
+                "diameters": [3.2, 3.4],
+                "prior_ka_by_diameter_um": {
+                    "3.2": [17951.817681, 19959.913358],
+                    "3.4": [17945.070213, 18942.065540],
+                },
+                "prior_kb_by_diameter_um": {
+                    "3.2": [8369.922251, 9702.253910],
+                    "3.4": [1191.930971, 1261.869441],
+                },
+            }
+        ],
+    }
+
+    exp = load_experiments(config, tmp_path)[0]
+
+    assert exp.phase1_prior_overrides(3.2) == {
+        "ka": [17951.817681, 19959.913358],
+        "kb": [8369.922251, 9702.253910],
+    }
+    assert exp.phase1_prior_overrides(3.4) == {
+        "ka": [17945.070213, 18942.065540],
+        "kb": [1191.930971, 1261.869441],
+    }
+    assert exp.phase1_prior_overrides(5.8) == {}
+
+
+def test_experiment_phase1_prior_overrides_use_experiment_defaults_before_diameter_keys(
+    tmp_path: Path,
+) -> None:
+    config = {
+        "emb_diameters": [2.1, 2.9],
+        "prior_d0": [0.0, 0.5],
+        "prior_sigma": [0.0, 1.0],
+        "experiments": [
+            {
+                "name": "compression",
+                "enabled": True,
+                "diameters": [2.1, 2.9],
+                "prior_ka": [5600.0, 55800.0],
+                "prior_kb": [101.0, 999.0],
+                "prior_ka_by_diameter_um": {
+                    "2.9": [6000.0, 50000.0],
+                },
+            }
+        ],
+    }
+
+    exp = load_experiments(config, tmp_path)[0]
+
+    assert exp.phase1_prior_overrides(2.1) == {
+        "ka": [5600.0, 55800.0],
+        "kb": [101.0, 999.0],
+    }
+    assert exp.phase1_prior_override_sources(2.1) == {
+        "ka": "experiment_override",
+        "kb": "experiment_override",
+    }
+    assert exp.phase1_prior_overrides(2.9) == {
+        "ka": [6000.0, 50000.0],
+        "kb": [101.0, 999.0],
+    }
+    assert exp.phase1_prior_override_sources(2.9) == {
+        "ka": "diameter_override",
+        "kb": "experiment_override",
+    }
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        ([2.0], "exactly two values"),
+        ([2.0, 1.0], "min < max"),
+        (4.0, "two-value sequence"),
+    ],
+)
+def test_experiment_phase1_prior_overrides_reject_malformed_bounds(
+    tmp_path: Path,
+    value,
+    message: str,
+) -> None:
+    config = {
+        "emb_diameters": [3.2],
+        "prior_d0": [0.0, 0.5],
+        "prior_sigma": [0.0, 1.0],
+        "experiments": [
+            {
+                "name": "indentation",
+                "enabled": True,
+                "diameters": [3.2],
+                "prior_ka_by_diameter_um": {"3.2": value},
+            }
+        ],
+    }
+
+    exp = load_experiments(config, tmp_path)[0]
+
+    with pytest.raises(ValueError, match=message):
+        exp.phase1_prior_overrides(3.2)
+
+
+def test_emb_lanes_have_distinct_dataset_identity_and_labels(tmp_path: Path):
+    config = {
+        "structure": "emb",
+        "experiments": [
+            {
+                "name": "compression",
+                "lane": "soft",
+                "enabled": True,
+                "diameters": [4.1],
+                "diameter_labels": {"4.1": "4.10"},
+                "data_dir": "soft/data",
+                "data_prefix": "compression_soft_data_",
+                "surrogate_parameterization": "direct_ka_kb",
+            },
+            {
+                "name": "compression",
+                "lane": "hard",
+                "enabled": True,
+                "diameters": [4.1],
+                "diameter_labels": {"4.1": "4.10"},
+                "data_dir": "hard/data",
+                "data_prefix": "compression_hard_data_",
+            },
+        ],
+    }
+
+    soft, hard = load_experiments(config, tmp_path)
+
+    assert soft.name == "compression"
+    assert soft.routing_name == "compression_soft"
+    assert soft.experiment_id == canonical_experiment_id("emb", "compression_soft")
+    assert soft.dataset_name(4.1) == "compression_soft_4.10um"
+    assert soft.data_file(4.1) == tmp_path / "soft" / "data" / "compression_soft_data_4.10um.dat"
+    assert soft.surrogate_parameterization == "direct_ka_kb"
+    assert hard.experiment_id == canonical_experiment_id("emb", "compression_hard")
+    assert hard.dataset_name(4.1) == "compression_hard_4.10um"
+
+
 def test_csv_reference_requires_dpd_companion_file(tmp_path: Path):
     data_dir = tmp_path / "compression" / "evalkit" / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -231,4 +378,16 @@ def test_load_experiments_rejects_duplicate_structure_scoped_experiment(tmp_path
     }
 
     with pytest.raises(ValueError, match="Duplicate experiment reference"):
+        load_experiments(config, tmp_path)
+
+
+def test_load_experiments_rejects_duplicate_lanes(tmp_path: Path):
+    config = {
+        "experiments": [
+            {"structure": "emb", "name": "compression", "lane": "soft", "diameters": [4.1]},
+            {"structure": "emb", "name": "compression", "lane": "soft", "diameters": [4.71]},
+        ]
+    }
+
+    with pytest.raises(ValueError, match="Duplicate experiment reference 'emb:compression_soft'"):
         load_experiments(config, tmp_path)

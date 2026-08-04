@@ -175,7 +175,7 @@ def test_phase1_uses_phase1_burn_in_from_config(
     monkeypatch.setattr(
         mod,
         "phase1_prior_specs",
-        lambda config, prior_d0, prior_sigma: [
+        lambda config, prior_d0, prior_sigma, prior_overrides=None: [
             ("Yt", config["prior_Yt"]),
             ("kb", config["prior_kb"]),
             ("d0", prior_d0),
@@ -246,7 +246,7 @@ def test_phase1_falls_back_to_hbi_burn_in_when_phase1_knob_missing(
     monkeypatch.setattr(
         mod,
         "phase1_prior_specs",
-        lambda config, prior_d0, prior_sigma: [
+        lambda config, prior_d0, prior_sigma, prior_overrides=None: [
             ("Yt", config["prior_Yt"]),
             ("kb", config["prior_kb"]),
             ("d0", prior_d0),
@@ -317,7 +317,7 @@ def test_phase1_falls_back_to_hbi_burn_in_when_phase1_knob_is_null(
     monkeypatch.setattr(
         mod,
         "phase1_prior_specs",
-        lambda config, prior_d0, prior_sigma: [
+        lambda config, prior_d0, prior_sigma, prior_overrides=None: [
             ("Yt", config["prior_Yt"]),
             ("kb", config["prior_kb"]),
             ("d0", prior_d0),
@@ -386,7 +386,7 @@ def test_phase1_cpu_surrogate_path_covers_dry_run_profiling_and_max_gen(
     monkeypatch.setattr(
         mod,
         "phase1_prior_specs",
-        lambda config, prior_d0, prior_sigma: [
+        lambda config, prior_d0, prior_sigma, prior_overrides=None: [
             ("Yt", config["prior_Yt"]),
             ("kb", config["prior_kb"]),
             ("d0", prior_d0),
@@ -574,6 +574,18 @@ def test_phase1_prepare_environment_and_dry_run(
         ("indentation", 3.2, str(tmp_path), "indentation_data_", str(tmp_path / "3.2.csv")),
     ]
 
+    direct_exp = types.SimpleNamespace(
+        name="compression",
+        surrogate_parameterization="direct_ka_kb",
+        diameters=[4.1],
+        dataset_name=lambda diameter_um: f"compression_soft_{diameter_um}um",
+        get_reference_points=lambda diameter_um: [0.0, 1.0],
+        get_reference_data=lambda diameter_um: [2.0, 3.0],
+    )
+    prepare_calls.clear()
+    mod._prepare_experiment_environment([direct_exp], rank=0, output_root=output_root)
+    assert prepare_calls == []
+
     with pytest.raises(ValueError, match="Unsupported experiment type 'mystery'"):
         mod._prepare_experiment_environment([unknown_exp], rank=0, output_root=output_root)
 
@@ -672,7 +684,7 @@ def test_phase1_non_surrogate_compression_model_uses_lane_local_init_path(
     monkeypatch.setattr(
         mod,
         "phase1_prior_specs",
-        lambda config, prior_d0, prior_sigma: [
+        lambda config, prior_d0, prior_sigma, prior_overrides=None: [
             ("Yt", config["prior_Yt"]),
             ("kb", config["prior_kb"]),
             ("d0", prior_d0),
@@ -875,6 +887,7 @@ def test_phase1_main_forwards_cli_arguments(monkeypatch: pytest.MonkeyPatch, pha
         output_dir="_setup",
         device="cpu",
         setup_only=False,
+        korali_random_seed=None,
     ) -> None:
         captured.update(
             {
@@ -885,6 +898,7 @@ def test_phase1_main_forwards_cli_arguments(monkeypatch: pytest.MonkeyPatch, pha
                 "output_dir": output_dir,
                 "device": device,
                 "setup_only": setup_only,
+                "korali_random_seed": korali_random_seed,
             }
         )
 
@@ -903,6 +917,8 @@ def test_phase1_main_forwards_cli_arguments(monkeypatch: pytest.MonkeyPatch, pha
             "results",
             "--device",
             "gpu",
+            "--korali-random-seed",
+            "1000",
         ],
     )
 
@@ -916,4 +932,83 @@ def test_phase1_main_forwards_cli_arguments(monkeypatch: pytest.MonkeyPatch, pha
         "output_dir": "results",
         "device": "gpu",
         "setup_only": False,
+        "korali_random_seed": 1000,
     }
+
+
+def test_phase1_resonance_uses_direct_ka_kb_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase1_runtime,
+) -> None:
+    mod, fake_korali, _fake_comm = phase1_runtime
+    config_path = tmp_path / "resonance_phase1.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "structure": "emb",
+                "phase1_contract_mode": "emb_direct_ka_kb",
+                "pop_size": 50000,
+                "max_gen": -1,
+                "target_cov": 0.8,
+                "covariance_scaling": 0.04,
+                "phase1_burn_in": 1,
+                "hbi_burn_in": 0,
+                "use_surrogate": True,
+                "surrogate": {"backend": "dnn"},
+                "prior_ka": [1000.0, 100000.0],
+                "prior_kb": [100.0, 100000.0],
+                "prior_d0": [0.0, 0.5],
+                "prior_sigma": [0.001, 0.5],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class _FakeResonance:
+        name = "resonance"
+        enabled = True
+        diameters = [4.0]
+        prior_d0 = None
+        prior_sigma = [0.001, 0.5]
+        data_dir = tmp_path
+        data_prefix = "resonance_data_"
+
+        @staticmethod
+        def dataset_name(diameter_um: float) -> str:
+            return f"resonance_{diameter_um}um"
+
+        @staticmethod
+        def get_reference_points(_diameter_um: float) -> list[float]:
+            return [4.0]
+
+        @staticmethod
+        def get_reference_data(_diameter_um: float) -> list[float]:
+            return [1.6]
+
+        @staticmethod
+        def data_file(_diameter_um: float) -> Path:
+            return tmp_path / "resonance_data_4.0um.dat"
+
+        @staticmethod
+        def phase1_prior_overrides(_diameter_um: float) -> dict[str, list[float]]:
+            return {}
+
+    monkeypatch.setattr(mod, "load_experiments", lambda config, root: [_FakeResonance()])
+    monkeypatch.setattr(mod, "preload_emb_resonance", lambda *args, **kwargs: None)
+    monkeypatch.setattr(mod, "configure_device_conduit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(mod, "to_korali_path", lambda path, *, base_dir: path)
+
+    output_dir = tmp_path / "phase1_output"
+    mod.run_inference(config_path=str(config_path), output_dir=str(output_dir), device="cpu")
+
+    experiment = fake_korali.created_experiments[0]
+    assert [experiment["Variables"][i]["Name"] for i in range(4)] == ["ka", "kb", "d0", "[Sigma]"]
+    assert [experiment["Distributions"][i]["Name"] for i in range(4)] == [
+        "Prior ka",
+        "Prior kb",
+        "Prior d0",
+        "Prior sigma",
+    ]
+    assert experiment["Problem"]["Reference Data"] == [1.6]
+    assert experiment["File Output"]["Path"].endswith("results_phase_1/resonance_4.0um")

@@ -1,9 +1,9 @@
-from typing import List, Optional, Tuple
+from typing import List, Literal, Optional, Tuple
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-EMB_EXPERIMENTS = {"compression", "indentation"}
+EMB_EXPERIMENTS = {"compression", "indentation", "resonance"}
 GV_EXPERIMENTS = {"stretching", "buckling", "torsion", "eigenmodes", "shear_flow"}
 STRUCTURE_EXPERIMENTS = {
     "emb": EMB_EXPERIMENTS,
@@ -17,6 +17,13 @@ EMB_PHASE1_PRIOR_FIELDS = (
     "prior_b2",
     "prior_a3",
     "prior_a4",
+    "prior_d0",
+    "prior_sigma",
+)
+EMB_GENERIC_DIRECT_PHASE1_CONTRACT_MODE = "emb_direct_ka_kb"
+EMB_DIRECT_PHASE1_PRIOR_FIELDS = (
+    "prior_ka",
+    "prior_kb",
     "prior_d0",
     "prior_sigma",
 )
@@ -76,10 +83,19 @@ def _validate_experiment_structure_pair(
 class ExperimentSelection(BaseModel):
     structure: Optional[str] = None
     name: str
+    lane: Optional[str] = None
     geometries: Optional[List[str]] = None
     controls: Optional[List[str]] = None
     diameters: Optional[List[float]] = None
     enabled: bool = True
+    grouped_reference_data: bool = False
+    reference_diameters: Optional[List[float]] = None
+    prior_ka: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    prior_kb: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    prior_d0: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    prior_sigma: Optional[List[float]] = Field(default=None, min_length=2, max_length=2)
+    prior_ka_by_diameter_um: Optional[dict] = None
+    prior_kb_by_diameter_um: Optional[dict] = None
 
     @field_validator("structure")
     @classmethod
@@ -98,6 +114,15 @@ class ExperimentSelection(BaseModel):
         if any(diameter <= 0 for diameter in value):
             raise ValueError("All diameters must be positive")
         return sorted(value)
+
+    @field_validator("reference_diameters")
+    @classmethod
+    def validate_reference_diameters(cls, value: Optional[List[float]]) -> Optional[List[float]]:
+        if value is None:
+            return value
+        if any(diameter <= 0 for diameter in value):
+            raise ValueError("All reference diameters must be positive")
+        return value
 
     @model_validator(mode="after")
     def normalize_legacy_geometry_fields(self) -> "ExperimentSelection":
@@ -166,6 +191,126 @@ class TMCMCParams(BaseModel):
     covariance_scaling: float = Field(ge=0.001, le=1.0)
 
 
+class ResonanceEvaluatorConfig(BaseModel):
+    """Typed selection of an analytical or artifact-backed EMB resonance map."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal[
+        "analytical_dpd_formula",
+        "analytical_vacuum_shell",
+        "artifact_surface",
+        "artifact_emulator_bank",
+        "artifact_polynomial_bank",
+    ] = "analytical_dpd_formula"
+    artifact_path: Optional[str] = None
+    artifact_sha256: Optional[str] = None
+    expected_fixed_kb_dpd: Optional[float] = Field(default=None, gt=0.0)
+    bank_build_report_path: Optional[str] = None
+    bank_build_report_sha256: Optional[str] = None
+    independent_go_path: Optional[str] = None
+    independent_go_sha256: Optional[str] = None
+    promotion_contract_path: Optional[str] = None
+    promotion_contract_sha256: Optional[str] = None
+    allow_benchmark_artifact: bool = False
+
+    @field_validator(
+        "artifact_sha256",
+        "bank_build_report_sha256",
+        "independent_go_sha256",
+        "promotion_contract_sha256",
+    )
+    @classmethod
+    def validate_artifact_sha256(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        normalized = value.strip().lower()
+        if len(normalized) != 64 or any(
+            character not in "0123456789abcdef" for character in normalized
+        ):
+            raise ValueError(
+                "resonance.evaluator.artifact_sha256 must be a 64-character "
+                "hexadecimal SHA-256 digest."
+            )
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_artifact_mode(self) -> "ResonanceEvaluatorConfig":
+        artifact_modes = {
+            "artifact_surface",
+            "artifact_emulator_bank",
+            "artifact_polynomial_bank",
+        }
+        if self.mode in artifact_modes and not self.artifact_path:
+            raise ValueError(
+                "resonance.evaluator.artifact_path is required for artifact-backed modes."
+            )
+        analytical_modes = {"analytical_dpd_formula", "analytical_vacuum_shell"}
+        if self.mode in analytical_modes and self.artifact_path is not None:
+            raise ValueError(
+                "resonance.evaluator.artifact_path is only valid for artifact-backed modes."
+            )
+        if self.mode in analytical_modes and self.artifact_sha256 is not None:
+            raise ValueError(
+                "resonance.evaluator.artifact_sha256 is only valid for artifact-backed modes."
+            )
+        if self.mode in analytical_modes and self.expected_fixed_kb_dpd is not None:
+            raise ValueError(
+                "resonance.evaluator.expected_fixed_kb_dpd is only valid for artifact-backed modes."
+            )
+        if self.mode == "artifact_polynomial_bank":
+            required = {
+                "artifact_sha256": self.artifact_sha256,
+                "expected_fixed_kb_dpd": self.expected_fixed_kb_dpd,
+            }
+            if not self.allow_benchmark_artifact:
+                required.update(
+                    {
+                        "bank_build_report_path": self.bank_build_report_path,
+                        "bank_build_report_sha256": self.bank_build_report_sha256,
+                        "independent_go_path": self.independent_go_path,
+                        "independent_go_sha256": self.independent_go_sha256,
+                        "promotion_contract_path": self.promotion_contract_path,
+                        "promotion_contract_sha256": self.promotion_contract_sha256,
+                    }
+                )
+            missing = sorted(name for name, value in required.items() if value is None)
+            if missing:
+                raise ValueError(
+                    "artifact_polynomial_bank requires pinned release fields: "
+                    + ", ".join(missing)
+                )
+        return self
+
+
+class ResonanceConfig(BaseModel):
+    """Resonance schema while preserving established analytical YAML fields."""
+
+    model_config = ConfigDict(extra="allow")
+
+    agent: Optional[str] = None
+    evaluator: Optional[ResonanceEvaluatorConfig] = None
+    excluded_diameters_um: Optional[List[float]] = None
+    excluded_diameters_reason: Optional[str] = None
+
+    @field_validator("excluded_diameters_um")
+    @classmethod
+    def validate_excluded_diameters(cls, value: Optional[List[float]]) -> Optional[List[float]]:
+        if value is None:
+            return value
+        if any(diameter <= 0.0 for diameter in value):
+            raise ValueError("resonance.excluded_diameters_um must contain only positive values.")
+        return sorted(set(float(diameter) for diameter in value))
+
+    @model_validator(mode="after")
+    def validate_exclusion_reason(self) -> "ResonanceConfig":
+        if self.excluded_diameters_um and not self.excluded_diameters_reason:
+            raise ValueError(
+                "resonance.excluded_diameters_reason is required when diameters are excluded."
+            )
+        return self
+
+
 class InferenceConfig(BaseModel):
     emb_diameters: Optional[List[float]] = Field(default=None, min_length=1)
     frac_diam: float = Field(ge=0.1, le=0.5, default=0.2)
@@ -229,11 +374,14 @@ class InferenceConfig(BaseModel):
     data_files: Optional[dict] = Field(default=None)
     surrogate_dir: Optional[str] = Field(default=None)
     surrogate: Optional[dict] = Field(default=None)
+    phase1_contract_mode: Optional[str] = Field(default=None)
     experimental: Optional[dict] = Field(default=None)
+    resonance: Optional[ResonanceConfig] = Field(default=None)
     experimental_gv_hbi: bool = Field(default=False)
     geometries: Optional[List[str]] = Field(default=None)
     experiments: Optional[List[ExperimentSelection]] = Field(default=None)
     calibrated_parameters: Optional[List[str]] = Field(default=None)
+    direct_compression_prior_extrapolation: Optional[dict] = Field(default=None)
 
     @field_validator("emb_diameters")
     @classmethod
@@ -306,10 +454,11 @@ class InferenceConfig(BaseModel):
                     )
                 if selection.structure == "emb" and selection.geometries is None and self.emb_diameters:
                     selection.geometries = [emb_geometry_id(diameter) for diameter in self.emb_diameters]
-                key = (selection.structure, selection.name)
+                key = (selection.structure, selection.name, selection.lane)
                 if key in seen:
                     raise ValueError(
-                        f"Duplicate experiment selection for structure '{selection.structure}' and experiment '{selection.name}'"
+                        f"Duplicate experiment selection for structure '{selection.structure}' "
+                        f"and experiment '{selection.name}' lane '{selection.lane}'"
                     )
                 seen.add(key)
         active_structures = set(self.structures or [])
@@ -319,8 +468,18 @@ class InferenceConfig(BaseModel):
             active_structures.update(selection.structure for selection in self.experiments if selection.structure)
         if not active_structures:
             active_structures = {"emb"}
+        if self.phase1_contract_mode is not None:
+            valid_contract_modes = {EMB_GENERIC_DIRECT_PHASE1_CONTRACT_MODE}
+            if self.phase1_contract_mode not in valid_contract_modes:
+                raise ValueError(
+                    f"Unsupported Phase 1 contract mode '{self.phase1_contract_mode}'. "
+                    f"Expected one of {sorted(valid_contract_modes)}."
+                )
         if "emb" in active_structures:
-            self._require_prior_fields(EMB_PHASE1_PRIOR_FIELDS, structure="EMB")
+            if self.phase1_contract_mode == EMB_GENERIC_DIRECT_PHASE1_CONTRACT_MODE:
+                self._require_prior_fields(EMB_DIRECT_PHASE1_PRIOR_FIELDS, structure="direct EMB")
+            else:
+                self._require_prior_fields(EMB_PHASE1_PRIOR_FIELDS, structure="EMB")
         if "gv" in active_structures:
             self._require_prior_fields(GV_PHASE1_PRIOR_FIELDS, structure="GV")
         return self

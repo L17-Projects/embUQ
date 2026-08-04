@@ -39,12 +39,26 @@ def _load_phase3b_module():
     sys.path.insert(0, str(repo_root / "emb" / "compression" / "evalkit"))
     sys.path.insert(0, str(repo_root / "emb" / "indentation"))
     sys.path.insert(0, str(repo_root / "emb" / "indentation" / "evalkit"))
+    backend_names = (
+        "emb.compression.evalkit.posterior_compression",
+        "emb.indentation.evalkit.posterior_indentation",
+    )
+    previous_backends = {name: sys.modules.get(name) for name in backend_names}
+    for name in backend_names:
+        sys.modules.pop(name, None)
     _install_phase3b_backend_stubs()
     module_path = repo_root / "inference" / "scripts" / "run_phase_3b.py"
     spec = importlib.util.spec_from_file_location("mesouq_test_run_phase3b", module_path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        for name, previous in previous_backends.items():
+            if previous is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = previous
     return module
 
 
@@ -102,6 +116,8 @@ def test_phase3b_main_forwards_device_and_paths(monkeypatch):
         device="cpu",
         dataset_name=None,
         diameter=None,
+        korali_random_seed=None,
+        restart=False,
     ):
         captured["profiling"] = profiling
         captured["config_path"] = config_path
@@ -109,6 +125,8 @@ def test_phase3b_main_forwards_device_and_paths(monkeypatch):
         captured["device"] = device
         captured["dataset_name"] = dataset_name
         captured["diameter"] = diameter
+        captured["korali_random_seed"] = korali_random_seed
+        captured["restart"] = restart
 
     monkeypatch.setattr(module, "run_phase_3b", _fake_run_phase_3b)
 
@@ -137,4 +155,6 @@ def test_phase3b_main_forwards_device_and_paths(monkeypatch):
         "device": "gpu",
         "dataset_name": "compression_2.1um",
         "diameter": None,
+        "korali_random_seed": None,
+        "restart": False,
     }

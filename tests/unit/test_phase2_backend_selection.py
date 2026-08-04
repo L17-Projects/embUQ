@@ -18,12 +18,17 @@ class _AutoDict(dict):
 
 
 class _FakeExperiment(_AutoDict):
-    def __init__(self) -> None:
+    def __init__(self, owner=None) -> None:
         super().__init__()
+        self.owner = owner
         self.loaded_state_path: str | None = None
+        self.load_state_result = True
 
-    def loadState(self, path: str) -> None:
+    def loadState(self, path: str) -> bool:
         self.loaded_state_path = path
+        if self.owner is not None and self.owner.next_load_state_results:
+            return self.owner.next_load_state_results.pop(0)
+        return self.load_state_result
 
 
 class _FakeEngine(_AutoDict):
@@ -69,9 +74,10 @@ class _FakeKoraliModule(types.ModuleType):
         super().__init__("korali")
         self.created_experiments: list[_FakeExperiment] = []
         self.created_engines: list[_FakeEngine] = []
+        self.next_load_state_results: list[bool] = []
 
     def Experiment(self) -> _FakeExperiment:
-        exp = _FakeExperiment()
+        exp = _FakeExperiment(owner=self)
         self.created_experiments.append(exp)
         return exp
 
@@ -124,7 +130,11 @@ def phase2_runtime(monkeypatch: pytest.MonkeyPatch, phase2_module):
         recorded["dated_prints"].append(message)
 
     def fake_phase2_hyperprior_specs(_config):
-        return [("Yt", (1.0, 2.0), (0.1, 0.2))]
+        return [
+            ("Yt", (1.0, 2.0), (0.1, 0.2)),
+            ("kb", (3.0, 4.0), (0.3, 0.4)),
+            ("d0", (0.0, 0.5), (0.0, 0.3)),
+        ]
 
     def fake_load_experiments(_config, _root):
         return [_FakeStudy([2.1], enabled=True), _FakeStudy([2.9], enabled=False)]
@@ -152,6 +162,11 @@ def phase2_runtime(monkeypatch: pytest.MonkeyPatch, phase2_module):
 
 def _write_phase2_config(path: Path, *, include_backend: str | None = None) -> None:
     payload: dict[str, object] = {
+        "prior_Yt": [1.0, 2.0],
+        "prior_kb": [3.0, 4.0],
+        "prior_d0": [0.0, 0.5],
+        "prior_sigma": [0.0, 1.0],
+        "fixed_params": {"b1": 0.0, "b2": 0.0, "a3": 0.0, "a4": 0.0},
         "hbi_pop_size": 8,
         "hbi_burn_in": 2,
         "hbi_target_cov": 0.4,
@@ -160,6 +175,29 @@ def _write_phase2_config(path: Path, *, include_backend: str | None = None) -> N
     }
     if include_backend is not None:
         payload["phase2_backend"] = include_backend
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+
+
+def _write_direct_phase2_config(path: Path) -> None:
+    payload: dict[str, object] = {
+        "structure": "emb",
+        "phase1_contract_mode": "emb_direct_ka_kb",
+        "prior_ka": [1000.0, 100000.0],
+        "prior_kb": [100.0, 100000.0],
+        "prior_d0": [0.0, 0.5],
+        "prior_sigma": [0.001, 0.5],
+        "hyperprior_mu_ka": [1000.0, 100000.0],
+        "hyperprior_sigma_ka": [0.0, 50000.0],
+        "hyperprior_mu_kb": [100.0, 100000.0],
+        "hyperprior_sigma_kb": [0.0, 50000.0],
+        "hbi_pop_size": 8,
+        "hbi_burn_in": 2,
+        "hbi_target_cov": 0.4,
+        "hbi_covariance_scaling": 0.7,
+        "hbi_max_gen": 3,
+        "phase2_backend": "cpu-mpi",
+    }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(payload), encoding="utf-8")
 
@@ -308,6 +346,60 @@ def test_run_hierarchical_inference_cpu_mpi_configures_mpi_conduit(
     assert any("phase2_backend=cpu-mpi" in msg for msg in recorded["dated_prints"])
 
 
+def test_run_hierarchical_inference_direct_contract_adds_nuisance_conditionals(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, phase2_runtime
+) -> None:
+    mod, fake_korali, _fake_comm, _recorded = phase2_runtime
+    config_path = tmp_path / "configs" / "validation" / "direct.yaml"
+    _write_direct_phase2_config(config_path)
+    monkeypatch.setattr(
+        mod,
+        "load_experiments",
+        lambda _config, _root: [_FakeStudy([4.0, 3.2], enabled=True)],
+    )
+    monkeypatch.setattr(
+        mod,
+        "phase2_hyperprior_specs",
+        lambda _config: [
+            ("ka", (1000.0, 100000.0), (0.0, 50000.0)),
+            ("kb", (100.0, 100000.0), (0.0, 50000.0)),
+        ],
+    )
+
+    mod.run_hierarchical_inference(config_path=str(config_path), output_dir=str(tmp_path / "out"))
+
+    experiment = fake_korali.created_experiments[0]
+    assert experiment["Problem"]["Conditional Priors"] == [
+        "Conditional ka",
+        "Conditional kb",
+        "Conditional d0",
+        "Conditional sigma",
+    ]
+    variables = experiment["Variables"]
+    assert [variables[i]["Name"] for i in range(4)] == ["mu_ka", "sigma_ka", "mu_kb", "sigma_kb"]
+    distributions = experiment["Distributions"]
+    assert distributions[0]["Name"] == "Conditional ka"
+    assert distributions[3]["Name"] == "Conditional kb"
+    assert distributions[6]["Name"] == "Conditional d0"
+    assert distributions[6]["Minimum"] == 0.0
+    assert distributions[6]["Maximum"] == 0.5
+    assert distributions[7]["Name"] == "Conditional sigma"
+    assert distributions[7]["Minimum"] == 0.001
+    assert distributions[7]["Maximum"] == 0.5
+
+
+def test_run_hierarchical_inference_raises_when_phase1_state_missing(
+    tmp_path: Path, phase2_runtime
+) -> None:
+    mod, fake_korali, _fake_comm, _recorded = phase2_runtime
+    config_path = tmp_path / "configs" / "validation" / "inference.yaml"
+    _write_phase2_config(config_path, include_backend="cpu-mpi")
+    fake_korali.next_load_state_results.append(False)
+
+    with pytest.raises(FileNotFoundError, match="could not load Phase 1 state"):
+        mod.run_hierarchical_inference(config_path=str(config_path), output_dir=str(tmp_path / "out"))
+
+
 
 def test_run_hierarchical_inference_native_cuda_disabled_raises(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, phase2_runtime
@@ -342,6 +434,7 @@ def test_main_forwards_default_arguments(monkeypatch: pytest.MonkeyPatch, phase2
         "config_path": None,
         "output_dir": "_setup",
         "phase2_backend": None,
+        "korali_random_seed": None,
     }
 
 
@@ -370,4 +463,5 @@ def test_main_forwards_explicit_arguments(monkeypatch: pytest.MonkeyPatch, phase
         "config_path": "config.yaml",
         "output_dir": "phase2",
         "phase2_backend": "native-cuda",
+        "korali_random_seed": None,
     }
