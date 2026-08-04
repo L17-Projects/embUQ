@@ -214,6 +214,73 @@ The build directory must be absent or empty. A machine-readable
 `uq_emb_manuscript_replay_receipt.json` records every command, output hash,
 page count, baseline comparison, and wall time.
 
+## Accepted figure replay
+
+Figures 6, 7, and 9 are replayed from immutable accepted outputs and a separate
+plotting-dependency set. Stage and verify the plotting inputs and the small
+historical conversion runtime once:
+
+```bash
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py stage \
+  --spec papers/UQ_EMB/manifests/frozen_plotting_dependencies_202607.staging.json \
+  --manifest papers/UQ_EMB/manifests/frozen_plotting_dependencies_202607.files.json
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py verify \
+  --root "${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/frozen_plotting_dependencies_202607" \
+  --manifest papers/UQ_EMB/manifests/frozen_plotting_dependencies_202607.files.json
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py stage \
+  --spec papers/UQ_EMB/manifests/frozen_legacy_paper_runtime_complete_202606.staging.json \
+  --manifest papers/UQ_EMB/manifests/frozen_legacy_paper_runtime_complete_202606.files.json
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py verify \
+  --root "${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/frozen_legacy_paper_runtime_complete_202606" \
+  --manifest papers/UQ_EMB/manifests/frozen_legacy_paper_runtime_complete_202606.files.json
+```
+
+The three indentation conversion constants used by Figure 9 are tracked in
+`manifests/figure9_indentation_conversion_constants_202606.json`. They equal
+twice the median of column 8 in each historical surrogate sample table, with
+the source hashes and row counts recorded alongside each value. This avoids
+retaining 45 MiB of training tables solely for three deterministic scalars.
+
+Define the frozen paths and render into new, empty scratch directories:
+
+```bash
+PLOT_ROOT="${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/frozen_plotting_dependencies_202607"
+ACCEPTED_ROOT="${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/accepted_production_outputs_202607"
+LEGACY_ROOT="${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/frozen_legacy_paper_runtime_complete_202606"
+TEX_BIN="${MESOUQ_SCRATCH_ROOT}/runs/jcp_june02_repro_audit_20260628/tinytex-local/bin/x86_64-linux"
+
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/render_figure6_replay.py \
+  --renderer "${PLOT_ROOT}/code/figure6/render_figure6.py" \
+  --paper-style "${PLOT_ROOT}/code/paper_style/uqdpd_generate_reduced_story_assets.py" \
+  --paper-style-source "${PLOT_ROOT}/code/paper_style" \
+  --rows "${PLOT_ROOT}/inputs/figure6/leave_one_out_rows.csv" \
+  --tex-bin-dir "${TEX_BIN}" --texdeps-dir "${PLOT_ROOT}/texdeps" \
+  --output-dir "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/figure6" \
+  --baseline-pdf papers/UQ_EMB/editor_submission/review2_v1/Figure_6.pdf
+
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/render_figure7_replay.py \
+  --code-root "${PLOT_ROOT}/code/figure7" \
+  --renderer-inputs "${PLOT_ROOT}/inputs/figure7/renderer_inputs" \
+  --phase1-overlay "${PLOT_ROOT}/inputs/figure7/definity_phase1_overlay_780k.csv.gz" \
+  --phase1-manifest "${PLOT_ROOT}/inputs/figure7/definity_phase1_overlay_780k.manifest.json" \
+  --tex-bin-dir "${TEX_BIN}" --texdeps-dir "${PLOT_ROOT}/texdeps" \
+  --output-dir "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/figure7" \
+  --baseline-pdf papers/UQ_EMB/editor_submission/review2_v1/Figure_7.pdf
+
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/render_figure9_replay.py \
+  --renderer "${PLOT_ROOT}/code/figure9/render_figure9.py" \
+  --accepted-root "${ACCEPTED_ROOT}" --plotting-root "${PLOT_ROOT}" \
+  --old-generator "${LEGACY_ROOT}/legacy_tree/_paper/v3/scripts/generate_reduced_story_assets.py" \
+  --conversion-constants papers/UQ_EMB/manifests/figure9_indentation_conversion_constants_202606.json \
+  --tex-bin-dir "${TEX_BIN}" --texdeps-dir "${PLOT_ROOT}/texdeps" \
+  --output-root "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/figure9" \
+  --baseline-pdf papers/UQ_EMB/editor_submission/review2_v1/Figure_9.pdf
+```
+
+Each renderer refuses a non-empty output directory and writes a receipt. With
+the frozen toolchain, the rasterized result must match the submitted editor
+asset exactly.
+
 ## Remaining command surface
 
 The closeout will add the remaining frozen commands for data preparation, DNN
