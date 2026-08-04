@@ -293,9 +293,87 @@ Each renderer refuses a non-empty output directory and writes a receipt. With
 the frozen toolchain, the rasterized result must match the submitted editor
 asset exactly.
 
-## Remaining command surface
+## Mechanical DNN provenance
 
-The closeout will add the remaining frozen commands for data preparation, DNN
-training, acoustic-surrogate fitting, direct DPD validation, and figures.
-Those commands delegate shared behavior to neutral MesoUQ workflow code and
-preserve both `--site karolina` and `--site vega`.
+The accepted DNN training tables and weights are immutable runtime dependencies.
+Verify their hashes and row counts, record the recovered network architectures,
+and emit prospective refresh commands with explicit new seeds:
+
+```bash
+RUNTIME_ROOT="${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/frozen_runtime_dependencies_202607"
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/audit_dnn_surrogate_provenance.py \
+  --dependency-root "${RUNTIME_ROOT}" \
+  --manifest papers/UQ_EMB/manifests/frozen_runtime_dependencies_202607.files.json \
+  --repo-root "$PWD" \
+  --output-root "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/dnn_refresh" \
+  --python-bin "${MESOUQ_ENV_ROOT}/bin/python" \
+  --seed 202607 --max-epoch 100 \
+  --receipt "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/dnn_provenance.json"
+```
+
+The receipt deliberately reports `exact_retraining: false`: the accepted
+architecture-sweep receipts and random seeds were not preserved. The accepted
+weights are verified exactly; the emitted commands are a documented statistical
+refresh baseline, not a byte-identical retraining claim.
+
+## Acoustic polynomial replay
+
+Recompute every exact-diameter squared-frequency polynomial from the frozen
+physical-frequency table and compare its coefficients and in-support
+predictions with the accepted banks:
+
+```bash
+RUNTIME_ROOT="${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/frozen_runtime_dependencies_202607"
+${MESOUQ_ENV_ROOT}/bin/python \
+  scripts/workflows/emb/uq_emb/replay_acoustic_polynomial_surrogates.py \
+  --artifact-root "${RUNTIME_ROOT}/acoustic_surrogates" \
+  --output-dir "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/acoustic_polynomials_$(date +%Y%m%dT%H%M%S)"
+```
+
+The replay enforces the accepted policy: one free-intercept quadratic in
+`f_res^2` per exact diameter, fitted to the highest 28 of 32 labels with
+unweighted frequency-space residuals. It rejects fallback, diameter
+interpolation, and evaluation outside the declared support.
+
+## Direct-DPD replay readiness
+
+Materialize all six mechanical and all six acoustic validation commands without
+submitting or executing DPD:
+
+```bash
+ACCEPTED_ROOT="${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/accepted_production_outputs_202607"
+DIRECT_ROOT="${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/direct_dpd_$(date +%Y%m%dT%H%M%S)"
+GV_PYTHON="${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/bin/python"
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/materialize_direct_dpd_replay.py \
+  --accepted-root "${ACCEPTED_ROOT}" \
+  --output-root "${DIRECT_ROOT}" \
+  --site "${MESOUQ_SITE}" \
+  --python-bin "${GV_PYTHON}"
+```
+
+Before verifying or executing the generated commands, enter the Mirheo/OpenMPI/
+CUDA module environment provided by the selected site's scheduler wrapper, then
+activate the shared runtime:
+
+```bash
+export MESOUQ_REPO_ROOT="$PWD"
+source scripts/platforms/hpc/site_env.sh
+mesouq_activate_site_env "${MESOUQ_SITE}" "${MESOUQ_REPO_ROOT}"
+source "${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/env.sh"
+```
+
+Run the sub-minute readiness verifier in that activated environment. It checks
+the frozen and materialized hashes and loads each acoustic input through the
+frozen breathing runner; it never launches Mirheo:
+
+```bash
+"${GV_PYTHON}" scripts/workflows/emb/uq_emb/verify_direct_dpd_replay_plan.py \
+  --plan "${DIRECT_ROOT}/direct_dpd_replay_plan.json" \
+  --receipt "${DIRECT_ROOT}/direct_dpd_replay_verification.json"
+```
+
+The Definity `d2` acoustic command intentionally retains the user-approved
+`k_a=17812.5` same-protocol point, 0.1482% from the inferred MAP. The other five
+acoustic launch commands are reconstructed from retained MAP and setup
+manifests using the byte-identical frozen runner and protocol values. The plan
+records that the historical shell launch wrapper was not uniformly preserved.

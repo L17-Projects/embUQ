@@ -6,11 +6,10 @@ MAP inputs and protocol manifests, creates a fresh replay-input root, and
 writes commands for the current site-neutral mechanical runner and the frozen
 breathing protocols.  It never submits a scheduler job or executes Mirheo.
 
-SonoVue acoustic re-extraction manifests retain the MAP inputs and protocol
-settings but not their launch command or a source hash.  Their generated
-commands are consequently marked ``candidate_provenance_incomplete`` rather
-than claimed as exact replays.  Definity d2 is similarly recorded as a
-near-MAP accepted result, not an exact-MAP acoustic replay.
+Acoustic commands are reconstructed from the retained MAP rows and exact setup
+protocols.  They use the byte-identical frozen breathing runner, but are not
+claimed to reproduce an unrecorded shell launch wrapper.  Definity d2 is the
+user-accepted 0.1482% near-MAP coordinate and is labeled accordingly.
 """
 
 from __future__ import annotations
@@ -35,14 +34,14 @@ ACCEPTED_ROOT_DEFAULT = Path(
 VALID_SITES = ("karolina", "vega")
 REPO_ROOT = Path(__file__).resolve().parents[4]
 MECHANICAL_RUNNER = REPO_ROOT / "scripts/platforms/hpc/run_map_mirheo.py"
-DEFINITY_ACOUSTIC_RUNNER = (
-    REPO_ROOT / "scripts/workflows/emb/run_emb_fullfluid_ka_breathing_campaign.py"
-)
 SONOVUE_ACOUSTIC_RUNNER = (
     REPO_ROOT / "scripts/workflows/emb/run_emb_free_shell_breathing_protocol.py"
 )
+MECHANICAL_EVALUATORS = {
+    "compression": REPO_ROOT / "propagation/scripts/evaluate_map_mirheo_optimized.py",
+    "indentation": REPO_ROOT / "propagation/scripts/evaluate_map_mirheo_optimized_indentation.py",
+}
 ACOUSTIC_RUNTIME_SOURCES = (
-    DEFINITY_ACOUSTIC_RUNNER,
     SONOVUE_ACOUSTIC_RUNNER,
     REPO_ROOT / "scripts/workflows/emb/emb_deflate_only_analysis.py",
     REPO_ROOT / "scripts/workflows/emb/emb_particle_staging.py",
@@ -102,10 +101,6 @@ def _resolve_site(cli_site: str | None) -> str:
     return cli_site or env_site or "karolina"
 
 
-def _default_python(site: str) -> str:
-    return "/usr/bin/python3.11" if site == "karolina" else "python3"
-
-
 def _ensure_fresh_output(path: Path) -> None:
     if path.exists() and any(path.iterdir()):
         raise FileExistsError(
@@ -123,7 +118,7 @@ def _mechanical_manifest(
     accepted_root: Path,
     bubble: dict[str, Any],
     output_root: Path,
-) -> tuple[Path, list[dict[str, str]]]:
+) -> tuple[Path, Path | None, list[dict[str, str]]]:
     bubble_id = str(bubble["id"])
     agent = str(bubble["agent"])
     experiment = str(bubble["experiment"])
@@ -143,6 +138,7 @@ def _mechanical_manifest(
             raise ValueError(f"Accepted Definity mechanical MAP lacks {dataset}: {source}")
         frozen = dict(payload)
         frozen["datasets"] = {dataset: datasets[dataset]}
+        direct_map = None
         source_hashes = [{"accepted_path": str(source.resolve()), "accepted_sha256": _sha256(source)}]
     else:
         source = accepted_root / "sonovue/direct_dpd/inputs/manifest.json"
@@ -183,154 +179,285 @@ def _mechanical_manifest(
             {"accepted_path": str(source.resolve()), "accepted_sha256": _sha256(source)},
             {"accepted_path": str(map_source.resolve()), "accepted_sha256": _sha256(map_source)},
         ]
+        direct_map = output_root / bubble_id / "mechanical/map_json" / map_source.name
+        _copy_input(map_source, direct_map)
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(frozen, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return destination, source_hashes
+    return destination, direct_map, source_hashes
 
 
 def _mechanical_command(
     *,
     site: str,
     python_bin: str,
+    accepted_root: Path,
     bubble: dict[str, Any],
     output_root: Path,
+    direct_map: Path | None,
 ) -> list[str]:
     bubble_id = str(bubble["id"])
+    agent = str(bubble["agent"])
+    experiment = str(bubble["experiment"])
+    dataset = _dataset_name(experiment, float(bubble["diameter_um"]))
+    if agent == "sonovue":
+        if direct_map is None:
+            raise ValueError(f"Missing materialized SonoVue MAP input for {bubble_id}.")
+        provenance_path = accepted_root / f"sonovue/direct_dpd/mechanical/{bubble_id}/provenance.json"
+        provenance = _json(provenance_path)
+        protocol = provenance.get("protocol")
+        if not isinstance(protocol, dict):
+            raise ValueError(f"Accepted SonoVue mechanical protocol is missing: {provenance_path}")
+        case_root = output_root / bubble_id / "mechanical/map_mirheo"
+        return [
+            "env",
+            f"MESOUQ_SITE={site}",
+            "mpirun",
+            "--oversubscribe",
+            "-x",
+            "MESOUQ_SITE",
+            "-n",
+            str(protocol["mpi_ranks"]),
+            python_bin,
+            str(MECHANICAL_EVALUATORS[experiment]),
+            "--map-file",
+            str(direct_map),
+            "--output",
+            str(case_root / "results" / f"{dataset}_result.json"),
+            "--n-displacements",
+            str(protocol["force_grid_points"]),
+            "--extend-range",
+            str(protocol["force_grid_extension_fraction"]),
+            "--numsteps",
+            str(protocol["production_steps"]),
+            "--numsteps-eq",
+            str(protocol["equilibration_steps"]),
+            "--retry-attempt",
+            str(protocol["retry_attempt"]),
+            "--scratch-root",
+            str(case_root / "_scratch" / dataset),
+        ]
+
+    accepted_summary_path = (
+        accepted_root
+        / f"definity/direct_dpd/mechanical/{bubble_id}/map_workflow/map_mirheo/"
+        "map_mirheo_manifest.json"
+    )
+    accepted_summary = _json(accepted_summary_path)
     return [
         python_bin,
         str(MECHANICAL_RUNNER),
         "--site",
         site,
         "--experiment",
-        str(bubble["experiment"]),
+        experiment,
         "--model-family",
         "reduced-model",
         "--profile",
-        "production",
+        "validation",
         "--output-dir",
         str(output_root / bubble_id / "mechanical"),
         "--python-bin",
         python_bin,
         "--n-displacements",
-        "15",
+        str(accepted_summary["n_displacements"]),
         "--mpi-ranks",
-        "2",
+        str(accepted_summary["mpi_ranks"]),
+        "--timeout-seconds",
+        str(accepted_summary["timeout_seconds"]),
         "--max-retries",
-        "0",
+        str(accepted_summary["max_retries"]),
         "--dataset-name",
-        _dataset_name(str(bubble["experiment"]), float(bubble["diameter_um"])),
+        dataset,
     ]
 
 
-def _definity_acoustic_entry(
-    *, accepted_root: Path, output_root: Path, python_bin: str, bubble: dict[str, Any]
-) -> dict[str, Any]:
-    bubble_id = str(bubble["id"])
+def _write_single_csv_row(path: Path, fieldnames: list[str], row: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerow(row)
+
+
+def _accepted_hbi_state(accepted_root: Path, bubble: dict[str, Any]) -> Path:
+    agent = str(bubble["agent"])
+    dataset = _dataset_name(str(bubble["experiment"]), float(bubble["diameter_um"]))
+    path = accepted_root / agent / "hbi/results_phase_3b" / dataset / "genLatest.json"
+    if not path.is_file():
+        raise FileNotFoundError(f"Accepted HBI state is missing: {path}")
+    return path
+
+
+def _definity_setup_manifest(accepted_root: Path, bubble_id: str) -> Path:
     if bubble_id == "d2":
-        source = (
-            accepted_root
-            / "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/setup_manifest.json"
+        return accepted_root / "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/setup_manifest.json"
+    diameter_token = {"d1": "2p1", "d3": "3p0"}[bubble_id]
+    matches = sorted(
+        (accepted_root / f"definity/direct_dpd/acoustic/{bubble_id}").glob(
+            f"fullfluid_campaign/production/definity/definity_{diameter_token}um/"
+            f"ka-index-*/definity_{diameter_token}um/seed-000/setup_manifest.json"
         )
-        return {
-            "modality": "acoustic",
-            "status": "provenance_incomplete_near_map_only",
-            "command": None,
-            "source_hashes": [{"accepted_path": str(source.resolve()), "accepted_sha256": _sha256(source)}],
-            "provenance_gaps": [
-                "Accepted d2 acoustic evidence is a 0.1482% near-MAP point, not an exact-MAP run.",
-                "No accepted exact-MAP acoustic input or executable command is available.",
-            ],
-        }
-
-    accepted_case = accepted_root / f"definity/direct_dpd/acoustic/{bubble_id}"
-    map_source = accepted_case / "accepted_map_values.csv"
-    design_source = accepted_case / "fullfluid_campaign/design/production_design.csv"
-    campaign_root = output_root / bubble_id / "acoustic/fullfluid_campaign"
-    map_copy = campaign_root / "inputs/accepted_map_values.csv"
-    design_copy = campaign_root / "design/production_design.csv"
-    sources = [_copy_input(map_source, map_copy), _copy_input(design_source, design_copy)]
-    command = [
-        "mpirun",
-        "-n",
-        "2",
-        python_bin,
-        str(DEFINITY_ACOUSTIC_RUNNER),
-        "run",
-        "--campaign-root",
-        str(campaign_root),
-        "--map-values",
-        str(map_copy),
-        "--phase",
-        "production",
-        "--case-index",
-        "0",
-        "--particle-checker-every",
-        "100",
-        "--particle-staging-root",
-        str(output_root / "_particle_staging" / bubble_id),
-    ]
-    return {
-        "modality": "acoustic",
-        "status": "exact_protocol_command",
-        "command": command,
-        "source_hashes": sources,
-        "provenance_gaps": [],
-    }
+    )
+    if len(matches) != 1:
+        raise ValueError(f"Expected one accepted {bubble_id} setup manifest, found {len(matches)}.")
+    return matches[0]
 
 
-def _sonovue_acoustic_entry(
-    *, accepted_root: Path, output_root: Path, python_bin: str, bubble: dict[str, Any]
-) -> dict[str, Any]:
+def _acoustic_sources(
+    *, accepted_root: Path, bubble: dict[str, Any]
+) -> tuple[Path, dict[str, Any], dict[str, Any], list[dict[str, str]]]:
     bubble_id = str(bubble["id"])
-    diameter_um = float(bubble["diameter_um"])
+    agent = str(bubble["agent"])
+    if agent == "definity":
+        setup_source = _definity_setup_manifest(accepted_root, bubble_id)
+        setup = _json(setup_source)
+        map_payload = setup.get("bubble")
+        protocol = setup.get("protocol")
+        if not isinstance(map_payload, dict) or not isinstance(protocol, dict):
+            raise ValueError(f"Accepted Definity acoustic setup is incomplete: {setup_source}")
+        sources = [{"accepted_path": str(setup_source.resolve()), "accepted_sha256": _sha256(setup_source)}]
+        return setup_source, map_payload, protocol, sources
+
     manifest_source = accepted_root / f"sonovue/direct_dpd/acoustic/{bubble_id}/manifest.json"
     manifest = _json(manifest_source)
     results = manifest.get("results")
     if not isinstance(results, list) or len(results) != 1:
         raise ValueError(f"Expected one accepted SonoVue acoustic result: {manifest_source}")
     result = results[0]
+    map_payload = result.get("map")
     protocol = result.get("setup_protocol")
-    if not isinstance(protocol, dict):
-        raise ValueError(f"Accepted SonoVue acoustic protocol missing: {manifest_source}")
-    symbol = str(result["symbol"])
-    map_source = accepted_root / "sonovue/direct_dpd/inputs/breathing_frequency" / f"{symbol}.csv"
-    map_copy = output_root / bubble_id / "acoustic/inputs" / f"{symbol}.csv"
-    sources = [_copy_input(map_source, map_copy), {"accepted_path": str(manifest_source.resolve()), "accepted_sha256": _sha256(manifest_source)}]
-    run_root = output_root / bubble_id / "acoustic/reextraction"
-    command = [
-        "mpirun", "-n", "2", python_bin, str(SONOVUE_ACOUSTIC_RUNNER),
-        "--map-values", str(map_copy),
-        "--run-root", str(run_root),
-        "--symbols", symbol,
-        "--seed-indices", "0",
+    if not isinstance(map_payload, dict) or not isinstance(protocol, dict):
+        raise ValueError(f"Accepted SonoVue acoustic manifest is incomplete: {manifest_source}")
+    sources = [{"accepted_path": str(manifest_source.resolve()), "accepted_sha256": _sha256(manifest_source)}]
+    return manifest_source, map_payload, protocol, sources
+
+
+def _acoustic_map_row(map_payload: dict[str, Any], state_path: Path) -> dict[str, Any]:
+    return {
+        "agent": map_payload["agent"],
+        "diameter_symbol": map_payload.get("symbol", map_payload.get("diameter_symbol")),
+        "modality": map_payload["modality"],
+        "dataset": map_payload["dataset"],
+        "diameter_um": map_payload["diameter_um"],
+        "radius_dpd": map_payload["radius_dpd"],
+        "radius_source": map_payload["radius_source"],
+        "source_label": map_payload["source_label"],
+        "sample_index": map_payload["sample_index"],
+        "sample_count": map_payload["sample_count"],
+        "ka": map_payload["ka"],
+        "kb": map_payload["kb"],
+        "d0": map_payload["d0"],
+        "sigma": map_payload["sigma"],
+        "legacy_Yt": map_payload.get("legacy_Yt", map_payload.get("legacy_yt")),
+        "logLikelihood": map_payload.get("logLikelihood", map_payload.get("log_likelihood")),
+        "logPrior": map_payload.get("logPrior", map_payload.get("log_prior")),
+        "logPosterior": map_payload.get("logPosterior", map_payload.get("log_posterior")),
+        "state_path": str(state_path.resolve()),
+        "map_template_state_path": str(state_path.resolve()),
+    }
+
+
+def _protocol_command_args(protocol: dict[str, Any]) -> list[str]:
+    fit_end = protocol.get("fit_end_dpd")
+    return [
         "--dt", str(protocol["dt"]),
         "--equil-steps", str(protocol["equil_steps"]),
+        "--pulse-steps", str(protocol.get("pulse_steps", 0)),
         "--relax-steps", str(protocol["relax_steps"]),
         "--sample-every", str(protocol["sample_every"]),
         "--trajectory-capture", str(protocol["trajectory_capture"]),
+        "--pulse-force-per-vertex", str(protocol.get("pulse_force_per_vertex", 0.001)),
         "--excitation-mode", str(protocol["excitation_mode"]),
         "--initial-radius-scale", str(protocol["initial_radius_scale"]),
+        "--prestrain-placement", str(protocol.get("prestrain_placement", "post-equilibration")),
         "--post-deflation-ramp-steps", str(protocol["post_deflation_ramp_steps"]),
         "--post-deflation-hold-steps", str(protocol["post_deflation_hold_steps"]),
         "--post-deflation-hold-update-every-steps", str(protocol["post_deflation_hold_update_every_steps"]),
+        "--post-deflation-hold-reset-velocities",
+        "--radial-velocity-kick", str(protocol.get("radial_velocity_kick", 0.0)),
+        "--radial-velocity-kick-mode", str(protocol.get("radial_velocity_kick_mode", "add")),
         "--solvent-mode", str(protocol["solvent_mode"]),
         "--water-shell-fsi-scale", str(protocol["water_shell_fsi_scale"]),
+        "--water-shell-gamma-scale", str(protocol.get("water_shell_gamma_scale", 1.0)),
+        "--bouncer-mode", str(protocol.get("bouncer_mode", "on")),
         "--membrane-mass-scale", str(protocol["membrane_mass_scale"]),
         "--lim-mu-policy", str(protocol["lim_mu_policy"]),
         "--primary-observable", str(protocol["primary_observable"]),
-        "--fit-end-dpd", str(protocol["fit_end_dpd"]),
-        "--particle-dump-root", str(output_root / "_particle_staging" / bubble_id),
+        "--box-padding-dpd", str(protocol.get("box_padding_dpd", 8.0)),
+        "--transient-cut-fraction", str(protocol.get("transient_cut_fraction", 0.0)),
+        "--fit-start-dpd", str(protocol.get("fit_start_dpd", 0.0)),
+        "--fit-end-dpd", "-1.0" if fit_end is None else str(fit_end),
+        "--particle-checker-every", str(protocol.get("particle_checker_every", 0)),
+        "--pin-com",
     ]
+
+
+def _acoustic_entry(
+    *, site: str, accepted_root: Path, output_root: Path, python_bin: str, bubble: dict[str, Any]
+) -> dict[str, Any]:
+    bubble_id = str(bubble["id"])
+    setup_source, map_payload, protocol, sources = _acoustic_sources(
+        accepted_root=accepted_root, bubble=bubble
+    )
+    state_source = _accepted_hbi_state(accepted_root, bubble)
+    sources.append({"accepted_path": str(state_source.resolve()), "accepted_sha256": _sha256(state_source)})
+    symbol = str(map_payload.get("symbol", map_payload.get("diameter_symbol")))
+    if not symbol or symbol == "None":
+        raise ValueError(f"Accepted acoustic symbol is missing: {setup_source}")
+    map_copy = output_root / bubble_id / "acoustic/inputs" / f"{symbol}.csv"
+    row = _acoustic_map_row(map_payload, state_source)
+    fieldnames = list(row)
+    _write_single_csv_row(map_copy, fieldnames, row)
+    state_hash = _sha256(state_source)
+    command = [
+        "env",
+        f"MESOUQ_SITE={site}",
+        f"MESOUQ_BOUND_MAP_SOURCE_PATH={state_source.resolve()}",
+        f"MESOUQ_BOUND_MAP_SOURCE_SHA256={state_hash}",
+        "mpirun",
+        "--oversubscribe",
+        "-x",
+        "MESOUQ_SITE",
+        "-x",
+        "MESOUQ_BOUND_MAP_SOURCE_PATH",
+        "-x",
+        "MESOUQ_BOUND_MAP_SOURCE_SHA256",
+        "-n",
+        "2",
+        python_bin,
+        str(SONOVUE_ACOUSTIC_RUNNER),
+        "--map-values",
+        str(map_copy),
+        "--run-root",
+        str(output_root / bubble_id / "acoustic/replay"),
+        "--symbols",
+        symbol,
+        "--seed-indices",
+        "0",
+        *_protocol_command_args(protocol),
+        "--particle-dump-root",
+        str(output_root / "_particle_staging" / bubble_id),
+    ]
+    near_map = bubble_id == "d2"
     return {
         "modality": "acoustic",
-        "status": "candidate_provenance_incomplete",
+        "status": (
+            "user_accepted_near_map_reconstructed_exact_protocol_command"
+            if near_map
+            else "reconstructed_exact_protocol_command"
+        ),
         "command": command,
+        "materialized_map_values": str(map_copy),
+        "materialized_map_values_sha256": _sha256(map_copy),
         "source_hashes": sources,
+        "acceptance_notes": (
+            ["d2 uses the user-accepted 17812.5 near-MAP ka, 0.1482% from the inferred MAP."]
+            if near_map
+            else []
+        ),
         "provenance_gaps": [
-            "The accepted canonical re-extraction manifest records no launch command.",
-            "The accepted canonical re-extraction manifest records no acoustic runner source hash.",
-            "This command is reconstructed from retained MAP inputs and setup protocol fields; it is not claimed exact.",
+            "The launch command is reconstructed from retained MAP and setup manifests; the scientific runner and protocol values are frozen."
         ],
     }
 
@@ -359,28 +486,31 @@ def materialize_direct_dpd_replay(
     entries: list[dict[str, Any]] = []
     for bubble in BUBBLES:
         bubble_id = str(bubble["id"])
-        mechanical_manifest, mechanical_sources = _mechanical_manifest(
+        mechanical_manifest, direct_map, mechanical_sources = _mechanical_manifest(
             accepted_root=accepted_root, bubble=bubble, output_root=output_root
         )
         mechanical = {
             "modality": "mechanical",
             "status": "exact_protocol_command",
             "command": _mechanical_command(
-                site=site, python_bin=python_bin, bubble=bubble, output_root=output_root
+                site=site,
+                python_bin=python_bin,
+                accepted_root=accepted_root,
+                bubble=bubble,
+                output_root=output_root,
+                direct_map=direct_map,
             ),
             "materialized_phase3b_map_manifest": str(mechanical_manifest),
             "materialized_phase3b_map_manifest_sha256": _sha256(mechanical_manifest),
             "source_hashes": mechanical_sources,
             "provenance_gaps": [],
         }
-        acoustic = (
-            _definity_acoustic_entry(
-                accepted_root=accepted_root, output_root=output_root, python_bin=python_bin, bubble=bubble
-            )
-            if bubble["agent"] == "definity"
-            else _sonovue_acoustic_entry(
-                accepted_root=accepted_root, output_root=output_root, python_bin=python_bin, bubble=bubble
-            )
+        acoustic = _acoustic_entry(
+            site=site,
+            accepted_root=accepted_root,
+            output_root=output_root,
+            python_bin=python_bin,
+            bubble=bubble,
         )
         entries.append({"bubble_id": bubble_id, **bubble, "mechanical": mechanical, "acoustic": acoustic})
 
@@ -392,7 +522,25 @@ def materialize_direct_dpd_replay(
         "accepted_artifact_root": str(accepted_root),
         "site": site,
         "python_bin": python_bin,
-        "runtime_source_hashes": _source_hashes((MECHANICAL_RUNNER, *ACOUSTIC_RUNTIME_SOURCES)),
+        "runtime_activation": {
+            "required_before_execution": True,
+            "site_modules": (
+                "Load the Mirheo/OpenMPI/CUDA modules required by the selected site wrapper."
+            ),
+            "shared_activation": (
+                "Set MESOUQ_SITE_RUNTIME_ROOT and MESOUQ_REPO_ROOT, source "
+                "scripts/platforms/hpc/site_env.sh, call "
+                f"mesouq_activate_site_env {site} \"$MESOUQ_REPO_ROOT\", then source "
+                "\"$MESOUQ_SITE_RUNTIME_ROOT/gv_venv/env.sh\"."
+            ),
+            "reason": (
+                "The verified Mirheo interpreter depends on libraries and environment variables "
+                "provided by the activated site runtime."
+            ),
+        },
+        "runtime_source_hashes": _source_hashes(
+            (MECHANICAL_RUNNER, *MECHANICAL_EVALUATORS.values(), *ACOUSTIC_RUNTIME_SOURCES)
+        ),
         "bubbles": entries,
     }
     plan_path = output_root / "direct_dpd_replay_plan.json"
@@ -407,8 +555,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--site", choices=VALID_SITES, default=None)
     parser.add_argument(
         "--python-bin",
-        default=None,
-        help="Python executable embedded in planned commands. Defaults to /usr/bin/python3.11 on Karolina.",
+        required=True,
+        help="Verified Mirheo-capable Python executable embedded in the static replay commands.",
     )
     args = parser.parse_args(argv)
     try:
@@ -417,7 +565,7 @@ def main(argv: list[str] | None = None) -> int:
             accepted_root=args.accepted_root,
             output_root=args.output_root,
             site=site,
-            python_bin=args.python_bin or _default_python(site),
+            python_bin=args.python_bin,
         )
     except (FileNotFoundError, FileExistsError, ValueError, RuntimeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

@@ -38,6 +38,18 @@ def _accepted_root(tmp_path: Path) -> Path:
     sonovue_cases = []
     for index, (bubble, diameter) in enumerate((("d4", 3.2), ("d5", 3.4), ("d6", 5.8)), start=1):
         symbol = f"sonovue_{diameter:.2f}um".replace(".", "p")
+        state_path = root / f"sonovue/hbi/results_phase_3b/indentation_{diameter:.1f}um/genLatest.json"
+        _write_json(state_path, {"bubble": bubble})
+        acoustic_map = {
+            "agent": "SonoVue", "symbol": symbol, "modality": "indentation",
+            "dataset": f"indentation_{diameter:.1f}um", "diameter_um": diameter,
+            "radius_dpd": diameter * 2.0, "radius_source": "established_breathing_protocol",
+            "source_label": "accepted_sonovue_50k", "sample_index": index,
+            "sample_count": 50000, "ka": 1000.0 + index, "kb": 2000.0 + index,
+            "d0": 0.1, "sigma": 0.04, "legacy_yt": 10000.0,
+            "log_likelihood": 2.0, "log_prior": -1.0, "log_posterior": 1.0,
+            "state_path": "/historical/state",
+        }
         map_payload = {
             "diameter_um": diameter,
             "parameters": [1000.0 + index, 2000.0 + index, 0.1],
@@ -51,7 +63,7 @@ def _accepted_root(tmp_path: Path) -> Path:
         sonovue_cases.append({"diameter_um": diameter, "symbol": symbol})
         _write_json(
             root / f"sonovue/direct_dpd/acoustic/{bubble}/manifest.json",
-            {"results": [{"symbol": symbol, "setup_protocol": {
+            {"results": [{"symbol": symbol, "map": acoustic_map, "setup_protocol": {
                 "dt": 0.0001, "equil_steps": 10000, "relax_steps": 120000, "sample_every": 150,
                 "trajectory_capture": "particle-dump", "excitation_mode": "prestrain", "initial_radius_scale": 0.95,
                 "post_deflation_ramp_steps": 500, "post_deflation_hold_steps": 500,
@@ -59,9 +71,19 @@ def _accepted_root(tmp_path: Path) -> Path:
                 "membrane_mass_scale": 160.0, "lim_mu_policy": "derive-from-ka", "primary_observable": "rms_radius_dpd", "fit_end_dpd": 0.25,
             }}]},
         )
+        _write_json(
+            root / f"sonovue/direct_dpd/mechanical/{bubble}/provenance.json",
+            {"protocol": {
+                "mpi_ranks": 2, "force_grid_points": 15,
+                "force_grid_extension_fraction": 0.1, "production_steps": 20000,
+                "equilibration_steps": 40000, "retry_attempt": 0,
+            }},
+        )
     _write_json(root / "sonovue/direct_dpd/inputs/manifest.json", {"cases": sonovue_cases})
     for bubble, diameter in (("d1", 2.1), ("d2", 2.9), ("d3", 3.0)):
         dataset = f"compression_{diameter:.1f}um"
+        state_path = root / f"definity/hbi/results_phase_3b/{dataset}/genLatest.json"
+        _write_json(state_path, {"bubble": bubble})
         _write_json(
             root / f"definity/direct_dpd/mechanical/{bubble}/map_workflow/map_phase3b/phase3b_map_manifest.json",
             {"experiment": "compression", "datasets": {dataset: {
@@ -70,15 +92,40 @@ def _accepted_root(tmp_path: Path) -> Path:
                 "diameter_um": diameter, "run_dir": "/accepted/state", "output_csv": "",
             }}},
         )
+        _write_json(
+            root / f"definity/direct_dpd/mechanical/{bubble}/map_workflow/map_mirheo/map_mirheo_manifest.json",
+            {"n_displacements": 15, "mpi_ranks": 2, "timeout_seconds": 1800, "max_retries": 1},
+        )
         acoustic = root / f"definity/direct_dpd/acoustic/{bubble}"
+        symbol = f"definity_{diameter:.1f}um".replace(".", "p")
+        setup = {
+            "bubble": {
+                "agent": "Definity", "symbol": symbol, "modality": "compression",
+                "dataset": dataset, "diameter_um": diameter, "radius_dpd": diameter * 2.0,
+                "radius_source": "frozen_diameter_um_over_0p5",
+                "source_label": "attempt081_seed00_50k", "sample_index": 1,
+                "sample_count": 50000, "ka": 1000.0, "kb": 389.2, "d0": 0.1,
+                "sigma": 0.04, "legacy_yt": 10000.0, "log_likelihood": 2.0,
+                "log_prior": -1.0, "log_posterior": 1.0, "state_path": "/historical/state",
+            },
+            "protocol": {
+                "dt": 0.0001, "equil_steps": 40000, "relax_steps": 120000,
+                "sample_every": 150, "trajectory_capture": "particle-dump",
+                "excitation_mode": "prestrain", "initial_radius_scale": 0.95,
+                "post_deflation_ramp_steps": 500, "post_deflation_hold_steps": 5000,
+                "post_deflation_hold_update_every_steps": 10, "solvent_mode": "full",
+                "water_shell_fsi_scale": 0.4, "membrane_mass_scale": 160.0,
+                "lim_mu_policy": "derive-from-ka", "primary_observable": "rms_radius_dpd",
+                "fit_end_dpd": None, "particle_checker_every": 100,
+            },
+        }
+        setup_path = (
+            acoustic / "fullfluid_campaign/production/definity" / symbol
+            / "ka-index-000" / symbol / "seed-000/setup_manifest.json"
+        )
         if bubble == "d2":
-            _write_json(
-                root / "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/setup_manifest.json",
-                {"near_map": True},
-            )
-        else:
-            _write_csv(acoustic / "accepted_map_values.csv", {"diameter_um": diameter, "ka": 1000.0})
-            _write_csv(acoustic / "fullfluid_campaign/design/production_design.csv", {"phase": "production", "case_index": 0})
+            setup_path = acoustic / "../d2_near_map_0p1482pct/setup_manifest.json"
+        _write_json(setup_path.resolve(), setup)
     return root
 
 
@@ -94,18 +141,22 @@ def test_materialize_direct_dpd_replay_writes_six_static_pairs(tmp_path: Path) -
     assert plan["mode"] == "static_dry_run_only"
     assert plan["submission"] == "not performed"
     assert len(plan["bubbles"]) == 6
+    assert plan["runtime_activation"]["required_before_execution"] is True
+    assert "mesouq_activate_site_env karolina" in plan["runtime_activation"]["shared_activation"]
     assert plan["runtime_source_hashes"]
     assert (tmp_path / "replay/direct_dpd_replay_plan.json").is_file()
     d1 = plan["bubbles"][0]
     assert d1["mechanical"]["command"][0] == "/usr/bin/python3.11"
-    assert d1["acoustic"]["status"] == "exact_protocol_command"
-    assert "--particle-staging-root" in d1["acoustic"]["command"]
+    assert d1["mechanical"]["command"][d1["mechanical"]["command"].index("--profile") + 1] == "validation"
+    assert d1["acoustic"]["status"] == "reconstructed_exact_protocol_command"
+    assert "--particle-dump-root" in d1["acoustic"]["command"]
     d2 = plan["bubbles"][1]
-    assert d2["acoustic"]["command"] is None
-    assert d2["acoustic"]["status"] == "provenance_incomplete_near_map_only"
+    assert d2["acoustic"]["command"] is not None
+    assert d2["acoustic"]["status"] == "user_accepted_near_map_reconstructed_exact_protocol_command"
     d4 = plan["bubbles"][3]
-    assert d4["acoustic"]["status"] == "candidate_provenance_incomplete"
+    assert d4["acoustic"]["status"] == "reconstructed_exact_protocol_command"
     assert "--trajectory-capture" in d4["acoustic"]["command"]
+    assert "--extend-range" in d4["mechanical"]["command"]
     assert (tmp_path / "replay/d4/acoustic/inputs/sonovue_3p20um.csv").is_file()
 
 
