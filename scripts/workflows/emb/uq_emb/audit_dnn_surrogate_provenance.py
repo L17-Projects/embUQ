@@ -237,6 +237,7 @@ def audit(
         "execution_provenance": replay_receipt_provenance(
             repo_root=repo_root,
             runner=Path(__file__),
+            consumed_paths=[dependency_root],
         ),
         "accepted_artifacts": "immutable_verified",
         "exact_retraining": False,

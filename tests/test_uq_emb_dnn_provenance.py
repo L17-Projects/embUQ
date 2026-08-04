@@ -59,8 +59,11 @@ def _fixture(tmp_path: Path, module):
     return dependency_root, manifest, tuple(patched_cases)
 
 
-def test_audit_verifies_artifacts_and_labels_refresh_as_prospective(tmp_path: Path) -> None:
+def test_audit_verifies_artifacts_and_labels_refresh_as_prospective(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _load_module()
+    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
     dependency_root, manifest, cases = _fixture(tmp_path, module)
     module.CASES = cases
 

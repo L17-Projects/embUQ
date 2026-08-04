@@ -148,8 +148,11 @@ def test_fit_replays_known_free_intercept_squared_frequency_family() -> None:
     )
 
 
-def test_replay_materializes_bounded_receipt_and_banks(tmp_path: Path) -> None:
+def test_replay_materializes_bounded_receipt_and_banks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _module()
+    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
     labels = _labels()
     artifact_root = tmp_path / "artifacts"
     _write_artifacts(module, artifact_root, labels)
@@ -166,8 +169,11 @@ def test_replay_materializes_bounded_receipt_and_banks(tmp_path: Path) -> None:
     assert saved["provenance"]["policy"]["fallback_allowed"] is False
 
 
-def test_replay_fails_clearly_on_frozen_bank_tolerance_mismatch(tmp_path: Path) -> None:
+def test_replay_fails_clearly_on_frozen_bank_tolerance_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _module()
+    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
     labels = _labels()
     artifact_root = tmp_path / "artifacts"
     _write_artifacts(module, artifact_root, labels)

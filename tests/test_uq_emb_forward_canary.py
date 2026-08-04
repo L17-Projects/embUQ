@@ -78,6 +78,8 @@ def test_summarize_batch_rejects_nonfinite_and_nonpositive_uncertainty() -> None
     result = module._summarize_batch(valid, expected_rows=3, expected_columns=2)
 
     assert result["shape"] == [3, 2]
+    assert result["predictions"] == valid["Batch Reference Evaluations"]
+    assert result["standard_deviations"] == valid["Batch Standard Deviation"]
     assert result["prediction_min"] == 1.0
     assert result["standard_deviation_max"] == pytest.approx(0.4)
 

@@ -26,7 +26,13 @@ def _load_module():
     return module
 
 
-def _receipt(site: str, root: str, prediction: float = 1.25) -> dict:
+def _receipt(
+    site: str,
+    root: str,
+    prediction: float = 1.25,
+    *,
+    interior_prediction: float = 1.5,
+) -> dict:
     return {
         "schema_version": "mesouq.uq_emb.forward_canary.v1",
         "status": "passed",
@@ -50,7 +56,19 @@ def _receipt(site: str, root: str, prediction: float = 1.25) -> dict:
         },
         "datasets": [
             {
+                "dataset_name": "indentation_3.2um",
+                "shape": [1, 3],
                 "prediction_min": prediction,
+                "prediction_max": 2.0,
+                "predictions": [[prediction, interior_prediction, 2.0]],
+                "standard_deviation_min": 0.1,
+                "standard_deviation_max": 0.3,
+                "standard_deviations": [[0.1, 0.2, 0.3]],
+                "reference_points": [1.0, 2.0, 3.0],
+                "reference_data": [4.0, 5.0, 6.0],
+                "reference_input_sha256": "e" * 64,
+                "parameter_batch": [[1.0, 2.0, 3.0, 4.0]],
+                "parameter_batch_sha256": "f" * 64,
                 "path": f"{root}/model.pkl",
                 "sha256": "a" * 64,
                 "data_file": f"{root}/data.dat",
@@ -85,7 +103,18 @@ def test_comparison_rejects_scientific_difference(tmp_path: Path) -> None:
     _write(karolina, _receipt("karolina", "/scratch"))
     _write(vega, _receipt("vega", "/ceph", prediction=1.5))
 
-    with pytest.raises(ValueError, match="payloads differ"):
+    with pytest.raises(ValueError, match="Full forward-canary predictions differ"):
+        module.compare_receipts(karolina, vega, expected_agent="sonovue")
+
+
+def test_comparison_rejects_interior_difference_with_same_extrema(tmp_path: Path) -> None:
+    module = _load_module()
+    karolina = tmp_path / "karolina.json"
+    vega = tmp_path / "vega.json"
+    _write(karolina, _receipt("karolina", "/scratch", interior_prediction=1.5))
+    _write(vega, _receipt("vega", "/ceph", interior_prediction=1.75))
+
+    with pytest.raises(ValueError, match="Full forward-canary predictions differ"):
         module.compare_receipts(karolina, vega, expected_agent="sonovue")
 
 

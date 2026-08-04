@@ -167,17 +167,34 @@ def test_materialize_validates_frozen_inputs_and_writes_receipt(tmp_path: Path) 
     accepted_manifest = {
         "paper_id": module.PAPER_ID,
         "artifact_set_id": "accepted-production-outputs-202607",
+        "artifact_set_dir": module.ACCEPTED_SET,
         "locked": True,
-        "files": [{"path": config_relative, "sha256": _sha256(config_path)}],
+        "file_count": 1,
+        "logical_size_bytes": config_path.stat().st_size,
+        "files": [
+            {
+                "path": config_relative,
+                "size_bytes": config_path.stat().st_size,
+                "sha256": _sha256(config_path),
+            }
+        ],
     }
+    dependency_files = [
+        {
+            "path": relative,
+            "size_bytes": (dependency_root / relative).stat().st_size,
+            "sha256": _sha256(dependency_root / relative),
+        }
+        for relative in dependency_relatives
+    ]
     dependency_manifest = {
         "paper_id": module.PAPER_ID,
         "artifact_set_id": "frozen-runtime-dependencies-202607",
+        "artifact_set_dir": module.DEPENDENCY_SET,
         "locked": True,
-        "files": [
-            {"path": relative, "sha256": _sha256(dependency_root / relative)}
-            for relative in dependency_relatives
-        ],
+        "file_count": len(dependency_files),
+        "logical_size_bytes": sum(item["size_bytes"] for item in dependency_files),
+        "files": dependency_files,
     }
     (manifest_root / f"{module.ACCEPTED_SET}.files.json").write_text(
         json.dumps(accepted_manifest), encoding="utf-8"
@@ -206,6 +223,8 @@ def test_materialize_validates_frozen_inputs_and_writes_receipt(tmp_path: Path) 
     assert receipt["dependency_manifest_sha256"] == _sha256(
         manifest_root / f"{module.DEPENDENCY_SET}.files.json"
     )
+    assert receipt["accepted_source_verification"]["status"] == "PASS"
+    assert receipt["dependency_verification"]["status"] == "PASS"
     assert len(receipt["provenance"]["git_commit"]) == 40
     assert yaml.safe_load(output_config.read_text(encoding="utf-8"))["out"] == str(
         (tmp_path / "run").resolve()
@@ -280,8 +299,17 @@ def test_materialize_rejects_mutated_dependency(tmp_path: Path) -> None:
             {
                 "paper_id": module.PAPER_ID,
                 "artifact_set_id": "accepted-production-outputs-202607",
+                "artifact_set_dir": module.ACCEPTED_SET,
                 "locked": True,
-                "files": [{"path": config_relative, "sha256": _sha256(config_path)}],
+                "file_count": 1,
+                "logical_size_bytes": config_path.stat().st_size,
+                "files": [
+                    {
+                        "path": config_relative,
+                        "size_bytes": config_path.stat().st_size,
+                        "sha256": _sha256(config_path),
+                    }
+                ],
             }
         ),
         encoding="utf-8",
@@ -291,14 +319,23 @@ def test_materialize_rejects_mutated_dependency(tmp_path: Path) -> None:
             {
                 "paper_id": module.PAPER_ID,
                 "artifact_set_id": "frozen-runtime-dependencies-202607",
+                "artifact_set_dir": module.DEPENDENCY_SET,
                 "locked": True,
-                "files": [{"path": bank_relative, "sha256": "0" * 64}],
+                "file_count": 1,
+                "logical_size_bytes": bank_path.stat().st_size,
+                "files": [
+                    {
+                        "path": bank_relative,
+                        "size_bytes": bank_path.stat().st_size,
+                        "sha256": "0" * 64,
+                    }
+                ],
             }
         ),
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="hash mismatch"):
+    with pytest.raises(ValueError, match="content mismatch"):
         module.materialize(
             agent="definity",
             artifact_root=artifact_root,

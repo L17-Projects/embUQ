@@ -122,6 +122,15 @@ def render_figure6(
         "execution_provenance": replay_receipt_provenance(
             repo_root=REPO_ROOT,
             runner=Path(__file__),
+            consumed_paths=[
+                renderer,
+                paper_style,
+                paper_style_source,
+                rows,
+                tex_bin_dir,
+                texdeps_dir,
+                *([baseline_pdf] if baseline_pdf is not None else []),
+            ],
         ),
         "renderer": {"path": str(renderer), "sha256": _sha256(renderer)},
         "paper_style": {"path": str(paper_style), "sha256": _sha256(paper_style)},

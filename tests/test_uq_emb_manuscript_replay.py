@@ -57,6 +57,7 @@ def test_compile_manuscript_stages_frozen_files_and_checks_baseline(
         "verify_snapshot",
         lambda **_kwargs: {"status": "PASS", "file_count": len(entries)},
     )
+    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
     real_run = subprocess.run
 
     def fake_run(command, *, cwd, check, **kwargs):

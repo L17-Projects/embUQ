@@ -121,9 +121,14 @@ export MESOUQ_WORKSPACE_ROOT=/home/it4i-bbenvegnen/workspace
 ## HBI configuration materialization
 
 The accepted SonoVue and grouped Definity 50k configurations are immutable
-inputs in `accepted_production_outputs_202607`. Materialize a 10k replay config
-against the verified external dependencies without changing its scientific
-settings:
+inputs in `accepted_production_outputs_202607`. Materialization verifies the
+accepted source config against its locked manifest and verifies every path,
+size, and SHA-256 value in the runtime-dependency set. Replay entry points
+repeat content verification for every locked artifact set they consume and
+fail if any required closeout manifest is missing.
+
+Materialize a 10k replay config against the verified external dependencies
+without changing its scientific settings:
 
 ```bash
 /usr/bin/python3.11 scripts/workflows/emb/uq_emb/materialize_hbi_config.py \
@@ -152,8 +157,8 @@ matching sidecar.
 Before starting HBI, exercise all three mechanical DNNs and every configured
 acoustic likelihood lane for one agent. The command evaluates a three-row batch
 at each diameter, runs the complete acoustic preflight, and records model hashes,
-array shapes, finite ranges, positive observation uncertainties, source grouping,
-and wall time:
+reference inputs, parameter batches, complete predictions, complete standard
+deviations, summary ranges, source grouping, and wall time:
 
 ```bash
 ${MESOUQ_ENV_ROOT}/bin/python \
@@ -181,9 +186,10 @@ Replace `definity` with `sonovue` for the second agent. The Definity receipt mus
 show one grouped acoustic dataset with 14 reference rows. SonoVue must show three
 separate acoustic datasets with one row each.
 
-After copying the two Vega receipts to Karolina, compare the scientific payload
-while ignoring only location, scheduler, interpreter-path, and timing fields.
-The comparison requires the same semantic configuration digest and Git commit:
+After copying the two Vega receipts to Karolina, compare the complete forward
+arrays with `rtol=1e-6` and `atol=1e-8`, while ignoring only location, scheduler,
+interpreter-path, and timing fields. The comparison also requires identical
+reference-input digests, semantic configuration digests, and Git commits:
 
 ```bash
 /usr/bin/python3.11 scripts/workflows/emb/uq_emb/compare_forward_canaries.py \

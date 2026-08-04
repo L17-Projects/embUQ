@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 import hashlib
 import json
 import os
@@ -30,6 +31,118 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _locked_manifest(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        raise FileNotFoundError(f"Locked UQ_EMB manifest is missing: {path}")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("paper_id") != "UQ_EMB" or payload.get("locked") is not True:
+        raise ValueError(f"Unexpected or unlocked UQ_EMB manifest: {path}")
+    files = payload.get("files")
+    if not isinstance(files, list):
+        raise ValueError(f"Locked UQ_EMB manifest has no files list: {path}")
+    paths = [str(entry.get("path", "")) for entry in files if isinstance(entry, dict)]
+    if len(paths) != len(files) or any(not item for item in paths) or len(set(paths)) != len(paths):
+        raise ValueError(f"Locked UQ_EMB manifest has invalid or duplicate paths: {path}")
+    return payload
+
+
+def _manifest_entries(payload: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    return {str(entry["path"]): entry for entry in payload["files"]}
+
+
+def verify_locked_artifact_root(*, root: Path, manifest_path: Path) -> dict[str, Any]:
+    """Verify every file in a locked artifact set, including absence of extras."""
+    root = root.expanduser().resolve()
+    manifest_path = manifest_path.expanduser().resolve()
+    payload = _locked_manifest(manifest_path)
+    if not root.is_dir():
+        raise FileNotFoundError(f"Locked UQ_EMB artifact root is missing: {root}")
+    symlinks = sorted(path for path in root.rglob("*") if path.is_symlink())
+    if symlinks:
+        raise ValueError(f"Locked UQ_EMB artifact root contains symlinks: {symlinks[0]}")
+
+    expected = _manifest_entries(payload)
+    actual_paths = sorted(path for path in root.rglob("*") if path.is_file())
+    actual_relatives = {path.relative_to(root).as_posix(): path for path in actual_paths}
+    missing = sorted(set(expected) - set(actual_relatives))
+    unexpected = sorted(set(actual_relatives) - set(expected))
+    if missing or unexpected:
+        raise ValueError(
+            f"Locked UQ_EMB artifact inventory mismatch for {root}: "
+            f"missing={missing[:5]}, unexpected={unexpected[:5]}"
+        )
+
+    logical_size = 0
+    for relative, path in actual_relatives.items():
+        record = expected[relative]
+        size = path.stat().st_size
+        logical_size += size
+        if int(record.get("size_bytes", -1)) != size or record.get("sha256") != sha256(path):
+            raise ValueError(f"Locked UQ_EMB artifact content mismatch: {path}")
+
+    expected_count = int(payload.get("file_count", -1))
+    expected_size = int(
+        payload.get("logical_size_bytes", payload.get("total_size_bytes", -1))
+    )
+    if expected_count != len(actual_paths) or expected_size != logical_size:
+        raise ValueError(
+            f"Locked UQ_EMB artifact totals mismatch for {root}: "
+            f"count={len(actual_paths)}/{expected_count}, size={logical_size}/{expected_size}"
+        )
+    return {
+        "status": "PASS",
+        "root": str(root),
+        "manifest": str(manifest_path),
+        "manifest_sha256": sha256(manifest_path),
+        "file_count": len(actual_paths),
+        "logical_size_bytes": logical_size,
+    }
+
+
+def verify_locked_manifest_members(
+    *,
+    root: Path,
+    manifest_path: Path,
+    members: Iterable[Path],
+) -> dict[str, Any]:
+    """Verify selected consumed files against a locked artifact manifest."""
+    root = root.expanduser().resolve()
+    manifest_path = manifest_path.expanduser().resolve()
+    payload = _locked_manifest(manifest_path)
+    expected = _manifest_entries(payload)
+    verified: list[dict[str, Any]] = []
+    for member in members:
+        path = member.expanduser().resolve()
+        try:
+            relative = path.relative_to(root).as_posix()
+        except ValueError as exc:
+            raise ValueError(f"Consumed artifact escapes its locked root: {path}") from exc
+        record = expected.get(relative)
+        if record is None:
+            raise ValueError(f"Consumed artifact is absent from the locked manifest: {path}")
+        if not path.is_file():
+            raise FileNotFoundError(f"Consumed locked artifact is missing: {path}")
+        size = path.stat().st_size
+        digest = sha256(path)
+        if int(record.get("size_bytes", -1)) != size or record.get("sha256") != digest:
+            raise ValueError(f"Consumed locked artifact content mismatch: {path}")
+        verified.append({"path": str(path), "size_bytes": size, "sha256": digest})
+    return {
+        "status": "PASS",
+        "root": str(root),
+        "manifest": str(manifest_path),
+        "manifest_sha256": sha256(manifest_path),
+        "members": verified,
+    }
+
+
+def _artifact_root_for_path(path: Path, artifact_set_dir: str) -> Path | None:
+    for candidate in (path, *path.parents):
+        if candidate.name == artifact_set_dir:
+            return candidate
+    return None
 
 
 def _git(repo_root: Path, *args: str) -> str:
@@ -74,16 +187,50 @@ def replay_receipt_provenance(
     repo_root: Path,
     runner: Path,
     site: str | None = None,
+    consumed_paths: Iterable[Path] = (),
 ) -> dict[str, Any]:
-    """Bind a replay receipt to its runner, Git state, and locked manifests."""
+    """Bind a replay receipt to Git and verify every consumed locked artifact set."""
     repo_root = repo_root.expanduser().resolve()
     runner = runner.expanduser().resolve()
     manifest_root = repo_root / "papers" / "UQ_EMB" / "manifests"
-    manifests = {}
+    manifests: dict[str, dict[str, Any]] = {}
+    payloads: dict[str, dict[str, Any]] = {}
     for name in DEFAULT_CLOSEOUT_MANIFESTS:
         path = manifest_root / name
-        if path.is_file():
-            manifests[name] = {"path": str(path), "sha256": sha256(path)}
+        payloads[name] = _locked_manifest(path)
+        manifests[name] = {"path": str(path), "sha256": sha256(path)}
+
+    resolved_consumed = [path.expanduser().resolve() for path in consumed_paths]
+    roots_to_verify: dict[tuple[str, Path], None] = {}
+    editor_root = repo_root / "papers" / "UQ_EMB" / "editor_submission" / "review2_v1"
+    for consumed in resolved_consumed:
+        if consumed == editor_root or editor_root in consumed.parents:
+            roots_to_verify[("editor_submission_review2_v1.json", editor_root)] = None
+            continue
+        if consumed == repo_root or repo_root in consumed.parents:
+            continue
+        matched = False
+        for name, payload in payloads.items():
+            artifact_set_dir = payload.get("artifact_set_dir")
+            if not isinstance(artifact_set_dir, str) or not artifact_set_dir:
+                continue
+            root = _artifact_root_for_path(consumed, artifact_set_dir)
+            if root is not None:
+                roots_to_verify[(name, root)] = None
+                matched = True
+                break
+        if not matched:
+            raise ValueError(
+                f"External replay input is not covered by a locked UQ_EMB manifest: {consumed}"
+            )
+
+    verified_sets = {
+        f"{name}:{root}": verify_locked_artifact_root(
+            root=root,
+            manifest_path=manifest_root / name,
+        )
+        for name, root in roots_to_verify
+    }
     return {
         "runtime": runtime_provenance(
             repo_root=repo_root,
@@ -91,6 +238,7 @@ def replay_receipt_provenance(
         ),
         "runner": {"path": str(runner), "sha256": sha256(runner)},
         "locked_manifests": manifests,
+        "verified_artifact_sets": verified_sets,
     }
 
 
@@ -158,6 +306,11 @@ def load_materialization_binding(
         if not expected_path.is_file() or payload.get(hash_key) != sha256(expected_path):
             raise ValueError(f"Materialization receipt {hash_key} mismatch: {expected_path}")
 
+    dependency_verification = verify_locked_artifact_root(
+        root=dependency_root,
+        manifest_path=manifest_root / f"{DEPENDENCY_SET}.files.json",
+    )
+
     source_config = Path(str(payload.get("source_config", ""))).expanduser().resolve()
     expected_source_root = artifact_root / ACCEPTED_SET
     try:
@@ -168,6 +321,11 @@ def load_materialization_binding(
         ) from exc
     if not source_config.is_file() or payload.get("source_config_sha256") != sha256(source_config):
         raise ValueError(f"Materialization source config hash mismatch: {source_config}")
+    accepted_source_verification = verify_locked_manifest_members(
+        root=expected_source_root,
+        manifest_path=manifest_root / f"{ACCEPTED_SET}.files.json",
+        members=[source_config],
+    )
 
     materialization_provenance = payload.get("provenance")
     if not isinstance(materialization_provenance, dict):
@@ -190,4 +348,6 @@ def load_materialization_binding(
         "source_config_sha256": payload.get("source_config_sha256"),
         "accepted_manifest_sha256": payload.get("accepted_manifest_sha256"),
         "dependency_manifest_sha256": payload.get("dependency_manifest_sha256"),
+        "accepted_source_verification": accepted_source_verification,
+        "dependency_verification": dependency_verification,
     }

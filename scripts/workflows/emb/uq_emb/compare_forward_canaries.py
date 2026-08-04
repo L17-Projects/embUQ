@@ -9,8 +9,12 @@ import json
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 
 SCHEMA_VERSION = "mesouq.uq_emb.forward_canary_comparison.v1"
+FORWARD_RTOL = 1.0e-6
+FORWARD_ATOL = 1.0e-8
 IGNORED_KEYS = frozenset(
     {
         "config_path",
@@ -34,6 +38,12 @@ IGNORED_KEYS = frozenset(
         "virtual_env",
         "conda_prefix",
         "wall_seconds",
+        "prediction_min",
+        "prediction_max",
+        "predictions",
+        "standard_deviation_min",
+        "standard_deviation_max",
+        "standard_deviations",
     }
 )
 
@@ -67,6 +77,48 @@ def _scientific_payload(value: Any) -> Any:
     return value
 
 
+def _compare_forward_arrays(
+    karolina: dict[str, Any],
+    vega: dict[str, Any],
+) -> list[dict[str, Any]]:
+    karolina_datasets = karolina.get("datasets")
+    vega_datasets = vega.get("datasets")
+    if not isinstance(karolina_datasets, list) or not isinstance(vega_datasets, list):
+        raise ValueError("Forward-canary receipts must contain dataset lists")
+    if len(karolina_datasets) != len(vega_datasets):
+        raise ValueError("Forward-canary dataset counts differ across sites")
+
+    comparisons: list[dict[str, Any]] = []
+    for karolina_row, vega_row in zip(karolina_datasets, vega_datasets, strict=True):
+        dataset_name = str(karolina_row.get("dataset_name", ""))
+        if not dataset_name or dataset_name != str(vega_row.get("dataset_name", "")):
+            raise ValueError("Forward-canary dataset ordering differs across sites")
+        comparison: dict[str, Any] = {"dataset_name": dataset_name}
+        for key in ("predictions", "standard_deviations"):
+            left = np.asarray(karolina_row.get(key), dtype=np.float64)
+            right = np.asarray(vega_row.get(key), dtype=np.float64)
+            if left.shape != right.shape or left.size == 0:
+                raise ValueError(
+                    f"Forward-canary {key} shapes differ for {dataset_name}: "
+                    f"{left.shape} != {right.shape}"
+                )
+            if not np.allclose(left, right, rtol=FORWARD_RTOL, atol=FORWARD_ATOL):
+                difference = np.abs(left - right)
+                raise ValueError(
+                    f"Full forward-canary {key} differ for {dataset_name}: "
+                    f"max_abs={float(np.max(difference))}"
+                )
+            difference = np.abs(left - right)
+            scale = np.maximum(np.maximum(np.abs(left), np.abs(right)), FORWARD_ATOL)
+            comparison[key] = {
+                "shape": list(left.shape),
+                "max_abs_difference": float(np.max(difference)),
+                "max_relative_difference": float(np.max(difference / scale)),
+            }
+        comparisons.append(comparison)
+    return comparisons
+
+
 def compare_receipts(
     karolina_path: Path,
     vega_path: Path,
@@ -90,6 +142,8 @@ def compare_receipts(
     if len(karolina_commit) != 40 or karolina_commit != vega_commit:
         raise ValueError("Forward canaries were not executed from the same Git commit")
 
+    numerical_comparisons = _compare_forward_arrays(karolina, vega)
+
     karolina_science = _scientific_payload(karolina)
     vega_science = _scientific_payload(vega)
     karolina_canonical = _canonical_json(karolina_science)
@@ -105,6 +159,8 @@ def compare_receipts(
         "config_semantic_sha256": semantic_sha,
         "git_commit": karolina_commit,
         "scientific_payload_sha256": digest,
+        "forward_array_tolerances": {"rtol": FORWARD_RTOL, "atol": FORWARD_ATOL},
+        "forward_array_comparisons": numerical_comparisons,
         "ignored_location_or_timing_keys": sorted(IGNORED_KEYS),
         "karolina": {
             "receipt": str(karolina_path.resolve()),

@@ -17,7 +17,11 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[3]
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from replay_provenance import runtime_provenance  # noqa: E402
+from replay_provenance import (  # noqa: E402
+    runtime_provenance,
+    verify_locked_artifact_root,
+    verify_locked_manifest_members,
+)
 
 
 PAPER_ID = "UQ_EMB"
@@ -286,6 +290,15 @@ def materialize(
     dependency_root = artifact_root / DEPENDENCY_SET
 
     source_config = _verified_file(accepted_root, paths["config"], accepted_hashes)
+    accepted_source_verification = verify_locked_manifest_members(
+        root=accepted_root,
+        manifest_path=accepted_manifest_path,
+        members=[source_config],
+    )
+    dependency_verification = verify_locked_artifact_root(
+        root=dependency_root,
+        manifest_path=dependency_manifest_path,
+    )
     verified_dependencies: dict[str, str] = {}
     for relative in (
         paths["bank"],
@@ -364,6 +377,8 @@ def materialize(
         "dependency_manifest": str(dependency_manifest_path.resolve()),
         "dependency_manifest_sha256": _sha256(dependency_manifest_path),
         "verified_dependencies": verified_dependencies,
+        "accepted_source_verification": accepted_source_verification,
+        "dependency_verification": dependency_verification,
         "rewrites": rewrites,
         "provenance": runtime_provenance(
             repo_root=REPO_ROOT,

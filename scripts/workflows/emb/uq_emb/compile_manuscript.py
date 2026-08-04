@@ -215,6 +215,7 @@ def compile_manuscript(
         "execution_provenance": replay_receipt_provenance(
             repo_root=REPO_ROOT,
             runner=Path(__file__),
+            consumed_paths=[bundle_root],
         ),
         "bundle_verification": frozen_report,
         "build_root": str(build_root),

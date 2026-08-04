@@ -51,6 +51,11 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _canonical_sha256(value: Any) -> str:
+    canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def _bounds(
     config: Mapping[str, Any],
     experiment: ExperimentSpec,
@@ -122,6 +127,8 @@ def _summarize_batch(
         raise ValueError("Forward standard deviations must be strictly positive.")
     return {
         "shape": list(expected_shape),
+        "predictions": predictions.tolist(),
+        "standard_deviations": standard_deviations.tolist(),
         "prediction_min": float(np.min(predictions)),
         "prediction_max": float(np.max(predictions)),
         "standard_deviation_min": float(np.min(standard_deviations)),
@@ -220,6 +227,9 @@ def _evaluate_dataset(
         expected_rows=len(_BATCH_FRACTIONS),
         expected_columns=len(reference_points),
     )
+    reference_points_payload = np.asarray(reference_points, dtype=np.float64).tolist()
+    reference_data_payload = np.asarray(reference_data, dtype=np.float64).tolist()
+    parameter_payload = parameters.astype(np.float64).tolist()
     return {
         "dataset_name": experiment.dataset_name(diameter_um),
         "experiment": experiment.name,
@@ -231,7 +241,16 @@ def _evaluate_dataset(
         if experiment.name == "resonance"
         else [float(diameter_um)],
         "parameter_order": ["ka", "kb", "d0", "sigma"],
-        "parameter_batch": parameters.astype(float).tolist(),
+        "parameter_batch": parameter_payload,
+        "parameter_batch_sha256": _canonical_sha256(parameter_payload),
+        "reference_points": reference_points_payload,
+        "reference_data": reference_data_payload,
+        "reference_input_sha256": _canonical_sha256(
+            {
+                "points": reference_points_payload,
+                "data": reference_data_payload,
+            }
+        ),
         "artifacts": artifacts,
         **summary,
     }

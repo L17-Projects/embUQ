@@ -573,6 +573,7 @@ def replay(
         "execution_provenance": replay_receipt_provenance(
             repo_root=REPO_ROOT,
             runner=Path(__file__),
+            consumed_paths=[artifact_root, labels_path, fits_path, banks_path],
         ),
         "provenance": provenance,
         "comparison": comparison,

@@ -266,6 +266,15 @@ def render_figure7(
         "execution_provenance": replay_receipt_provenance(
             repo_root=REPO_ROOT,
             runner=Path(__file__),
+            consumed_paths=[
+                code_root,
+                renderer_inputs,
+                phase1_overlay,
+                phase1_manifest,
+                *([tex_bin_dir] if tex_bin_dir is not None else []),
+                *([texdeps_dir] if texdeps_dir is not None else []),
+                *([baseline_pdf] if baseline_pdf is not None else []),
+            ],
         ),
         "renderer_scripts": {
             name: {"path": str(path), "sha256": _sha256(path)}
