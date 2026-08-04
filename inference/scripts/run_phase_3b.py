@@ -387,7 +387,7 @@ def run_phase_3b(
         experiment_names=target_experiments,
         diameters=target_diameters,
     )
-    for target_index, (exp, diameter_um) in enumerate(selected_targets):
+    for exp, diameter_um in selected_targets:
         parameterization = surrogate_parameterization_for_experiment(exp)
         if is_generic_direct_phase1 and parameterization == DIRECT_KA_KB_SURROGATE_PARAMETERIZATION:
             if exp.name != "compression":
@@ -448,7 +448,7 @@ def run_phase_3b(
         "indentation": compute_indentation_surrogate_batch,
         "resonance": compute_emb_resonance_batch,
     }
-    for exp, diameter_um in selected_targets:
+    for target_index, (exp, diameter_um) in enumerate(selected_targets):
         parameterization = surrogate_parameterization_for_experiment(exp)
         if is_generic_direct_phase1 and parameterization == DIRECT_KA_KB_SURROGATE_PARAMETERIZATION:
             if exp.name != "compression":

@@ -21,6 +21,7 @@ REPO_ROOT = SCRIPT_DIR.parents[3]
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from verify_frozen_submission import verify_snapshot  # noqa: E402
+from replay_provenance import replay_receipt_provenance  # noqa: E402
 
 
 SCHEMA_VERSION = "mesouq.uq_emb.manuscript_replay.v1"
@@ -211,6 +212,10 @@ def compile_manuscript(
     receipt = {
         "schema_version": SCHEMA_VERSION,
         "status": "passed",
+        "execution_provenance": replay_receipt_provenance(
+            repo_root=REPO_ROOT,
+            runner=Path(__file__),
+        ),
         "bundle_verification": frozen_report,
         "build_root": str(build_root),
         "pdflatex": shutil.which(pdflatex) or pdflatex,

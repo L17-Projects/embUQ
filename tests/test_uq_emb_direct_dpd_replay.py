@@ -6,6 +6,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 
 SCRIPT = (
     Path(__file__).resolve().parents[1]
@@ -215,6 +217,26 @@ def test_materializer_requires_explicit_site(tmp_path: Path, monkeypatch) -> Non
         assert "Missing site selector" in str(exc)
     else:  # pragma: no cover
         raise AssertionError("Expected a missing site selector to fail")
+
+
+def test_cli_requires_explicit_accepted_root(tmp_path: Path) -> None:
+    module = _module()
+
+    with pytest.raises(SystemExit) as exc:
+        module.main(
+            [
+                "--accepted-manifest",
+                str(tmp_path / "manifest.json"),
+                "--output-root",
+                str(tmp_path / "output"),
+                "--python-bin",
+                "/verified/python",
+                "--site",
+                "karolina",
+            ]
+        )
+
+    assert exc.value.code == 2
 
 
 def test_materializer_rejects_source_mutated_after_manifest(tmp_path: Path) -> None:

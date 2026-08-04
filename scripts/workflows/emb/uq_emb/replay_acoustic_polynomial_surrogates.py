@@ -26,6 +26,12 @@ from scipy.optimize import LinearConstraint, minimize
 
 sys.dont_write_bytecode = True
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[3]
+sys.path.insert(0, str(SCRIPT_DIR))
+
+from replay_provenance import replay_receipt_provenance  # noqa: E402
+
 
 SCHEMA_VERSION = "mesouq.uq_emb.acoustic_polynomial_replay.v1"
 FIT_POINT_COUNT = 28
@@ -564,6 +570,10 @@ def replay(
     report: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "status": comparison["status"],
+        "execution_provenance": replay_receipt_provenance(
+            repo_root=REPO_ROOT,
+            runner=Path(__file__),
+        ),
         "provenance": provenance,
         "comparison": comparison,
         "outputs": [],

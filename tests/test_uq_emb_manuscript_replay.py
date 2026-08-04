@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 from pathlib import Path
 
 
@@ -56,9 +57,13 @@ def test_compile_manuscript_stages_frozen_files_and_checks_baseline(
         "verify_snapshot",
         lambda **_kwargs: {"status": "PASS", "file_count": len(entries)},
     )
+    real_run = subprocess.run
 
-    def fake_run(command, *, cwd, env, check):
+    def fake_run(command, *, cwd, check, **kwargs):
+        if command[0] == "git":
+            return real_run(command, cwd=cwd, check=check, **kwargs)
         assert check is True
+        env = kwargs["env"]
         assert env["SOURCE_DATE_EPOCH"] == "1785834096"
         if command[0] != "pdflatex":
             return

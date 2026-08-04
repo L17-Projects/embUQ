@@ -60,7 +60,7 @@ Definity `d2` acoustic check is retained with its exact near-MAP provenance
 (0.1482% relative offset in `k_a`) in the machine-readable collection
 manifest.
 
-Define the two site-independent roots before using the staging commands:
+Define the two site-selected roots before using the staging commands:
 
 ```bash
 export MESOUQ_SCRATCH_ROOT=/scratch/project/eu-26-17/eubrieucb/mesouq
@@ -393,5 +393,5 @@ input through the frozen breathing runner. It never launches Mirheo:
 The Definity `d2` acoustic command intentionally retains the user-approved
 `k_a=17812.5` same-protocol point, 0.1482% from the inferred MAP. The other five
 acoustic launch commands are reconstructed from retained MAP and setup
-manifests using the byte-identical frozen runner and protocol values. The plan
+manifests using a commit-pinned compatible replay runner and the frozen protocol values. The plan
 records that the historical shell launch wrapper was not uniformly preserved.

@@ -7,7 +7,7 @@ writes commands for the current site-neutral mechanical runner and the frozen
 breathing protocols.  It never submits a scheduler job or executes Mirheo.
 
 Acoustic commands are reconstructed from the retained MAP rows and exact setup
-protocols.  They use the byte-identical frozen breathing runner, but are not
+protocols.  They use the commit-pinned compatible replay runner, but are not
 claimed to reproduce an unrecorded shell launch wrapper.  Definity d2 is the
 user-accepted 0.1482% near-MAP coordinate and is labeled accordingly.
 """
@@ -27,10 +27,6 @@ from typing import Any, Iterable
 
 
 SCHEMA_VERSION = "mesouq.uq_emb.direct_dpd_replay.v1"
-ACCEPTED_ROOT_DEFAULT = Path(
-    "/scratch/project/eu-26-17/eubrieucb/mesouq/papers/UQ_EMB/artifacts/"
-    "accepted_production_outputs_202607"
-)
 ACCEPTED_ARTIFACT_SET_ID = "accepted-production-outputs-202607"
 VALID_SITES = ("karolina", "vega")
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -684,7 +680,7 @@ def materialize_direct_dpd_replay(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--accepted-root", type=Path, default=ACCEPTED_ROOT_DEFAULT)
+    parser.add_argument("--accepted-root", type=Path, required=True)
     parser.add_argument(
         "--accepted-manifest",
         type=Path,

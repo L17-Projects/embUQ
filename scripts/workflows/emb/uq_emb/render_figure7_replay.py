@@ -22,6 +22,12 @@ from matplotlib.ticker import FuncFormatter
 
 sys.dont_write_bytecode = True
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[3]
+sys.path.insert(0, str(SCRIPT_DIR))
+
+from replay_provenance import replay_receipt_provenance  # noqa: E402
+
 
 SCHEMA_VERSION = "mesouq.uq_emb.figure7_replay.v1"
 FROZEN_BINS = {
@@ -257,6 +263,10 @@ def render_figure7(
     receipt = {
         "schema_version": SCHEMA_VERSION,
         "status": "PASS",
+        "execution_provenance": replay_receipt_provenance(
+            repo_root=REPO_ROOT,
+            runner=Path(__file__),
+        ),
         "renderer_scripts": {
             name: {"path": str(path), "sha256": _sha256(path)}
             for name, path in renderer_paths.items()

@@ -111,7 +111,7 @@ def run_replay(
         python_bin=python_bin,
         stages=stages,
     )
-    config_binding = load_materialization_binding(config_path)
+    config_binding = load_materialization_binding(config_path, repo_root=REPO_ROOT)
     if execute and "phase1" in stages and (output_root / "results_phase_1").exists():
         raise FileExistsError(
             f"Refusing to overwrite existing Phase 1 output under {output_root}. "

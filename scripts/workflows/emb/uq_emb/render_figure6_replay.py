@@ -16,6 +16,12 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[3]
+sys.path.insert(0, str(SCRIPT_DIR))
+
+from replay_provenance import replay_receipt_provenance  # noqa: E402
+
 
 SCHEMA_VERSION = "mesouq.uq_emb.figure6_replay.v1"
 
@@ -113,6 +119,10 @@ def render_figure6(
     receipt = {
         "schema_version": SCHEMA_VERSION,
         "status": "PASS",
+        "execution_provenance": replay_receipt_provenance(
+            repo_root=REPO_ROOT,
+            runner=Path(__file__),
+        ),
         "renderer": {"path": str(renderer), "sha256": _sha256(renderer)},
         "paper_style": {"path": str(paper_style), "sha256": _sha256(paper_style)},
         "rows": {"path": str(rows), "sha256": _sha256(rows), "count": len(retained)},

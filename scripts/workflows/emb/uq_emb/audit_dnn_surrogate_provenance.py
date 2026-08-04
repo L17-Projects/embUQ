@@ -7,8 +7,14 @@ import argparse
 import hashlib
 import json
 import shlex
+import sys
 from pathlib import Path
 from typing import Any, Mapping
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+
+from replay_provenance import replay_receipt_provenance  # noqa: E402
 
 
 PAPER_ID = "UQ_EMB"
@@ -228,6 +234,10 @@ def audit(
         "schema_version": "1.0",
         "paper_id": PAPER_ID,
         "status": "PASS",
+        "execution_provenance": replay_receipt_provenance(
+            repo_root=repo_root,
+            runner=Path(__file__),
+        ),
         "accepted_artifacts": "immutable_verified",
         "exact_retraining": False,
         "retraining_limitation": (

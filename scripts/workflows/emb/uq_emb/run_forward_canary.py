@@ -252,7 +252,7 @@ def run_forward_canary(
         raise ValueError(f"Expected a mapping in {config_path}.")
     InferenceConfig.model_validate(config)
     os.environ["HUQ_INFERENCE_CONFIG"] = str(config_path)
-    config_binding = load_materialization_binding(config_path)
+    config_binding = load_materialization_binding(config_path, repo_root=REPO_ROOT)
 
     preflight = preflight_emb_resonance_config(config, project_root=REPO_ROOT)
     if preflight.get("status") != "passed":
