@@ -45,6 +45,21 @@ def _receipt(
         "config_semantic_sha256": "b" * 64,
         "materialization_receipt": f"{root}/config.materialization.json",
         "materialization_receipt_sha256": site * 16,
+        "accepted_source_verification": {
+            "status": "PASS",
+            "root": f"{root}/accepted",
+            "manifest": f"{root}/accepted.json",
+            "manifest_sha256": "1" * 64,
+            "file_count": 1,
+        },
+        "dependency_verification": {
+            "status": "PASS",
+            "root": f"{root}/dependencies",
+            "manifest": f"{root}/dependencies.json",
+            "manifest_sha256": "2" * 64,
+            "file_count": 200,
+            "logical_size_bytes": 67044794,
+        },
         "provenance": {
             "git_commit": "c" * 40,
             "git_status_clean": True,
