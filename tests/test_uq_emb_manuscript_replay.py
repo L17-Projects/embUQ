@@ -57,7 +57,12 @@ def test_compile_manuscript_stages_frozen_files_and_checks_baseline(
         "verify_snapshot",
         lambda **_kwargs: {"status": "PASS", "file_count": len(entries)},
     )
-    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
+    provenance_calls = []
+    monkeypatch.setattr(
+        module,
+        "replay_receipt_provenance",
+        lambda **kwargs: provenance_calls.append(kwargs) or {},
+    )
     real_run = subprocess.run
 
     def fake_run(command, *, cwd, check, **kwargs):
@@ -90,6 +95,10 @@ def test_compile_manuscript_stages_frozen_files_and_checks_baseline(
     assert [row["target"] for row in receipt["commands"]] == list(module.TARGETS)
     assert receipt["baseline_comparison"]["main.pdf"]["text_matches"] is True
     assert receipt["baseline_comparison"]["main_marked_up.pdf"]["page_count_matches"] is True
+    assert all(
+        isinstance(path, Path)
+        for path in provenance_calls[0]["consumed_paths"]
+    )
     assert (build_root / "uq_emb_manuscript_replay_receipt.json").is_file()
 
 

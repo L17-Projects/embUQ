@@ -209,18 +209,20 @@ def compile_manuscript(
     ):
         raise ValueError(f"Recompiled PDFs differ from the frozen text/page baseline: {baseline_comparison}")
 
+    pdflatex_path = Path(shutil.which(pdflatex) or pdflatex)
+    bibtex_path = Path(shutil.which(bibtex) or bibtex)
     receipt = {
         "schema_version": SCHEMA_VERSION,
         "status": "passed",
         "execution_provenance": replay_receipt_provenance(
             repo_root=REPO_ROOT,
             runner=Path(__file__),
-            consumed_paths=[bundle_root, pdflatex, bibtex],
+            consumed_paths=[bundle_root, pdflatex_path, bibtex_path],
         ),
         "bundle_verification": frozen_report,
         "build_root": str(build_root),
-        "pdflatex": shutil.which(pdflatex) or pdflatex,
-        "bibtex": shutil.which(bibtex) or bibtex,
+        "pdflatex": str(pdflatex_path),
+        "bibtex": str(bibtex_path),
         "commands": command_results,
         "outputs": outputs,
         "baseline_comparison": baseline_comparison,
