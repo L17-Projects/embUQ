@@ -22,6 +22,7 @@ DEFAULT_CLOSEOUT_MANIFESTS = (
     "frozen_legacy_paper_runtime_complete_202606.files.json",
     "frozen_plotting_dependencies_202607.files.json",
     "frozen_runtime_dependencies_202607.files.json",
+    "frozen_tinytex_runtime_202606.files.json",
 )
 
 

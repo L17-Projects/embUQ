@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "paper_id": "UQ_EMB",
+  "artifact_set_id": "frozen-tinytex-runtime-202606",
+  "artifact_set_dir": "frozen_tinytex_runtime_202606",
+  "locked": true,
+  "source_spec_hint": "papers/UQ_EMB/manifests/frozen_tinytex_runtime_202606.staging.json",
+  "destination_root": "$MESOUQ_UQ_EMB_ARTIFACT_ROOT",
+  "entries": [
+    {
+      "artifact_id": "tinytex-runtime",
+      "source": "$MESOUQ_SCRATCH_ROOT/papers/UQ_EMB/repro_staging/tinytex-local-dereferenced",
+      "destination": "tinytex-local"
+    }
+  ]
+}

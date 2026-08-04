@@ -232,7 +232,18 @@ scientific configuration.
 ## Manuscript replay
 
 Compile the immutable editor submission into a fresh scratch directory with
-the frozen TinyTeX toolchain. The command verifies the submission manifest,
+the frozen TinyTeX toolchain. Stage and verify that toolchain once:
+
+```bash
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py stage \
+  --spec papers/UQ_EMB/manifests/frozen_tinytex_runtime_202606.staging.json \
+  --manifest papers/UQ_EMB/manifests/frozen_tinytex_runtime_202606.files.json
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py verify \
+  --root "${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/frozen_tinytex_runtime_202606" \
+  --manifest papers/UQ_EMB/manifests/frozen_tinytex_runtime_202606.files.json
+```
+
+The compile command verifies the submission and toolchain manifests,
 preserves the submitted clean and marked PDFs as baselines, resolves the
 bibliographies and cross-references, and requires matching page counts and
 extracted text for the two main-manuscript PDFs:
@@ -240,8 +251,8 @@ extracted text for the two main-manuscript PDFs:
 ```bash
 /usr/bin/python3.11 scripts/workflows/emb/uq_emb/compile_manuscript.py \
   --build-root "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/manuscript_$(date +%Y%m%dT%H%M%S)" \
-  --pdflatex "${MESOUQ_SCRATCH_ROOT}/runs/jcp_june02_repro_audit_20260628/tinytex-local/bin/x86_64-linux/pdflatex" \
-  --bibtex "${MESOUQ_SCRATCH_ROOT}/runs/jcp_june02_repro_audit_20260628/tinytex-local/bin/x86_64-linux/bibtex"
+  --pdflatex "${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/frozen_tinytex_runtime_202606/tinytex-local/bin/x86_64-linux/pdflatex" \
+  --bibtex "${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/frozen_tinytex_runtime_202606/tinytex-local/bin/x86_64-linux/bibtex"
 ```
 
 The build directory must be absent or empty. A machine-readable
@@ -281,7 +292,7 @@ Define the frozen paths and render into new, empty scratch directories:
 PLOT_ROOT="${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/frozen_plotting_dependencies_202607"
 ACCEPTED_ROOT="${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/accepted_production_outputs_202607"
 LEGACY_ROOT="${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/frozen_legacy_paper_runtime_complete_202606"
-TEX_BIN="${MESOUQ_SCRATCH_ROOT}/runs/jcp_june02_repro_audit_20260628/tinytex-local/bin/x86_64-linux"
+TEX_BIN="${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/frozen_tinytex_runtime_202606/tinytex-local/bin/x86_64-linux"
 
 /usr/bin/python3.11 scripts/workflows/emb/uq_emb/render_figure6_replay.py \
   --renderer "${PLOT_ROOT}/code/figure6/render_figure6.py" \
