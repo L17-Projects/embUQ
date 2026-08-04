@@ -206,7 +206,7 @@ class ResonanceEvaluatorConfig(BaseModel):
     artifact_path: Optional[str] = None
     artifact_sha256: Optional[str] = None
     expected_fixed_kb_dpd: Optional[float] = Field(default=None, gt=0.0)
-    bank_build_tool_path: Optional[str] = None
+    provenance_path_overrides: dict[str, str] = Field(default_factory=dict)
     bank_build_report_path: Optional[str] = None
     bank_build_report_sha256: Optional[str] = None
     independent_go_path: Optional[str] = None

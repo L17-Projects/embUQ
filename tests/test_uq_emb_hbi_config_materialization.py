@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from meso_uq.inference.emb_resonance import _resolve_relocated_provenance_path
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = (
@@ -30,6 +32,19 @@ def _load_module():
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_relocated_provenance_path_uses_explicit_override(tmp_path: Path) -> None:
+    staged = tmp_path / "staged.csv"
+    staged.write_text("frozen\n", encoding="utf-8")
+
+    resolved = _resolve_relocated_provenance_path(
+        tmp_path,
+        "/missing/karolina/workspace/source.csv",
+        {"/missing/karolina/workspace/source.csv": str(staged)},
+    )
+
+    assert resolved == staged.resolve()
 
 
 def _definity_config() -> dict:
@@ -95,9 +110,7 @@ def test_definity_rewrite_preserves_grouped_production_science(tmp_path: Path) -
     assert materialized["hbi_pop_size"] == 10_000
     assert materialized["phase3b_pop_size"] == 10_000
     assert source["out"] == "/old/run"
-    assert materialized["resonance"]["evaluator"]["bank_build_tool_path"] == str(
-        (tmp_path / "dependencies" / module.POLYNOMIAL_BANK_BUILD_TOOL).resolve()
-    )
+    assert materialized["resonance"]["evaluator"]["provenance_path_overrides"] == {}
     assert len(rewrites) == 12
 
 
@@ -115,6 +128,7 @@ def test_materialize_validates_frozen_inputs_and_writes_receipt(tmp_path: Path) 
     dependency_relatives = (
         module.AGENT_PATHS["definity"]["bank"],
         module.POLYNOMIAL_BANK_BUILD_TOOL,
+        *module.PROMOTION_SOURCES.values(),
         module.AGENT_PATHS["definity"]["bank_report"],
         module.AGENT_PATHS["definity"]["independent_go"],
         module.PROMOTION_CONTRACT,
@@ -123,6 +137,31 @@ def test_materialize_validates_frozen_inputs_and_writes_receipt(tmp_path: Path) 
         path = dependency_root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"{relative}\n", encoding="utf-8")
+
+    build_tool_path = dependency_root / module.POLYNOMIAL_BANK_BUILD_TOOL
+    bank_path = dependency_root / module.AGENT_PATHS["definity"]["bank"]
+    bank_path.write_text(
+        json.dumps(
+            {
+                "provenance": {
+                    "build_tool": {
+                        "path": "/frozen/original/freeze_approved_polynomial_banks.py",
+                        "sha256": _sha256(build_tool_path),
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    promotion_records = {}
+    for label, relative in module.PROMOTION_SOURCES.items():
+        staged_path = dependency_root / relative
+        promotion_records[label] = {
+            "path": f"/frozen/original/{staged_path.name}",
+            "sha256": _sha256(staged_path),
+        }
+    promotion_path = dependency_root / module.PROMOTION_CONTRACT
+    promotion_path.write_text(json.dumps(promotion_records), encoding="utf-8")
 
     manifest_root.mkdir()
     accepted_manifest = {
@@ -163,6 +202,10 @@ def test_materialize_validates_frozen_inputs_and_writes_receipt(tmp_path: Path) 
     assert yaml.safe_load(output_config.read_text(encoding="utf-8"))["out"] == str(
         (tmp_path / "run").resolve()
     )
+    evaluator = yaml.safe_load(output_config.read_text(encoding="utf-8"))["resonance"][
+        "evaluator"
+    ]
+    assert len(evaluator["provenance_path_overrides"]) == 4
 
 
 def test_materialize_rejects_mutated_dependency(tmp_path: Path) -> None:

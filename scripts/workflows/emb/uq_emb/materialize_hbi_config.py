@@ -43,6 +43,13 @@ PROMOTION_CONTRACT = "acoustic_surrogates/family_contract/promotion_contract.jso
 POLYNOMIAL_BANK_BUILD_TOOL = (
     "acoustic_surrogates/code/freeze_approved_polynomial_banks.py"
 )
+PROMOTION_SOURCES = {
+    "approved_coefficients": (
+        "acoustic_surrogates/polynomial_fits/free_intercept_squared_frequency_fits.csv"
+    ),
+    "source_labels": "acoustic_surrogates/physical_labels/physical_resonance_labels.csv",
+    "builder": "acoustic_surrogates/code/build_free_intercept_squared_frequency_diagnostic.py",
+}
 ACOUSTIC_DATA = "reference_data/acoustic"
 
 
@@ -111,6 +118,7 @@ def rewrite_hbi_config(
     dependency_root: Path,
     run_root: Path,
     population: int,
+    provenance_path_overrides: Mapping[str, str] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     if agent not in AGENT_PATHS:
         raise ValueError(f"Unsupported UQ_EMB agent: {agent}")
@@ -164,7 +172,6 @@ def rewrite_hbi_config(
         raise ValueError("Frozen production config must define resonance.evaluator")
     for key, relative in (
         ("artifact_path", paths["bank"]),
-        ("bank_build_tool_path", POLYNOMIAL_BANK_BUILD_TOOL),
         ("bank_build_report_path", paths["bank_report"]),
         ("independent_go_path", paths["independent_go"]),
         ("promotion_contract_path", PROMOTION_CONTRACT),
@@ -176,6 +183,13 @@ def rewrite_hbi_config(
             f"/resonance/evaluator/{key}",
             rewrites,
         )
+    _replace(
+        evaluator,
+        "provenance_path_overrides",
+        dict(provenance_path_overrides or {}),
+        "/resonance/evaluator/provenance_path_overrides",
+        rewrites,
+    )
 
     _replace(config, "out", str(run_root.resolve()), "/out", rewrites)
     for key in ("pop_size", "hbi_pop_size", "phase3b_pop_size"):
@@ -209,12 +223,41 @@ def materialize(
     for relative in (
         paths["bank"],
         POLYNOMIAL_BANK_BUILD_TOOL,
+        *PROMOTION_SOURCES.values(),
         paths["bank_report"],
         paths["independent_go"],
         PROMOTION_CONTRACT,
     ):
         verified = _verified_file(dependency_root, relative, dependency_hashes)
         verified_dependencies[relative] = _sha256(verified)
+
+    bank_payload = json.loads((dependency_root / paths["bank"]).read_text(encoding="utf-8"))
+    promotion_payload = json.loads(
+        (dependency_root / PROMOTION_CONTRACT).read_text(encoding="utf-8")
+    )
+    provenance_records = {
+        "build_tool": bank_payload.get("provenance", {}).get("build_tool"),
+        **{
+            label: promotion_payload.get(label)
+            for label in PROMOTION_SOURCES
+        },
+    }
+    provenance_relatives = {
+        "build_tool": POLYNOMIAL_BANK_BUILD_TOOL,
+        **PROMOTION_SOURCES,
+    }
+    provenance_path_overrides: dict[str, str] = {}
+    for label, relative in provenance_relatives.items():
+        record = provenance_records.get(label)
+        if not isinstance(record, Mapping) or not record.get("path") or not record.get("sha256"):
+            raise ValueError(f"Frozen polynomial provenance has no valid {label} binding")
+        if str(record["sha256"]) != dependency_hashes.get(relative):
+            raise ValueError(
+                f"Frozen polynomial provenance hash differs from the staged {label} dependency"
+            )
+        provenance_path_overrides[str(record["path"])] = str(
+            (dependency_root / relative).resolve()
+        )
 
     source = yaml.safe_load(source_config.read_text(encoding="utf-8"))
     if not isinstance(source, dict):
@@ -225,6 +268,7 @@ def materialize(
         dependency_root=dependency_root,
         run_root=run_root,
         population=population,
+        provenance_path_overrides=provenance_path_overrides,
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)

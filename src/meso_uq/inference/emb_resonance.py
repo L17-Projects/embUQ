@@ -382,12 +382,22 @@ def _resolve_project_path(project_root: str | Path, value: Any, field_name: str)
 def _resolve_relocated_provenance_path(
     project_root: str | Path,
     value: Any,
+    overrides: Mapping[str, Any] | None = None,
 ) -> Path:
     """Resolve a pinned workspace artifact after a cross-site relocation."""
 
-    path = Path(str(value or "")).expanduser().resolve()
+    recorded_path = str(value or "")
+    path = Path(recorded_path).expanduser().resolve()
     if path.is_file():
         return path
+
+    replacement = (overrides or {}).get(recorded_path)
+    if replacement:
+        return _resolve_project_path(
+            project_root,
+            replacement,
+            f"resonance.evaluator.provenance_path_overrides[{recorded_path!r}]",
+        )
 
     try:
         workspace_index = path.parts.index("workspace")
@@ -847,18 +857,12 @@ def _validate_polynomial_bank_release(
     build_tool = bank.provenance.get("build_tool")
     if not isinstance(build_tool, Mapping):
         raise ValueError("Polynomial frequency bank has no pinned build tool.")
-    configured_build_tool_path = evaluator.get("bank_build_tool_path")
-    if configured_build_tool_path is None:
-        build_tool_path = _resolve_relocated_provenance_path(
-            project_root,
-            build_tool.get("path"),
-        )
-    else:
-        build_tool_path = _resolve_project_path(
-            project_root,
-            configured_build_tool_path,
-            "resonance.evaluator.bank_build_tool_path",
-        )
+    provenance_path_overrides = evaluator.get("provenance_path_overrides")
+    build_tool_path = _resolve_relocated_provenance_path(
+        project_root,
+        build_tool.get("path"),
+        provenance_path_overrides,
+    )
     if not build_tool_path.is_file():
         raise FileNotFoundError(f"Polynomial bank build tool not found: {build_tool_path}")
     _artifact_sha256(build_tool_path, build_tool.get("sha256"))
@@ -927,6 +931,7 @@ def _validate_polynomial_bank_release(
         source_path = _resolve_relocated_provenance_path(
             project_root,
             record.get("path"),
+            provenance_path_overrides,
         )
         if not source_path.is_file():
             raise FileNotFoundError(f"Polynomial promotion {label} source not found: {source_path}")
