@@ -52,6 +52,61 @@ the persistent artifact root:
 They will be addressed through manifests and explicit staging commands. No
 paper workflow may depend on symlinks into working directories.
 
+The locked accepted-output set contains only the successful July 24 SonoVue
+and July 27 Definity 50k states, their accepted direct-DPD checks, the
+paper-figure exports, and their audit records. Interrupted and cancelled HBI
+states, failed materializations, and Python caches are excluded. The accepted
+Definity `d2` acoustic check is retained with its exact near-MAP provenance
+(0.1482% relative offset in `k_a`) in the machine-readable collection
+manifest.
+
+Define the two site-independent roots before using the staging commands:
+
+```bash
+export MESOUQ_SCRATCH_ROOT=/scratch/project/eu-26-17/eubrieucb/mesouq
+export MESOUQ_UQ_EMB_ARTIFACT_ROOT="${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/artifacts"
+```
+
+Plan the copy and inspect its size without writing any artifact:
+
+```bash
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py plan \
+  --spec papers/UQ_EMB/manifests/accepted_production_outputs_202607.staging.json
+```
+
+Stage the immutable set. The command copies into a temporary directory,
+preserves internal hardlinks, computes SHA-256 values, verifies the temporary
+copy, and only then publishes it atomically:
+
+```bash
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py stage \
+  --spec papers/UQ_EMB/manifests/accepted_production_outputs_202607.staging.json \
+  --manifest papers/UQ_EMB/manifests/accepted_production_outputs_202607.files.json
+```
+
+Verify an existing staged set without modifying it:
+
+```bash
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py verify \
+  --root "${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/accepted_production_outputs_202607" \
+  --manifest papers/UQ_EMB/manifests/accepted_production_outputs_202607.files.json
+```
+
+The DNN weights, force-spectroscopy inputs, acoustic observations, 736 physical
+frequency labels, polynomial coefficients and banks, mass-scaling evidence,
+and surrogate audit records form a separate immutable dependency set. Stage
+and verify it with:
+
+```bash
+export MESOUQ_WORKSPACE_ROOT=/home/it4i-bbenvegnen/workspace
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py stage \
+  --spec papers/UQ_EMB/manifests/frozen_runtime_dependencies_202607.staging.json \
+  --manifest papers/UQ_EMB/manifests/frozen_runtime_dependencies_202607.files.json
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py verify \
+  --root "${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/frozen_runtime_dependencies_202607" \
+  --manifest papers/UQ_EMB/manifests/frozen_runtime_dependencies_202607.files.json
+```
+
 ## Planned command surface
 
 The closeout adds separate, frozen commands for data preparation, DNN training,

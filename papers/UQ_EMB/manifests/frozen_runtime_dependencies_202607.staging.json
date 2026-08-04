@@ -1,0 +1,101 @@
+{
+  "schema_version": "1.0",
+  "paper_id": "UQ_EMB",
+  "artifact_set_id": "frozen-runtime-dependencies-202607",
+  "artifact_set_dir": "frozen_runtime_dependencies_202607",
+  "locked": true,
+  "source_spec_hint": "papers/UQ_EMB/manifests/frozen_runtime_dependencies_202607.staging.json",
+  "destination_root": "$MESOUQ_UQ_EMB_ARTIFACT_ROOT",
+  "entries": [
+    {
+      "artifact_id": "definity-dnn-2p1",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/compression/surrogate/diameters/2.1um",
+      "destination": "mechanical_surrogates/definity/2.1um"
+    },
+    {
+      "artifact_id": "definity-dnn-2p9",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/compression/surrogate/diameters/2.9um",
+      "destination": "mechanical_surrogates/definity/2.9um"
+    },
+    {
+      "artifact_id": "definity-dnn-3p0",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/compression/surrogate/diameters/3.0um",
+      "destination": "mechanical_surrogates/definity/3.0um"
+    },
+    {
+      "artifact_id": "sonovue-dnn-3p2",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/indentation/surrogate/diameters/3.2um",
+      "destination": "mechanical_surrogates/sonovue/3.2um"
+    },
+    {
+      "artifact_id": "sonovue-dnn-3p4",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/indentation/surrogate/diameters/3.4um",
+      "destination": "mechanical_surrogates/sonovue/3.4um"
+    },
+    {
+      "artifact_id": "sonovue-dnn-5p8",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/indentation/surrogate/diameters/5.8um",
+      "destination": "mechanical_surrogates/sonovue/5.8um"
+    },
+    {
+      "artifact_id": "definity-mechanical-reference-data",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/compression/evalkit/data",
+      "destination": "reference_data/mechanical/definity"
+    },
+    {
+      "artifact_id": "sonovue-mechanical-reference-data",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/indentation/evalkit/data",
+      "destination": "reference_data/mechanical/sonovue"
+    },
+    {
+      "artifact_id": "acoustic-reference-data",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/resonance/evalkit/data",
+      "destination": "reference_data/acoustic"
+    },
+    {
+      "artifact_id": "physical-acoustic-labels",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/evidence/physical_resonance_polynomial_emulators_20260722",
+      "destination": "acoustic_surrogates/physical_labels"
+    },
+    {
+      "artifact_id": "acoustic-polynomial-fits",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/evidence/free_intercept_squared_frequency_diagnostic_20260722",
+      "destination": "acoustic_surrogates/polynomial_fits"
+    },
+    {
+      "artifact_id": "acoustic-polynomial-banks",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/evidence/polynomial_hbi_integration_readiness_20260722/banks_v2",
+      "destination": "acoustic_surrogates/frozen_banks"
+    },
+    {
+      "artifact_id": "acoustic-polynomial-independent-audit",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/evidence/polynomial_hbi_independent_audit_20260722",
+      "destination": "acoustic_surrogates/independent_audit"
+    },
+    {
+      "artifact_id": "acoustic-polynomial-family-contract",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/evidence/polynomial_emulator_family_decision_20260722",
+      "destination": "acoustic_surrogates/family_contract"
+    },
+    {
+      "artifact_id": "acoustic-mass-scaling-evidence",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/evidence/matched_coordinate_mass_scaling_20point_gate_audit_20260721T202513Z",
+      "destination": "acoustic_surrogates/mass_scaling_evidence"
+    },
+    {
+      "artifact_id": "acoustic-physical-label-builder",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/build_physical_resonance_polynomial_emulators.py",
+      "destination": "acoustic_surrogates/code/build_physical_resonance_polynomial_emulators.py"
+    },
+    {
+      "artifact_id": "acoustic-polynomial-fit-builder",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/build_free_intercept_squared_frequency_diagnostic.py",
+      "destination": "acoustic_surrogates/code/build_free_intercept_squared_frequency_diagnostic.py"
+    },
+    {
+      "artifact_id": "acoustic-polynomial-bank-freezer",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/fullfluid_hbi_readiness/scripts/freeze_approved_polynomial_banks.py",
+      "destination": "acoustic_surrogates/code/freeze_approved_polynomial_banks.py"
+    }
+  ]
+}

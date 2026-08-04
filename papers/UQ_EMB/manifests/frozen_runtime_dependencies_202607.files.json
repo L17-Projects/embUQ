@@ -1,0 +1,1106 @@
+{
+  "artifact_root_hint": "$MESOUQ_UQ_EMB_ARTIFACT_ROOT",
+  "artifact_set_dir": "frozen_runtime_dependencies_202607",
+  "artifact_set_id": "frozen-runtime-dependencies-202607",
+  "created_at_utc": "2026-08-04T11:08:23.731247+00:00",
+  "file_count": 200,
+  "files": [
+    {
+      "path": "acoustic_surrogates/code/build_free_intercept_squared_frequency_diagnostic.py",
+      "sha256": "72fcf7061ea038ddafcc7a3c5c28c9ced057be31c67d4b96e24e074f3d08e968",
+      "size_bytes": 14880
+    },
+    {
+      "path": "acoustic_surrogates/code/build_physical_resonance_polynomial_emulators.py",
+      "sha256": "8277f07f8f469ecbbcb22af4930df810a21e4656e2ee073a9557a69ddcc0a10d",
+      "size_bytes": 29428
+    },
+    {
+      "path": "acoustic_surrogates/code/freeze_approved_polynomial_banks.py",
+      "sha256": "692d66d7cd6f393918f2feebd8923b427509becbfc6b3e7227812ac0309e81b6",
+      "size_bytes": 17473
+    },
+    {
+      "path": "acoustic_surrogates/family_contract/README.md",
+      "sha256": "86a69b02088e7c1ca846546003b61fcf557bc1201855f5f106d2b3d28a26641a",
+      "size_bytes": 738
+    },
+    {
+      "path": "acoustic_surrogates/family_contract/SHA256SUMS",
+      "sha256": "2ec70a4170eaca2f0a9154465b2320d6ba603aeb3112d4d762111a960d416acd",
+      "size_bytes": 166
+    },
+    {
+      "path": "acoustic_surrogates/family_contract/promotion_contract.json",
+      "sha256": "8efca2d8607a9ae02da714d29aa6b20907a21867ad5f0899c8aa7132264792e2",
+      "size_bytes": 2533
+    },
+    {
+      "path": "acoustic_surrogates/frozen_banks/approved_polynomial_bank_freeze_manifest.json",
+      "sha256": "2fd75e514bdbaa6a7c74b71f544a120807cc8bea5118a60c291f571815e24b3a",
+      "size_bytes": 2747
+    },
+    {
+      "path": "acoustic_surrogates/frozen_banks/definity_approved_free_intercept_squared_frequency_bank.json",
+      "sha256": "9f49004c76e018ee4c380b86ee8a348bb24960f8e42f07f4f774ad2862ee4abc",
+      "size_bytes": 56405
+    },
+    {
+      "path": "acoustic_surrogates/frozen_banks/definity_approved_free_intercept_squared_frequency_bank_report.json",
+      "sha256": "b27194ce4ef48dbcdf5e8a252f5016dd3d7a8989e8a20b820bfee5dce122bcec",
+      "size_bytes": 8442
+    },
+    {
+      "path": "acoustic_surrogates/frozen_banks/definity_approved_free_intercept_squared_frequency_independent_go.json",
+      "sha256": "719f00b00f8a6322bb6f66fde22f97db232762c0b6d36a991d9c56c8e3a351aa",
+      "size_bytes": 1002
+    },
+    {
+      "path": "acoustic_surrogates/frozen_banks/sonovue_approved_free_intercept_squared_frequency_bank.json",
+      "sha256": "c989da643a0d6e53d3b73f00de5e25cffba47ab4b7e64e33a6cf243dbbb12802",
+      "size_bytes": 18668
+    },
+    {
+      "path": "acoustic_surrogates/frozen_banks/sonovue_approved_free_intercept_squared_frequency_bank_report.json",
+      "sha256": "7748d15986a1a9f353ef3cec140332bd335dcc069f40a7519ae5ada78681543e",
+      "size_bytes": 4692
+    },
+    {
+      "path": "acoustic_surrogates/frozen_banks/sonovue_approved_free_intercept_squared_frequency_independent_go.json",
+      "sha256": "9388c0e7af7ca6a5b25f91b7305acabb4095830badc7e8e583a24828fe9b368b",
+      "size_bytes": 1001
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/BLOCK_READINESS10K_R1.md",
+      "sha256": "9381cc3f4f6d3dc88f6e568e3ad2c72f8d0c691915b5efe2ada6832799491298",
+      "size_bytes": 1363
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/BLOCK_STAGED_READINESS10K_R1_V2.md",
+      "sha256": "60b53f47f43ce8028b4c1d87d0388838591e5e43b18a1e580ce07579ec13be5d",
+      "size_bytes": 1285
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/CHECKPOINT.md",
+      "sha256": "2bc8a5a8d6a1e7e993ba538dba8015a5c731d39b45bb3be37f6b763598a5aa63",
+      "size_bytes": 5608
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/GO_READINESS10K_R2_PRESUBMISSION.md",
+      "sha256": "4d15b3b1efc7c75dbf8c685309afe5432c378c2e2c55c868ac49313bcf21e0c1",
+      "size_bytes": 3064
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/HOLD_READINESS10K_R2_FIGURE7_CAPS.md",
+      "sha256": "73aa01cd4ba850ebef46ad393a8692ff0a0d0746a4173949d7c0fc717d2e3a8e",
+      "size_bytes": 1632
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/HOLD_READINESS10K_R3_STALE_ADAPTER_CAPS.md",
+      "sha256": "06478390b5844489cfb876165964ed7199c5efcf53656ddc0642d48397cb4fff",
+      "size_bytes": 2134
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/HOLD_READINESS10K_R4_CANONICAL_SUITE_FAILURES.md",
+      "sha256": "c752133df29ebc3a2f794fba1b620538c247938f57f5a10f715d7a1f154a851a",
+      "size_bytes": 1747
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/IMPLEMENTATION_HANDOFF.md",
+      "sha256": "a2a79ebc3bcd56670624580d00d5b9e83479b01df28cf4adfb430cf5c49ca0dc",
+      "size_bytes": 1586
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/PROVENANCE_VIOLATION_R1_SUBMISSION.md",
+      "sha256": "0aa53f54e6318e05a0b2a617476408ccd7fd8e7149e8375593c248ce9bc932c9",
+      "size_bytes": 1558
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/R2_SCHEDULER_50MIN_SUPPLEMENT.md",
+      "sha256": "077b07d7a4778b55368818170efa6e03e6b0cfbedace2c6341bdc229cc14cb15",
+      "size_bytes": 1016
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/R2_SCHEDULER_MUTATION_SUPPLEMENT.md",
+      "sha256": "e670212615b27ac3aa5ab3fe2d7fcbfb6428af4caf467d0a627fd223d61bccdf",
+      "size_bytes": 1088
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/R2_SUBMISSION_RECEIPT.md",
+      "sha256": "388e5cc77a8599dff39b7e8b9ab4e7dce3b518da031a0fa0d8d45fb3118b39ea",
+      "size_bytes": 1771
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/SHA256SUMS",
+      "sha256": "6813efc0b1bc67e25e698f9b1b15c4c12bd846194714348a3190a37a3a237b27",
+      "size_bytes": 5078
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/audit_checkpoint.py",
+      "sha256": "4b7ae8de54f74e11b35135a9a73e8c0c40820f76245366653a3c50932b4d1974",
+      "size_bytes": 18239
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/audit_frozen_banks.py",
+      "sha256": "4b34213e28befdcb3152f645c8e4d39feb6b6a14bb4311a5ac7b0e39d5e459d0",
+      "size_bytes": 20092
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/audit_only_definity_10k.manifest.json",
+      "sha256": "3eb6d961d68e44b4f063042a968535b24a8e6764c7bca3f509463c099455845b",
+      "size_bytes": 38807
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/audit_only_definity_10k.yaml",
+      "sha256": "d2f5d4f821d6cf45e936599e23bb30365f816d9d059d2ad7a4ac618b8e12369d",
+      "size_bytes": 7954
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/audit_only_definity_callback_benchmark.json",
+      "sha256": "55372df4b627f429df1e1ff077a9e232bad35bde079c62521e803e3e9b0c9b67",
+      "size_bytes": 1275
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/audit_only_sonovue_10k.manifest.json",
+      "sha256": "7f7e0a1aca475fc44b441e13a24db7effa4449b4307fc052a3d20aa09717a057",
+      "size_bytes": 26992
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/audit_only_sonovue_10k.yaml",
+      "sha256": "6c4ffcce4f8fbf82c3b914039a0337a8e14f70b1f83a40b719c88560bcc4179d",
+      "size_bytes": 5806
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/audit_only_sonovue_callback_benchmark.json",
+      "sha256": "b69155895d9176617eae5773ff8159cc5fc66ce03f7fb420b630d7253a70923b",
+      "size_bytes": 1536
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/audit_prepared_configs.py",
+      "sha256": "0d3696a91b469f26bb54182b9308ca5ea04d9e88d05720374836ec8ef5b0bea2",
+      "size_bytes": 9062
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/audit_readiness10k_r2_presubmission.py",
+      "sha256": "9df45293f3ea0efd057c54073d6846effc58eaca9b30c1d9aa55fa14672d8ce3",
+      "size_bytes": 18199
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/audit_readiness10k_r3_presubmission.py",
+      "sha256": "7509b47760e27b124b6784491f7b9552df8e095e7ead1bf1e7f2ff2648af110b",
+      "size_bytes": 19342
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/audit_readiness10k_r4_presubmission.py",
+      "sha256": "34a9b239171088e4543a2c93b3f3a2dd44a4a29ec7e70b958deaf64aee150f57",
+      "size_bytes": 45803
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/callback_benchmark_audit.json",
+      "sha256": "ffbee17aea200067c802fa65e1df023f027d4e2a9324e3367dd55c5a183c3a31",
+      "size_bytes": 2671
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/checkpoint_audit.json",
+      "sha256": "cf9bb8e4f42c009e889f45f6e2bded2177b87a77434dabf031c9f6dfb660eb5c",
+      "size_bytes": 23169
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/checkpoint_audit.stdout.json",
+      "sha256": "cf9bb8e4f42c009e889f45f6e2bded2177b87a77434dabf031c9f6dfb660eb5c",
+      "size_bytes": 23169
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/definity_frozen_bank_independent_go_10k_only.json",
+      "sha256": "c544b3a0bad62c9ec272e247b07f5634d22d00c0e3cad41db545d7f4cec96135",
+      "size_bytes": 1393
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/focused_full_test.log",
+      "sha256": "3a24b9558b631585af0615b0bd43153a060fb4d6ec36857f68985fc1bada2173",
+      "size_bytes": 261
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/focused_test_receipt.json",
+      "sha256": "54c9f4b8c9fceca8ac3163b18583ae5e18a5130b0e1a8d77eac3bc905fb115a4",
+      "size_bytes": 1308
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/frozen_bank_audit.json",
+      "sha256": "e032f371321fc226133f194ff42b9d20af21ba55df2ed95ad5784f13e5e9ad29",
+      "size_bytes": 24501
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/frozen_bank_audit.stdout.json",
+      "sha256": "e032f371321fc226133f194ff42b9d20af21ba55df2ed95ad5784f13e5e9ad29",
+      "size_bytes": 24501
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/frozen_bank_runtime_observations.json",
+      "sha256": "b09d44a6b49ece86a759fd0e4bd6fb8a4fd3c27fc610a6559804991cfc17c7f9",
+      "size_bytes": 617
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/monitor_readiness10k_r2_jobs.sh",
+      "sha256": "1bb15c06731e556d1cde5d809ae1163b0da3c1da4748a63cec319a64f3549192",
+      "size_bytes": 1463
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/prepared_config_audit.json",
+      "sha256": "200bda927342a51427351ac83d77119e6677958e437fd96f5582891dff00be41",
+      "size_bytes": 3663
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/provenance_violation_r1_submission.json",
+      "sha256": "cc44df74fda1aca3ae6a00a407ae8cc6ed2a1b24f4a95c674f694e1d334432f2",
+      "size_bytes": 2787
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r2_scheduler_final_accounting.txt",
+      "sha256": "d18953892adb4f1038a3a39e9f64d92d50203f785df85aaa6a86fecdc877e845",
+      "size_bytes": 439
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r2_scheduler_monitor.log",
+      "sha256": "4ad31c4ac49cc632f254a7d52fcb8bf624649b91261d59e6e5c2ec3c876b8087",
+      "size_bytes": 3945
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r2_scheduler_mutation_audit.json",
+      "sha256": "ea20d535df9a425131739b52dd79ccd56fe0ac3b965e99dd4fe9054af0b9f5ed",
+      "size_bytes": 1384
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r2_submission_audit.json",
+      "sha256": "1356a2ad93a6cbe12282fa445c67a015ee3b9a7fddf0715675184308459649f6",
+      "size_bytes": 3899
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r3_staged_figure7_axis_dynamic_check.json",
+      "sha256": "73f8a2a06d126b54435d02eeb5a635a00bb4d5453f19d497d5595e1dddfd4b64",
+      "size_bytes": 4782
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/definity/likelihood_points_used_for_inference/compression_likelihood_points_2.1um.csv",
+      "sha256": "87dd7a20fa9c782be9ab1bb8d6dffe4f2743a1ea97a445736385430815d02a53",
+      "size_bytes": 56
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/definity/likelihood_points_used_for_inference/compression_likelihood_points_2.9um.csv",
+      "sha256": "8576905d1a1cf78119eabfdea45c1a97824056ffce2ae86ed51bdd6d9ccd2f29",
+      "size_bytes": 56
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/definity/likelihood_points_used_for_inference/compression_likelihood_points_3.0um.csv",
+      "sha256": "33c09fe19595d348cf8b3c99ef2ff0407b06e7f7b9bfd9b66d2785ed37cabe0a",
+      "size_bytes": 56
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/definity/tables/definity_resonance_observations.csv",
+      "sha256": "416fffd1afa8f350ba213fa1a774aa3ba8440962601a2767a73e80b9334a29c7",
+      "size_bytes": 35
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/definity/tables/posterior_scatter_samples.csv",
+      "sha256": "b0cb5a45b695770beb3b7e5182def24b35ad80955c10f14abb47872e6e7b2076",
+      "size_bytes": 1118
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/definity/tables/propagation_seed_curves.csv",
+      "sha256": "5cf5bd869b00abef7f179f1817fca5cfb46c288f8827cbf7991dab196f1a1538",
+      "size_bytes": 227
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/definity/tables/resonance_prediction_summary.csv",
+      "sha256": "8ba6f03960c77b9ccebc2799e31d7089a4e3b22ddfbb156d76ff6e9db84be626",
+      "size_bytes": 173
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/renderer_environment.sh",
+      "sha256": "2d63c9117c3ba11f69a69577e21dce145f848f381577fa251196e653dd5ecea9",
+      "size_bytes": 1840
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/renderer_input_manifest.json",
+      "sha256": "16cc1e6f5bb80e58f8c099edfe479a15e415c9d4543f57e2c8e023f3260b943d",
+      "size_bytes": 12461
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/renderer_input_manifest.yaml",
+      "sha256": "fa8abd1c2612b70b6c4f4e2836e7ac7b957a8955ae8559863fa098b4d1d8e133",
+      "size_bytes": 10543
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/sonovue/artifacts/comparison_artifacts_seed_sweep/tables/propagation_seed_curves.csv",
+      "sha256": "c07bd83e38024fde07aed8c6235d18f7b6cc50e87dc223daddc0e1e79eee2777",
+      "size_bytes": 223
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/sonovue/artifacts/sonovue_emulator_frequency_seed_summary.csv",
+      "sha256": "3c2a8b4f2b32ec683864baaf89e7a81f7caaa10e14d1ae7f2659077f330fdc5c",
+      "size_bytes": 186
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/sonovue/heavy_tables/phase1_indentation_all_seed_ridge_samples.csv",
+      "sha256": "d4a94db841d82b7cd6987fb0f7e7a5cc178f7cf5269b95d9a334ec9aeef23ac2",
+      "size_bytes": 562
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/sonovue/heavy_tables/posterior_scatter_samples.csv",
+      "sha256": "fe1a5bb2cdf7358745fa0135873200b5c895d7128195bd1ce24714483db50431",
+      "size_bytes": 1116
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/sonovue/likelihood_points_used_for_inference/indentation_likelihood_points_3.2um.csv",
+      "sha256": "b806bc96150e93112e1d14acfbed04e47a59b98ed4be9ff9eb2aaa07161b76c5",
+      "size_bytes": 55
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/sonovue/likelihood_points_used_for_inference/indentation_likelihood_points_3.4um.csv",
+      "sha256": "3368af2c1c0af5b6c52f04cf226929fd7ecf352a5a31be7bb9e62cc779d03785",
+      "size_bytes": 55
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/adapter_output/sonovue/likelihood_points_used_for_inference/indentation_likelihood_points_5.8um.csv",
+      "sha256": "cba1452de3434aafc878259c4403820a5dd6c08c51be90f8dc811454a3860bd3",
+      "size_bytes": 55
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/data/acoustic_posterior_predictive.csv",
+      "sha256": "86eb944e540d98d389f2d3067270d3a86dd4d08808ec6956521d40bd23dee07b",
+      "size_bytes": 110
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/data/figure7_posterior_cloud_samples.csv",
+      "sha256": "963ab415fca6fa7d3e5acfacf33e8ad7e4d45c491537db363bcd651a03ede366",
+      "size_bytes": 1506
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/data/mechanical_posterior_predictive_curves.csv",
+      "sha256": "712d6bb0a252eb4c34aae2d08fb9507ae60bac840f8f0c94a202bde25efbc326",
+      "size_bytes": 293
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/data/mechanical_reference_points.csv",
+      "sha256": "d23a621d796f8f01bf301b5c017cacb29cb34797cf713031ca05802de0a9ea33",
+      "size_bytes": 153
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/r4_dynamic_axis_checks/data/mechanical_resonance_predictions.csv",
+      "sha256": "aba65e661781118b136f270c09083269f2219a3cc1a3909a8de73d081d2b5c15",
+      "size_bytes": 312
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/readiness10k_r1_block.json",
+      "sha256": "65a5d7dcb9068a0760c57d6cec3ca808c0897c6326facbe3125930cf18981d44",
+      "size_bytes": 2165
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/readiness10k_r2_figure7_caps_hold.json",
+      "sha256": "3cc1aa90ffa7b43958be2bf15ee7e0ed3492230057b8b07b12b506c0f23ae225",
+      "size_bytes": 1964
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/readiness10k_r2_presubmission_audit.json",
+      "sha256": "9d08a7ae13bc1edbe4b64874f8e2e55704f7e61b1f4e8dd7c556417868983142",
+      "size_bytes": 7577
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/readiness10k_r2_presubmission_go.json",
+      "sha256": "2f61501ee7c4ac7b7ae6881ac334d4928848846f55366fdb2bd3f5b2fa6806f6",
+      "size_bytes": 4269
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/readiness10k_r3_presubmission_audit.json",
+      "sha256": "187f117901f18918c9db2a28142d798be4bf9274d53baaf30309a9834dc1d55e",
+      "size_bytes": 1421
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/readiness10k_r3_stale_adapter_hold.json",
+      "sha256": "eed63bd3ad7b524ff33b9ee20fda1b9904f7b464ac83736f94deb0a1d893e1fc",
+      "size_bytes": 4040
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/readiness10k_r4_presubmission_audit.json",
+      "sha256": "c45205559a91c4c4618db1e6063e18a6c6ea1e0ac06935e5096491f6e2eb5000",
+      "size_bytes": 6394
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/readiness10k_r5_cluster_cancel_failure.json",
+      "sha256": "7d2c75de106b8cfead7285b8f7d1992acf959332cd91a810c1b3f9420f2dd581",
+      "size_bytes": 1469
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/readiness10k_r5_presubmission_audit.json",
+      "sha256": "5d7bbe485d9a6569e5feaaddb53962494bbaf83c453d44fa3cfb0130975a4b0f",
+      "size_bytes": 15389
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/readiness10k_r5_retry1_cluster_cancel_failure.json",
+      "sha256": "aeaa114c53646cd2e2ceb75e3d61d0c01e0f5620d29ce25b7a37d703ddb73157",
+      "size_bytes": 1427
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/readiness10k_r5_retry1_presubmission_audit.json",
+      "sha256": "643f097598060551edab53db51d42809aae25d313fb2c59632e277a4621a692e",
+      "size_bytes": 6321
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/readiness10k_r5_retry2_presubmission_audit.json",
+      "sha256": "ca4ebfa3491f82e0084f1053cd4b84e1a924dee01c29b828ce3e04bf748cac5c",
+      "size_bytes": 7424
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/release_resolver_receipt.json",
+      "sha256": "ebfdbaa0a838103146d5ef39f5fda6bc3601def27bfc78f2bf1fbf3cb6c8d564",
+      "size_bytes": 1329
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/sonovue_frozen_bank_independent_go_10k_only.json",
+      "sha256": "50741818df61d5ef935692f6c2e9917f496cadfce2e0dc2c57a0aa46bad6f475",
+      "size_bytes": 1393
+    },
+    {
+      "path": "acoustic_surrogates/independent_audit/staged_readiness10k_r1_v2_block.json",
+      "sha256": "c04cef563fde06b2405ec7d4e0a8b26d7075ce02ac5d01fd5ba679dd2f11c831",
+      "size_bytes": 1220
+    },
+    {
+      "path": "acoustic_surrogates/mass_scaling_evidence/REPORT.md",
+      "sha256": "9a292a15bdfd24c6405c11ae1d3e975274c1975627de242c609be6ac401daceb",
+      "size_bytes": 8469
+    },
+    {
+      "path": "acoustic_surrogates/mass_scaling_evidence/SHA256SUMS",
+      "sha256": "f96b1e4af866d5291ab57c24331632041d091a0e7556dfbe8f5012c7f73a3917",
+      "size_bytes": 1384
+    },
+    {
+      "path": "acoustic_surrogates/mass_scaling_evidence/angular_scaling_fits.csv",
+      "sha256": "4f6c6e88210a6644afb2fe09274bdbfdfcad3af6dd6827f3f04feb5038725904",
+      "size_bytes": 2602
+    },
+    {
+      "path": "acoustic_surrogates/mass_scaling_evidence/angular_terms_and_peak_scaling.png",
+      "sha256": "2cb148d436cf429629118e6b6e8bac82885eb03d7c83ce308c321f237aceb417",
+      "size_bytes": 265044
+    },
+    {
+      "path": "acoustic_surrogates/mass_scaling_evidence/audit_manifest.json",
+      "sha256": "62e74e3103b52ad855cc0fc50b90e0ec3bc8b8c86ad251c3d940d5971210c9c2",
+      "size_bytes": 5484
+    },
+    {
+      "path": "acoustic_surrogates/mass_scaling_evidence/audit_mass_scaling_gate.py",
+      "sha256": "e50515a6d251b51d10caa0060cdb51881c1c8c4202047273716b2510b2b22c9b",
+      "size_bytes": 42374
+    },
+    {
+      "path": "acoustic_surrogates/mass_scaling_evidence/audit_summary.csv",
+      "sha256": "cb5e7d90479769f5dac9143ce9ca74ff2bfa445d75a5fa70702e56bb5b731077",
+      "size_bytes": 1425
+    },
+    {
+      "path": "acoustic_surrogates/mass_scaling_evidence/audited_20point_records.csv",
+      "sha256": "04117a5d1af4a99bd4cfba789fec5b118366b97de1f7e5b5ad0a884ce77b07ec",
+      "size_bytes": 26601
+    },
+    {
+      "path": "acoustic_surrogates/mass_scaling_evidence/driven_peak_domain_checks.csv",
+      "sha256": "60a09a0dfdd9bd4c4eea278006f618aebc0245df435f959d951ff37f88192eb7",
+      "size_bytes": 7172
+    },
+    {
+      "path": "acoustic_surrogates/mass_scaling_evidence/lambda_free_vs_fixed_residuals.png",
+      "sha256": "2f1f529a282b11a487abb32b00404063db8eec7f4f2e9516ed2ecb244da0ca07",
+      "size_bytes": 215774
+    },
+    {
+      "path": "acoustic_surrogates/mass_scaling_evidence/lambda_leave_one_out.csv",
+      "sha256": "7e8c1796f9a9f4d3a28ce8b646dcc846ba62d94d5adbec6b439774865da20e95",
+      "size_bytes": 6943
+    },
+    {
+      "path": "acoustic_surrogates/mass_scaling_evidence/lambda_model_comparison.csv",
+      "sha256": "cecef19cf57e1dae49de49b7a1149abd2cde0bed1017702b632f27146c97a58f",
+      "size_bytes": 7578
+    },
+    {
+      "path": "acoustic_surrogates/mass_scaling_evidence/lambda_point_influence.csv",
+      "sha256": "f953e5acb64e27af6f9e4990f7f7e2c6c5ba60042be2d9a83323cc51c49f0345",
+      "size_bytes": 12036
+    },
+    {
+      "path": "acoustic_surrogates/mass_scaling_evidence/lambda_wls_influence.png",
+      "sha256": "62ff87d8245c911f964fff331530e0cdbd997afbd652404cc61ecacb613b9606",
+      "size_bytes": 89080
+    },
+    {
+      "path": "acoustic_surrogates/mass_scaling_evidence/package_fit_reproduction_diffs.csv",
+      "sha256": "a9d4008fa32b45d35b32532c51887ff60e6b0c00fcf5a63f2d9b44472e5f08d3",
+      "size_bytes": 480
+    },
+    {
+      "path": "acoustic_surrogates/mass_scaling_evidence/regeneration_commands.txt",
+      "sha256": "2dbc9c9ed8a96b1c491eeda1d311cca58857dff0be1551450afc06fdf13ed42e",
+      "size_bytes": 271
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/INDEPENDENT_AUDIT.md",
+      "sha256": "061b15b1ee1b049957e14367cc747ec068589183a959849f378beac629aeae1e",
+      "size_bytes": 8362
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/REPORT.md",
+      "sha256": "cd521813f454a1067bd0eb477a2ea1c26033bb6f79f4dda3b458dcad9cf7fba6",
+      "size_bytes": 1374
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/SHA256SUMS",
+      "sha256": "7311e274cceefe1e7560371bc59c22e0ea30dc5222c512fc44a9c684c9a0d162",
+      "size_bytes": 1252
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/audit_pre_remediation/INDEPENDENT_AUDIT.md",
+      "sha256": "c9c5e7326a04445f4b6c428e108b16ada3294f823b6f948ae2b732deee5c5308",
+      "size_bytes": 9214
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/audit_pre_remediation/independent_audit.json",
+      "sha256": "8f4dc2901613c993ce687428177f950e001a41402307ee6680b4401ba6e86b7b",
+      "size_bytes": 11930
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/definity_physical_resonance_polynomial_bank.json",
+      "sha256": "7ace56ee24d85ff5b78c2b2869b64676f2e6ce9326de25b751524eb8d2e0e107",
+      "size_bytes": 35223
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/definity_physical_resonance_polynomial_emulators.pdf",
+      "sha256": "790b22634145837656ddf786b5d00964a5ce12f3553832badad36abd77179195",
+      "size_bytes": 93415
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/definity_physical_resonance_polynomial_emulators.png",
+      "sha256": "b3c9c010bd7df3be456dfc9db3e34f2744cc5669e4f612f65b7711f77fa60e5c",
+      "size_bytes": 853486
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/degree_1_vs_2_high_ka_comparison.csv",
+      "sha256": "07ff7ce99f34a0435e8282a8d658c9acefb195fe6d5ff8582168ffe142d18b89",
+      "size_bytes": 9760
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/independent_audit.json",
+      "sha256": "fa3dff43499d2739a252f9fdda77d61dafd6deeeaa24528102a4f50b37494313",
+      "size_bytes": 9939
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/manifest.json",
+      "sha256": "e24d2be3c1914a2c896473af9ade6a7ace2445ccc38daad86d95609c40725646",
+      "size_bytes": 3523
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/physical_resonance_labels.csv",
+      "sha256": "402545fe6d145200a2eeda74d6bfc4a2487ad9b4e70356f10de784bf4dc6773b",
+      "size_bytes": 1046759
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/polynomial_coefficients.csv",
+      "sha256": "6133dc5f8b54aefeafd5afe83bc74c95a8cc99127260b9fe5a0b38a608389afb",
+      "size_bytes": 6064
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/scientific_decision_snapshot.json",
+      "sha256": "f2965764b21e7f3ef9829bb27faeca165c340b2ac52339a9975dec3042b76f87",
+      "size_bytes": 1650
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/sonovue_physical_resonance_polynomial_bank.json",
+      "sha256": "596f732e487c5a61d2e79118e5be0e5bc93d019c1bdd53dbb293004904129743",
+      "size_bytes": 12288
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/sonovue_physical_resonance_polynomial_emulators.pdf",
+      "sha256": "1ff6e61ed37c6d90cdc4c962eda2cd704a58b38652791c09a2c1c5ef09ed01cf",
+      "size_bytes": 43523
+    },
+    {
+      "path": "acoustic_surrogates/physical_labels/sonovue_physical_resonance_polynomial_emulators.png",
+      "sha256": "24ce7e553d52e1c8dbbd13c11faf69e24c114c4ae5d6be62651787fbb45c2e3a",
+      "size_bytes": 346389
+    },
+    {
+      "path": "acoustic_surrogates/polynomial_fits/REPORT.md",
+      "sha256": "a6968fa0502572c02de27e29c184378f6984fd45ac9da787b34212fe22645b91",
+      "size_bytes": 451
+    },
+    {
+      "path": "acoustic_surrogates/polynomial_fits/SHA256SUMS",
+      "sha256": "01c95bc2f95d0cf9ab43350638f6410fddc9201404ad2438f154f8091a694568",
+      "size_bytes": 1145
+    },
+    {
+      "path": "acoustic_surrogates/polynomial_fits/definity_free_intercept_squared_frequency_diagnostic.pdf",
+      "sha256": "ed27612769e3dcae041c55d19d898dac2a3c6f4bfc3e57cbc940ac59e622cab9",
+      "size_bytes": 88195
+    },
+    {
+      "path": "acoustic_surrogates/polynomial_fits/definity_free_intercept_squared_frequency_diagnostic.png",
+      "sha256": "33d3f0d61c5d8d7f5cf9d8f4052e8dcbf8ff119af0aef4d03165d5cc3a9f5ccb",
+      "size_bytes": 850862
+    },
+    {
+      "path": "acoustic_surrogates/polynomial_fits/free_intercept_squared_frequency_fits.csv",
+      "sha256": "91af86a461de7d2fc075c6b774cd781e79d3590c2fa15223bc7eb762dd0deb11",
+      "size_bytes": 8542
+    },
+    {
+      "path": "acoustic_surrogates/polynomial_fits/sonovue_definity_free_intercept_squared_frequency_diagnostic.pdf",
+      "sha256": "34bbb284b7786fd17bb82ace00930122edbd37b18dca6e7ac7ac4ec5040e6478",
+      "size_bytes": 90812
+    },
+    {
+      "path": "acoustic_surrogates/polynomial_fits/sonovue_definity_free_intercept_squared_frequency_diagnostic.png",
+      "sha256": "82c37b6a863e69ec778ac81eb9ffc59bf9ad9b2b7a24a026af000e2f4a673e1a",
+      "size_bytes": 1036068
+    },
+    {
+      "path": "acoustic_surrogates/polynomial_fits/sonovue_free_intercept_squared_frequency_diagnostic.pdf",
+      "sha256": "63632a329a55f656914b2dda51fa7753d11b2df2de6f632095a2cd72b0cf5844",
+      "size_bytes": 42517
+    },
+    {
+      "path": "acoustic_surrogates/polynomial_fits/sonovue_free_intercept_squared_frequency_diagnostic.png",
+      "sha256": "4c60dd3ad9d7104e6d36b5efc02e3a6d939fa7abe8146be50a676d4109bc40db",
+      "size_bytes": 317558
+    },
+    {
+      "path": "acoustic_surrogates/polynomial_fits/summary.json",
+      "sha256": "5a5b8eed6815950793d9da8ef92f42edea7e7de4f4ffe5ae26c69d55bf20aa52",
+      "size_bytes": 1114
+    },
+    {
+      "path": "mechanical_surrogates/definity/2.1um/data/F_Delta.dat",
+      "sha256": "f5228c3e5c4bf67b8073214eba43d3789c814db70bc3b454d4e0a058333ec7cd",
+      "size_bytes": 3991728
+    },
+    {
+      "path": "mechanical_surrogates/definity/2.1um/trained/microbubble_force_BEST.pkl",
+      "sha256": "82c7b75d366d0fb6bc96345ae53d2c205d9afabc10ed70f536175b84507ad79a",
+      "size_bytes": 207864
+    },
+    {
+      "path": "mechanical_surrogates/definity/2.1um/trained/microbubble_force_BNN.pt",
+      "sha256": "378b3ca521ec1b1728aef9783326e8006ae852d09abff7a37875f2edce14e0a9",
+      "size_bytes": 73941
+    },
+    {
+      "path": "mechanical_surrogates/definity/2.9um/data/F_Delta.dat",
+      "sha256": "fdbe453af6fcb188840da6ec8fa6bc0256e5b132f23d8d4d1d7f4a9676168069",
+      "size_bytes": 4465211
+    },
+    {
+      "path": "mechanical_surrogates/definity/2.9um/trained/microbubble_force_BEST.pkl",
+      "sha256": "33377dfbe835d85b4fa872d35e2386797774e1c90e378f7f51c52fe823237777",
+      "size_bytes": 539862
+    },
+    {
+      "path": "mechanical_surrogates/definity/2.9um/trained/microbubble_force_BNN.pt",
+      "sha256": "2ec78945b4ec5029614fc9c4451e584371b654cc75bfedd4e13c535157e48a53",
+      "size_bytes": 73941
+    },
+    {
+      "path": "mechanical_surrogates/definity/3.0um/data/F_Delta.dat",
+      "sha256": "d2b2f7d8747e665d722a6bb7ffa4d8b02d5b1ed5f3b3e0c48bbeb2b470bedc76",
+      "size_bytes": 4059384
+    },
+    {
+      "path": "mechanical_surrogates/definity/3.0um/trained/microbubble_force_BEST.pkl",
+      "sha256": "b26854e877129257dd1d4db00f9ec715296dc94b7b6cf39277dc6ec65a35573e",
+      "size_bytes": 57311
+    },
+    {
+      "path": "mechanical_surrogates/definity/3.0um/trained/microbubble_force_BNN.pt",
+      "sha256": "c1640e43101b3b824c020efff12d1f87a8845fb67c7ec86578df2f7989daf782",
+      "size_bytes": 73941
+    },
+    {
+      "path": "mechanical_surrogates/sonovue/3.2um/data/samples_all.dat",
+      "sha256": "635ef0871ecd3cfc56bea5e4d77b4cf3331d093dbf99c2f72f99291feadd1012",
+      "size_bytes": 11404504
+    },
+    {
+      "path": "mechanical_surrogates/sonovue/3.2um/trained/microbubble_displacement_BEST.pkl",
+      "sha256": "a620862f6c8a140648d26f33746cd1573ae5dc9215e6d277476159e36b9d5dfa",
+      "size_bytes": 140988
+    },
+    {
+      "path": "mechanical_surrogates/sonovue/3.2um/trained/microbubble_displacement_BNN.pt",
+      "sha256": "25e16eec3ffc6f65d1676cdb9a4c4af329cdd7f7837965a2ac277b491d37b6f4",
+      "size_bytes": 74061
+    },
+    {
+      "path": "mechanical_surrogates/sonovue/3.4um/data/samples_all.dat",
+      "sha256": "b3138accbac70e1e3e35c40db0dda1a3eeaf62c148cf9d79670fd6e52559fae9",
+      "size_bytes": 23985672
+    },
+    {
+      "path": "mechanical_surrogates/sonovue/3.4um/trained/microbubble_displacement_BEST.pkl",
+      "sha256": "c1de5e63a80d263d771f64da25077ab092030473c6ed420f153c2e0aff66e393",
+      "size_bytes": 74782
+    },
+    {
+      "path": "mechanical_surrogates/sonovue/5.8um/data/samples_all.dat",
+      "sha256": "fff4b13944293a4d9952bddf115e01750b97370092a3dd9bf041d98971ffcd6f",
+      "size_bytes": 11405457
+    },
+    {
+      "path": "mechanical_surrogates/sonovue/5.8um/trained/microbubble_displacement_BEST.pkl",
+      "sha256": "7bd636c70cc5d2ef47c050f94ab6de74981048ff94dcbf8c5a1f8b5908397d4c",
+      "size_bytes": 140988
+    },
+    {
+      "path": "reference_data/acoustic/README.md",
+      "sha256": "5973eddc214518ecac40cbdd281407c38e46ae84eaed2e5df47fe772f01eecb3",
+      "size_bytes": 582
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_0.28um.dat",
+      "sha256": "10fa7ec34c2c26aa21e4fdc3d68e3ec51db5502a4454ccdb832ce7a81ea12e94",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_0.54um.dat",
+      "sha256": "9a727304097cd7eb5acf337ddd6705d74a3390054d389966b862bc276390859b",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_0.6um.dat",
+      "sha256": "f67c83e1109b9914683e284c381c9b95e4c3fa03bab69868da172822d31ff8db",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_0.7um.dat",
+      "sha256": "053adcc1a3ce843584f08219bc1cee347e4234c6d5171005ba248ea033d614ae",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_0.8um.dat",
+      "sha256": "3a9da9dd386037f2b83b41f76aebca975eb000cb991bc1ded92ca3c2fe66a7e6",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_1.3um.dat",
+      "sha256": "360c5681e8f82596a333fd90d780c10506ca0ceb9219de617eb4c5540f6ecab8",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_10.09um.dat",
+      "sha256": "59987fd1ceb627169a340d59309dec716a52ba0c4021a5c0373955a4892a75a5",
+      "size_bytes": 37
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_10.0um.dat",
+      "sha256": "09c5f03b5dee8d8eef25898f3b7d59bc556d2d03545c089fe82c0281569aad3d",
+      "size_bytes": 37
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_11.2um.dat",
+      "sha256": "12d19287f9223dcad3c961e003b32ea29dea68c6208434a710e1da4c04007bbf",
+      "size_bytes": 37
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_4.68um.dat",
+      "sha256": "8e0367f761362501697c13baa09f0fbddd2f0e11a6a67a637965ce342be3090b",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_5.18um.dat",
+      "sha256": "8c314e954177f533fb310cb762b290aab2099acd89087d4c6262aadbe83ea588",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_5.59um.dat",
+      "sha256": "7379da6f3f4fd89f308f2d1b29cf5ea6cc87ac583a1c8982e006846da8b7a5e6",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_6.0um.dat",
+      "sha256": "7acee1a9d9e35f0370bdcfb2991e6be165910925a7b3bd301d51d4cfe9763093",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_6.18um.dat",
+      "sha256": "420cd4908915fb5e7c1fcd919e21657ecf872624576027b248cda94ec64e8cc1",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_7.08um.dat",
+      "sha256": "8c1cde5f4072be2d349650aa297ace628162fe7a4341a87e3dc84905beebc359",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_7.29um.dat",
+      "sha256": "e4f93683828d1fe88e6debddba424c2365f4a77aed138dadc83ba3272a09a57e",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_7.2um.dat",
+      "sha256": "608281dc3a0f720b68db44a90197ce599891634c8d672cb0a512065bdac1324a",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_7.86um.dat",
+      "sha256": "3594560f9b787a6d975f6f6070a1a2bb7f4accf1b88c66e16f3b355856bf1593",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_8.67um.dat",
+      "sha256": "782f5f7b6fd57f1e7f7f490992663da04b6c7b6b1cde24eef93e883124cc560a",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/definity_resonance_data_8.87um.dat",
+      "sha256": "186fc57bc1f53cfb796c92fa5b0d36c666de2fa66fa31be35703a72bd5474be5",
+      "size_bytes": 36
+    },
+    {
+      "path": "reference_data/acoustic/resonance_data_2.6um.dat",
+      "sha256": "84d14987332ca10387b69565613cc4360ffe90a863c2da87775bfb98f5f0639b",
+      "size_bytes": 34
+    },
+    {
+      "path": "reference_data/acoustic/resonance_data_3.2um.dat",
+      "sha256": "ab6ea89b943a62a61c2f0956d6621fdcea277ad8f267542bc76b25f34b419fc7",
+      "size_bytes": 34
+    },
+    {
+      "path": "reference_data/acoustic/resonance_data_4.0um.dat",
+      "sha256": "91634532fda280566f5babad66406a2a1e1b33394374e0511498fe08a86aedf3",
+      "size_bytes": 34
+    },
+    {
+      "path": "reference_data/mechanical/definity/README.md",
+      "sha256": "9c00738db27457e581a2fb998da8ec6442cd2c702a2078eb345ce6984b7057f2",
+      "size_bytes": 303
+    },
+    {
+      "path": "reference_data/mechanical/definity/compression_data_2.1um.dat",
+      "sha256": "fa13cf34b77bff6897954bfea5167c18de553668b82d5dd7274c53da85b2c292",
+      "size_bytes": 1246
+    },
+    {
+      "path": "reference_data/mechanical/definity/compression_data_2.9um.dat",
+      "sha256": "454b0db8f4a8d7ba66ed0fb95908143d84cb3e35ffd3381a53e70e7e8d306a37",
+      "size_bytes": 746
+    },
+    {
+      "path": "reference_data/mechanical/definity/compression_data_3.0um.dat",
+      "sha256": "0ad513a23e6acd1d33004bd795718bc0a3afd8be6a0616591c418a2abd206ae9",
+      "size_bytes": 1146
+    },
+    {
+      "path": "reference_data/mechanical/definity/data_1.csv",
+      "sha256": "4e01419ba6884e11695f187ade91d248cc05987ed80b736adf87fe2f0f28aba6",
+      "size_bytes": 1082
+    },
+    {
+      "path": "reference_data/mechanical/definity/data_1_interp.dat",
+      "sha256": "da57fef38826470c77879d582fd55868b9a4108aa5d6e480dd98d662c05bcb55",
+      "size_bytes": 1232
+    },
+    {
+      "path": "reference_data/mechanical/definity/data_2.csv",
+      "sha256": "c93185652bb6a6917c65c1ca7995a5b1a75341f225a249debc620ee086f878ea",
+      "size_bytes": 712
+    },
+    {
+      "path": "reference_data/mechanical/definity/data_2_interp.dat",
+      "sha256": "e7a868ac2d088e6d47157ec8f270b253e6a1e6c0f4c1b671cec3bd6892d1b800",
+      "size_bytes": 732
+    },
+    {
+      "path": "reference_data/mechanical/definity/data_3.csv",
+      "sha256": "4a737d2a3b96d3e00fda1c118ac93f8e0b3d0c42ec5fb3de0efa357be6fb41c4",
+      "size_bytes": 1003
+    },
+    {
+      "path": "reference_data/mechanical/definity/data_3_interp.dat",
+      "sha256": "8e20921d162551ddd2b0b04a3e78242c21ff986b004b08ebc15b276907d34deb",
+      "size_bytes": 1132
+    },
+    {
+      "path": "reference_data/mechanical/definity/plot_reference_data.py",
+      "sha256": "12c7af56d688217a5ea53e74aa2a3bd745aecf75db4be580fe7b01961235037f",
+      "size_bytes": 6997
+    },
+    {
+      "path": "reference_data/mechanical/sonovue/README.md",
+      "sha256": "ec61568d76bfc15010b2e038b2b1731c00b2c67b26d57f8372d283deee7eb903",
+      "size_bytes": 314
+    },
+    {
+      "path": "reference_data/mechanical/sonovue/data_morris_3.19.csv",
+      "sha256": "6be74ffb62b347ebab6e48c7dab2fde90131be0d2b5c99c58138eac8771aacc5",
+      "size_bytes": 1340
+    },
+    {
+      "path": "reference_data/mechanical/sonovue/data_morris_3.40.csv",
+      "sha256": "e0054a2b4b71a77eeea0870f17802aab05c500982d833edd6a7a92b9a0ca3c47",
+      "size_bytes": 1874
+    },
+    {
+      "path": "reference_data/mechanical/sonovue/data_morris_3.40_old.csv",
+      "sha256": "f7ad1237a586fba7ef8082a823c8b3d7b0b725b1a41ea7493d998cba1a616d4b",
+      "size_bytes": 983
+    },
+    {
+      "path": "reference_data/mechanical/sonovue/data_morris_5.76.csv",
+      "sha256": "eda893365ea473d2ce33ef2ee2606b922b771c364638862c75351288ed9af836",
+      "size_bytes": 945
+    },
+    {
+      "path": "reference_data/mechanical/sonovue/indentation_data_3.2um.dat",
+      "sha256": "7c420a88f07f1afdecf4ad3234e80aa7974160de1115386a0e7a6d86e18b337c",
+      "size_bytes": 1496
+    },
+    {
+      "path": "reference_data/mechanical/sonovue/indentation_data_3.2um.dat.filtered",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "reference_data/mechanical/sonovue/indentation_data_3.2um.dat.full",
+      "sha256": "bc7e5b3ed7f4a1c8411e040bee0c8a99888b07a1d66a0f49bcffd6f10cebe901",
+      "size_bytes": 1646
+    },
+    {
+      "path": "reference_data/mechanical/sonovue/indentation_data_3.4um.dat",
+      "sha256": "e7f4ef72352bf87f8dffe53f9cdd0beb51978d2c16048ff1679ef610c0649aed",
+      "size_bytes": 1046
+    },
+    {
+      "path": "reference_data/mechanical/sonovue/indentation_data_3.4um.dat.filtered",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "reference_data/mechanical/sonovue/indentation_data_3.4um.dat.full",
+      "sha256": "561f9434147dc3e03adeac563450d243c0f86abd522777b99648b827344d12dc",
+      "size_bytes": 2346
+    },
+    {
+      "path": "reference_data/mechanical/sonovue/indentation_data_5.8um.dat",
+      "sha256": "dce8fa1c9689dd9dfa0e874e1e1d54ecc93ca47f8da0cd43834dd2735c270b3a",
+      "size_bytes": 996
+    },
+    {
+      "path": "reference_data/mechanical/sonovue/indentation_data_5.8um.dat.filtered",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "reference_data/mechanical/sonovue/indentation_data_5.8um.dat.full",
+      "sha256": "6653a4a17c262d804b00f12320878b25ad26c50687f31e95e9e0b106564fd79a",
+      "size_bytes": 1146
+    }
+  ],
+  "locked": true,
+  "logical_size_bytes": 67044794,
+  "paper_id": "UQ_EMB",
+  "schema_version": "1.0",
+  "selections": [
+    {
+      "artifact_id": "definity-dnn-2p1",
+      "destination": "mechanical_surrogates/definity/2.1um",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/compression/surrogate/diameters/2.1um"
+    },
+    {
+      "artifact_id": "definity-dnn-2p9",
+      "destination": "mechanical_surrogates/definity/2.9um",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/compression/surrogate/diameters/2.9um"
+    },
+    {
+      "artifact_id": "definity-dnn-3p0",
+      "destination": "mechanical_surrogates/definity/3.0um",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/compression/surrogate/diameters/3.0um"
+    },
+    {
+      "artifact_id": "sonovue-dnn-3p2",
+      "destination": "mechanical_surrogates/sonovue/3.2um",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/indentation/surrogate/diameters/3.2um"
+    },
+    {
+      "artifact_id": "sonovue-dnn-3p4",
+      "destination": "mechanical_surrogates/sonovue/3.4um",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/indentation/surrogate/diameters/3.4um"
+    },
+    {
+      "artifact_id": "sonovue-dnn-5p8",
+      "destination": "mechanical_surrogates/sonovue/5.8um",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/indentation/surrogate/diameters/5.8um"
+    },
+    {
+      "artifact_id": "definity-mechanical-reference-data",
+      "destination": "reference_data/mechanical/definity",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/compression/evalkit/data"
+    },
+    {
+      "artifact_id": "sonovue-mechanical-reference-data",
+      "destination": "reference_data/mechanical/sonovue",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/indentation/evalkit/data"
+    },
+    {
+      "artifact_id": "acoustic-reference-data",
+      "destination": "reference_data/acoustic",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/emb/resonance/evalkit/data"
+    },
+    {
+      "artifact_id": "physical-acoustic-labels",
+      "destination": "acoustic_surrogates/physical_labels",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/evidence/physical_resonance_polynomial_emulators_20260722"
+    },
+    {
+      "artifact_id": "acoustic-polynomial-fits",
+      "destination": "acoustic_surrogates/polynomial_fits",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/evidence/free_intercept_squared_frequency_diagnostic_20260722"
+    },
+    {
+      "artifact_id": "acoustic-polynomial-banks",
+      "destination": "acoustic_surrogates/frozen_banks",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/evidence/polynomial_hbi_integration_readiness_20260722/banks_v2"
+    },
+    {
+      "artifact_id": "acoustic-polynomial-independent-audit",
+      "destination": "acoustic_surrogates/independent_audit",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/evidence/polynomial_hbi_independent_audit_20260722"
+    },
+    {
+      "artifact_id": "acoustic-polynomial-family-contract",
+      "destination": "acoustic_surrogates/family_contract",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/evidence/polynomial_emulator_family_decision_20260722"
+    },
+    {
+      "artifact_id": "acoustic-mass-scaling-evidence",
+      "destination": "acoustic_surrogates/mass_scaling_evidence",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/evidence/matched_coordinate_mass_scaling_20point_gate_audit_20260721T202513Z"
+    },
+    {
+      "artifact_id": "acoustic-physical-label-builder",
+      "destination": "acoustic_surrogates/code/build_physical_resonance_polynomial_emulators.py",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/build_physical_resonance_polynomial_emulators.py"
+    },
+    {
+      "artifact_id": "acoustic-polynomial-fit-builder",
+      "destination": "acoustic_surrogates/code/build_free_intercept_squared_frequency_diagnostic.py",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/build_free_intercept_squared_frequency_diagnostic.py"
+    },
+    {
+      "artifact_id": "acoustic-polynomial-bank-freezer",
+      "destination": "acoustic_surrogates/code/freeze_approved_polynomial_banks.py",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/fullfluid_hbi_readiness/scripts/freeze_approved_polynomial_banks.py"
+    }
+  ],
+  "source_spec": "papers/UQ_EMB/manifests/frozen_runtime_dependencies_202607.staging.json"
+}
