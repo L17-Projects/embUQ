@@ -31,8 +31,14 @@ ACCEPTED_ROOT_DEFAULT = Path(
     "/scratch/project/eu-26-17/eubrieucb/mesouq/papers/UQ_EMB/artifacts/"
     "accepted_production_outputs_202607"
 )
+ACCEPTED_ARTIFACT_SET_ID = "accepted-production-outputs-202607"
 VALID_SITES = ("karolina", "vega")
 REPO_ROOT = Path(__file__).resolve().parents[4]
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+
+from replay_provenance import runtime_provenance  # noqa: E402
+
 MECHANICAL_RUNNER = REPO_ROOT / "scripts/platforms/hpc/run_map_mirheo.py"
 SONOVUE_ACOUSTIC_RUNNER = (
     REPO_ROOT / "scripts/workflows/emb/run_emb_free_shell_breathing_protocol.py"
@@ -73,6 +79,62 @@ def _json(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _load_accepted_manifest(manifest_path: Path, accepted_root: Path) -> dict[str, Any]:
+    manifest_path = manifest_path.expanduser().resolve()
+    accepted_root = accepted_root.expanduser().resolve()
+    payload = _json(manifest_path)
+    if payload.get("paper_id") != "UQ_EMB":
+        raise ValueError(f"Unexpected accepted-manifest paper_id: {manifest_path}")
+    if payload.get("artifact_set_id") != ACCEPTED_ARTIFACT_SET_ID:
+        raise ValueError(f"Unexpected accepted artifact_set_id: {manifest_path}")
+    if payload.get("artifact_set_dir") != accepted_root.name:
+        raise ValueError(
+            "Accepted manifest artifact_set_dir does not match the accepted root: "
+            f"{payload.get('artifact_set_dir')!r} != {accepted_root.name!r}"
+        )
+    if payload.get("locked") is not True:
+        raise ValueError(f"Accepted artifact manifest is not locked: {manifest_path}")
+    files = payload.get("files")
+    if not isinstance(files, list) or not files:
+        raise ValueError(f"Accepted artifact manifest has no files: {manifest_path}")
+    records: dict[str, dict[str, Any]] = {}
+    for record in files:
+        relative = str(record.get("path", ""))
+        if not relative or relative in records:
+            raise ValueError(f"Invalid or duplicate accepted manifest path: {relative!r}")
+        records[relative] = dict(record)
+    return {
+        "path": manifest_path,
+        "sha256": _sha256(manifest_path),
+        "root": accepted_root,
+        "records": records,
+    }
+
+
+def _accepted_source(index: dict[str, Any], path: Path) -> dict[str, str]:
+    root = Path(index["root"])
+    resolved = path.expanduser().resolve()
+    try:
+        relative = resolved.relative_to(root).as_posix()
+    except ValueError as exc:
+        raise ValueError(f"Accepted replay input escapes its artifact root: {resolved}") from exc
+    record = index["records"].get(relative)
+    if not isinstance(record, dict):
+        raise ValueError(f"Accepted replay input is absent from the locked manifest: {relative}")
+    if not resolved.is_file():
+        raise FileNotFoundError(f"Accepted replay input is missing: {resolved}")
+    actual_size = resolved.stat().st_size
+    if int(record.get("size_bytes", -1)) != actual_size:
+        raise ValueError(f"Accepted replay input size mismatch: {relative}")
+    actual_sha = _sha256(resolved)
+    if str(record.get("sha256", "")) != actual_sha:
+        raise ValueError(f"Accepted replay input hash mismatch: {relative}")
+    return {
+        "accepted_path": str(resolved),
+        "accepted_sha256": actual_sha,
+    }
+
+
 def _copy_input(source: Path, destination: Path) -> dict[str, str]:
     if not source.is_file():
         raise FileNotFoundError(f"Accepted replay input is missing: {source}")
@@ -98,7 +160,10 @@ def _resolve_site(cli_site: str | None) -> str:
         raise ValueError(
             f"Conflicting site selectors: --site={cli_site} and MESOUQ_SITE={env_site}."
         )
-    return cli_site or env_site or "karolina"
+    site = cli_site or env_site
+    if site is None:
+        raise ValueError("Missing site selector. Pass --site or set MESOUQ_SITE.")
+    return site
 
 
 def _ensure_fresh_output(path: Path) -> None:
@@ -116,6 +181,7 @@ def _dataset_name(experiment: str, diameter_um: float) -> str:
 def _mechanical_manifest(
     *,
     accepted_root: Path,
+    accepted_index: dict[str, Any],
     bubble: dict[str, Any],
     output_root: Path,
 ) -> tuple[Path, Path | None, list[dict[str, str]]]:
@@ -132,6 +198,7 @@ def _mechanical_manifest(
             / f"definity/direct_dpd/mechanical/{bubble_id}/map_workflow/"
             "map_phase3b/phase3b_map_manifest.json"
         )
+        source_record = _accepted_source(accepted_index, source)
         payload = _json(source)
         datasets = payload.get("datasets")
         if not isinstance(datasets, dict) or dataset not in datasets:
@@ -139,9 +206,10 @@ def _mechanical_manifest(
         frozen = dict(payload)
         frozen["datasets"] = {dataset: datasets[dataset]}
         direct_map = None
-        source_hashes = [{"accepted_path": str(source.resolve()), "accepted_sha256": _sha256(source)}]
+        source_hashes = [source_record]
     else:
         source = accepted_root / "sonovue/direct_dpd/inputs/manifest.json"
+        source_record = _accepted_source(accepted_index, source)
         input_manifest = _json(source)
         cases = input_manifest.get("cases")
         if not isinstance(cases, list):
@@ -152,6 +220,7 @@ def _mechanical_manifest(
         map_source = accepted_root / "sonovue/direct_dpd/inputs/force_spectroscopy" / (
             f"indentation_{diameter_um:.1f}um_map.json"
         )
+        map_record = _accepted_source(accepted_index, map_source)
         map_payload = _json(map_source)
         values = dict(zip(map_payload["parameter_names"], map_payload["parameters"], strict=True))
         source_meta = map_payload.get("source")
@@ -175,10 +244,7 @@ def _mechanical_manifest(
                 }
             },
         }
-        source_hashes = [
-            {"accepted_path": str(source.resolve()), "accepted_sha256": _sha256(source)},
-            {"accepted_path": str(map_source.resolve()), "accepted_sha256": _sha256(map_source)},
-        ]
+        source_hashes = [source_record, map_record]
         direct_map = output_root / bubble_id / "mechanical/map_json" / map_source.name
         _copy_input(map_source, direct_map)
 
@@ -192,6 +258,7 @@ def _mechanical_command(
     site: str,
     python_bin: str,
     accepted_root: Path,
+    accepted_index: dict[str, Any],
     bubble: dict[str, Any],
     output_root: Path,
     direct_map: Path | None,
@@ -203,7 +270,8 @@ def _mechanical_command(
     if agent == "sonovue":
         if direct_map is None:
             raise ValueError(f"Missing materialized SonoVue MAP input for {bubble_id}.")
-        provenance_path = accepted_root / f"sonovue/direct_dpd/mechanical/{bubble_id}/provenance.json"
+        provenance_path = _mechanical_protocol_source(accepted_root, bubble)
+        _accepted_source(accepted_index, provenance_path)
         provenance = _json(provenance_path)
         protocol = provenance.get("protocol")
         if not isinstance(protocol, dict):
@@ -238,11 +306,8 @@ def _mechanical_command(
             str(case_root / "_scratch" / dataset),
         ]
 
-    accepted_summary_path = (
-        accepted_root
-        / f"definity/direct_dpd/mechanical/{bubble_id}/map_workflow/map_mirheo/"
-        "map_mirheo_manifest.json"
-    )
+    accepted_summary_path = _mechanical_protocol_source(accepted_root, bubble)
+    _accepted_source(accepted_index, accepted_summary_path)
     accepted_summary = _json(accepted_summary_path)
     return [
         python_bin,
@@ -272,6 +337,17 @@ def _mechanical_command(
     ]
 
 
+def _mechanical_protocol_source(accepted_root: Path, bubble: dict[str, Any]) -> Path:
+    bubble_id = str(bubble["id"])
+    if bubble["agent"] == "sonovue":
+        return accepted_root / f"sonovue/direct_dpd/mechanical/{bubble_id}/provenance.json"
+    return (
+        accepted_root
+        / f"definity/direct_dpd/mechanical/{bubble_id}/map_workflow/map_mirheo/"
+        "map_mirheo_manifest.json"
+    )
+
+
 def _write_single_csv_row(path: Path, fieldnames: list[str], row: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as handle:
@@ -280,12 +356,17 @@ def _write_single_csv_row(path: Path, fieldnames: list[str], row: dict[str, Any]
         writer.writerow(row)
 
 
-def _accepted_hbi_state(accepted_root: Path, bubble: dict[str, Any]) -> Path:
+def _accepted_hbi_state(
+    accepted_root: Path,
+    accepted_index: dict[str, Any],
+    bubble: dict[str, Any],
+) -> Path:
     agent = str(bubble["agent"])
     dataset = _dataset_name(str(bubble["experiment"]), float(bubble["diameter_um"]))
     path = accepted_root / agent / "hbi/results_phase_3b" / dataset / "genLatest.json"
     if not path.is_file():
         raise FileNotFoundError(f"Accepted HBI state is missing: {path}")
+    _accepted_source(accepted_index, path)
     return path
 
 
@@ -305,21 +386,23 @@ def _definity_setup_manifest(accepted_root: Path, bubble_id: str) -> Path:
 
 
 def _acoustic_sources(
-    *, accepted_root: Path, bubble: dict[str, Any]
+    *, accepted_root: Path, accepted_index: dict[str, Any], bubble: dict[str, Any]
 ) -> tuple[Path, dict[str, Any], dict[str, Any], list[dict[str, str]]]:
     bubble_id = str(bubble["id"])
     agent = str(bubble["agent"])
     if agent == "definity":
         setup_source = _definity_setup_manifest(accepted_root, bubble_id)
+        setup_record = _accepted_source(accepted_index, setup_source)
         setup = _json(setup_source)
         map_payload = setup.get("bubble")
         protocol = setup.get("protocol")
         if not isinstance(map_payload, dict) or not isinstance(protocol, dict):
             raise ValueError(f"Accepted Definity acoustic setup is incomplete: {setup_source}")
-        sources = [{"accepted_path": str(setup_source.resolve()), "accepted_sha256": _sha256(setup_source)}]
+        sources = [setup_record]
         return setup_source, map_payload, protocol, sources
 
     manifest_source = accepted_root / f"sonovue/direct_dpd/acoustic/{bubble_id}/manifest.json"
+    manifest_record = _accepted_source(accepted_index, manifest_source)
     manifest = _json(manifest_source)
     results = manifest.get("results")
     if not isinstance(results, list) or len(results) != 1:
@@ -329,7 +412,7 @@ def _acoustic_sources(
     protocol = result.get("setup_protocol")
     if not isinstance(map_payload, dict) or not isinstance(protocol, dict):
         raise ValueError(f"Accepted SonoVue acoustic manifest is incomplete: {manifest_source}")
-    sources = [{"accepted_path": str(manifest_source.resolve()), "accepted_sha256": _sha256(manifest_source)}]
+    sources = [manifest_record]
     return manifest_source, map_payload, protocol, sources
 
 
@@ -393,24 +476,19 @@ def _protocol_command_args(protocol: dict[str, Any]) -> list[str]:
     ]
 
 
-def _acoustic_entry(
-    *, site: str, accepted_root: Path, output_root: Path, python_bin: str, bubble: dict[str, Any]
-) -> dict[str, Any]:
-    bubble_id = str(bubble["id"])
-    setup_source, map_payload, protocol, sources = _acoustic_sources(
-        accepted_root=accepted_root, bubble=bubble
-    )
-    state_source = _accepted_hbi_state(accepted_root, bubble)
-    sources.append({"accepted_path": str(state_source.resolve()), "accepted_sha256": _sha256(state_source)})
-    symbol = str(map_payload.get("symbol", map_payload.get("diameter_symbol")))
-    if not symbol or symbol == "None":
-        raise ValueError(f"Accepted acoustic symbol is missing: {setup_source}")
-    map_copy = output_root / bubble_id / "acoustic/inputs" / f"{symbol}.csv"
-    row = _acoustic_map_row(map_payload, state_source)
-    fieldnames = list(row)
-    _write_single_csv_row(map_copy, fieldnames, row)
+def _acoustic_command(
+    *,
+    site: str,
+    python_bin: str,
+    state_source: Path,
+    map_copy: Path,
+    output_root: Path,
+    bubble_id: str,
+    symbol: str,
+    protocol: dict[str, Any],
+) -> list[str]:
     state_hash = _sha256(state_source)
-    command = [
+    return [
         "env",
         f"MESOUQ_SITE={site}",
         f"MESOUQ_BOUND_MAP_SOURCE_PATH={state_source.resolve()}",
@@ -439,6 +517,42 @@ def _acoustic_entry(
         "--particle-dump-root",
         str(output_root / "_particle_staging" / bubble_id),
     ]
+
+
+def _acoustic_entry(
+    *,
+    site: str,
+    accepted_root: Path,
+    accepted_index: dict[str, Any],
+    output_root: Path,
+    python_bin: str,
+    bubble: dict[str, Any],
+) -> dict[str, Any]:
+    bubble_id = str(bubble["id"])
+    setup_source, map_payload, protocol, sources = _acoustic_sources(
+        accepted_root=accepted_root,
+        accepted_index=accepted_index,
+        bubble=bubble,
+    )
+    state_source = _accepted_hbi_state(accepted_root, accepted_index, bubble)
+    sources.append(_accepted_source(accepted_index, state_source))
+    symbol = str(map_payload.get("symbol", map_payload.get("diameter_symbol")))
+    if not symbol or symbol == "None":
+        raise ValueError(f"Accepted acoustic symbol is missing: {setup_source}")
+    map_copy = output_root / bubble_id / "acoustic/inputs" / f"{symbol}.csv"
+    row = _acoustic_map_row(map_payload, state_source)
+    fieldnames = list(row)
+    _write_single_csv_row(map_copy, fieldnames, row)
+    command = _acoustic_command(
+        site=site,
+        python_bin=python_bin,
+        state_source=state_source,
+        map_copy=map_copy,
+        output_root=output_root,
+        bubble_id=bubble_id,
+        symbol=symbol,
+        protocol=protocol,
+    )
     near_map = bubble_id == "d2"
     return {
         "modality": "acoustic",
@@ -472,6 +586,7 @@ def _source_hashes(paths: Iterable[Path]) -> dict[str, str]:
 def materialize_direct_dpd_replay(
     *,
     accepted_root: Path,
+    accepted_manifest: Path,
     output_root: Path,
     site: str,
     python_bin: str,
@@ -480,6 +595,7 @@ def materialize_direct_dpd_replay(
     accepted_root = accepted_root.expanduser().resolve()
     if not accepted_root.is_dir():
         raise FileNotFoundError(f"Accepted direct-DPD artifact root is missing: {accepted_root}")
+    accepted_index = _load_accepted_manifest(accepted_manifest, accepted_root)
     output_root = output_root.expanduser().resolve()
     _ensure_fresh_output(output_root)
 
@@ -487,7 +603,16 @@ def materialize_direct_dpd_replay(
     for bubble in BUBBLES:
         bubble_id = str(bubble["id"])
         mechanical_manifest, direct_map, mechanical_sources = _mechanical_manifest(
-            accepted_root=accepted_root, bubble=bubble, output_root=output_root
+            accepted_root=accepted_root,
+            accepted_index=accepted_index,
+            bubble=bubble,
+            output_root=output_root,
+        )
+        mechanical_sources.append(
+            _accepted_source(
+                accepted_index,
+                _mechanical_protocol_source(accepted_root, bubble),
+            )
         )
         mechanical = {
             "modality": "mechanical",
@@ -496,6 +621,7 @@ def materialize_direct_dpd_replay(
                 site=site,
                 python_bin=python_bin,
                 accepted_root=accepted_root,
+                accepted_index=accepted_index,
                 bubble=bubble,
                 output_root=output_root,
                 direct_map=direct_map,
@@ -508,6 +634,7 @@ def materialize_direct_dpd_replay(
         acoustic = _acoustic_entry(
             site=site,
             accepted_root=accepted_root,
+            accepted_index=accepted_index,
             output_root=output_root,
             python_bin=python_bin,
             bubble=bubble,
@@ -520,8 +647,15 @@ def materialize_direct_dpd_replay(
         "mode": "static_dry_run_only",
         "submission": "not performed",
         "accepted_artifact_root": str(accepted_root),
+        "accepted_artifact_manifest": str(Path(accepted_index["path"])),
+        "accepted_artifact_manifest_sha256": str(accepted_index["sha256"]),
         "site": site,
         "python_bin": python_bin,
+        "provenance": runtime_provenance(
+            repo_root=REPO_ROOT,
+            site=site,
+            requested_python_bin=python_bin,
+        ),
         "runtime_activation": {
             "required_before_execution": True,
             "site_modules": (
@@ -551,6 +685,12 @@ def materialize_direct_dpd_replay(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--accepted-root", type=Path, default=ACCEPTED_ROOT_DEFAULT)
+    parser.add_argument(
+        "--accepted-manifest",
+        type=Path,
+        required=True,
+        help="Locked manifest for the accepted artifact root.",
+    )
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--site", choices=VALID_SITES, default=None)
     parser.add_argument(
@@ -563,6 +703,7 @@ def main(argv: list[str] | None = None) -> int:
         site = _resolve_site(args.site)
         plan = materialize_direct_dpd_replay(
             accepted_root=args.accepted_root,
+            accepted_manifest=args.accepted_manifest,
             output_root=args.output_root,
             site=site,
             python_bin=args.python_bin,

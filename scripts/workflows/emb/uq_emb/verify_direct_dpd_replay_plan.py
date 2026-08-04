@@ -18,6 +18,7 @@ EXPECTED_BUBBLES = ("d1", "d2", "d3", "d4", "d5", "d6")
 DEFAULT_ACOUSTIC_RUNNER = (
     Path(__file__).resolve().parents[1] / "run_emb_free_shell_breathing_protocol.py"
 )
+DEFAULT_MATERIALIZER = Path(__file__).resolve().parent / "materialize_direct_dpd_replay.py"
 
 
 def _sha256(path: Path) -> str:
@@ -38,6 +39,16 @@ def _load_runner(path: Path) -> Callable[[Path], list[Any]]:
     return module.load_bubbles
 
 
+def _load_materializer(path: Path):
+    spec = importlib.util.spec_from_file_location("uq_emb_direct_dpd_materializer", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Cannot import direct-DPD materializer: {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def _verify_hash(path: Path, expected: str, context: str) -> None:
     if not path.is_file():
         raise FileNotFoundError(f"{context} is missing: {path}")
@@ -56,7 +67,11 @@ def _command_environment(command: list[str]) -> tuple[str, str]:
     return paths[0], hashes[0]
 
 
-def verify(plan_path: Path, acoustic_runner: Path) -> dict[str, Any]:
+def verify(
+    plan_path: Path,
+    acoustic_runner: Path,
+    materializer_path: Path = DEFAULT_MATERIALIZER,
+) -> dict[str, Any]:
     payload = json.loads(plan_path.read_text(encoding="utf-8"))
     if payload.get("schema_version") != EXPECTED_SCHEMA:
         raise ValueError(f"Unexpected replay schema in {plan_path}")
@@ -65,6 +80,21 @@ def verify(plan_path: Path, acoustic_runner: Path) -> dict[str, Any]:
     activation = payload.get("runtime_activation") or {}
     if activation.get("required_before_execution") is not True:
         raise ValueError("Replay plan does not declare the required site-runtime activation")
+
+    materializer = _load_materializer(materializer_path)
+    accepted_root = Path(str(payload.get("accepted_artifact_root", ""))).resolve()
+    accepted_manifest = Path(str(payload.get("accepted_artifact_manifest", ""))).resolve()
+    accepted_index = materializer._load_accepted_manifest(accepted_manifest, accepted_root)
+    if payload.get("accepted_artifact_manifest_sha256") != accepted_index["sha256"]:
+        raise ValueError("Replay plan accepted-manifest hash does not match the locked manifest")
+    provenance = payload.get("provenance") or {}
+    current_provenance = materializer.runtime_provenance(
+        repo_root=materializer.REPO_ROOT,
+        site=str(payload.get("site", "")),
+        requested_python_bin=str(payload.get("python_bin", "")),
+    )
+    if provenance.get("git_commit") != current_provenance["git_commit"]:
+        raise ValueError("Replay plan Git commit does not match the current materializer checkout")
 
     for relative, expected in (payload.get("runtime_source_hashes") or {}).items():
         repository = Path(__file__).resolve().parents[4]
@@ -87,11 +117,64 @@ def verify(plan_path: Path, acoustic_runner: Path) -> dict[str, Any]:
             if not isinstance(command, list) or not command:
                 raise ValueError(f"{bubble_id} {modality} command is missing")
             for source in item.get("source_hashes") or []:
-                _verify_hash(
+                verified = materializer._accepted_source(
+                    accepted_index,
                     Path(source["accepted_path"]),
-                    str(source["accepted_sha256"]),
-                    f"{bubble_id} {modality} accepted source",
                 )
+                if verified != source:
+                    raise ValueError(
+                        f"{bubble_id} {modality} source binding differs from the locked manifest"
+                    )
+
+        expected_bubble = materializer.BUBBLES[len(loaded)]
+        for field in ("id", "agent", "diameter_um", "experiment"):
+            if entry.get(field) != expected_bubble[field]:
+                raise ValueError(f"{bubble_id} metadata differs from the canonical bubble table")
+
+        output_root = plan_path.parent.resolve()
+        direct_map = None
+        if entry["agent"] == "sonovue":
+            direct_map = (
+                output_root
+                / bubble_id
+                / "mechanical/map_json"
+                / f"indentation_{float(entry['diameter_um']):.1f}um_map.json"
+            )
+        expected_mechanical_command = materializer._mechanical_command(
+            site=str(payload["site"]),
+            python_bin=str(payload["python_bin"]),
+            accepted_root=accepted_root,
+            accepted_index=accepted_index,
+            bubble=expected_bubble,
+            output_root=output_root,
+            direct_map=direct_map,
+        )
+        if entry["mechanical"].get("command") != expected_mechanical_command:
+            raise ValueError(f"{bubble_id} mechanical command differs from the canonical command")
+
+        _setup_source, map_payload, protocol, _sources = materializer._acoustic_sources(
+            accepted_root=accepted_root,
+            accepted_index=accepted_index,
+            bubble=expected_bubble,
+        )
+        state_source = materializer._accepted_hbi_state(
+            accepted_root,
+            accepted_index,
+            expected_bubble,
+        )
+        symbol = str(map_payload.get("symbol", map_payload.get("diameter_symbol")))
+        expected_acoustic_command = materializer._acoustic_command(
+            site=str(payload["site"]),
+            python_bin=str(payload["python_bin"]),
+            state_source=state_source,
+            map_copy=Path(entry["acoustic"]["materialized_map_values"]),
+            output_root=output_root,
+            bubble_id=bubble_id,
+            symbol=symbol,
+            protocol=protocol,
+        )
+        if entry["acoustic"].get("command") != expected_acoustic_command:
+            raise ValueError(f"{bubble_id} acoustic command differs from the canonical command")
 
         mechanical = entry["mechanical"]
         _verify_hash(
@@ -141,6 +224,9 @@ def verify(plan_path: Path, acoustic_runner: Path) -> dict[str, Any]:
         "plan": str(plan_path.resolve()),
         "plan_sha256": _sha256(plan_path),
         "site": payload.get("site"),
+        "accepted_artifact_manifest": str(accepted_manifest),
+        "accepted_artifact_manifest_sha256": accepted_index["sha256"],
+        "git_commit": provenance.get("git_commit"),
         "bubble_count": len(loaded),
         "planned_command_count": len(loaded) * 2,
         "dpd_executed": False,
@@ -152,10 +238,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--acoustic-runner", type=Path, default=DEFAULT_ACOUSTIC_RUNNER)
+    parser.add_argument("--materializer", type=Path, default=DEFAULT_MATERIALIZER)
     parser.add_argument("--receipt", type=Path, required=True)
     args = parser.parse_args()
     try:
-        report = verify(args.plan.resolve(), args.acoustic_runner.resolve())
+        report = verify(
+            args.plan.resolve(),
+            args.acoustic_runner.resolve(),
+            args.materializer.resolve(),
+        )
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         parser.exit(2, f"error: {exc}\n")
     args.receipt.parent.mkdir(parents=True, exist_ok=True)

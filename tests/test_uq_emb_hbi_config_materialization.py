@@ -199,6 +199,14 @@ def test_materialize_validates_frozen_inputs_and_writes_receipt(tmp_path: Path) 
     assert output_config.is_file()
     assert Path(receipt["receipt"]).is_file()
     assert receipt["source_config_sha256"] == _sha256(config_path)
+    assert len(receipt["semantic_config_sha256"]) == 64
+    assert receipt["accepted_manifest_sha256"] == _sha256(
+        manifest_root / f"{module.ACCEPTED_SET}.files.json"
+    )
+    assert receipt["dependency_manifest_sha256"] == _sha256(
+        manifest_root / f"{module.DEPENDENCY_SET}.files.json"
+    )
+    assert len(receipt["provenance"]["git_commit"]) == 40
     assert yaml.safe_load(output_config.read_text(encoding="utf-8"))["out"] == str(
         (tmp_path / "run").resolve()
     )
@@ -206,6 +214,50 @@ def test_materialize_validates_frozen_inputs_and_writes_receipt(tmp_path: Path) 
         "evaluator"
     ]
     assert len(evaluator["provenance_path_overrides"]) == 4
+
+
+def test_semantic_config_digest_ignores_only_relocated_roots(tmp_path: Path) -> None:
+    module = _load_module()
+    source = _definity_config()
+    first_root = tmp_path / "karolina-artifacts"
+    second_root = tmp_path / "vega-artifacts"
+    override_sources = {
+        "/legacy/a.py": "acoustic_surrogates/code/a.py",
+        "/legacy/b.csv": "acoustic_surrogates/data/b.csv",
+    }
+    first, _ = module.rewrite_hbi_config(
+        source,
+        agent="definity",
+        dependency_root=first_root,
+        run_root=tmp_path / "karolina-run",
+        population=10_000,
+        provenance_path_overrides={
+            key: str(first_root / relative) for key, relative in override_sources.items()
+        },
+    )
+    second, _ = module.rewrite_hbi_config(
+        source,
+        agent="definity",
+        dependency_root=second_root,
+        run_root=tmp_path / "vega-run",
+        population=10_000,
+        provenance_path_overrides={
+            key: str(second_root / relative) for key, relative in override_sources.items()
+        },
+    )
+
+    assert module._semantic_config_sha256(
+        first, agent="definity", dependency_root=first_root
+    ) == module._semantic_config_sha256(
+        second, agent="definity", dependency_root=second_root
+    )
+
+    second["hyperprior_mu_ka"] = [14_000.0, 18_000.0]
+    assert module._semantic_config_sha256(
+        first, agent="definity", dependency_root=first_root
+    ) != module._semantic_config_sha256(
+        second, agent="definity", dependency_root=second_root
+    )
 
 
 def test_materialize_rejects_mutated_dependency(tmp_path: Path) -> None:

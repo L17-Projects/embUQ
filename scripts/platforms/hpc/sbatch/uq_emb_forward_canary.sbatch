@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ -n "${SLURM_JOB_ID:-}" ]]; then
+  echo "This neutral launcher must run on a login node, not inside a Slurm allocation." >&2
+  exit 2
+fi
+
 legacy_name="HPC""_SITE"
 if [[ ${!legacy_name+x} ]]; then
   echo "${legacy_name} is no longer supported. Use --site or MESOUQ_SITE." >&2
@@ -23,12 +28,16 @@ if [[ -n "${SITE_ARG}" && -n "${ENV_SITE}" && "${SITE_ARG}" != "${ENV_SITE}" ]];
   echo "Conflicting site selectors: --site=${SITE_ARG} and MESOUQ_SITE=${ENV_SITE}." >&2
   exit 2
 fi
-SITE="${SITE_ARG:-${ENV_SITE:-karolina}}"
+SITE="${SITE_ARG:-${ENV_SITE:-}}"
+if [[ -z "${SITE}" ]]; then
+  echo "Missing site selector. Pass --site or set MESOUQ_SITE." >&2
+  exit 2
+fi
 case "${SITE}" in
   karolina|vega) ;;
   *) echo "Unsupported site=${SITE}. Expected karolina or vega." >&2; exit 2 ;;
 esac
 
 export MESOUQ_SITE="${SITE}"
-exec bash "${REPO_ROOT}/scripts/platforms/${SITE}/sbatch/uq_emb_forward_canary.sbatch" \
-  --site "${SITE}" "${args[@]}"
+exec sbatch "${args[@]}" \
+  "${REPO_ROOT}/scripts/platforms/${SITE}/sbatch/uq_emb_forward_canary.sbatch"

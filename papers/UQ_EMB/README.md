@@ -74,9 +74,20 @@ Plan the copy and inspect its size without writing any artifact:
   --spec papers/UQ_EMB/manifests/accepted_production_outputs_202607.staging.json
 ```
 
-Stage the immutable set. The command copies into a temporary directory,
-preserves internal hardlinks, computes SHA-256 values, verifies the temporary
-copy, and only then publishes it atomically:
+The tracked file manifest is the acceptance decision. For a new artifact set,
+create it once with the explicit `snapshot` command, review it, and commit it
+before staging. `snapshot` refuses to overwrite an existing manifest:
+
+```bash
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py snapshot \
+  --spec papers/UQ_EMB/manifests/accepted_production_outputs_202607.staging.json \
+  --manifest papers/UQ_EMB/manifests/accepted_production_outputs_202607.files.json
+```
+
+Stage the immutable set against that existing locked manifest. The command
+copies into a temporary directory, preserves internal hardlinks, verifies every
+path, size, and SHA-256 value, and only then publishes the copy atomically. It
+never creates or overwrites the manifest:
 
 ```bash
 /usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py stage \
@@ -131,7 +142,10 @@ contract by SHA-256.
 It rewrites only external runtime paths, output location, and the three
 population fields. A JSON sidecar records every rewrite. The grouped Definity
 `source3` configuration is authoritative and remains grouped during
-materialization.
+materialization. The sidecar also records a location-independent semantic
+configuration digest, the two locked-manifest hashes, the Git commit, and the
+runtime identity. Forward canaries and HBI replays refuse configs without this
+matching sidecar.
 
 ## Forward-artifact canary
 
@@ -151,15 +165,16 @@ ${MESOUQ_ENV_ROOT}/bin/python \
 ```
 
 Use `--site vega` on Vega after staging and verifying the same immutable
-dependency set below that site's `MESOUQ_UQ_EMB_ARTIFACT_ROOT`. The matching
-ten-minute Slurm entrypoints are thin site wrappers:
+dependency set below that site's `MESOUQ_UQ_EMB_ARTIFACT_ROOT`. The neutral
+launcher requires an explicit site and submits the selected site wrapper so its
+scheduler directives are honored:
 
 ```bash
 REPO_ROOT="$PWD" \
 MESOUQ_SITE_RUNTIME_ROOT="${MESOUQ_SITE_RUNTIME_ROOT}" \
 CONFIG_PATH="${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/configs/definity_hbi_10000.yaml" \
 OUTPUT_PATH="${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/canaries/karolina_definity.json" \
-sbatch scripts/platforms/karolina/sbatch/uq_emb_forward_canary.sbatch
+bash scripts/platforms/hpc/sbatch/uq_emb_forward_canary.sbatch --site karolina
 ```
 
 Replace `definity` with `sonovue` for the second agent. The Definity receipt must
@@ -167,7 +182,8 @@ show one grouped acoustic dataset with 14 reference rows. SonoVue must show thre
 separate acoustic datasets with one row each.
 
 After copying the two Vega receipts to Karolina, compare the scientific payload
-while ignoring only site paths, config hashes, and timing fields:
+while ignoring only location, scheduler, interpreter-path, and timing fields.
+The comparison requires the same semantic configuration digest and Git commit:
 
 ```bash
 /usr/bin/python3.11 scripts/workflows/emb/uq_emb/compare_forward_canaries.py \
@@ -193,14 +209,14 @@ ${MESOUQ_ENV_ROOT}/bin/python \
 
 Add `--execute` only inside an appropriate GPU allocation. The runner rejects
 an existing Phase 1 tree instead of overwriting it and updates a JSON receipt
-after every completed stage. The production Slurm wrapper is:
+after every completed stage. The neutral production launcher is:
 
 ```bash
 REPO_ROOT="$PWD" \
 MESOUQ_SITE_RUNTIME_ROOT="${MESOUQ_SITE_RUNTIME_ROOT}" \
 CONFIG_PATH="${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/configs/definity_hbi_10000.yaml" \
 OUTPUT_ROOT="${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/definity_10k" \
-sbatch scripts/platforms/karolina/sbatch/uq_emb_hbi_replay.sbatch
+bash scripts/platforms/hpc/sbatch/uq_emb_hbi_replay.sbatch --site karolina
 ```
 
 The equivalent Vega wrappers are under `scripts/platforms/vega/sbatch`. Both
@@ -346,6 +362,7 @@ DIRECT_ROOT="${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/direct_dpd_$(date +%Y%m
 GV_PYTHON="${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/bin/python"
 /usr/bin/python3.11 scripts/workflows/emb/uq_emb/materialize_direct_dpd_replay.py \
   --accepted-root "${ACCEPTED_ROOT}" \
+  --accepted-manifest papers/UQ_EMB/manifests/accepted_production_outputs_202607.files.json \
   --output-root "${DIRECT_ROOT}" \
   --site "${MESOUQ_SITE}" \
   --python-bin "${GV_PYTHON}"
@@ -363,8 +380,9 @@ source "${MESOUQ_SITE_RUNTIME_ROOT}/gv_venv/env.sh"
 ```
 
 Run the sub-minute readiness verifier in that activated environment. It checks
-the frozen and materialized hashes and loads each acoustic input through the
-frozen breathing runner; it never launches Mirheo:
+each accepted source against the locked manifest, reconstructs and compares all
+12 canonical commands, checks the materialized hashes, and loads each acoustic
+input through the frozen breathing runner. It never launches Mirheo:
 
 ```bash
 "${GV_PYTHON}" scripts/workflows/emb/uq_emb/verify_direct_dpd_replay_plan.py \

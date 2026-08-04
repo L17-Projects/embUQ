@@ -6,11 +6,18 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Mapping
 
 import yaml
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[3]
+sys.path.insert(0, str(SCRIPT_DIR))
+
+from replay_provenance import runtime_provenance  # noqa: E402
 
 
 PAPER_ID = "UQ_EMB"
@@ -197,6 +204,66 @@ def rewrite_hbi_config(
     return config, rewrites
 
 
+def _semantic_config_payload(
+    config: Mapping[str, Any],
+    *,
+    agent: str,
+    dependency_root: Path,
+) -> dict[str, Any]:
+    """Remove only relocated filesystem identity from an HBI config."""
+    paths = AGENT_PATHS[agent]
+    canonical = deepcopy(dict(config))
+    canonical["out"] = "run://uq_emb"
+    for experiment in canonical.get("experiments", []):
+        if not isinstance(experiment, dict):
+            continue
+        if experiment.get("name") == paths["mechanical_experiment"]:
+            experiment["data_dir"] = f"artifact://{paths['mechanical_data']}"
+            experiment["surrogate_dir"] = f"artifact://{paths['mechanical_surrogates']}"
+        elif experiment.get("name") == "resonance":
+            experiment["data_dir"] = f"artifact://{ACOUSTIC_DATA}"
+
+    evaluator = canonical.get("resonance", {}).get("evaluator", {})
+    if isinstance(evaluator, dict):
+        for key, relative in (
+            ("artifact_path", paths["bank"]),
+            ("bank_build_report_path", paths["bank_report"]),
+            ("independent_go_path", paths["independent_go"]),
+            ("promotion_contract_path", PROMOTION_CONTRACT),
+        ):
+            evaluator[key] = f"artifact://{relative}"
+        overrides = evaluator.get("provenance_path_overrides")
+        if isinstance(overrides, dict):
+            canonical_overrides: dict[str, str] = {}
+            for source, destination in overrides.items():
+                destination_path = Path(str(destination)).resolve()
+                try:
+                    relative = destination_path.relative_to(dependency_root.resolve())
+                except ValueError as exc:
+                    raise ValueError(
+                        "Provenance override escapes the immutable dependency root: "
+                        f"{destination_path}"
+                    ) from exc
+                canonical_overrides[str(source)] = f"artifact://{relative.as_posix()}"
+            evaluator["provenance_path_overrides"] = canonical_overrides
+    return canonical
+
+
+def _semantic_config_sha256(
+    config: Mapping[str, Any],
+    *,
+    agent: str,
+    dependency_root: Path,
+) -> str:
+    payload = _semantic_config_payload(
+        config,
+        agent=agent,
+        dependency_root=dependency_root,
+    )
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def materialize(
     *,
     agent: str,
@@ -285,10 +352,23 @@ def materialize(
         "source_config_sha256": _sha256(source_config),
         "materialized_config": str(output_config.resolve()),
         "materialized_config_sha256": _sha256(output_config),
+        "semantic_config_sha256": _semantic_config_sha256(
+            materialized,
+            agent=agent,
+            dependency_root=dependency_root,
+        ),
         "artifact_root": str(artifact_root.resolve()),
         "run_root": str(run_root.resolve()),
+        "accepted_manifest": str(accepted_manifest_path.resolve()),
+        "accepted_manifest_sha256": _sha256(accepted_manifest_path),
+        "dependency_manifest": str(dependency_manifest_path.resolve()),
+        "dependency_manifest_sha256": _sha256(dependency_manifest_path),
         "verified_dependencies": verified_dependencies,
         "rewrites": rewrites,
+        "provenance": runtime_provenance(
+            repo_root=REPO_ROOT,
+            site="materialization",
+        ),
         "preserved_configuration": (
             "All scientific priors, hyperpriors, observations, likelihood grouping, "
             "sampler controls, and evaluator hashes are preserved from the accepted config."

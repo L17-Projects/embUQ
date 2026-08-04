@@ -17,6 +17,7 @@ import yaml
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[3]
+sys.path.insert(0, str(SCRIPT_DIR))
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from meso_uq.config.models import InferenceConfig  # noqa: E402
@@ -33,6 +34,10 @@ from meso_uq.inference.emb_resonance import (  # noqa: E402
     preload_emb_resonance,
 )
 from meso_uq.platforms.site_selector import resolve_hpc_site  # noqa: E402
+from replay_provenance import (  # noqa: E402
+    load_materialization_binding,
+    runtime_provenance,
+)
 
 SCHEMA_VERSION = "mesouq.uq_emb.forward_canary.v1"
 _BATCH_FRACTIONS = (0.4, 0.5, 0.6)
@@ -247,6 +252,7 @@ def run_forward_canary(
         raise ValueError(f"Expected a mapping in {config_path}.")
     InferenceConfig.model_validate(config)
     os.environ["HUQ_INFERENCE_CONFIG"] = str(config_path)
+    config_binding = load_materialization_binding(config_path)
 
     preflight = preflight_emb_resonance_config(config, project_root=REPO_ROOT)
     if preflight.get("status") != "passed":
@@ -280,7 +286,11 @@ def run_forward_canary(
         "device": device,
         "agent": preflight.get("agent"),
         "config_path": str(config_path),
-        "config_sha256": _sha256(config_path),
+        **config_binding,
+        "provenance": runtime_provenance(
+            repo_root=REPO_ROOT,
+            site=site,
+        ),
         "phase1_contract_mode": config.get("phase1_contract_mode"),
         "acoustic_forward_model": preflight.get("forward_model"),
         "acoustic_artifacts": {
@@ -324,8 +334,8 @@ def main(argv: list[str] | None = None) -> int:
     site = resolve_hpc_site(
         cli_site=args.site,
         env=os.environ,
-        allow_hostname=True,
-        default="karolina",
+        allow_hostname=False,
+        default=None,
     )
     report = run_forward_canary(
         config_path=args.config,

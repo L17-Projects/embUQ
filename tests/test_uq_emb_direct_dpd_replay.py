@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -129,10 +130,40 @@ def _accepted_root(tmp_path: Path) -> Path:
     return root
 
 
+def _accepted_manifest(tmp_path: Path, root: Path) -> Path:
+    files = []
+    for path in sorted(item for item in root.rglob("*") if item.is_file()):
+        files.append(
+            {
+                "path": path.relative_to(root).as_posix(),
+                "size_bytes": path.stat().st_size,
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
+        )
+    manifest = tmp_path / "accepted.files.json"
+    _write_json(
+        manifest,
+        {
+            "schema_version": "1.0",
+            "paper_id": "UQ_EMB",
+            "artifact_set_id": "accepted-production-outputs-202607",
+            "artifact_set_dir": root.name,
+            "locked": True,
+            "file_count": len(files),
+            "logical_size_bytes": sum(item["size_bytes"] for item in files),
+            "files": files,
+        },
+    )
+    return manifest
+
+
 def test_materialize_direct_dpd_replay_writes_six_static_pairs(tmp_path: Path) -> None:
     module = _module()
+    accepted_root = _accepted_root(tmp_path)
+    accepted_manifest = _accepted_manifest(tmp_path, accepted_root)
     plan = module.materialize_direct_dpd_replay(
-        accepted_root=_accepted_root(tmp_path),
+        accepted_root=accepted_root,
+        accepted_manifest=accepted_manifest,
         output_root=tmp_path / "replay",
         site="karolina",
         python_bin="/usr/bin/python3.11",
@@ -144,6 +175,9 @@ def test_materialize_direct_dpd_replay_writes_six_static_pairs(tmp_path: Path) -
     assert plan["runtime_activation"]["required_before_execution"] is True
     assert "mesouq_activate_site_env karolina" in plan["runtime_activation"]["shared_activation"]
     assert plan["runtime_source_hashes"]
+    assert plan["accepted_artifact_manifest_sha256"] == hashlib.sha256(
+        accepted_manifest.read_bytes()
+    ).hexdigest()
     assert (tmp_path / "replay/direct_dpd_replay_plan.json").is_file()
     d1 = plan["bubbles"][0]
     assert d1["mechanical"]["command"][0] == "/usr/bin/python3.11"
@@ -169,3 +203,36 @@ def test_materializer_rejects_conflicting_site_environment(tmp_path: Path, monke
         assert "Conflicting site selectors" in str(exc)
     else:  # pragma: no cover
         raise AssertionError("Expected conflicting site selectors to fail")
+
+
+def test_materializer_requires_explicit_site(tmp_path: Path, monkeypatch) -> None:
+    module = _module()
+    monkeypatch.delenv("MESOUQ_SITE", raising=False)
+
+    try:
+        module._resolve_site(None)
+    except ValueError as exc:
+        assert "Missing site selector" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("Expected a missing site selector to fail")
+
+
+def test_materializer_rejects_source_mutated_after_manifest(tmp_path: Path) -> None:
+    module = _module()
+    accepted_root = _accepted_root(tmp_path)
+    accepted_manifest = _accepted_manifest(tmp_path, accepted_root)
+    source = accepted_root / "sonovue/direct_dpd/inputs/manifest.json"
+    source.write_text("{}\n", encoding="utf-8")
+
+    try:
+        module.materialize_direct_dpd_replay(
+            accepted_root=accepted_root,
+            accepted_manifest=accepted_manifest,
+            output_root=tmp_path / "replay",
+            site="karolina",
+            python_bin="/usr/bin/python3.11",
+        )
+    except ValueError as exc:
+        assert "mismatch" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("Expected a mutated accepted source to fail")

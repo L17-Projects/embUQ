@@ -16,9 +16,23 @@ IGNORED_KEYS = frozenset(
         "config_path",
         "config_sha256",
         "data_file",
+        "git_branch",
+        "hostname",
+        "materialization_receipt",
+        "materialization_receipt_sha256",
         "path",
+        "python_executable",
+        "python_version",
+        "repo_root",
+        "requested_python_bin",
         "site",
+        "site_runtime_root",
+        "slurm_array_job_id",
+        "slurm_array_task_id",
+        "slurm_job_id",
         "training_data_file",
+        "virtual_env",
+        "conda_prefix",
         "wall_seconds",
     }
 )
@@ -68,6 +82,13 @@ def compare_receipts(
         raise ValueError(f"Expected agent {expected_agent!r}, got {agent!r}")
     if karolina.get("site") != "karolina" or vega.get("site") != "vega":
         raise ValueError("Forward-canary receipts are not ordered Karolina then Vega")
+    semantic_sha = str(karolina.get("config_semantic_sha256", ""))
+    if len(semantic_sha) != 64 or semantic_sha != str(vega.get("config_semantic_sha256", "")):
+        raise ValueError("Forward canaries do not share the same semantic config digest")
+    karolina_commit = str((karolina.get("provenance") or {}).get("git_commit", ""))
+    vega_commit = str((vega.get("provenance") or {}).get("git_commit", ""))
+    if len(karolina_commit) != 40 or karolina_commit != vega_commit:
+        raise ValueError("Forward canaries were not executed from the same Git commit")
 
     karolina_science = _scientific_payload(karolina)
     vega_science = _scientific_payload(vega)
@@ -81,6 +102,8 @@ def compare_receipts(
         "schema_version": SCHEMA_VERSION,
         "status": "passed",
         "agent": agent,
+        "config_semantic_sha256": semantic_sha,
+        "git_commit": karolina_commit,
         "scientific_payload_sha256": digest,
         "ignored_location_or_timing_keys": sorted(IGNORED_KEYS),
         "karolina": {

@@ -36,6 +36,18 @@ def _receipt(site: str, root: str, prediction: float = 1.25) -> dict:
         "wall_seconds": 1.0 if site == "karolina" else 2.0,
         "config_path": f"{root}/config.yaml",
         "config_sha256": site * 8,
+        "config_semantic_sha256": "b" * 64,
+        "materialization_receipt": f"{root}/config.materialization.json",
+        "materialization_receipt_sha256": site * 16,
+        "provenance": {
+            "git_commit": "c" * 40,
+            "git_status_clean": True,
+            "hostname": f"{site}.example",
+            "python_executable": f"{root}/python",
+            "python_version": "3.11" if site == "karolina" else "3.10",
+            "slurm_job_id": "1" if site == "karolina" else "2",
+            "site_runtime_root": root,
+        },
         "datasets": [
             {
                 "prediction_min": prediction,
@@ -62,6 +74,8 @@ def test_comparison_ignores_only_location_and_timing_fields(tmp_path: Path) -> N
 
     assert report["status"] == "passed"
     assert len(report["scientific_payload_sha256"]) == 64
+    assert report["config_semantic_sha256"] == "b" * 64
+    assert report["git_commit"] == "c" * 40
 
 
 def test_comparison_rejects_scientific_difference(tmp_path: Path) -> None:
@@ -72,4 +86,32 @@ def test_comparison_rejects_scientific_difference(tmp_path: Path) -> None:
     _write(vega, _receipt("vega", "/ceph", prediction=1.5))
 
     with pytest.raises(ValueError, match="payloads differ"):
+        module.compare_receipts(karolina, vega, expected_agent="sonovue")
+
+
+def test_comparison_rejects_semantically_different_materialized_configs(tmp_path: Path) -> None:
+    module = _load_module()
+    karolina = tmp_path / "karolina.json"
+    vega = tmp_path / "vega.json"
+    karolina_payload = _receipt("karolina", "/scratch")
+    vega_payload = _receipt("vega", "/ceph")
+    vega_payload["config_semantic_sha256"] = "d" * 64
+    _write(karolina, karolina_payload)
+    _write(vega, vega_payload)
+
+    with pytest.raises(ValueError, match="semantic config digest"):
+        module.compare_receipts(karolina, vega, expected_agent="sonovue")
+
+
+def test_comparison_rejects_different_git_commits(tmp_path: Path) -> None:
+    module = _load_module()
+    karolina = tmp_path / "karolina.json"
+    vega = tmp_path / "vega.json"
+    karolina_payload = _receipt("karolina", "/scratch")
+    vega_payload = _receipt("vega", "/ceph")
+    vega_payload["provenance"]["git_commit"] = "d" * 40
+    _write(karolina, karolina_payload)
+    _write(vega, vega_payload)
+
+    with pytest.raises(ValueError, match="same Git commit"):
         module.compare_receipts(karolina, vega, expected_agent="sonovue")

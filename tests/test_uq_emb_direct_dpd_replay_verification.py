@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -31,8 +32,11 @@ def test_verifier_accepts_materialized_fixture(tmp_path: Path) -> None:
         "uq_emb_direct_dpd_verifier",
     )
     output_root = tmp_path / "replay"
+    accepted_root = fixture_module._accepted_root(tmp_path)
+    accepted_manifest = fixture_module._accepted_manifest(tmp_path, accepted_root)
     materializer.materialize_direct_dpd_replay(
-        accepted_root=fixture_module._accepted_root(tmp_path),
+        accepted_root=accepted_root,
+        accepted_manifest=accepted_manifest,
         output_root=output_root,
         site="karolina",
         python_bin="/usr/bin/python3.11",
@@ -45,3 +49,42 @@ def test_verifier_accepts_materialized_fixture(tmp_path: Path) -> None:
     assert report["bubble_count"] == 6
     assert report["planned_command_count"] == 12
     assert report["dpd_executed"] is False
+    assert report["accepted_artifact_manifest"] == str(accepted_manifest.resolve())
+
+
+def test_verifier_rejects_tampered_command(tmp_path: Path) -> None:
+    fixture_module = _module(
+        "tests/test_uq_emb_direct_dpd_replay.py", "uq_emb_direct_dpd_fixture_tamper"
+    )
+    materializer = _module(
+        "scripts/workflows/emb/uq_emb/materialize_direct_dpd_replay.py",
+        "uq_emb_direct_dpd_materializer_tamper",
+    )
+    verifier = _module(
+        "scripts/workflows/emb/uq_emb/verify_direct_dpd_replay_plan.py",
+        "uq_emb_direct_dpd_verifier_tamper",
+    )
+    output_root = tmp_path / "replay"
+    accepted_root = fixture_module._accepted_root(tmp_path)
+    accepted_manifest = fixture_module._accepted_manifest(tmp_path, accepted_root)
+    materializer.materialize_direct_dpd_replay(
+        accepted_root=accepted_root,
+        accepted_manifest=accepted_manifest,
+        output_root=output_root,
+        site="karolina",
+        python_bin="/usr/bin/python3.11",
+    )
+    plan_path = output_root / "direct_dpd_replay_plan.json"
+    payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    payload["bubbles"][0]["acoustic"]["command"].extend(["--dt", "99"])
+    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    try:
+        verifier.verify(
+            plan_path,
+            ROOT / "scripts/workflows/emb/run_emb_free_shell_breathing_protocol.py",
+        )
+    except ValueError as exc:
+        assert "acoustic command differs" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("Expected a tampered replay command to fail")

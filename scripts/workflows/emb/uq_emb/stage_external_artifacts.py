@@ -36,6 +36,12 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _write_json_exclusive(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("x", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
 def _expand(value: str) -> Path:
     for match in ENVIRONMENT_VARIABLE_PATTERN.finditer(value):
         name = match.group("braced") or match.group("plain")
@@ -238,11 +244,8 @@ def plan_staging(spec_path: Path) -> dict[str, Any]:
 def _copy_selection(selected: list[dict[str, Any]], temporary_root: Path) -> None:
     copied_inodes: dict[tuple[int, int], Path] = {}
     for item in selected:
-        source = item["source"]
-        destination = temporary_root / item["destination"]
         for file_path in item["files"]:
-            relative_target = _target_path(item, file_path)
-            target = temporary_root / relative_target
+            target = temporary_root / _target_path(item, file_path)
             target.parent.mkdir(parents=True, exist_ok=True)
             stat = file_path.stat()
             inode = (stat.st_dev, stat.st_ino)
@@ -269,6 +272,97 @@ def _manifest_entries(root: Path) -> list[dict[str, Any]]:
 
 def _total_size(entries: Iterable[dict[str, Any]]) -> int:
     return sum(int(entry["size_bytes"]) for entry in entries)
+
+
+def _manifest_payload(
+    *,
+    spec: dict[str, Any],
+    spec_path: Path,
+    selected: list[dict[str, Any]],
+) -> dict[str, Any]:
+    files_by_path: dict[str, dict[str, Any]] = {}
+    for item in selected:
+        for file_path in item["files"]:
+            target = _target_path(item, file_path)
+            target_key = target.as_posix()
+            if target_key in files_by_path:
+                raise ValueError(f"Artifact selections overlap at destination: {target_key}")
+            files_by_path[target_key] = {
+                "path": target_key,
+                "size_bytes": file_path.stat().st_size,
+                "sha256": _sha256(file_path),
+            }
+    files = [files_by_path[path] for path in sorted(files_by_path)]
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "paper_id": PAPER_ID,
+        "artifact_set_id": spec["artifact_set_id"],
+        "artifact_set_dir": spec["artifact_set_dir"],
+        "locked": True,
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "source_spec": spec.get("source_spec_hint", spec_path.as_posix()),
+        "artifact_root_hint": spec["destination_root"],
+        "selections": [
+            {
+                "artifact_id": item["artifact_id"],
+                "source": item["source_hint"],
+                "destination": item["destination"].as_posix(),
+            }
+            for item in selected
+        ],
+        "file_count": len(files),
+        "logical_size_bytes": _total_size(files),
+        "files": files,
+    }
+
+
+def snapshot_manifest(*, spec_path: Path, manifest_path: Path) -> dict[str, Any]:
+    """Create a locked acceptance manifest without staging any files."""
+    spec = _load_spec(spec_path)
+    _destination_parent, _final_root, selected = _selection(spec)
+    payload = _manifest_payload(spec=spec, spec_path=spec_path, selected=selected)
+    _write_json_exclusive(manifest_path, payload)
+    return {
+        "status": "PASS",
+        "manifest": str(manifest_path.resolve()),
+        "artifact_set_id": payload["artifact_set_id"],
+        "file_count": payload["file_count"],
+        "logical_size_bytes": payload["logical_size_bytes"],
+    }
+
+
+def _validate_manifest_for_spec(
+    *,
+    manifest_path: Path,
+    spec: dict[str, Any],
+    selected: list[dict[str, Any]],
+) -> None:
+    if not manifest_path.is_file():
+        raise FileNotFoundError(
+            f"Locked artifact manifest is missing: {manifest_path}. "
+            "Create it explicitly with the snapshot command before staging."
+        )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("schema_version") != SCHEMA_VERSION or manifest.get("paper_id") != PAPER_ID:
+        raise ValueError("Unexpected external-artifact manifest schema or paper_id")
+    if manifest.get("locked") is not True:
+        raise ValueError("External-artifact manifests must set locked=true")
+    for key in ("artifact_set_id", "artifact_set_dir"):
+        if manifest.get(key) != spec.get(key):
+            raise ValueError(
+                f"Artifact manifest {key} does not match the staging spec: "
+                f"{manifest.get(key)!r} != {spec.get(key)!r}"
+            )
+    expected_selections = [
+        {
+            "artifact_id": item["artifact_id"],
+            "source": item["source_hint"],
+            "destination": item["destination"].as_posix(),
+        }
+        for item in selected
+    ]
+    if manifest.get("selections") != expected_selections:
+        raise ValueError("Artifact manifest selections do not match the staging spec")
 
 
 def verify_staged(*, root: Path, manifest_path: Path) -> dict[str, Any]:
@@ -323,6 +417,11 @@ def stage_artifacts(*, spec_path: Path, manifest_path: Path) -> dict[str, Any]:
         root=final_root,
         label="Artifact manifest",
     )
+    _validate_manifest_for_spec(
+        manifest_path=manifest_path,
+        spec=spec,
+        selected=selected,
+    )
     if final_root.exists():
         raise ValueError(f"Artifact-set destination already exists: {final_root}")
     destination_parent.mkdir(parents=True, exist_ok=True)
@@ -335,36 +434,6 @@ def stage_artifacts(*, spec_path: Path, manifest_path: Path) -> dict[str, Any]:
     try:
         temporary_root.mkdir(parents=False)
         _copy_selection(selected, temporary_root)
-        files = _manifest_entries(temporary_root)
-        payload = {
-            "schema_version": SCHEMA_VERSION,
-            "paper_id": PAPER_ID,
-            "artifact_set_id": spec["artifact_set_id"],
-            "artifact_set_dir": spec["artifact_set_dir"],
-            "locked": True,
-            "created_at_utc": datetime.now(timezone.utc).isoformat(),
-            "source_spec": spec.get("source_spec_hint", spec_path.as_posix()),
-            "artifact_root_hint": spec["destination_root"],
-            "selections": [
-                {
-                    "artifact_id": item["artifact_id"],
-                    "source": item["source_hint"],
-                    "destination": item["destination"].as_posix(),
-                }
-                for item in selected
-            ],
-            "file_count": len(files),
-            "logical_size_bytes": _total_size(files),
-            "files": files,
-        }
-        if manifest_path.exists():
-            locked_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            if locked_manifest.get("artifact_set_id") != spec["artifact_set_id"]:
-                raise ValueError("Locked manifest artifact_set_id differs from staging spec")
-            if locked_manifest.get("artifact_set_dir") != spec["artifact_set_dir"]:
-                raise ValueError("Locked manifest artifact_set_dir differs from staging spec")
-        else:
-            _write_json(manifest_path, payload)
         preflight = verify_staged(root=temporary_root, manifest_path=manifest_path)
         if preflight["status"] != "PASS":
             raise RuntimeError(f"Staged artifact verification failed: {preflight}")
@@ -386,7 +455,14 @@ def _parser() -> argparse.ArgumentParser:
     plan = subparsers.add_parser("plan", help="Validate and size an artifact staging spec")
     plan.add_argument("--spec", type=Path, required=True)
 
-    stage = subparsers.add_parser("stage", help="Copy and checksum an immutable artifact set")
+    snapshot = subparsers.add_parser(
+        "snapshot",
+        help="Create a locked source manifest without staging files",
+    )
+    snapshot.add_argument("--spec", type=Path, required=True)
+    snapshot.add_argument("--manifest", type=Path, required=True)
+
+    stage = subparsers.add_parser("stage", help="Copy against an existing locked artifact manifest")
     stage.add_argument("--spec", type=Path, required=True)
     stage.add_argument("--manifest", type=Path, required=True)
 
@@ -401,6 +477,11 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "plan":
         report = plan_staging(args.spec.resolve())
+    elif args.command == "snapshot":
+        report = snapshot_manifest(
+            spec_path=args.spec.resolve(),
+            manifest_path=args.manifest.resolve(),
+        )
     elif args.command == "stage":
         report = stage_artifacts(
             spec_path=args.spec.resolve(),

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import subprocess
@@ -16,10 +15,15 @@ import yaml
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[3]
+sys.path.insert(0, str(SCRIPT_DIR))
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from meso_uq.config.models import InferenceConfig  # noqa: E402
 from meso_uq.platforms.site_selector import resolve_hpc_site  # noqa: E402
+from replay_provenance import (  # noqa: E402
+    load_materialization_binding,
+    runtime_provenance,
+)
 from meso_uq.vega_workflows import (  # noqa: E402
     VegaWorkflowSelection,
     build_inference_command,
@@ -29,15 +33,6 @@ from meso_uq.vega_workflows import (  # noqa: E402
 SCHEMA_VERSION = "mesouq.uq_emb.hbi_replay.v1"
 VALID_STAGES = ("phase1", "phase2", "phase3b")
 AGENT_EXPERIMENT = {"sonovue": "indentation", "definity": "compression"}
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
 
 def _load_and_validate_config(config_path: Path) -> tuple[dict[str, Any], str, int]:
     with config_path.open("r", encoding="utf-8") as handle:
@@ -116,6 +111,7 @@ def run_replay(
         python_bin=python_bin,
         stages=stages,
     )
+    config_binding = load_materialization_binding(config_path)
     if execute and "phase1" in stages and (output_root / "results_phase_1").exists():
         raise FileExistsError(
             f"Refusing to overwrite existing Phase 1 output under {output_root}. "
@@ -130,7 +126,12 @@ def run_replay(
         "population": population,
         "site": site,
         "config_path": str(config_path),
-        "config_sha256": _sha256(config_path),
+        **config_binding,
+        "provenance": runtime_provenance(
+            repo_root=REPO_ROOT,
+            site=site,
+            requested_python_bin=python_bin,
+        ),
         "output_root": str(output_root),
         "stages": stages,
         "commands": [format_command(command) for command in commands],
@@ -180,8 +181,8 @@ def main(argv: list[str] | None = None) -> int:
     site = resolve_hpc_site(
         cli_site=args.site,
         env=os.environ,
-        allow_hostname=True,
-        default="karolina",
+        allow_hostname=False,
+        default=None,
     )
     receipt = run_replay(
         config_path=args.config,
