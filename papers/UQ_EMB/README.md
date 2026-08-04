@@ -126,7 +126,8 @@ settings:
 
 Use `--agent sonovue` for SonoVue and `--population 50000` for an exact-size
 production replay. The command verifies the frozen source config, polynomial
-bank, bank report, independent-audit receipt, and promotion contract by SHA-256.
+bank, bank build tool, bank report, independent-audit receipt, and promotion
+contract by SHA-256.
 It rewrites only external runtime paths, output location, and the three
 population fields. A JSON sidecar records every rewrite. The grouped Definity
 `source3` configuration is authoritative and remains grouped during

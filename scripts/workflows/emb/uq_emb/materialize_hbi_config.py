@@ -40,6 +40,9 @@ AGENT_PATHS: dict[str, dict[str, str]] = {
 }
 
 PROMOTION_CONTRACT = "acoustic_surrogates/family_contract/promotion_contract.json"
+POLYNOMIAL_BANK_BUILD_TOOL = (
+    "acoustic_surrogates/code/freeze_approved_polynomial_banks.py"
+)
 ACOUSTIC_DATA = "reference_data/acoustic"
 
 
@@ -161,6 +164,7 @@ def rewrite_hbi_config(
         raise ValueError("Frozen production config must define resonance.evaluator")
     for key, relative in (
         ("artifact_path", paths["bank"]),
+        ("bank_build_tool_path", POLYNOMIAL_BANK_BUILD_TOOL),
         ("bank_build_report_path", paths["bank_report"]),
         ("independent_go_path", paths["independent_go"]),
         ("promotion_contract_path", PROMOTION_CONTRACT),
@@ -204,6 +208,7 @@ def materialize(
     verified_dependencies: dict[str, str] = {}
     for relative in (
         paths["bank"],
+        POLYNOMIAL_BANK_BUILD_TOOL,
         paths["bank_report"],
         paths["independent_go"],
         PROMOTION_CONTRACT,

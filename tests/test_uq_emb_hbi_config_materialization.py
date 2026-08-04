@@ -95,7 +95,10 @@ def test_definity_rewrite_preserves_grouped_production_science(tmp_path: Path) -
     assert materialized["hbi_pop_size"] == 10_000
     assert materialized["phase3b_pop_size"] == 10_000
     assert source["out"] == "/old/run"
-    assert len(rewrites) == 11
+    assert materialized["resonance"]["evaluator"]["bank_build_tool_path"] == str(
+        (tmp_path / "dependencies" / module.POLYNOMIAL_BANK_BUILD_TOOL).resolve()
+    )
+    assert len(rewrites) == 12
 
 
 def test_materialize_validates_frozen_inputs_and_writes_receipt(tmp_path: Path) -> None:
@@ -111,6 +114,7 @@ def test_materialize_validates_frozen_inputs_and_writes_receipt(tmp_path: Path) 
 
     dependency_relatives = (
         module.AGENT_PATHS["definity"]["bank"],
+        module.POLYNOMIAL_BANK_BUILD_TOOL,
         module.AGENT_PATHS["definity"]["bank_report"],
         module.AGENT_PATHS["definity"]["independent_go"],
         module.PROMOTION_CONTRACT,

@@ -847,10 +847,18 @@ def _validate_polynomial_bank_release(
     build_tool = bank.provenance.get("build_tool")
     if not isinstance(build_tool, Mapping):
         raise ValueError("Polynomial frequency bank has no pinned build tool.")
-    build_tool_path = _resolve_relocated_provenance_path(
-        project_root,
-        build_tool.get("path"),
-    )
+    configured_build_tool_path = evaluator.get("bank_build_tool_path")
+    if configured_build_tool_path is None:
+        build_tool_path = _resolve_relocated_provenance_path(
+            project_root,
+            build_tool.get("path"),
+        )
+    else:
+        build_tool_path = _resolve_project_path(
+            project_root,
+            configured_build_tool_path,
+            "resonance.evaluator.bank_build_tool_path",
+        )
     if not build_tool_path.is_file():
         raise FileNotFoundError(f"Polynomial bank build tool not found: {build_tool_path}")
     _artifact_sha256(build_tool_path, build_tool.get("sha256"))
