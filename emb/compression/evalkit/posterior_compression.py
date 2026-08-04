@@ -259,7 +259,9 @@ def compute_compression_surrogate_direct(
         project_root=project_root,
     )
     Yt, kb, b1, b2, a3, a4, d0, sigma = legacy_params.tolist()
-    surrogate = _get_surrogate(project_root, diameter_um, device=device, backend=backend)
+    surrogate = _get_direct_surrogate(
+        project_root, diameter_um, device=device, backend=backend
+    )
     displ_corrected = [max(0.0, d - d0) for d in displ]
     forces = surrogate.evaluate_compression(x=[Yt, kb, b1, b2, a3, a4], disp=displ_corrected)
     legacy_compression_surrogate_likelihood(forces, sigma).assign_to_sample(sample)
@@ -339,7 +341,9 @@ def compute_compression_surrogate_batch_direct(
     theta = legacy_params[:, :6]
     d0 = legacy_params[:, 6]
     sigma = legacy_params[:, 7]
-    surrogate = _get_surrogate(project_root, diameter_um, device=device, backend=backend)
+    surrogate = _get_direct_surrogate(
+        project_root, diameter_um, device=device, backend=backend
+    )
     forces = surrogate.evaluate_compression_batch(
         theta,
         disp=displ,

@@ -31,7 +31,7 @@ def test_compute_compression_surrogate_direct_applies_d0_and_relative_sigma(monk
     )
     monkeypatch.setattr(
         posterior_compression,
-        "_get_surrogate",
+        "_get_direct_surrogate",
         lambda *args, **kwargs: _DummyLegacySurrogate(),
     )
     sample = {"Parameters": [10.0, 20.0, 0.5, 0.1]}
@@ -58,7 +58,7 @@ def test_compute_compression_surrogate_batch_direct_uses_ka_kb_d0_sigma(monkeypa
     )
     monkeypatch.setattr(
         posterior_compression,
-        "_get_surrogate",
+        "_get_direct_surrogate",
         lambda *args, **kwargs: _DummyLegacySurrogate(),
     )
     sample = {

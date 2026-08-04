@@ -132,10 +132,72 @@ population fields. A JSON sidecar records every rewrite. The grouped Definity
 `source3` configuration is authoritative and remains grouped during
 materialization.
 
+## Forward-artifact canary
+
+Before starting HBI, exercise all three mechanical DNNs and every configured
+acoustic likelihood lane for one agent. The command evaluates a three-row batch
+at each diameter, runs the complete acoustic preflight, and records model hashes,
+array shapes, finite ranges, positive observation uncertainties, source grouping,
+and wall time:
+
+```bash
+${MESOUQ_ENV_ROOT}/bin/python \
+  scripts/workflows/emb/uq_emb/run_forward_canary.py \
+  --site karolina \
+  --device cuda \
+  --config "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/configs/definity_hbi_10000.yaml" \
+  --output "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/canaries/karolina_definity.json"
+```
+
+Use `--site vega` on Vega after staging and verifying the same immutable
+dependency set below that site's `MESOUQ_UQ_EMB_ARTIFACT_ROOT`. The matching
+ten-minute Slurm entrypoints are thin site wrappers:
+
+```bash
+REPO_ROOT="$PWD" \
+MESOUQ_SITE_RUNTIME_ROOT="${MESOUQ_SITE_RUNTIME_ROOT}" \
+CONFIG_PATH="${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/configs/definity_hbi_10000.yaml" \
+OUTPUT_PATH="${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/canaries/karolina_definity.json" \
+sbatch scripts/platforms/karolina/sbatch/uq_emb_forward_canary.sbatch
+```
+
+Replace `definity` with `sonovue` for the second agent. The Definity receipt must
+show one grouped acoustic dataset with 14 reference rows. SonoVue must show three
+separate acoustic datasets with one row each.
+
+## HBI replay
+
+Print and record the exact accepted Phase 1, native-CUDA Phase 2, and Phase 3b
+commands without running them:
+
+```bash
+${MESOUQ_ENV_ROOT}/bin/python \
+  scripts/workflows/emb/uq_emb/run_hbi_replay.py \
+  --site karolina \
+  --config "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/configs/definity_hbi_10000.yaml" \
+  --output-root "${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/definity_10k" \
+  --python-bin "${MESOUQ_ENV_ROOT}/bin/python"
+```
+
+Add `--execute` only inside an appropriate GPU allocation. The runner rejects
+an existing Phase 1 tree instead of overwriting it and updates a JSON receipt
+after every completed stage. The production Slurm wrapper is:
+
+```bash
+REPO_ROOT="$PWD" \
+MESOUQ_SITE_RUNTIME_ROOT="${MESOUQ_SITE_RUNTIME_ROOT}" \
+CONFIG_PATH="${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/configs/definity_hbi_10000.yaml" \
+OUTPUT_ROOT="${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/definity_10k" \
+sbatch scripts/platforms/karolina/sbatch/uq_emb_hbi_replay.sbatch
+```
+
+The equivalent Vega wrappers are under `scripts/platforms/vega/sbatch`. Both
+sites delegate to the same neutral Python runners and retain identical
+scientific configuration.
+
 ## Remaining command surface
 
-The closeout will add separate frozen commands for data preparation, DNN
-training, acoustic-surrogate fitting, HBI execution, direct DPD validation,
-figures, and manuscript compilation. Those commands delegate shared behavior to
-neutral MesoUQ workflow code and preserve both `--site karolina` and
-`--site vega`.
+The closeout will add the remaining frozen commands for data preparation, DNN
+training, acoustic-surrogate fitting, direct DPD validation, figures, and
+manuscript compilation. Those commands delegate shared behavior to neutral
+MesoUQ workflow code and preserve both `--site karolina` and `--site vega`.
