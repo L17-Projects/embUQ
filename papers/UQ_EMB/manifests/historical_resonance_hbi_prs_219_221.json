@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0",
+  "paper_id": "UQ_EMB",
+  "artifact_set_id": "historical-resonance-hbi-prs-219-221",
+  "created_at_utc": "2026-08-04T15:39:53Z",
+  "purpose": "Lossless preservation of superseded resonance-HBI development history before closing PRs 219, 220, and 221.",
+  "archive": {
+    "path": "$MESOUQ_SCRATCH_ROOT/papers/UQ_EMB/historical_pr_archives/historical_resonance_hbi_prs_219_221.bundle",
+    "bytes": 116688691,
+    "sha256": "e4306ee4132a3f7715d7d1f1145977933df71572e6ff7f73ebb8b62469592293",
+    "complete_history": true,
+    "verification_command": "git bundle verify $MESOUQ_SCRATCH_ROOT/papers/UQ_EMB/historical_pr_archives/historical_resonance_hbi_prs_219_221.bundle",
+    "inspection_command": "git bundle list-heads $MESOUQ_SCRATCH_ROOT/papers/UQ_EMB/historical_pr_archives/historical_resonance_hbi_prs_219_221.bundle",
+    "recovery_command": "git clone $MESOUQ_SCRATCH_ROOT/papers/UQ_EMB/historical_pr_archives/historical_resonance_hbi_prs_219_221.bundle historical-resonance-hbi-recovery"
+  },
+  "pull_requests": [
+    {
+      "number": 219,
+      "title": "Add SonoVue resonance HBI evidence",
+      "head_ref": "feature/sonovue-resonance-hbi",
+      "head_sha": "b0a97c04a8c07b03e28a356313cacebd7ab727f0",
+      "base_ref": "main",
+      "changed_file_count": 35,
+      "disposition": "superseded_by_uq_emb_replay_stack",
+      "close_without_branch_deletion": true
+    },
+    {
+      "number": 220,
+      "title": "SonoVue resonance HBI evidence and Definity handoff",
+      "head_ref": "feature/sonovue-dpd-resonance-karolina",
+      "head_sha": "67b7a1b1246d24687c964a7acbb48f103d17127b",
+      "base_ref": "main",
+      "changed_file_count": 906,
+      "disposition": "superseded_by_uq_emb_replay_stack",
+      "close_without_branch_deletion": true
+    },
+    {
+      "number": 221,
+      "title": "Add Definity resonance HBI evidence",
+      "head_ref": "feature/definity-resonance-hbi",
+      "head_sha": "2eb11b1fa1e2c9b6e1235f2875bd651f1f424806",
+      "base_ref": "feature/sonovue-dpd-resonance-karolina",
+      "changed_file_count": 58,
+      "disposition": "superseded_by_uq_emb_replay_stack",
+      "close_without_branch_deletion": true
+    }
+  ],
+  "retention": {
+    "delete_archive": false,
+    "delete_remote_branches": false,
+    "accepted_production_outputs_remain_authoritative": true,
+    "accepted_production_manifest": "papers/UQ_EMB/manifests/accepted_production_outputs_202607.files.json"
+  }
+}
