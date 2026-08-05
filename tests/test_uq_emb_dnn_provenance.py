@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -133,3 +134,83 @@ def test_audit_receipt_must_remain_outside_dependency_root(tmp_path: Path) -> No
             output=dependency_root / "audit.json",
             locked_root=dependency_root,
         )
+
+
+def test_audit_receipt_must_not_hardlink_dependency(tmp_path: Path) -> None:
+    module = _load_module()
+    dependency_root = tmp_path / "dependencies"
+    dependency_root.mkdir()
+    dependency = dependency_root / "model.pkl"
+    dependency.write_bytes(b"locked")
+    receipt = tmp_path / "audit.json"
+    receipt.hardlink_to(dependency)
+
+    with pytest.raises(ValueError, match="hardlink to immutable artifact"):
+        module._require_output_outside_locked_root(
+            output=receipt,
+            locked_root=dependency_root,
+        )
+
+
+def test_audit_main_rejects_manifest_as_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module()
+    dependency_root = tmp_path / "dependencies"
+    dependency_root.mkdir()
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(SCRIPT),
+            "--dependency-root",
+            str(dependency_root),
+            "--manifest",
+            str(manifest),
+            "--repo-root",
+            str(REPO_ROOT),
+            "--output-root",
+            str(tmp_path / "refresh"),
+            "--python-bin",
+            "/verified/python",
+            "--receipt",
+            str(manifest),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="must not overwrite or hardlink input"):
+        module.main()
+
+
+def test_audit_main_rejects_refresh_output_inside_dependency_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module()
+    dependency_root = tmp_path / "dependencies"
+    dependency_root.mkdir()
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(SCRIPT),
+            "--dependency-root",
+            str(dependency_root),
+            "--manifest",
+            str(manifest),
+            "--repo-root",
+            str(REPO_ROOT),
+            "--output-root",
+            str(dependency_root / "refresh"),
+            "--python-bin",
+            "/verified/python",
+            "--receipt",
+            str(tmp_path / "receipt.json"),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="outside the immutable dependency root"):
+        module.main()

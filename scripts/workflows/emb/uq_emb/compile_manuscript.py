@@ -21,7 +21,11 @@ REPO_ROOT = SCRIPT_DIR.parents[3]
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from verify_frozen_submission import verify_snapshot  # noqa: E402
-from replay_provenance import replay_receipt_provenance  # noqa: E402
+from replay_provenance import (  # noqa: E402
+    checked_replay_path,
+    replay_receipt_provenance,
+    require_output_outside_consumed_roots,
+)
 
 
 SCHEMA_VERSION = "mesouq.uq_emb.manuscript_replay.v1"
@@ -123,16 +127,31 @@ def compile_manuscript(
     bibtex: str,
 ) -> dict[str, Any]:
     started = time.monotonic()
-    bundle_root = bundle_root.expanduser().resolve()
-    manifest_path = manifest_path.expanduser().resolve()
-    build_root = build_root.expanduser().resolve()
-
+    bundle_root = checked_replay_path(bundle_root, label="frozen manuscript bundle")
+    manifest_path = checked_replay_path(manifest_path, label="manuscript manifest")
+    pdflatex_path = checked_replay_path(
+        Path(shutil.which(pdflatex) or pdflatex), label="pdflatex executable"
+    )
+    bibtex_path = checked_replay_path(
+        Path(shutil.which(bibtex) or bibtex), label="bibtex executable"
+    )
+    build_root = checked_replay_path(build_root, label="manuscript build root")
     _require_build_outside_bundle(build_root=build_root, bundle_root=bundle_root)
+    build_root = require_output_outside_consumed_roots(
+        output_path=build_root,
+        repo_root=REPO_ROOT,
+        consumed_paths=[bundle_root, pdflatex_path, bibtex_path],
+    )
 
     frozen_report = verify_snapshot(root=bundle_root, manifest_path=manifest_path)
     if frozen_report["status"] != "PASS":
         raise ValueError(f"Frozen editor bundle verification failed: {frozen_report}")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    execution_provenance = replay_receipt_provenance(
+        repo_root=REPO_ROOT,
+        runner=Path(__file__),
+        consumed_paths=[bundle_root, pdflatex_path, bibtex_path],
+    )
 
     _require_fresh_directory(build_root)
     _copy_manifest_files(bundle_root, build_root, manifest)
@@ -222,16 +241,10 @@ def compile_manuscript(
     ):
         raise ValueError(f"Recompiled PDFs differ from the frozen text/page baseline: {baseline_comparison}")
 
-    pdflatex_path = Path(shutil.which(pdflatex) or pdflatex)
-    bibtex_path = Path(shutil.which(bibtex) or bibtex)
     receipt = {
         "schema_version": SCHEMA_VERSION,
         "status": "passed",
-        "execution_provenance": replay_receipt_provenance(
-            repo_root=REPO_ROOT,
-            runner=Path(__file__),
-            consumed_paths=[bundle_root, pdflatex_path, bibtex_path],
-        ),
+        "execution_provenance": execution_provenance,
         "bundle_verification": frozen_report,
         "build_root": str(build_root),
         "pdflatex": str(pdflatex_path),

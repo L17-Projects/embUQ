@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 
 SCRIPT = (
@@ -49,3 +50,33 @@ def test_load_overlay_checks_manifest_count(tmp_path: Path) -> None:
     assert len(table) == 2
     assert report["plotted_samples"] == 2
     assert report["counts_by_diameter"] == {"2.1 um": 2}
+
+
+def test_figure7_verifies_locked_inputs_before_creating_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    output = tmp_path / "output"
+    monkeypatch.setattr(
+        module,
+        "require_output_outside_consumed_roots",
+        lambda *, output_path, **_kwargs: output_path.resolve(),
+    )
+
+    def reject_before_write(**_kwargs):
+        assert not output.exists()
+        raise ValueError("locked root drift")
+
+    monkeypatch.setattr(module, "replay_receipt_provenance", reject_before_write)
+    with pytest.raises(ValueError, match="locked root drift"):
+        module.render_figure7(
+            code_root=tmp_path / "code",
+            renderer_inputs=tmp_path / "inputs",
+            phase1_overlay=tmp_path / "overlay.csv",
+            phase1_manifest=tmp_path / "overlay.json",
+            output_dir=output,
+            tex_bin_dir=None,
+            texdeps_dir=None,
+            baseline_pdf=None,
+        )
+    assert not output.exists()

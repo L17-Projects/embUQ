@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -224,3 +225,52 @@ def test_comparison_rejects_symmetric_integrity_field_omission(tmp_path: Path) -
 
     with pytest.raises(ValueError, match="source_config_sha256"):
         module.compare_receipts(karolina, vega, expected_agent="sonovue")
+
+
+def test_comparison_output_must_not_hardlink_input(tmp_path: Path) -> None:
+    module = _load_module()
+    karolina = tmp_path / "karolina.json"
+    vega = tmp_path / "vega.json"
+    _write(karolina, _receipt("karolina", "/scratch"))
+    _write(vega, _receipt("vega", "/ceph"))
+    output = tmp_path / "comparison.json"
+    output.hardlink_to(karolina)
+
+    with pytest.raises(ValueError, match="must not overwrite or hardlink input"):
+        module.require_output_distinct_from_inputs(
+            output_path=output,
+            input_paths=[karolina, vega],
+            label="Forward-canary comparison output",
+        )
+
+
+def test_comparison_main_rejects_existing_unrelated_hardlink(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load_module()
+    karolina = tmp_path / "karolina.json"
+    vega = tmp_path / "vega.json"
+    _write(karolina, _receipt("karolina", "/scratch"))
+    _write(vega, _receipt("vega", "/ceph"))
+    unrelated = tmp_path / "unrelated.json"
+    unrelated.write_text("{}\n", encoding="utf-8")
+    output = tmp_path / "comparison.json"
+    output.hardlink_to(unrelated)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(SCRIPT),
+            "--agent",
+            "sonovue",
+            "--karolina",
+            str(karolina),
+            "--vega",
+            str(vega),
+            "--output",
+            str(output),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="must not be an existing multi-link file"):
+        module.main()

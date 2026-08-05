@@ -14,7 +14,13 @@ from typing import Any, Mapping
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from replay_provenance import replay_receipt_provenance  # noqa: E402
+from replay_provenance import (  # noqa: E402
+    checked_replay_path,
+    replay_receipt_provenance,
+    require_output_distinct_from_inputs,
+    require_output_outside_known_locked_roots,
+    require_output_outside_locked_root,
+)
 
 
 PAPER_ID = "UQ_EMB"
@@ -103,15 +109,11 @@ CASES: tuple[dict[str, Any], ...] = (
 
 
 def _require_output_outside_locked_root(*, output: Path, locked_root: Path) -> None:
-    output = output.expanduser().resolve()
-    locked_root = locked_root.expanduser().resolve()
-    try:
-        output.relative_to(locked_root)
-    except ValueError:
-        return
-    raise ValueError(
-        "DNN audit receipt must remain outside the immutable dependency root: "
-        f"receipt={output}, dependency_root={locked_root}"
+    require_output_outside_locked_root(
+        output_path=output,
+        locked_root=locked_root,
+        label="DNN audit receipt",
+        locked_root_label="immutable dependency root",
     )
 
 
@@ -214,6 +216,25 @@ def audit(
     seed: int,
     max_epoch: int,
 ) -> dict[str, Any]:
+    dependency_root = checked_replay_path(dependency_root, label="DNN dependency root")
+    manifest_path = checked_replay_path(manifest_path, label="DNN dependency manifest")
+    repo_root = checked_replay_path(repo_root, label="repository root")
+    output_root = require_output_outside_locked_root(
+        output_path=output_root,
+        locked_root=dependency_root,
+        label="DNN refresh output",
+        locked_root_label="immutable dependency root",
+    )
+    output_root = require_output_outside_known_locked_roots(
+        output_path=output_root,
+        repo_root=repo_root,
+        label="DNN refresh output",
+    )
+    output_root = require_output_distinct_from_inputs(
+        output_path=output_root,
+        input_paths=[manifest_path],
+        label="DNN refresh output",
+    )
     expected = _manifest_hashes(manifest_path)
     rows: list[dict[str, Any]] = []
     for case in CASES:
@@ -286,15 +307,30 @@ def main() -> int:
     parser.add_argument("--receipt", type=Path, required=True)
     args = parser.parse_args()
 
-    dependency_root = args.dependency_root.resolve()
-    receipt = args.receipt.resolve()
+    dependency_root = checked_replay_path(
+        args.dependency_root, label="DNN dependency root"
+    )
+    manifest = checked_replay_path(args.manifest, label="DNN dependency manifest")
+    repo_root = checked_replay_path(args.repo_root, label="repository root")
+    receipt = checked_replay_path(args.receipt, label="DNN audit receipt")
     _require_output_outside_locked_root(output=receipt, locked_root=dependency_root)
+    receipt = require_output_outside_known_locked_roots(
+        output_path=receipt,
+        repo_root=repo_root,
+        label="DNN audit receipt",
+    )
+    receipt = require_output_distinct_from_inputs(
+        output_path=receipt,
+        input_paths=[manifest],
+        label="DNN audit receipt",
+    )
+    output_root = checked_replay_path(args.output_root, label="DNN refresh output")
 
     payload = audit(
         dependency_root=dependency_root,
-        manifest_path=args.manifest.resolve(),
-        repo_root=args.repo_root.resolve(),
-        output_root=args.output_root.resolve(),
+        manifest_path=manifest,
+        repo_root=repo_root,
+        output_root=output_root,
         python_bin=args.python_bin,
         seed=args.seed,
         max_epoch=args.max_epoch,

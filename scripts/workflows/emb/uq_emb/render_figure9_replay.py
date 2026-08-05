@@ -21,6 +21,7 @@ REPO_ROOT = SCRIPT_DIR.parents[3]
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from replay_provenance import (  # noqa: E402
+    checked_replay_path,
     replay_receipt_provenance,
     require_output_outside_consumed_roots,
 )
@@ -120,14 +121,20 @@ def render_figure9(
     output_root: Path,
     baseline_pdf: Path | None,
 ) -> dict:
-    renderer = renderer.expanduser().resolve()
-    accepted_root = accepted_root.expanduser().resolve()
-    plotting_root = plotting_root.expanduser().resolve()
-    old_generator = old_generator.expanduser().resolve()
-    conversion_constants = conversion_constants.expanduser().resolve()
-    tex_bin_dir = tex_bin_dir.expanduser().resolve()
-    texdeps_dir = texdeps_dir.expanduser().resolve()
-    baseline_pdf = baseline_pdf.expanduser().resolve() if baseline_pdf is not None else None
+    renderer = checked_replay_path(renderer, label="Figure 9 renderer")
+    accepted_root = checked_replay_path(accepted_root, label="Figure 9 accepted root")
+    plotting_root = checked_replay_path(plotting_root, label="Figure 9 plotting root")
+    old_generator = checked_replay_path(old_generator, label="Figure 9 legacy generator")
+    conversion_constants = checked_replay_path(
+        conversion_constants, label="Figure 9 conversion constants"
+    )
+    tex_bin_dir = checked_replay_path(tex_bin_dir, label="Figure 9 TeX binaries")
+    texdeps_dir = checked_replay_path(texdeps_dir, label="Figure 9 TeX dependencies")
+    baseline_pdf = (
+        checked_replay_path(baseline_pdf, label="Figure 9 baseline")
+        if baseline_pdf is not None
+        else None
+    )
     consumed_paths = [
         renderer,
         accepted_root,
@@ -141,6 +148,11 @@ def render_figure9(
     output_root = require_output_outside_consumed_roots(
         output_path=output_root,
         repo_root=REPO_ROOT,
+        consumed_paths=consumed_paths,
+    )
+    execution_provenance = replay_receipt_provenance(
+        repo_root=REPO_ROOT,
+        runner=Path(__file__),
         consumed_paths=consumed_paths,
     )
     if output_root.exists() and any(output_root.iterdir()):
@@ -225,11 +237,7 @@ def render_figure9(
     receipt = {
         "schema_version": SCHEMA_VERSION,
         "status": "PASS",
-        "execution_provenance": replay_receipt_provenance(
-            repo_root=REPO_ROOT,
-            runner=Path(__file__),
-            consumed_paths=consumed_paths,
-        ),
+        "execution_provenance": execution_provenance,
         "renderer": {"path": str(renderer), "sha256": _sha256(renderer)},
         "base_renderer": {"path": str(module.BASE), "sha256": _sha256(module.BASE)},
         "old_generator": {"path": str(old_generator), "sha256": _sha256(old_generator)},

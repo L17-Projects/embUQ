@@ -59,6 +59,11 @@ def test_compile_manuscript_stages_frozen_files_and_checks_baseline(
         "verify_snapshot",
         lambda **_kwargs: {"status": "PASS", "file_count": len(entries)},
     )
+    monkeypatch.setattr(
+        module,
+        "require_output_outside_consumed_roots",
+        lambda *, output_path, **_kwargs: output_path.resolve(),
+    )
     provenance_calls = []
     monkeypatch.setattr(
         module,
@@ -133,6 +138,40 @@ def test_compile_manuscript_rejects_build_root_inside_bundle(tmp_path: Path) -> 
         )
 
     assert not (bundle_root / "build").exists()
+
+
+def test_compile_verifies_provenance_before_creating_build_root(
+    monkeypatch, tmp_path: Path
+) -> None:
+    module = _load_module()
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text('{"files": []}\n', encoding="utf-8")
+    build_root = tmp_path / "build"
+    monkeypatch.setattr(module, "verify_snapshot", lambda **_kwargs: {"status": "PASS"})
+    monkeypatch.setattr(
+        module,
+        "require_output_outside_consumed_roots",
+        lambda *, output_path, **_kwargs: output_path.resolve(),
+    )
+
+    def reject_before_write(**_kwargs):
+        assert not build_root.exists()
+        raise ValueError("locked root drift")
+
+    monkeypatch.setattr(module, "replay_receipt_provenance", reject_before_write)
+    monkeypatch.setattr(module.shutil, "which", lambda _name: "/usr/bin/true")
+
+    with pytest.raises(ValueError, match="locked root drift"):
+        module.compile_manuscript(
+            bundle_root=bundle,
+            manifest_path=manifest,
+            build_root=build_root,
+            pdflatex="pdflatex",
+            bibtex="bibtex",
+        )
+    assert not build_root.exists()
 
 
 def test_log_audit_covers_natbib_references_and_rerun(tmp_path: Path) -> None:

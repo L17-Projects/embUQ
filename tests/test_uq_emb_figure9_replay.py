@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 
 REPLAY_SCRIPT = (
@@ -85,3 +86,34 @@ def test_export_conversion_constants_uses_twice_column_median(tmp_path: Path) ->
     assert payload["diameters"]["3.4"]["initial_diameter_dpd"] == 6.0
     assert payload["diameters"]["5.8"]["initial_diameter_dpd"] == 8.0
     assert output.is_file()
+
+
+def test_figure9_verifies_locked_inputs_before_creating_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module(REPLAY_SCRIPT, "uq_emb_figure9_prewrite")
+    output = tmp_path / "output"
+    monkeypatch.setattr(
+        module,
+        "require_output_outside_consumed_roots",
+        lambda *, output_path, **_kwargs: output_path.resolve(),
+    )
+
+    def reject_before_write(**_kwargs):
+        assert not output.exists()
+        raise ValueError("locked root drift")
+
+    monkeypatch.setattr(module, "replay_receipt_provenance", reject_before_write)
+    with pytest.raises(ValueError, match="locked root drift"):
+        module.render_figure9(
+            renderer=tmp_path / "renderer.py",
+            accepted_root=tmp_path / "accepted",
+            plotting_root=tmp_path / "plotting",
+            old_generator=tmp_path / "legacy.py",
+            conversion_constants=tmp_path / "constants.json",
+            tex_bin_dir=tmp_path / "tex-bin",
+            texdeps_dir=tmp_path / "texdeps",
+            output_root=output,
+            baseline_pdf=None,
+        )
+    assert not output.exists()

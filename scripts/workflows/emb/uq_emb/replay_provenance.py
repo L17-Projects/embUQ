@@ -52,6 +52,11 @@ def _checked_resolved_path(path: Path, *, label: str) -> Path:
     return _checked_lexical_path(path, label=label).resolve()
 
 
+def checked_replay_path(path: Path, *, label: str) -> Path:
+    """Return a canonical replay path without resolving away lexical symlinks."""
+    return _checked_resolved_path(path, label=label)
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -210,12 +215,116 @@ def _consumed_locked_roots(
     return roots
 
 
+def _reject_existing_hardlink_within_roots(
+    *, output_path: Path, locked_roots: Iterable[Path], label: str
+) -> None:
+    if not output_path.exists() or not output_path.is_file():
+        return
+    output_stat = output_path.stat()
+    output_inode = (output_stat.st_dev, output_stat.st_ino)
+    for root in locked_roots:
+        if not root.is_dir():
+            continue
+        for member in root.rglob("*"):
+            if not member.is_file():
+                continue
+            member_stat = member.stat()
+            if output_inode == (member_stat.st_dev, member_stat.st_ino):
+                raise ValueError(
+                    f"{label} must not be a hardlink to immutable artifact: {member}"
+                )
+    if output_stat.st_nlink > 1:
+        raise ValueError(f"{label} must not be an existing multi-link file: {output_path}")
+
+
+def require_output_outside_known_locked_roots(
+    *, output_path: Path, repo_root: Path, label: str
+) -> Path:
+    """Reject output containment in any canonical frozen UQ_EMB namespace."""
+    repo_root = _checked_resolved_path(repo_root, label="repository root")
+    output_lexical = _checked_lexical_path(output_path, label=label)
+    output_resolved = output_lexical.resolve()
+    manifest_root = repo_root / "papers" / "UQ_EMB" / "manifests"
+    payloads = {
+        name: _locked_manifest(manifest_root / name) for name in DEFAULT_CLOSEOUT_MANIFESTS
+    }
+    locked_names = {
+        str(payload["artifact_set_dir"])
+        for payload in payloads.values()
+        if isinstance(payload.get("artifact_set_dir"), str)
+        and payload.get("artifact_set_dir")
+    }
+    for candidate in (output_lexical, *output_lexical.parents):
+        if candidate.name in locked_names:
+            raise ValueError(
+                f"{label} must remain outside immutable artifact roots: {candidate}"
+            )
+    editor_root = repo_root / "papers" / "UQ_EMB" / "editor_submission" / "review2_v1"
+    if output_resolved == editor_root or editor_root in output_resolved.parents:
+        raise ValueError(
+            f"{label} must remain outside the immutable editor-submission root: {editor_root}"
+        )
+    _reject_existing_hardlink_within_roots(
+        output_path=output_resolved,
+        locked_roots=(),
+        label=label,
+    )
+    return output_resolved
+
+
+def require_output_outside_locked_root(
+    *,
+    output_path: Path,
+    locked_root: Path,
+    label: str,
+    locked_root_label: str = "immutable artifact root",
+) -> Path:
+    """Reject containment, symlink aliases, and hardlinks to one locked root."""
+    output_lexical = _checked_lexical_path(output_path, label=label)
+    locked_root = _checked_resolved_path(locked_root, label="immutable artifact root")
+    output_resolved = output_lexical.resolve()
+    if output_resolved == locked_root or locked_root in output_resolved.parents:
+        raise ValueError(
+            f"{label} must remain outside the {locked_root_label}: "
+            f"output={output_resolved}, locked_root={locked_root}"
+        )
+    _reject_existing_hardlink_within_roots(
+        output_path=output_resolved,
+        locked_roots=[locked_root],
+        label=label,
+    )
+    return output_resolved
+
+
+def require_output_distinct_from_inputs(
+    *, output_path: Path, input_paths: Iterable[Path], label: str
+) -> Path:
+    """Reject a report path that aliases or hardlinks any of its input files."""
+    output_lexical = _checked_lexical_path(output_path, label=label)
+    output_resolved = output_lexical.resolve()
+    for input_path in input_paths:
+        checked_input = _checked_resolved_path(input_path, label="input receipt")
+        same_existing_file = (
+            output_resolved.exists()
+            and checked_input.exists()
+            and os.path.samefile(output_resolved, checked_input)
+        )
+        if output_resolved == checked_input or same_existing_file:
+            raise ValueError(f"{label} must not overwrite or hardlink input: {checked_input}")
+    return output_resolved
+
+
 def require_output_outside_consumed_roots(
     *, output_path: Path, repo_root: Path, consumed_paths: Iterable[Path]
 ) -> Path:
-    """Reject replay output paths inside any immutable input artifact set."""
+    """Reject replay outputs inside or hardlinked to any identifiable locked set."""
     repo_root = _checked_resolved_path(repo_root, label="repository root")
-    output_path = _checked_resolved_path(output_path, label="output path")
+    output_lexical = _checked_lexical_path(output_path, label="output path")
+    output_path = require_output_outside_known_locked_roots(
+        output_path=output_lexical,
+        repo_root=repo_root,
+        label="Replay output",
+    )
     manifest_root = repo_root / "papers" / "UQ_EMB" / "manifests"
     payloads = {
         name: _locked_manifest(manifest_root / name) for name in DEFAULT_CLOSEOUT_MANIFESTS
@@ -225,6 +334,16 @@ def require_output_outside_consumed_roots(
         consumed_paths=consumed_paths,
         payloads=payloads,
     )
+    editor_root = repo_root / "papers" / "UQ_EMB" / "editor_submission" / "review2_v1"
+    if output_path == editor_root or editor_root in output_path.parents:
+        locked_roots[("editor_submission_review2_v1.json", editor_root)] = None
+    for name, payload in payloads.items():
+        artifact_set_dir = payload.get("artifact_set_dir")
+        if not isinstance(artifact_set_dir, str) or not artifact_set_dir:
+            continue
+        root = _artifact_root_for_path(output_lexical, artifact_set_dir)
+        if root is not None:
+            locked_roots[(name, root.resolve())] = None
     for _name, locked_root in locked_roots:
         try:
             output_path.relative_to(locked_root)
@@ -234,6 +353,11 @@ def require_output_outside_consumed_roots(
             "Replay output must remain outside immutable consumed artifact roots: "
             f"output={output_path}, locked_root={locked_root}"
         )
+    _reject_existing_hardlink_within_roots(
+        output_path=output_path,
+        locked_roots=[root for _name, root in locked_roots],
+        label="Replay output",
+    )
     return output_path
 
 

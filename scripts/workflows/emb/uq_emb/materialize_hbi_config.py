@@ -125,25 +125,26 @@ def _accepted_stage_seeds(
                 f"Locked accepted HBI log has no {stage} Korali seed record: {log_path}"
             )
         if stage == "phase3b":
-            base = min(values)
-            expected = set(range(base, max(values) + 1))
+            base = values[0]
+            repeated = [base] * len(values)
+            incremented = list(range(base, base + len(values)))
             # Separate target invocations may reuse one base seed.  Older accepted
-            # runs may instead increment it once per target; both forms preserve
-            # the same replay base and reject gaps or unrelated seed values.
-            if set(values) not in ({base}, expected):
+            # runs may instead increment it once per target; compare the ordered
+            # records so mixed repetitions cannot be misclassified as increments.
+            if values not in (repeated, incremented):
                 raise ValueError(
-                    "Locked accepted HBI Phase 3b seeds must reuse one base seed or form "
-                    "one contiguous sequence from that base: "
+                    "Locked accepted HBI Phase 3b seeds must repeat one base seed or form "
+                    "one contiguous sequence in target order from that base: "
                     f"{values}"
                 )
-            phase3b_seed_mode = "repeat" if set(values) == {base} else "increment"
+            phase3b_seed_mode = "repeat" if values == repeated else "increment"
         elif len(set(values)) != 1:
             raise ValueError(
                 f"Locked accepted HBI {stage} log has inconsistent Korali seeds: {values}"
             )
         if values[0] <= 0:
             raise ValueError(f"Locked accepted HBI {stage} seed must be positive: {values[0]}")
-        seeds[stage] = min(values) if stage == "phase3b" else values[0]
+        seeds[stage] = values[0]
     return {
         "accepted_stage_seeds": seeds,
         "accepted_phase3b_seed_mode": phase3b_seed_mode,

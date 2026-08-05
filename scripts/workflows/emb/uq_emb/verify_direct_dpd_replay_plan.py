@@ -15,6 +15,16 @@ from typing import Any, Callable
 
 EXPECTED_SCHEMA = "mesouq.uq_emb.direct_dpd_replay.v1"
 EXPECTED_BUBBLES = ("d1", "d2", "d3", "d4", "d5", "d6")
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+
+from replay_provenance import (  # noqa: E402
+    checked_replay_path,
+    require_output_distinct_from_inputs,
+    require_output_outside_known_locked_roots,
+    require_output_outside_locked_root,
+)
+
 DEFAULT_ACOUSTIC_RUNNER = (
     Path(__file__).resolve().parents[1] / "run_emb_free_shell_breathing_protocol.py"
 )
@@ -69,15 +79,15 @@ def _command_environment(command: list[str]) -> tuple[str, str]:
 
 def _require_receipt_outside_accepted_root(*, receipt: Path, plan_path: Path) -> None:
     payload = json.loads(plan_path.read_text(encoding="utf-8"))
-    accepted_root = Path(str(payload.get("accepted_artifact_root", ""))).resolve()
-    receipt = receipt.expanduser().resolve()
-    try:
-        receipt.relative_to(accepted_root)
-    except ValueError:
-        return
-    raise ValueError(
-        "Direct-DPD verification receipt must remain outside the accepted artifact root: "
-        f"receipt={receipt}, accepted_root={accepted_root}"
+    accepted_root = checked_replay_path(
+        Path(str(payload.get("accepted_artifact_root", ""))),
+        label="accepted artifact root",
+    )
+    require_output_outside_locked_root(
+        output_path=receipt,
+        locked_root=accepted_root,
+        label="Direct-DPD verification receipt",
+        locked_root_label="accepted artifact root",
     )
 
 
@@ -260,14 +270,36 @@ def main() -> int:
     parser.add_argument("--materializer", type=Path, default=DEFAULT_MATERIALIZER)
     parser.add_argument("--receipt", type=Path, required=True)
     args = parser.parse_args()
-    plan_path = args.plan.resolve()
-    receipt = args.receipt.resolve()
+    plan_path = checked_replay_path(args.plan, label="direct-DPD replay plan")
+    acoustic_runner = checked_replay_path(
+        args.acoustic_runner, label="direct-DPD acoustic runner"
+    )
+    materializer = checked_replay_path(args.materializer, label="direct-DPD materializer")
+    repo_root = checked_replay_path(
+        Path(__file__).resolve().parents[4], label="repository root"
+    )
+    plan_payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    accepted_manifest = checked_replay_path(
+        Path(str(plan_payload.get("accepted_artifact_manifest", ""))),
+        label="accepted artifact manifest",
+    )
+    receipt = checked_replay_path(args.receipt, label="direct-DPD verification receipt")
     try:
         _require_receipt_outside_accepted_root(receipt=receipt, plan_path=plan_path)
+        receipt = require_output_outside_known_locked_roots(
+            output_path=receipt,
+            repo_root=repo_root,
+            label="Direct-DPD verification receipt",
+        )
+        receipt = require_output_distinct_from_inputs(
+            output_path=receipt,
+            input_paths=[plan_path, accepted_manifest, acoustic_runner, materializer],
+            label="Direct-DPD verification receipt",
+        )
         report = verify(
             plan_path,
-            args.acoustic_runner.resolve(),
-            args.materializer.resolve(),
+            acoustic_runner,
+            materializer,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         parser.exit(2, f"error: {exc}\n")

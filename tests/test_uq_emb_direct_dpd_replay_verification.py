@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -126,3 +128,68 @@ def test_verifier_rejects_unselected_accepted_artifact_drift(tmp_path: Path) -> 
         assert "Locked UQ_EMB artifact content mismatch" in str(exc)
     else:  # pragma: no cover
         raise AssertionError("Expected whole-root accepted artifact drift to fail verification")
+
+
+def test_verification_receipt_must_not_hardlink_accepted_artifact(tmp_path: Path) -> None:
+    verifier = _module(
+        "scripts/workflows/emb/uq_emb/verify_direct_dpd_replay_plan.py",
+        "uq_emb_direct_dpd_verifier_hardlink",
+    )
+    accepted_root = tmp_path / "accepted"
+    accepted_root.mkdir()
+    member = accepted_root / "result.json"
+    member.write_text("{}\n", encoding="utf-8")
+    receipt = tmp_path / "verification.json"
+    receipt.hardlink_to(member)
+    plan = tmp_path / "plan.json"
+    plan.write_text(
+        json.dumps({"accepted_artifact_root": str(accepted_root)}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="hardlink to immutable artifact"):
+        verifier._require_receipt_outside_accepted_root(
+            receipt=receipt,
+            plan_path=plan,
+        )
+
+
+def test_verification_main_rejects_plan_as_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    verifier = _module(
+        "scripts/workflows/emb/uq_emb/verify_direct_dpd_replay_plan.py",
+        "uq_emb_direct_dpd_verifier_input_collision",
+    )
+    accepted_root = tmp_path / "accepted"
+    accepted_root.mkdir()
+    accepted_manifest = tmp_path / "accepted.json"
+    accepted_manifest.write_text("{}\n", encoding="utf-8")
+    plan = tmp_path / "plan.json"
+    plan.write_text(
+        json.dumps(
+            {
+                "accepted_artifact_root": str(accepted_root),
+                "accepted_artifact_manifest": str(accepted_manifest),
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify_direct_dpd_replay_plan.py",
+            "--plan",
+            str(plan),
+            "--receipt",
+            str(plan),
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        verifier.main()
+    assert exc_info.value.code == 2
+    assert "must not overwrite or hardlink input" in capsys.readouterr().err

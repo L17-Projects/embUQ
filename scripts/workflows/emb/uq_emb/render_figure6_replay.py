@@ -21,6 +21,7 @@ REPO_ROOT = SCRIPT_DIR.parents[3]
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from replay_provenance import (  # noqa: E402
+    checked_replay_path,
     replay_receipt_provenance,
     require_output_outside_consumed_roots,
 )
@@ -70,13 +71,19 @@ def render_figure6(
     output_dir: Path,
     baseline_pdf: Path | None,
 ) -> dict:
-    renderer = renderer.expanduser().resolve()
-    paper_style = paper_style.expanduser().resolve()
-    paper_style_source = paper_style_source.expanduser().resolve()
-    rows = rows.expanduser().resolve()
-    tex_bin_dir = tex_bin_dir.expanduser().resolve()
-    texdeps_dir = texdeps_dir.expanduser().resolve()
-    baseline_pdf = baseline_pdf.expanduser().resolve() if baseline_pdf is not None else None
+    renderer = checked_replay_path(renderer, label="Figure 6 renderer")
+    paper_style = checked_replay_path(paper_style, label="Figure 6 paper style")
+    paper_style_source = checked_replay_path(
+        paper_style_source, label="Figure 6 paper-style source"
+    )
+    rows = checked_replay_path(rows, label="Figure 6 rows")
+    tex_bin_dir = checked_replay_path(tex_bin_dir, label="Figure 6 TeX binaries")
+    texdeps_dir = checked_replay_path(texdeps_dir, label="Figure 6 TeX dependencies")
+    baseline_pdf = (
+        checked_replay_path(baseline_pdf, label="Figure 6 baseline")
+        if baseline_pdf is not None
+        else None
+    )
     consumed_paths = [
         renderer,
         paper_style,
@@ -89,6 +96,11 @@ def render_figure6(
     output_dir = require_output_outside_consumed_roots(
         output_path=output_dir,
         repo_root=REPO_ROOT,
+        consumed_paths=consumed_paths,
+    )
+    execution_provenance = replay_receipt_provenance(
+        repo_root=REPO_ROOT,
+        runner=Path(__file__),
         consumed_paths=consumed_paths,
     )
     if output_dir.exists() and any(output_dir.iterdir()):
@@ -135,11 +147,7 @@ def render_figure6(
     receipt = {
         "schema_version": SCHEMA_VERSION,
         "status": "PASS",
-        "execution_provenance": replay_receipt_provenance(
-            repo_root=REPO_ROOT,
-            runner=Path(__file__),
-            consumed_paths=consumed_paths,
-        ),
+        "execution_provenance": execution_provenance,
         "renderer": {"path": str(renderer), "sha256": _sha256(renderer)},
         "paper_style": {"path": str(paper_style), "sha256": _sha256(paper_style)},
         "rows": {"path": str(rows), "sha256": _sha256(rows), "count": len(retained)},

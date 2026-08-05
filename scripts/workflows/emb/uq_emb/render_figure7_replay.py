@@ -27,6 +27,7 @@ REPO_ROOT = SCRIPT_DIR.parents[3]
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from replay_provenance import (  # noqa: E402
+    checked_replay_path,
     replay_receipt_provenance,
     require_output_outside_consumed_roots,
 )
@@ -131,13 +132,29 @@ def render_figure7(
     texdeps_dir: Path | None,
     baseline_pdf: Path | None,
 ) -> dict[str, Any]:
-    code_root = code_root.expanduser().resolve()
-    renderer_inputs = renderer_inputs.expanduser().resolve()
-    phase1_overlay = phase1_overlay.expanduser().resolve()
-    phase1_manifest = phase1_manifest.expanduser().resolve()
-    tex_bin_dir = tex_bin_dir.expanduser().resolve() if tex_bin_dir is not None else None
-    texdeps_dir = texdeps_dir.expanduser().resolve() if texdeps_dir is not None else None
-    baseline_pdf = baseline_pdf.expanduser().resolve() if baseline_pdf is not None else None
+    code_root = checked_replay_path(code_root, label="Figure 7 code root")
+    renderer_inputs = checked_replay_path(
+        renderer_inputs, label="Figure 7 renderer inputs"
+    )
+    phase1_overlay = checked_replay_path(phase1_overlay, label="Figure 7 Phase-1 overlay")
+    phase1_manifest = checked_replay_path(
+        phase1_manifest, label="Figure 7 Phase-1 manifest"
+    )
+    tex_bin_dir = (
+        checked_replay_path(tex_bin_dir, label="Figure 7 TeX binaries")
+        if tex_bin_dir is not None
+        else None
+    )
+    texdeps_dir = (
+        checked_replay_path(texdeps_dir, label="Figure 7 TeX dependencies")
+        if texdeps_dir is not None
+        else None
+    )
+    baseline_pdf = (
+        checked_replay_path(baseline_pdf, label="Figure 7 baseline")
+        if baseline_pdf is not None
+        else None
+    )
     consumed_paths = [
         code_root,
         renderer_inputs,
@@ -150,6 +167,11 @@ def render_figure7(
     output_dir = require_output_outside_consumed_roots(
         output_path=output_dir,
         repo_root=REPO_ROOT,
+        consumed_paths=consumed_paths,
+    )
+    execution_provenance = replay_receipt_provenance(
+        repo_root=REPO_ROOT,
+        runner=Path(__file__),
         consumed_paths=consumed_paths,
     )
     if output_dir.exists() and any(output_dir.iterdir()):
@@ -281,11 +303,7 @@ def render_figure7(
     receipt = {
         "schema_version": SCHEMA_VERSION,
         "status": "PASS",
-        "execution_provenance": replay_receipt_provenance(
-            repo_root=REPO_ROOT,
-            runner=Path(__file__),
-            consumed_paths=consumed_paths,
-        ),
+        "execution_provenance": execution_provenance,
         "renderer_scripts": {
             name: {"path": str(path), "sha256": _sha256(path)}
             for name, path in renderer_paths.items()

@@ -454,7 +454,7 @@ def test_replay_output_must_remain_outside_consumed_locked_roots(tmp_path: Path)
         )
 
     forbidden = artifact_root / "rendered"
-    with pytest.raises(ValueError, match="outside immutable consumed artifact roots"):
+    with pytest.raises(ValueError, match="outside immutable (?:consumed )?artifact roots"):
         module.require_output_outside_consumed_roots(
             output_path=forbidden,
             repo_root=repo_root,
@@ -468,3 +468,81 @@ def test_replay_output_must_remain_outside_consumed_locked_roots(tmp_path: Path)
         repo_root=repo_root,
         consumed_paths=[dependency],
     ) == allowed.resolve()
+
+    unconsumed_root = tmp_path / "artifacts" / "frozen_plotting_dependencies_202607"
+    with pytest.raises(ValueError, match="outside immutable (?:consumed )?artifact roots"):
+        module.require_output_outside_consumed_roots(
+            output_path=unconsumed_root / "rendered",
+            repo_root=repo_root,
+            consumed_paths=[dependency],
+        )
+
+    hardlink = tmp_path / "dependency-hardlink.bin"
+    hardlink.hardlink_to(dependency)
+    with pytest.raises(
+        ValueError, match="(?:hardlink to immutable artifact|existing multi-link file)"
+    ):
+        module.require_output_outside_consumed_roots(
+            output_path=hardlink,
+            repo_root=repo_root,
+            consumed_paths=[dependency],
+        )
+
+
+def test_distinct_output_rejects_input_hardlink_and_symlink(tmp_path: Path) -> None:
+    module = _load_module()
+    source = tmp_path / "source.json"
+    source.write_text("{}\n", encoding="utf-8")
+    hardlink = tmp_path / "hardlink.json"
+    hardlink.hardlink_to(source)
+    with pytest.raises(ValueError, match="must not overwrite or hardlink input"):
+        module.require_output_distinct_from_inputs(
+            output_path=hardlink,
+            input_paths=[source],
+            label="Comparison output",
+        )
+
+    symlink = tmp_path / "symlink.json"
+    symlink.symlink_to(tmp_path / "new-output.json")
+    with pytest.raises(ValueError, match="symlinked path or ancestor"):
+        module.require_output_distinct_from_inputs(
+            output_path=symlink,
+            input_paths=[source],
+            label="Comparison output",
+        )
+
+
+def test_known_locked_root_guard_rejects_cross_root_and_unrelated_hardlink(
+    tmp_path: Path,
+) -> None:
+    module = _load_module()
+    repo_root = tmp_path / "repo"
+    manifest_root = repo_root / "papers" / "UQ_EMB" / "manifests"
+    manifest_root.mkdir(parents=True)
+    for name in module.DEFAULT_CLOSEOUT_MANIFESTS:
+        artifact_set_dir = name.removesuffix(".files.json")
+        _write_manifest(
+            manifest_root / name,
+            artifact_set_dir=artifact_set_dir,
+            files=[],
+            root=tmp_path / artifact_set_dir,
+        )
+
+    cross_root = tmp_path / "frozen_plotting_dependencies_202607" / "receipt.json"
+    with pytest.raises(ValueError, match="outside immutable artifact roots"):
+        module.require_output_outside_known_locked_roots(
+            output_path=cross_root,
+            repo_root=repo_root,
+            label="Replay receipt",
+        )
+
+    unrelated = tmp_path / "unrelated.json"
+    unrelated.write_text("{}\n", encoding="utf-8")
+    hardlink = tmp_path / "receipt.json"
+    hardlink.hardlink_to(unrelated)
+    with pytest.raises(ValueError, match="existing multi-link file"):
+        module.require_output_outside_known_locked_roots(
+            output_path=hardlink,
+            repo_root=repo_root,
+            label="Replay receipt",
+        )

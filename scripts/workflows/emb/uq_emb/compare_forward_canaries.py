@@ -6,10 +6,21 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+
+from replay_provenance import (  # noqa: E402
+    checked_replay_path,
+    require_output_distinct_from_inputs,
+    require_output_outside_known_locked_roots,
+)
 
 
 SCHEMA_VERSION = "mesouq.uq_emb.forward_canary_comparison.v1"
@@ -289,12 +300,23 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_args()
+    karolina = checked_replay_path(args.karolina, label="Karolina canary receipt")
+    vega = checked_replay_path(args.vega, label="Vega canary receipt")
+    output = require_output_distinct_from_inputs(
+        output_path=args.output,
+        input_paths=[karolina, vega],
+        label="Forward-canary comparison output",
+    )
+    output = require_output_outside_known_locked_roots(
+        output_path=output,
+        repo_root=SCRIPT_DIR.parents[3],
+        label="Forward-canary comparison output",
+    )
     report = compare_receipts(
-        args.karolina.expanduser().resolve(),
-        args.vega.expanduser().resolve(),
+        karolina,
+        vega,
         expected_agent=args.agent,
     )
-    output = args.output.expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"UQ_EMB {args.agent} forward canaries match: {output}")

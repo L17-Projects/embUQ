@@ -287,7 +287,6 @@ def test_materialize_validates_frozen_inputs_and_writes_receipt(tmp_path: Path) 
     (
         (3104, 3104, 3104),
         (3104, 3105, 3106),
-        (3104, 3104, 3105, 3106),
     ),
 )
 def test_accepted_stage_seeds_recovers_phase3b_base_seed(
@@ -330,7 +329,14 @@ def test_accepted_stage_seeds_recovers_phase3b_base_seed(
     )
 
 
-@pytest.mark.parametrize("phase3b_records", ((3104, 3106), (3104, 3105, 3107)))
+@pytest.mark.parametrize(
+    "phase3b_records",
+    (
+        (3104, 3106),
+        (3104, 3105, 3107),
+        (3104, 3104, 3105, 3106),
+    ),
+)
 def test_accepted_stage_seeds_rejects_phase3b_seed_gaps(
     tmp_path: Path,
     phase3b_records: tuple[int, ...],
