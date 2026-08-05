@@ -599,8 +599,17 @@ def materialize_direct_dpd_replay(
     accepted_root = accepted_root.expanduser().resolve()
     if not accepted_root.is_dir():
         raise FileNotFoundError(f"Accepted direct-DPD artifact root is missing: {accepted_root}")
-    accepted_index = _load_accepted_manifest(accepted_manifest, accepted_root)
     output_root = output_root.expanduser().resolve()
+    try:
+        output_root.relative_to(accepted_root)
+    except ValueError:
+        pass
+    else:
+        raise ValueError(
+            "Direct-DPD replay output must remain outside the accepted artifact root: "
+            f"output={output_root}, accepted_root={accepted_root}"
+        )
+    accepted_index = _load_accepted_manifest(accepted_manifest, accepted_root)
     _ensure_fresh_output(output_root)
 
     entries: list[dict[str, Any]] = []

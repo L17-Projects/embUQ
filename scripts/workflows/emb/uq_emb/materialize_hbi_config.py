@@ -354,6 +354,8 @@ def materialize(
     run_root: Path,
     population: int,
 ) -> dict[str, Any]:
+    artifact_root = artifact_root.expanduser().resolve()
+    output_dir = output_dir.expanduser().resolve()
     paths = AGENT_PATHS[agent]
     accepted_manifest_path = manifest_root / f"{ACCEPTED_SET}.files.json"
     dependency_manifest_path = manifest_root / f"{DEPENDENCY_SET}.files.json"
@@ -365,6 +367,15 @@ def materialize(
     dependency_hashes = _manifest_hashes(dependency_manifest)
     accepted_root = artifact_root / ACCEPTED_SET
     dependency_root = artifact_root / DEPENDENCY_SET
+    for locked_root in (accepted_root, dependency_root):
+        try:
+            output_dir.relative_to(locked_root)
+        except ValueError:
+            continue
+        raise ValueError(
+            "HBI materialization output must remain outside immutable artifact roots: "
+            f"output={output_dir}, locked_root={locked_root}"
+        )
 
     source_config = _verified_file(accepted_root, paths["config"], accepted_hashes)
     accepted_source_verification = verify_locked_manifest_members(

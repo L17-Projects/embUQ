@@ -197,6 +197,24 @@ def test_materialize_direct_dpd_replay_writes_six_static_pairs(tmp_path: Path) -
     assert (tmp_path / "replay/d4/acoustic/inputs/sonovue_3p20um.csv").is_file()
 
 
+def test_materializer_rejects_output_inside_accepted_root(tmp_path: Path) -> None:
+    module = _module()
+    accepted_root = _accepted_root(tmp_path)
+    accepted_manifest = _accepted_manifest(tmp_path, accepted_root)
+    forbidden_output = accepted_root / "replay"
+
+    with pytest.raises(ValueError, match="outside the accepted artifact root"):
+        module.materialize_direct_dpd_replay(
+            accepted_root=accepted_root,
+            accepted_manifest=accepted_manifest,
+            output_root=forbidden_output,
+            site="karolina",
+            python_bin="/usr/bin/python3.11",
+        )
+
+    assert not forbidden_output.exists()
+
+
 def test_materializer_rejects_conflicting_site_environment(tmp_path: Path, monkeypatch) -> None:
     module = _module()
     monkeypatch.setenv("MESOUQ_SITE", "vega")

@@ -242,13 +242,14 @@ def run_replay(
     if not execute:
         return receipt
 
-    os.environ["HUQ_INFERENCE_CONFIG"] = str(snapshot_config_path)
+    stage_env = os.environ.copy()
+    stage_env["HUQ_INFERENCE_CONFIG"] = str(snapshot_config_path)
     started = time.monotonic()
     try:
         for stage, command in zip(stages, commands, strict=True):
             stage_started = time.monotonic()
             before = _verify_run_input_snapshot(run_input_snapshot)
-            subprocess.run(command, cwd=REPO_ROOT, check=True)
+            subprocess.run(command, cwd=REPO_ROOT, check=True, env=stage_env)
             after = _verify_run_input_snapshot(run_input_snapshot)
             receipt["stage_results"].append(
                 {

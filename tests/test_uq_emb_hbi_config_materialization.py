@@ -267,6 +267,19 @@ def test_materialize_validates_frozen_inputs_and_writes_receipt(tmp_path: Path) 
             population=50_000,
         )
 
+    for locked_root in (accepted_root, dependency_root):
+        forbidden_output = locked_root / "generated-configs"
+        with pytest.raises(ValueError, match="outside immutable artifact roots"):
+            module.materialize(
+                agent="definity",
+                artifact_root=artifact_root,
+                manifest_root=manifest_root,
+                output_dir=forbidden_output,
+                run_root=tmp_path / "another-run",
+                population=50_000,
+            )
+        assert not forbidden_output.exists()
+
 
 @pytest.mark.parametrize(
     "phase3b_records",
