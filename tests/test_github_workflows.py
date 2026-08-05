@@ -3,7 +3,7 @@ from pathlib import Path
 import yaml
 
 UPLOAD_ARTIFACT_SHA = "actions/upload-artifact@" "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
-CODECOV_ACTION_SHA = "codecov/codecov-action@" "e79a6962e0d4c0c17b229090214935d2e33f8354"
+CODECOV_ACTION_SHA = "codecov/codecov-action@" "fb8b3582c8e4def4969c97caa2f19720cb33a72f"
 RUN_COVERAGE_SCOPE_IF = (
     "success() && github.event_name == 'pull_request' && "
     "steps.coverage-scope.outputs.run_coverage_gate == 'true'"
@@ -162,9 +162,9 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
 
     action_refs = set(_uses_by_step(workflow).values())
     assert action_refs == {
-        "actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae",
-        "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
-        "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
+        "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+        "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
+        "actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1",
         UPLOAD_ARTIFACT_SHA,
         CODECOV_ACTION_SHA,
     }
@@ -206,8 +206,8 @@ def test_release_smoke_workflow_has_concurrency_timeouts_and_dist_artifact():
 
     action_refs = set(_uses_by_step(workflow).values())
     assert action_refs == {
-        "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
-        "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
+        "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
+        "actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1",
         UPLOAD_ARTIFACT_SHA,
     }
 
