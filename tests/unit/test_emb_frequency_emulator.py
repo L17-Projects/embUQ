@@ -269,6 +269,19 @@ def test_loader_rejects_missing_source_hashes_and_dense_positive_failure() -> No
         DpdFrequencyEmulatorBank.from_mapping(payload)
 
 
+def test_loader_allows_benchmark_bank_without_production_source_hashes() -> None:
+    payload = _bank().to_mapping()
+    payload["provenance"] = {
+        "benchmark_only": True,
+        "inference_ready": True,
+    }
+    _refresh_integrity(payload)
+
+    loaded = DpdFrequencyEmulatorBank.from_mapping(payload)
+
+    assert loaded.provenance["benchmark_only"] is True
+
+
 def test_fit_serializes_scipy_pchip_coefficients_for_frequency_squared() -> None:
     ka = np.asarray([500.0, 8000.0, 21000.0, 42000.0], dtype=np.float64)
     frequency = np.asarray([2.0, 2.7, 3.4, 4.1], dtype=np.float64)

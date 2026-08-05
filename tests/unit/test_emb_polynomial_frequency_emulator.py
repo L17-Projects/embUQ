@@ -130,6 +130,17 @@ def test_loader_rejects_tamper_fallback_and_nonpositive_polynomial() -> None:
         )
 
 
+def test_loader_allows_benchmark_polynomial_bank_without_production_source_hashes() -> None:
+    payload = _bank().to_mapping()
+    payload["provenance"] = {"benchmark_only": True}
+    payload["validation"]["deterministic_fixture_gate_passed"] = True
+    _refresh_integrity(payload)
+
+    loaded = DpdPolynomialFrequencyEmulatorBank.from_mapping(payload)
+
+    assert loaded.provenance["benchmark_only"] is True
+
+
 def test_degree_two_frequency_squared_roots_use_raw_response_before_sqrt() -> None:
     emulator = DpdPolynomialFrequencyEmulator(
         diameter_um=1.3,

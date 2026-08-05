@@ -180,6 +180,7 @@ def test_external_artifact_verify_cli_rejects_symlinked_root_parent(
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    _snapshot(module, spec, manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     artifact_parent = tmp_path / "artifacts"
     alias_parent = tmp_path / "artifact-parent-alias"
@@ -313,6 +314,7 @@ def test_external_artifact_verify_rejects_report_hardlinked_to_manifest(
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    _snapshot(module, spec, manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     original_manifest = manifest.read_bytes()
     root = tmp_path / "artifacts" / "fixture-v1"
@@ -348,6 +350,7 @@ def test_external_artifact_verify_rejects_report_hardlinked_to_artifact(
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    _snapshot(module, spec, manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     root = tmp_path / "artifacts" / "fixture-v1"
     staged_file = root / "inputs" / "input.csv"

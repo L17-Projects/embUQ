@@ -370,6 +370,31 @@ def test_surrogate_getters_cache_instances(monkeypatch: pytest.MonkeyPatch) -> N
     assert len(indentation_builds) == 1
 
 
+def test_indentation_surrogate_cache_tracks_resolved_trained_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    builds = []
+    selected = {"path": tmp_path / "first" / "trained"}
+    monkeypatch.setattr(
+        posterior_indentation,
+        "_resolve_surrogate_trained_dir",
+        lambda _root, _diameter: selected["path"],
+    )
+    monkeypatch.setattr(
+        posterior_indentation,
+        "_build_surrogate",
+        lambda *args, **kwargs: builds.append((args, kwargs)) or object(),
+    )
+
+    first = posterior_indentation._get_surrogate("/repo", 3.2)
+    selected["path"] = tmp_path / "second" / "trained"
+    second = posterior_indentation._get_surrogate("/repo", 3.2)
+
+    assert first is not second
+    assert len(builds) == 2
+    assert builds[0][1]["trained_dir"] != builds[1][1]["trained_dir"]
+
+
 def test_compute_compression_surrogate_dnn_handles_debug_and_d0(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     stub = _CompressionDnnStub()
     monkeypatch.setattr(posterior_compression, "_resolve_project_root", lambda: "/repo")

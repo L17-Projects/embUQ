@@ -694,7 +694,8 @@ class DpdFrequencyEmulatorBank:
             provenance=_optional_mapping(payload.get("provenance"), "provenance"),
             validation=_optional_mapping(payload.get("validation"), "validation"),
         )
-        _hashed_source_datasets(bank.provenance.get("source_datasets"))
+        if bank.provenance.get("benchmark_only") is not True:
+            _hashed_source_datasets(bank.provenance.get("source_datasets"))
         if bank.validation.get("label_admission_policy") != FIT_PRIMARY_LABEL_ADMISSION_POLICY:
             raise ValueError("Frequency emulator bank validation must declare fit-primary labels.")
         if bank.validation.get("nonmonotone_frequency_policy") != NONMONOTONE_FREQUENCY_POLICY:
@@ -1333,7 +1334,8 @@ class DpdPolynomialFrequencyEmulatorBank:
             provenance=_optional_mapping(payload.get("provenance"), "provenance"),
             validation=_optional_mapping(payload.get("validation"), "validation"),
         )
-        _hashed_source_datasets(bank.provenance.get("source_datasets"))
+        if bank.provenance.get("benchmark_only") is not True:
+            _hashed_source_datasets(bank.provenance.get("source_datasets"))
         recorded_encodings = response.get("coefficient_response_encodings")
         if not isinstance(recorded_encodings, Sequence) or isinstance(
             recorded_encodings, (str, bytes)

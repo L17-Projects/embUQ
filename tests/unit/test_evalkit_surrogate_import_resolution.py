@@ -65,6 +65,15 @@ def test_indentation_surrogate_uses_configured_external_directory(
             "experiments": [
                 {
                     "name": "indentation",
+                    "lane": "disabled",
+                    "enabled": False,
+                    "diameters": [3.2],
+                    "surrogate_dir": str(tmp_path / "disabled"),
+                },
+                {
+                    "name": "indentation",
+                    "lane": "enabled",
+                    "enabled": True,
                     "diameters": [3.2],
                     "diameter_labels": {"3.2": "3.20"},
                     "surrogate_dir": str(external_root),
