@@ -157,6 +157,36 @@ def test_external_artifact_verify_cli_rejects_symlinked_root(tmp_path: Path) -> 
         raise AssertionError("Expected a symlinked verification root to be rejected")
 
 
+def test_external_artifact_verify_cli_rejects_symlinked_root_parent(
+    tmp_path: Path,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    manifest = tmp_path / "manifest.json"
+    module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+    artifact_parent = tmp_path / "artifacts"
+    alias_parent = tmp_path / "artifact-parent-alias"
+    alias_parent.symlink_to(artifact_parent, target_is_directory=True)
+
+    try:
+        module.main(
+            [
+                "verify",
+                "--root",
+                str(alias_parent / "fixture-v1"),
+                "--manifest",
+                str(manifest),
+            ]
+        )
+    except ValueError as exc:
+        assert "symlinked path components" in str(exc)
+    else:
+        raise AssertionError("Expected a symlinked verification-root parent to be rejected")
+
+
 def test_external_artifact_verify_rejects_report_inside_root(tmp_path: Path) -> None:
     module = _load_script()
     source = tmp_path / "source"
@@ -255,6 +285,77 @@ def test_external_artifact_verify_rejects_report_overwriting_manifest(
         raise AssertionError("Expected a manifest-overwriting report to be rejected")
 
     assert manifest.read_bytes() == original_manifest
+
+
+def test_external_artifact_verify_rejects_report_hardlinked_to_manifest(
+    tmp_path: Path,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    manifest = tmp_path / "manifest.json"
+    module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+    original_manifest = manifest.read_bytes()
+    root = tmp_path / "artifacts" / "fixture-v1"
+    report = tmp_path / "verification.json"
+    report.hardlink_to(manifest)
+
+    try:
+        module.main(
+            [
+                "verify",
+                "--root",
+                str(root),
+                "--manifest",
+                str(manifest),
+                "--report",
+                str(report),
+            ]
+        )
+    except ValueError as exc:
+        assert "must not overwrite" in str(exc)
+    else:
+        raise AssertionError("Expected a manifest-hardlinked report to be rejected")
+
+    assert manifest.read_bytes() == original_manifest
+
+
+def test_external_artifact_verify_rejects_report_hardlinked_to_artifact(
+    tmp_path: Path,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    manifest = tmp_path / "manifest.json"
+    module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+    root = tmp_path / "artifacts" / "fixture-v1"
+    staged_file = root / "inputs" / "input.csv"
+    original_artifact = staged_file.read_bytes()
+    report = tmp_path / "verification.json"
+    report.hardlink_to(staged_file)
+
+    try:
+        module.main(
+            [
+                "verify",
+                "--root",
+                str(root),
+                "--manifest",
+                str(manifest),
+                "--report",
+                str(report),
+            ]
+        )
+    except ValueError as exc:
+        assert "hardlink to an artifact file" in str(exc)
+    else:
+        raise AssertionError("Expected an artifact-hardlinked report to be rejected")
+
+    assert staged_file.read_bytes() == original_artifact
 
 
 def test_external_artifact_stage_rejects_duplicate_artifact_ids(tmp_path: Path) -> None:

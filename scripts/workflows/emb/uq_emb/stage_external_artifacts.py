@@ -50,8 +50,14 @@ def _expand(value: str) -> Path:
 
 
 def _reject_symlinks(root: Path) -> None:
-    if root.is_symlink():
-        raise ValueError(f"Artifact roots cannot be symlinks: {root}")
+    current = Path(root.anchor)
+    for part in root.absolute().parts[1:]:
+        current /= part
+        if current.is_symlink():
+            raise ValueError(
+                "Artifact roots cannot be symlinks or contain symlinked path components: "
+                f"{current}"
+            )
     links = sorted(path for path in root.rglob("*") if path.is_symlink())
     if links:
         rendered = ", ".join(str(path.relative_to(root)) for path in links[:20])
@@ -66,8 +72,30 @@ def _reject_path_within_root(*, path: Path, root: Path, label: str) -> None:
 
 
 def _reject_same_path(*, path: Path, protected_path: Path, label: str) -> None:
-    if path.resolve() == protected_path.resolve():
+    same_existing_file = (
+        path.exists()
+        and protected_path.exists()
+        and os.path.samefile(path, protected_path)
+    )
+    if path.resolve() == protected_path.resolve() or same_existing_file:
         raise ValueError(f"{label} must not overwrite {protected_path}: {path}")
+
+
+def _reject_existing_hardlink_within_root(*, path: Path, root: Path, label: str) -> None:
+    if not path.exists():
+        return
+    path_stat = path.stat()
+    for artifact_path in root.rglob("*"):
+        if not artifact_path.is_file():
+            continue
+        artifact_stat = artifact_path.stat()
+        if (path_stat.st_dev, path_stat.st_ino) == (
+            artifact_stat.st_dev,
+            artifact_stat.st_ino,
+        ):
+            raise ValueError(
+                f"{label} must not be a hardlink to an artifact file: {artifact_path}"
+            )
 
 
 def _source_files(path: Path) -> list[Path]:
@@ -391,6 +419,11 @@ def main(argv: list[str] | None = None) -> int:
             _reject_same_path(
                 path=report_path,
                 protected_path=manifest_path,
+                label="Verification report",
+            )
+            _reject_existing_hardlink_within_root(
+                path=report_path,
+                root=root,
                 label="Verification report",
             )
         report = verify_staged(root=root, manifest_path=manifest_path)
