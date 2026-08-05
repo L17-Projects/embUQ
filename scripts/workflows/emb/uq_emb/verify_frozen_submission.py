@@ -15,6 +15,8 @@ from typing import Any, Iterable
 SCHEMA_VERSION = "1.0"
 PAPER_ID = "UQ_EMB"
 MIN_FREE_HEADROOM_BYTES = 64 * 1024 * 1024
+MAX_SNAPSHOT_TOTAL_BYTES = 20 * 1024 * 1024
+MAX_SNAPSHOT_FILE_BYTES = 8 * 1024 * 1024
 
 
 def _sha256(path: Path) -> str:
@@ -51,6 +53,34 @@ def _entries(root: Path) -> list[dict[str, Any]]:
 
 def _total_size(entries: Iterable[dict[str, Any]]) -> int:
     return sum(int(entry["size_bytes"]) for entry in entries)
+
+
+def _enforce_snapshot_size_limits(entries: list[dict[str, Any]]) -> None:
+    oversized = [
+        entry
+        for entry in entries
+        if int(entry["size_bytes"]) > MAX_SNAPSHOT_FILE_BYTES
+    ]
+    if oversized:
+        rendered = ", ".join(
+            f"{entry['path']} ({entry['size_bytes']} bytes)" for entry in oversized
+        )
+        raise ValueError(
+            "Frozen snapshot files exceed the per-file limit "
+            f"of {MAX_SNAPSHOT_FILE_BYTES} bytes: {rendered}"
+        )
+
+    total_size = _total_size(entries)
+    if total_size > MAX_SNAPSHOT_TOTAL_BYTES:
+        raise ValueError(
+            "Frozen snapshot exceeds the total size limit: "
+            f"size={total_size}, limit={MAX_SNAPSHOT_TOTAL_BYTES}"
+        )
+
+
+def _reject_path_within_root(*, path: Path, root: Path, label: str) -> None:
+    if path == root or root in path.parents:
+        raise ValueError(f"{label} must be outside the frozen snapshot root: {path}")
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -131,6 +161,7 @@ def create_snapshot(
     source_entries = _entries(source)
     if not source_entries:
         raise ValueError(f"Snapshot source is empty: {source}")
+    _enforce_snapshot_size_limits(source_entries)
     source_total = _total_size(source_entries)
 
     if destination.exists() and any(destination.iterdir()):
@@ -196,9 +227,17 @@ def main(argv: list[str] | None = None) -> int:
             source_hint=args.source_hint,
         )
     else:
-        report = verify_snapshot(root=args.root.resolve(), manifest_path=args.manifest.resolve())
-        if args.report:
-            _write_json(args.report.resolve(), report)
+        root = args.root.resolve()
+        report_path = args.report.resolve() if args.report else None
+        if report_path is not None:
+            _reject_path_within_root(
+                path=report_path,
+                root=root,
+                label="Verification report",
+            )
+        report = verify_snapshot(root=root, manifest_path=args.manifest.resolve())
+        if report_path is not None:
+            _write_json(report_path, report)
 
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["status"] == "PASS" else 1

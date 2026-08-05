@@ -12,10 +12,16 @@ editor. It is a scoped exception to the general external-artifact policy: the
 complete 16 MiB package is retained in Git because it is the immutable review
 baseline. Do not edit files inside that snapshot.
 
+The frozen exception is limited to 20 MiB in total and 8 MiB per file. Activate
+a supported Python 3.10+ environment and set `MESOUQ_PYTHON` to that
+interpreter before running the commands below. On Karolina, use
+`export MESOUQ_PYTHON=/usr/bin/python3.11`.
+
 Verify it from the repository root:
 
 ```bash
-/usr/bin/python3.11 scripts/workflows/emb/uq_emb/verify_frozen_submission.py verify \
+"${MESOUQ_PYTHON:?set MESOUQ_PYTHON to Python 3.10+}" \
+  scripts/workflows/emb/uq_emb/verify_frozen_submission.py verify \
   --root papers/UQ_EMB/editor_submission/review2_v1 \
   --manifest papers/UQ_EMB/manifests/editor_submission_review2_v1.json
 ```
@@ -25,7 +31,8 @@ documentary; verification depends only on paths, sizes, and SHA-256 values in
 the tracked manifest.
 
 ```bash
-/usr/bin/python3.11 scripts/workflows/emb/uq_emb/verify_frozen_submission.py snapshot \
+"${MESOUQ_PYTHON:?set MESOUQ_PYTHON to Python 3.10+}" \
+  scripts/workflows/emb/uq_emb/verify_frozen_submission.py snapshot \
   --source "${MESOUQ_WORKSPACE}/paperWeek27Jul/bundle_review2_v1" \
   --destination papers/UQ_EMB/editor_submission/review2_v1 \
   --manifest papers/UQ_EMB/manifests/editor_submission_review2_v1.json \
