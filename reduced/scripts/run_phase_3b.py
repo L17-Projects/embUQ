@@ -28,6 +28,7 @@ def main() -> int:
     parser.add_argument("--device", choices=["cpu", "gpu"], default="cpu")
     parser.add_argument("--dataset-name", type=str, default=None)
     parser.add_argument("--diameter", type=float, default=None)
+    parser.add_argument("--korali-random-seed", type=int, default=None)
     args = parser.parse_args()
 
     cmd = [
@@ -45,6 +46,8 @@ def main() -> int:
         cmd.extend(["--dataset-name", args.dataset_name])
     if args.diameter is not None:
         cmd.extend(["--diameter", str(args.diameter)])
+    if args.korali_random_seed is not None:
+        cmd.extend(["--korali-random-seed", str(args.korali_random_seed)])
     return subprocess.call(cmd, cwd=str(PROJECT_ROOT))
 
 

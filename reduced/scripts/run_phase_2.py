@@ -28,6 +28,7 @@ def main() -> int:
         choices=["cpu-mpi", "native-cuda"],
         default=None,
     )
+    parser.add_argument("--korali-random-seed", type=int, default=None)
     args = parser.parse_args()
 
     cmd = [sys.executable, str(MAIN_DRIVER), "--config", args.config, "--output-dir", args.output_dir]
@@ -35,6 +36,8 @@ def main() -> int:
         cmd.append("--profiling")
     if args.phase2_backend is not None:
         cmd.extend(["--phase2-backend", args.phase2_backend])
+    if args.korali_random_seed is not None:
+        cmd.extend(["--korali-random-seed", str(args.korali_random_seed)])
     return subprocess.call(cmd, cwd=str(PROJECT_ROOT))
 
 

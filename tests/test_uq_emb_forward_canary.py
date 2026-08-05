@@ -129,6 +129,7 @@ def test_hbi_replay_builds_accepted_three_stage_sequence(
         output_root=tmp_path / "run",
         python_bin="/verified/python",
         stages=["phase1", "phase2", "phase3b"],
+        stage_seeds={"phase1": 1101, "phase2": 2101, "phase3b": 3104},
     )
 
     assert resolved_agent == agent
@@ -140,5 +141,6 @@ def test_hbi_replay_builds_accepted_three_stage_sequence(
     assert all(experiment not in command for command in commands)
     assert "--phase2-backend" in commands[1]
     assert "native-cuda" in commands[1]
-    assert commands[0][-2:] == ["--device", "gpu"]
-    assert commands[2][-2:] == ["--device", "gpu"]
+    assert commands[0][-4:] == ["--korali-random-seed", "1101", "--device", "gpu"]
+    assert commands[1][-4:] == ["--korali-random-seed", "2101", "--phase2-backend", "native-cuda"]
+    assert commands[2][-4:] == ["--korali-random-seed", "3104", "--device", "gpu"]

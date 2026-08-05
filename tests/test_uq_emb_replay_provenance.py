@@ -67,12 +67,25 @@ def _binding(tmp_path: Path, materialize_module) -> tuple[Path, Path]:
     dependency_root.mkdir(parents=True)
     source_config = accepted_root / "source.yaml"
     source_config.write_text("source: true\n", encoding="utf-8")
+    seed_log = accepted_root / materialize_module.AGENT_PATHS["definity"]["stage_seed_log"]
+    seed_log.parent.mkdir(parents=True)
+    seed_log.write_text(
+        "\n".join(
+            (
+                "[Korali] Random Seed: 1101",
+                "[HBI] Random Seed: 2101",
+                "[Phase 3b] Random Seed for compression_2.1um: 3104",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     dependency_file = dependency_root / "dependency.bin"
     dependency_file.write_bytes(b"locked-dependency")
     _write_manifest(
         accepted_manifest,
         artifact_set_dir=materialize_module.ACCEPTED_SET,
-        files=[source_config],
+        files=[source_config, seed_log],
         root=accepted_root,
     )
     _write_manifest(
@@ -106,11 +119,24 @@ def _binding(tmp_path: Path, materialize_module) -> tuple[Path, Path]:
         "dependency_manifest": str(dependency_manifest),
         "dependency_manifest_sha256": _sha256(dependency_manifest),
         "provenance": {"git_commit": "abc123", "git_status_clean": True},
+        "accepted_stage_seeds": {"phase1": 1101, "phase2": 2101, "phase3b": 3104},
+        "accepted_stage_seed_log": str(seed_log),
+        "accepted_stage_seed_log_sha256": _sha256(seed_log),
     }
     config_path.with_suffix(".materialization.json").write_text(
         json.dumps(receipt), encoding="utf-8"
     )
     return config_path, repo_root
+
+
+def _alias_path(tmp_path: Path, target: Path, *, kind: str, name: str) -> Path:
+    if kind == "direct":
+        alias = tmp_path / name
+        alias.symlink_to(target, target_is_directory=target.is_dir())
+        return alias
+    parent_alias = tmp_path / name
+    parent_alias.symlink_to(target.parent, target_is_directory=True)
+    return parent_alias / target.name
 
 
 def test_materialization_binding_enforces_semantic_manifest_and_git_state(
@@ -140,6 +166,7 @@ def test_materialization_binding_enforces_semantic_manifest_and_git_state(
         ("semantic", "semantic config hash mismatch"),
         ("manifest", "accepted_manifest_sha256 mismatch"),
         ("commit", "does not match runtime HEAD"),
+        ("seed", "accepted stage seeds differ"),
     ),
 )
 def test_materialization_binding_rejects_tampered_claims(
@@ -158,6 +185,8 @@ def test_materialization_binding_rejects_tampered_claims(
         receipt["semantic_config_sha256"] = "0" * 64
     elif mutation == "manifest":
         receipt["accepted_manifest_sha256"] = "0" * 64
+    elif mutation == "seed":
+        receipt["accepted_stage_seeds"]["phase1"] = 9999
     else:
         receipt["provenance"]["git_commit"] = "different"
     receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
@@ -187,6 +216,57 @@ def test_materialization_binding_rejects_dirty_runtime(
 
     with pytest.raises(ValueError, match="clean runtime worktree"):
         module.load_materialization_binding(config_path, repo_root=repo_root)
+
+
+@pytest.mark.parametrize("kind", ("direct", "ancestor"))
+def test_materialization_binding_rejects_lexical_config_alias(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+) -> None:
+    module = _load_module()
+    import materialize_hbi_config
+
+    config_path, repo_root = _binding(tmp_path, materialize_hbi_config)
+    alias = _alias_path(tmp_path, config_path, kind=kind, name=f"config_{kind}_alias")
+    monkeypatch.setattr(
+        module,
+        "_git",
+        lambda _root, *args: "abc123" if args == ("rev-parse", "HEAD") else "",
+    )
+
+    with pytest.raises(ValueError, match="symlinked path or ancestor"):
+        module.load_materialization_binding(alias, repo_root=repo_root)
+
+
+@pytest.mark.parametrize("kind", ("direct", "ancestor"))
+def test_locked_artifact_and_manifest_reject_lexical_aliases(
+    tmp_path: Path,
+    kind: str,
+) -> None:
+    module = _load_module()
+    import materialize_hbi_config
+
+    config_path, repo_root = _binding(tmp_path, materialize_hbi_config)
+    artifact_root = tmp_path / "artifacts" / materialize_hbi_config.ACCEPTED_SET
+    manifest_path = (
+        repo_root
+        / "papers"
+        / "UQ_EMB"
+        / "manifests"
+        / f"{materialize_hbi_config.ACCEPTED_SET}.files.json"
+    )
+    artifact_alias = _alias_path(
+        tmp_path, artifact_root, kind=kind, name=f"artifact_{kind}_alias"
+    )
+    manifest_alias = _alias_path(
+        tmp_path, manifest_path, kind=kind, name=f"manifest_{kind}_alias"
+    )
+
+    with pytest.raises(ValueError, match="symlinked path or ancestor"):
+        module.verify_locked_artifact_root(root=artifact_alias, manifest_path=manifest_path)
+    with pytest.raises(ValueError, match="symlinked path or ancestor"):
+        module._locked_manifest(manifest_alias)
 
 
 def test_materialization_binding_rejects_mutated_dependency_content(
@@ -300,6 +380,18 @@ def test_replay_receipt_verifies_consumed_artifact_content(
         consumed_paths=[artifact_root],
     )
     assert len(receipt["verified_artifact_sets"]) == 1
+
+    direct_alias = _alias_path(tmp_path, artifact_root, kind="direct", name="consumed_direct")
+    ancestor_alias = _alias_path(
+        tmp_path, artifact_root, kind="ancestor", name="consumed_ancestor"
+    )
+    for alias in (direct_alias, ancestor_alias):
+        with pytest.raises(ValueError, match="symlinked path or ancestor"):
+            module.replay_receipt_provenance(
+                repo_root=repo_root,
+                runner=runner,
+                consumed_paths=[alias],
+            )
 
     dependency.write_bytes(b"mutated")
     with pytest.raises(ValueError, match="artifact content mismatch"):

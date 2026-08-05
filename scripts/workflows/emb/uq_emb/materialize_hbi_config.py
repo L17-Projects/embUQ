@@ -6,7 +6,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import re
 import sys
+import tempfile
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Mapping
@@ -28,10 +31,16 @@ PAPER_ID = "UQ_EMB"
 ACCEPTED_SET = "accepted_production_outputs_202607"
 DEPENDENCY_SET = "frozen_runtime_dependencies_202607"
 SUPPORTED_POPULATIONS = (10_000, 50_000)
+_STAGE_SEED_PATTERNS = {
+    "phase1": re.compile(r"\[Korali\] Random Seed:\s*(\d+)"),
+    "phase2": re.compile(r"\[HBI\] Random Seed:\s*(\d+)"),
+    "phase3b": re.compile(r"\[Phase 3b\] Random Seed for .*?:\s*(\d+)"),
+}
 
 AGENT_PATHS: dict[str, dict[str, str]] = {
     "definity": {
         "config": "definity/config/definity_accepted_production50k.yaml",
+        "stage_seed_log": "definity/hbi/logs/run.stdout.log",
         "mechanical_experiment": "compression",
         "mechanical_data": "reference_data/mechanical/definity",
         "mechanical_surrogates": "mechanical_surrogates/definity",
@@ -41,6 +50,7 @@ AGENT_PATHS: dict[str, dict[str, str]] = {
     },
     "sonovue": {
         "config": "sonovue/config/sonovue_liked_candidate_production50k.yaml",
+        "stage_seed_log": "sonovue/hbi/logs/run.stdout.log",
         "mechanical_experiment": "indentation",
         "mechanical_data": "reference_data/mechanical/sonovue",
         "mechanical_surrogates": "mechanical_surrogates/sonovue",
@@ -70,6 +80,73 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(4 * 1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _write_new_file(path: Path, content: str) -> None:
+    """Publish a fully written file without replacing an existing materialization."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        text=True,
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temporary, path)
+        except FileExistsError as exc:
+            raise FileExistsError(
+                f"Refusing to replace an existing materialization artifact: {path}"
+            ) from exc
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _accepted_stage_seeds(
+    *,
+    accepted_root: Path,
+    accepted_hashes: Mapping[str, str],
+    seed_log_relative: str,
+) -> dict[str, Any]:
+    """Recover the accepted Korali base seeds from the locked production log."""
+    log_path = _verified_file(accepted_root, seed_log_relative, accepted_hashes)
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    seeds: dict[str, int] = {}
+    for stage, pattern in _STAGE_SEED_PATTERNS.items():
+        values = [int(value) for value in pattern.findall(text)]
+        if not values:
+            raise ValueError(
+                f"Locked accepted HBI log has no {stage} Korali seed record: {log_path}"
+            )
+        if stage == "phase3b":
+            base = min(values)
+            expected = set(range(base, max(values) + 1))
+            # Separate target invocations may reuse one base seed.  Older accepted
+            # runs may instead increment it once per target; both forms preserve
+            # the same replay base and reject gaps or unrelated seed values.
+            if set(values) not in ({base}, expected):
+                raise ValueError(
+                    "Locked accepted HBI Phase 3b seeds must reuse one base seed or form "
+                    "one contiguous sequence from that base: "
+                    f"{values}"
+                )
+        elif len(set(values)) != 1:
+            raise ValueError(
+                f"Locked accepted HBI {stage} log has inconsistent Korali seeds: {values}"
+            )
+        if values[0] <= 0:
+            raise ValueError(f"Locked accepted HBI {stage} seed must be positive: {values[0]}")
+        seeds[stage] = min(values) if stage == "phase3b" else values[0]
+    return {
+        "accepted_stage_seeds": seeds,
+        "accepted_stage_seed_log": str(log_path),
+        "accepted_stage_seed_log_sha256": _sha256(log_path),
+    }
 
 
 def _load_manifest(path: Path, artifact_set_id: str) -> dict[str, Any]:
@@ -351,11 +428,13 @@ def materialize(
         provenance_path_overrides=provenance_path_overrides,
     )
 
-    output_dir.mkdir(parents=True, exist_ok=True)
     output_config = output_dir / f"{agent}_hbi_{population}.yaml"
-    output_config.write_text(
-        yaml.safe_dump(materialized, sort_keys=False), encoding="utf-8"
+    accepted_seed_provenance = _accepted_stage_seeds(
+        accepted_root=accepted_root,
+        accepted_hashes=accepted_hashes,
+        seed_log_relative=paths["stage_seed_log"],
     )
+    _write_new_file(output_config, yaml.safe_dump(materialized, sort_keys=False))
     receipt = {
         "schema_version": "1.0",
         "paper_id": PAPER_ID,
@@ -378,6 +457,7 @@ def materialize(
         "dependency_manifest_sha256": _sha256(dependency_manifest_path),
         "verified_dependencies": verified_dependencies,
         "accepted_source_verification": accepted_source_verification,
+        **accepted_seed_provenance,
         "dependency_verification": dependency_verification,
         "rewrites": rewrites,
         "provenance": runtime_provenance(
@@ -390,9 +470,7 @@ def materialize(
         ),
     }
     receipt_path = output_config.with_suffix(".materialization.json")
-    receipt_path.write_text(
-        json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    _write_new_file(receipt_path, json.dumps(receipt, indent=2, sort_keys=True) + "\n")
     receipt["receipt"] = str(receipt_path.resolve())
     return receipt
 

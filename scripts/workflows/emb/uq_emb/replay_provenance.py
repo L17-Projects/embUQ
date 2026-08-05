@@ -26,6 +26,32 @@ DEFAULT_CLOSEOUT_MANIFESTS = (
 )
 
 
+def _checked_lexical_path(path: Path, *, label: str) -> Path:
+    """Reject literal paths that traverse a direct or ancestor symlink.
+
+    Replay inputs are locked by their literal artifact locations.  Resolving before
+    this check would erase the alias being rejected, so only expanduser and an
+    absolute lexical prefix are applied here.
+    """
+    lexical = path.expanduser()
+    if not lexical.is_absolute():
+        lexical = Path.cwd() / lexical
+    if ".." in lexical.parts:
+        raise ValueError(f"UQ_EMB replay {label} cannot contain parent traversal: {path}")
+    current = Path(lexical.anchor)
+    for component in lexical.parts[1:]:
+        current /= component
+        if current.is_symlink():
+            raise ValueError(
+                f"UQ_EMB replay {label} cannot use a symlinked path or ancestor: {current}"
+            )
+    return lexical
+
+
+def _checked_resolved_path(path: Path, *, label: str) -> Path:
+    return _checked_lexical_path(path, label=label).resolve()
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -35,6 +61,7 @@ def sha256(path: Path) -> str:
 
 
 def _locked_manifest(path: Path) -> dict[str, Any]:
+    path = _checked_resolved_path(path, label="manifest")
     if not path.is_file():
         raise FileNotFoundError(f"Locked UQ_EMB manifest is missing: {path}")
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -55,8 +82,8 @@ def _manifest_entries(payload: Mapping[str, Any]) -> dict[str, Mapping[str, Any]
 
 def verify_locked_artifact_root(*, root: Path, manifest_path: Path) -> dict[str, Any]:
     """Verify every file in a locked artifact set, including absence of extras."""
-    root = root.expanduser().resolve()
-    manifest_path = manifest_path.expanduser().resolve()
+    root = _checked_resolved_path(root, label="artifact root")
+    manifest_path = _checked_resolved_path(manifest_path, label="manifest")
     payload = _locked_manifest(manifest_path)
     if not root.is_dir():
         raise FileNotFoundError(f"Locked UQ_EMB artifact root is missing: {root}")
@@ -109,13 +136,13 @@ def verify_locked_manifest_members(
     members: Iterable[Path],
 ) -> dict[str, Any]:
     """Verify selected consumed files against a locked artifact manifest."""
-    root = root.expanduser().resolve()
-    manifest_path = manifest_path.expanduser().resolve()
+    root = _checked_resolved_path(root, label="artifact root")
+    manifest_path = _checked_resolved_path(manifest_path, label="manifest")
     payload = _locked_manifest(manifest_path)
     expected = _manifest_entries(payload)
     verified: list[dict[str, Any]] = []
     for member in members:
-        path = member.expanduser().resolve()
+        path = _checked_resolved_path(member, label="consumed artifact")
         try:
             relative = path.relative_to(root).as_posix()
         except ValueError as exc:
@@ -194,8 +221,8 @@ def replay_receipt_provenance(
     consumed_paths: Iterable[Path] = (),
 ) -> dict[str, Any]:
     """Bind a replay receipt to Git and verify every consumed locked artifact set."""
-    repo_root = repo_root.expanduser().resolve()
-    runner = runner.expanduser().resolve()
+    repo_root = _checked_resolved_path(repo_root, label="repository root")
+    runner = _checked_resolved_path(runner, label="runner")
     manifest_root = repo_root / "papers" / "UQ_EMB" / "manifests"
     manifests: dict[str, dict[str, Any]] = {}
     payloads: dict[str, dict[str, Any]] = {}
@@ -204,7 +231,9 @@ def replay_receipt_provenance(
         payloads[name] = _locked_manifest(path)
         manifests[name] = {"path": str(path), "sha256": sha256(path)}
 
-    resolved_consumed = [path.expanduser().resolve() for path in consumed_paths]
+    resolved_consumed = [
+        _checked_resolved_path(path, label="consumed path") for path in consumed_paths
+    ]
     roots_to_verify: dict[tuple[str, Path], None] = {}
     editor_root = repo_root / "papers" / "UQ_EMB" / "editor_submission" / "review2_v1"
     for consumed in resolved_consumed:
@@ -251,9 +280,11 @@ def load_materialization_binding(
     *,
     repo_root: Path,
 ) -> dict[str, Any]:
-    config_path = config_path.expanduser().resolve()
-    repo_root = repo_root.expanduser().resolve()
-    receipt_path = config_path.with_suffix(".materialization.json")
+    config_path = _checked_resolved_path(config_path, label="materialized config")
+    repo_root = _checked_resolved_path(repo_root, label="repository root")
+    receipt_path = _checked_resolved_path(
+        config_path.with_suffix(".materialization.json"), label="materialization receipt"
+    )
     if not receipt_path.is_file():
         raise FileNotFoundError(
             f"UQ_EMB materialization receipt is missing for {config_path}: {receipt_path}"
@@ -261,16 +292,24 @@ def load_materialization_binding(
     payload = json.loads(receipt_path.read_text(encoding="utf-8"))
     if payload.get("paper_id") != "UQ_EMB":
         raise ValueError(f"Unexpected materialization receipt paper_id: {receipt_path}")
-    if Path(str(payload.get("materialized_config", ""))).resolve() != config_path:
+    recorded_config = _checked_resolved_path(
+        Path(str(payload.get("materialized_config", ""))), label="receipt materialized config"
+    )
+    if recorded_config != config_path:
         raise ValueError(f"Materialization receipt points at a different config: {receipt_path}")
     actual_config_sha = sha256(config_path)
     if payload.get("materialized_config_sha256") != actual_config_sha:
         raise ValueError(f"Materialized config hash mismatch: {config_path}")
     agent = str(payload.get("agent", "")).strip().lower()
-    artifact_root = Path(str(payload.get("artifact_root", ""))).expanduser().resolve()
+    artifact_root = _checked_resolved_path(
+        Path(str(payload.get("artifact_root", ""))), label="receipt artifact root"
+    )
     from materialize_hbi_config import (  # Imported lazily to avoid a module cycle.
         ACCEPTED_SET,
+        AGENT_PATHS,
         DEPENDENCY_SET,
+        _accepted_stage_seeds,
+        _manifest_hashes,
         _semantic_config_sha256,
     )
 
@@ -301,11 +340,14 @@ def load_materialization_binding(
         ),
     )
     for path_key, hash_key, expected_path in manifest_bindings:
-        recorded_path = Path(str(payload.get(path_key, ""))).expanduser().resolve()
-        if recorded_path != expected_path.resolve():
+        recorded_path = _checked_resolved_path(
+            Path(str(payload.get(path_key, ""))), label=f"receipt {path_key}"
+        )
+        expected_path = _checked_resolved_path(expected_path, label="manifest")
+        if recorded_path != expected_path:
             raise ValueError(
                 f"Materialization receipt {path_key} is not the current locked manifest: "
-                f"{recorded_path} != {expected_path.resolve()}"
+                f"{recorded_path} != {expected_path}"
             )
         if not expected_path.is_file() or payload.get(hash_key) != sha256(expected_path):
             raise ValueError(f"Materialization receipt {hash_key} mismatch: {expected_path}")
@@ -315,7 +357,9 @@ def load_materialization_binding(
         manifest_path=manifest_root / f"{DEPENDENCY_SET}.files.json",
     )
 
-    source_config = Path(str(payload.get("source_config", ""))).expanduser().resolve()
+    source_config = _checked_resolved_path(
+        Path(str(payload.get("source_config", ""))), label="receipt source config"
+    )
     expected_source_root = artifact_root / ACCEPTED_SET
     try:
         source_config.relative_to(expected_source_root)
@@ -344,6 +388,45 @@ def load_materialization_binding(
         raise ValueError(f"Materialization was not produced from a clean worktree: {receipt_path}")
     if _git(repo_root, "status", "--porcelain"):
         raise ValueError(f"UQ_EMB replay requires a clean runtime worktree: {repo_root}")
+    stage_seeds = payload.get("accepted_stage_seeds")
+    if not isinstance(stage_seeds, dict) or set(stage_seeds) != {"phase1", "phase2", "phase3b"}:
+        raise ValueError(f"Materialization receipt lacks accepted per-stage seeds: {receipt_path}")
+    normalized_stage_seeds: dict[str, int] = {}
+    for stage, value in stage_seeds.items():
+        if not isinstance(value, int) or value <= 0:
+            raise ValueError(
+                f"Materialization receipt has invalid accepted {stage} seed: {value!r}"
+            )
+        normalized_stage_seeds[stage] = value
+    seed_log = _checked_resolved_path(
+        Path(str(payload.get("accepted_stage_seed_log", ""))), label="receipt accepted seed log"
+    )
+    try:
+        seed_log.relative_to(expected_source_root)
+    except ValueError as exc:
+        raise ValueError(f"Materialization receipt has invalid accepted seed log: {seed_log}") from exc
+    if not seed_log.is_file():
+        raise ValueError(f"Materialization receipt has invalid accepted seed log: {seed_log}")
+    if payload.get("accepted_stage_seed_log_sha256") != sha256(seed_log):
+        raise ValueError(f"Materialization receipt accepted seed log hash mismatch: {seed_log}")
+    verify_locked_manifest_members(
+        root=expected_source_root,
+        manifest_path=manifest_root / f"{ACCEPTED_SET}.files.json",
+        members=[seed_log],
+    )
+    accepted_manifest_payload = _locked_manifest(
+        manifest_root / f"{ACCEPTED_SET}.files.json"
+    )
+    locked_stage_seeds = _accepted_stage_seeds(
+        accepted_root=expected_source_root,
+        accepted_hashes=_manifest_hashes(accepted_manifest_payload),
+        seed_log_relative=AGENT_PATHS[agent]["stage_seed_log"],
+    )["accepted_stage_seeds"]
+    if normalized_stage_seeds != locked_stage_seeds:
+        raise ValueError(
+            "Materialization receipt accepted stage seeds differ from locked accepted provenance: "
+            f"{normalized_stage_seeds} != {locked_stage_seeds}"
+        )
     return {
         "materialization_receipt": str(receipt_path),
         "materialization_receipt_sha256": sha256(receipt_path),
@@ -354,4 +437,6 @@ def load_materialization_binding(
         "dependency_manifest_sha256": payload.get("dependency_manifest_sha256"),
         "accepted_source_verification": accepted_source_verification,
         "dependency_verification": dependency_verification,
+        "accepted_stage_seeds": normalized_stage_seeds,
+        "accepted_stage_seed_log_sha256": payload["accepted_stage_seed_log_sha256"],
     }

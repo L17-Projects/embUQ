@@ -5,8 +5,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -23,6 +25,7 @@ from meso_uq.platforms.site_selector import resolve_hpc_site  # noqa: E402
 from replay_provenance import (  # noqa: E402
     load_materialization_binding,
     runtime_provenance,
+    sha256,
 )
 from meso_uq.vega_workflows import (  # noqa: E402
     VegaWorkflowSelection,
@@ -33,6 +36,11 @@ from meso_uq.vega_workflows import (  # noqa: E402
 SCHEMA_VERSION = "mesouq.uq_emb.hbi_replay.v1"
 VALID_STAGES = ("phase1", "phase2", "phase3b")
 AGENT_EXPERIMENT = {"sonovue": "indentation", "definity": "compression"}
+STAGE_OUTPUTS = {
+    "phase1": "results_phase_1",
+    "phase2": "results_phase_2",
+    "phase3b": "results_phase_3b",
+}
 
 def _load_and_validate_config(config_path: Path) -> tuple[dict[str, Any], str, int]:
     with config_path.open("r", encoding="utf-8") as handle:
@@ -63,6 +71,7 @@ def build_replay_commands(
     output_root: Path,
     python_bin: str,
     stages: list[str],
+    stage_seeds: dict[str, int],
 ) -> tuple[str, int, list[list[str]]]:
     _config, agent, population = _load_and_validate_config(config_path)
     selection = VegaWorkflowSelection(
@@ -81,6 +90,7 @@ def build_replay_commands(
             cpu_ranks=1,
             device="gpu",
             phase2_backend="native-cuda" if stage == "phase2" else None,
+            korali_random_seed=stage_seeds[stage],
         )
         for stage in stages
     ]
@@ -94,6 +104,87 @@ def _write_receipt(path: Path, payload: dict[str, Any]) -> None:
     temporary.replace(path)
 
 
+def _validate_stage_selection_and_freshness(output_root: Path, stages: list[str]) -> None:
+    if not stages or len(set(stages)) != len(stages):
+        raise ValueError("Replay stages must be a non-empty sequence without duplicates.")
+    stage_indices = [VALID_STAGES.index(stage) for stage in stages]
+    if stage_indices != sorted(stage_indices):
+        raise ValueError("Replay stages must follow Phase 1, Phase 2, Phase 3b order.")
+
+    selected = set(stages)
+    for index, stage in zip(stage_indices, stages, strict=True):
+        stage_output = output_root / STAGE_OUTPUTS[stage]
+        if stage_output.exists():
+            raise FileExistsError(
+                f"Refusing to overwrite existing {stage} output under {output_root}: {stage_output}. "
+                "Choose a fresh replay root."
+            )
+        for prerequisite in VALID_STAGES[:index]:
+            prerequisite_output = output_root / STAGE_OUTPUTS[prerequisite]
+            if prerequisite not in selected and not prerequisite_output.is_dir():
+                raise FileNotFoundError(
+                    f"{stage} requires existing {prerequisite} output when {prerequisite} "
+                    f"is not selected for replay: {prerequisite_output}"
+                )
+
+
+def _snapshot_run_input(
+    *,
+    config_path: Path,
+    output_root: Path,
+    config_binding: dict[str, Any],
+) -> dict[str, str]:
+    """Copy the verified materialized config once and execute only that private copy."""
+    snapshot_dir = output_root / "runtime_inputs"
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_path = snapshot_dir / "hbi_config.yaml"
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=snapshot_dir,
+        prefix=f".{snapshot_path.name}.",
+        suffix=".tmp",
+    )
+    temporary = Path(temporary_name)
+    try:
+        with config_path.open("rb") as source, os.fdopen(descriptor, "wb") as destination:
+            shutil.copyfileobj(source, destination)
+            destination.flush()
+            os.fsync(destination.fileno())
+        try:
+            os.link(temporary, snapshot_path)
+        except FileExistsError as exc:
+            raise FileExistsError(
+                f"Refusing to replace an existing replay run-input snapshot: {snapshot_path}"
+            ) from exc
+        snapshot_path.chmod(0o444)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+    snapshot_sha256 = sha256(snapshot_path)
+    if snapshot_sha256 != config_binding["config_sha256"]:
+        raise ValueError(
+            "Private replay run-input snapshot differs from the verified materialized config: "
+            f"{snapshot_path}"
+        )
+    return {
+        "path": str(snapshot_path),
+        "sha256": snapshot_sha256,
+        "source_config_sha256": config_binding["config_sha256"],
+    }
+
+
+def _verify_run_input_snapshot(snapshot: dict[str, str]) -> dict[str, str]:
+    path = Path(snapshot["path"])
+    if not path.is_file():
+        raise FileNotFoundError(f"Private replay run-input snapshot is missing: {path}")
+    current_sha256 = sha256(path)
+    if current_sha256 != snapshot["sha256"]:
+        raise ValueError(
+            "Private replay run-input snapshot changed after verification: "
+            f"{path}"
+        )
+    return {"path": str(path), "sha256": current_sha256}
+
+
 def run_replay(
     *,
     config_path: Path,
@@ -103,20 +194,28 @@ def run_replay(
     stages: list[str],
     execute: bool,
 ) -> dict[str, Any]:
-    config_path = config_path.expanduser().resolve()
+    # Preserve the caller's lexical spelling until provenance validation has
+    # rejected direct or ancestor symlink aliases.
+    config_path = config_path.expanduser().absolute()
     output_root = output_root.expanduser().resolve()
-    agent, population, commands = build_replay_commands(
+    _validate_stage_selection_and_freshness(output_root, stages)
+    config_binding = load_materialization_binding(config_path, repo_root=REPO_ROOT)
+    stage_seeds = config_binding["accepted_stage_seeds"]
+    if set(stage_seeds) != set(VALID_STAGES):
+        raise ValueError(f"Materialization binding has invalid accepted stage seeds: {stage_seeds}")
+    run_input_snapshot = _snapshot_run_input(
         config_path=config_path,
+        output_root=output_root,
+        config_binding=config_binding,
+    )
+    snapshot_config_path = Path(run_input_snapshot["path"])
+    agent, population, commands = build_replay_commands(
+        config_path=snapshot_config_path,
         output_root=output_root,
         python_bin=python_bin,
         stages=stages,
+        stage_seeds=stage_seeds,
     )
-    config_binding = load_materialization_binding(config_path, repo_root=REPO_ROOT)
-    if execute and "phase1" in stages and (output_root / "results_phase_1").exists():
-        raise FileExistsError(
-            f"Refusing to overwrite existing Phase 1 output under {output_root}. "
-            "Choose a fresh replay root."
-        )
 
     receipt_path = output_root / "uq_emb_hbi_replay_receipt.json"
     receipt: dict[str, Any] = {
@@ -126,6 +225,8 @@ def run_replay(
         "population": population,
         "site": site,
         "config_path": str(config_path),
+        "run_input_snapshot": run_input_snapshot,
+        "accepted_stage_seeds": stage_seeds,
         **config_binding,
         "provenance": runtime_provenance(
             repo_root=REPO_ROOT,
@@ -141,17 +242,22 @@ def run_replay(
     if not execute:
         return receipt
 
-    os.environ["HUQ_INFERENCE_CONFIG"] = str(config_path)
+    os.environ["HUQ_INFERENCE_CONFIG"] = str(snapshot_config_path)
     started = time.monotonic()
     try:
         for stage, command in zip(stages, commands, strict=True):
             stage_started = time.monotonic()
+            before = _verify_run_input_snapshot(run_input_snapshot)
             subprocess.run(command, cwd=REPO_ROOT, check=True)
+            after = _verify_run_input_snapshot(run_input_snapshot)
             receipt["stage_results"].append(
                 {
                     "stage": stage,
+                    "korali_random_seed": stage_seeds[stage],
                     "status": "passed",
                     "wall_seconds": time.monotonic() - stage_started,
+                    "run_input_before": before,
+                    "run_input_after": after,
                 }
             )
             _write_receipt(receipt_path, receipt)

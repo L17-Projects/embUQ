@@ -281,7 +281,9 @@ def run_forward_canary(
     site: str,
 ) -> dict[str, Any]:
     started = time.monotonic()
-    config_path = config_path.expanduser().resolve()
+    # Preserve the caller's lexical spelling until provenance validation has
+    # rejected direct or ancestor symlink aliases.
+    config_path = config_path.expanduser().absolute()
     with config_path.open("r", encoding="utf-8") as handle:
         config = yaml.safe_load(handle) or {}
     if not isinstance(config, dict):

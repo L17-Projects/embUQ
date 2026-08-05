@@ -124,6 +124,21 @@ def test_materialize_validates_frozen_inputs_and_writes_receipt(tmp_path: Path) 
     config_path = accepted_root / config_relative
     config_path.parent.mkdir(parents=True)
     config_path.write_text(yaml.safe_dump(_definity_config(), sort_keys=False), encoding="utf-8")
+    seed_log = accepted_root / module.AGENT_PATHS["definity"]["stage_seed_log"]
+    seed_log.parent.mkdir(parents=True)
+    seed_log.write_text(
+        "\n".join(
+            (
+                "[Korali] Random Seed: 1101",
+                "[HBI] Random Seed: 2101",
+                "[Phase 3b] Random Seed for compression_2.1um: 3104",
+                "[Phase 3b] Random Seed for compression_2.9um: 3104",
+                "[Phase 3b] Random Seed for compression_3.0um: 3104",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     dependency_relatives = (
         module.AGENT_PATHS["definity"]["bank"],
@@ -164,19 +179,21 @@ def test_materialize_validates_frozen_inputs_and_writes_receipt(tmp_path: Path) 
     promotion_path.write_text(json.dumps(promotion_records), encoding="utf-8")
 
     manifest_root.mkdir()
+    accepted_files = [config_path, seed_log]
     accepted_manifest = {
         "paper_id": module.PAPER_ID,
         "artifact_set_id": "accepted-production-outputs-202607",
         "artifact_set_dir": module.ACCEPTED_SET,
         "locked": True,
-        "file_count": 1,
-        "logical_size_bytes": config_path.stat().st_size,
+        "file_count": len(accepted_files),
+        "logical_size_bytes": sum(path.stat().st_size for path in accepted_files),
         "files": [
             {
-                "path": config_relative,
-                "size_bytes": config_path.stat().st_size,
-                "sha256": _sha256(config_path),
+                "path": path.relative_to(accepted_root).as_posix(),
+                "size_bytes": path.stat().st_size,
+                "sha256": _sha256(path),
             }
+            for path in accepted_files
         ],
     }
     dependency_files = [
@@ -225,6 +242,12 @@ def test_materialize_validates_frozen_inputs_and_writes_receipt(tmp_path: Path) 
     )
     assert receipt["accepted_source_verification"]["status"] == "PASS"
     assert receipt["dependency_verification"]["status"] == "PASS"
+    assert receipt["accepted_stage_seeds"] == {
+        "phase1": 1101,
+        "phase2": 2101,
+        "phase3b": 3104,
+    }
+    assert receipt["accepted_stage_seed_log_sha256"] == _sha256(seed_log)
     assert len(receipt["provenance"]["git_commit"]) == 40
     assert yaml.safe_load(output_config.read_text(encoding="utf-8"))["out"] == str(
         (tmp_path / "run").resolve()
@@ -233,6 +256,94 @@ def test_materialize_validates_frozen_inputs_and_writes_receipt(tmp_path: Path) 
         "evaluator"
     ]
     assert len(evaluator["provenance_path_overrides"]) == 4
+
+    with pytest.raises(FileExistsError, match="existing materialization artifact"):
+        module.materialize(
+            agent="definity",
+            artifact_root=artifact_root,
+            manifest_root=manifest_root,
+            output_dir=tmp_path / "configs",
+            run_root=tmp_path / "run",
+            population=50_000,
+        )
+
+
+@pytest.mark.parametrize(
+    "phase3b_records",
+    (
+        (3104, 3104, 3104),
+        (3104, 3105, 3106),
+        (3104, 3104, 3105, 3106),
+    ),
+)
+def test_accepted_stage_seeds_recovers_phase3b_base_seed(
+    tmp_path: Path,
+    phase3b_records: tuple[int, ...],
+) -> None:
+    module = _load_module()
+    accepted_root = tmp_path / "accepted"
+    seed_log_relative = module.AGENT_PATHS["definity"]["stage_seed_log"]
+    log_path = accepted_root / seed_log_relative
+    log_path.parent.mkdir(parents=True)
+    log_path.write_text(
+        "\n".join(
+            (
+                "[Korali] Random Seed: 1101",
+                "[HBI] Random Seed: 2101",
+                *(
+                    f"[Phase 3b] Random Seed for target_{index}: {seed}"
+                    for index, seed in enumerate(phase3b_records)
+                ),
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    provenance = module._accepted_stage_seeds(
+        accepted_root=accepted_root,
+        accepted_hashes={seed_log_relative: _sha256(log_path)},
+        seed_log_relative=seed_log_relative,
+    )
+
+    assert provenance["accepted_stage_seeds"] == {
+        "phase1": 1101,
+        "phase2": 2101,
+        "phase3b": 3104,
+    }
+
+
+@pytest.mark.parametrize("phase3b_records", ((3104, 3106), (3104, 3105, 3107)))
+def test_accepted_stage_seeds_rejects_phase3b_seed_gaps(
+    tmp_path: Path,
+    phase3b_records: tuple[int, ...],
+) -> None:
+    module = _load_module()
+    accepted_root = tmp_path / "accepted"
+    seed_log_relative = module.AGENT_PATHS["definity"]["stage_seed_log"]
+    log_path = accepted_root / seed_log_relative
+    log_path.parent.mkdir(parents=True)
+    log_path.write_text(
+        "\n".join(
+            (
+                "[Korali] Random Seed: 1101",
+                "[HBI] Random Seed: 2101",
+                *(
+                    f"[Phase 3b] Random Seed for target_{index}: {seed}"
+                    for index, seed in enumerate(phase3b_records)
+                ),
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="one contiguous sequence"):
+        module._accepted_stage_seeds(
+            accepted_root=accepted_root,
+            accepted_hashes={seed_log_relative: _sha256(log_path)},
+            seed_log_relative=seed_log_relative,
+        )
 
 
 def test_semantic_config_digest_ignores_only_relocated_roots(tmp_path: Path) -> None:
