@@ -291,6 +291,17 @@ def run_forward_canary(
     InferenceConfig.model_validate(config)
     os.environ["HUQ_INFERENCE_CONFIG"] = str(config_path)
     config_binding = load_materialization_binding(config_path, repo_root=REPO_ROOT)
+    output_path = output_path.expanduser().resolve()
+    for key in ("accepted_artifact_root", "dependency_artifact_root"):
+        locked_root = Path(str(config_binding[key])).resolve()
+        try:
+            output_path.relative_to(locked_root)
+        except ValueError:
+            continue
+        raise ValueError(
+            "Forward-canary output must remain outside immutable artifact roots: "
+            f"output={output_path}, locked_root={locked_root}"
+        )
 
     preflight = preflight_emb_resonance_config(config, project_root=REPO_ROOT)
     if preflight.get("status") != "passed":
@@ -354,7 +365,6 @@ def run_forward_canary(
         },
         "wall_seconds": time.monotonic() - started,
     }
-    output_path = output_path.expanduser().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return report

@@ -532,8 +532,28 @@ def replay(
         raise ValueError("--output-dir cannot be used with --dry-run")
     if output_dir is not None:
         output_dir = output_dir.expanduser().resolve()
+        try:
+            output_dir.relative_to(artifact_root)
+        except ValueError:
+            pass
+        else:
+            raise ValueError(
+                "Acoustic replay output must remain outside the immutable artifact root: "
+                f"output={output_dir}, artifact_root={artifact_root}"
+            )
         if output_dir.exists() and any(output_dir.iterdir()):
             raise FileExistsError(f"Refusing to write into non-empty replay output: {output_dir}")
+    if report_path is not None:
+        report_path = report_path.expanduser().resolve()
+        try:
+            report_path.relative_to(artifact_root)
+        except ValueError:
+            pass
+        else:
+            raise ValueError(
+                "Acoustic replay report must remain outside the immutable artifact root: "
+                f"report={report_path}, artifact_root={artifact_root}"
+            )
 
     labels = load_labels(labels_path)
     replay_rows = fit_replay(labels)
@@ -586,7 +606,6 @@ def replay(
         report["outputs"].append({"path": str(csv_path), "sha256": sha256_file(csv_path)})
         report["outputs"].extend(_write_replay_banks(output_dir, replay_rows, provenance))
     if report_path is not None:
-        report_path = report_path.expanduser().resolve()
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     elif output_dir is not None:

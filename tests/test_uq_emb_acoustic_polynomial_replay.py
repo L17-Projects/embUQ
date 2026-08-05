@@ -169,6 +169,29 @@ def test_replay_materializes_bounded_receipt_and_banks(
     assert saved["provenance"]["policy"]["fallback_allowed"] is False
 
 
+@pytest.mark.parametrize("target_kind", ("output", "report"))
+def test_replay_rejects_outputs_inside_immutable_artifact_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target_kind: str,
+) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
+    artifact_root = tmp_path / "artifacts"
+    _write_artifacts(module, artifact_root, _labels())
+    kwargs = {"artifact_root": artifact_root, "dry_run": target_kind == "report"}
+    forbidden = artifact_root / "replay"
+    if target_kind == "output":
+        kwargs["output_dir"] = forbidden
+    else:
+        kwargs["report_path"] = forbidden / "report.json"
+
+    with pytest.raises(ValueError, match="outside the immutable artifact root"):
+        module.replay(**kwargs)
+
+    assert not forbidden.exists()
+
+
 def test_replay_fails_clearly_on_frozen_bank_tolerance_mismatch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

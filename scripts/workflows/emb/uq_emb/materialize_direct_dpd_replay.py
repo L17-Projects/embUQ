@@ -39,6 +39,10 @@ from replay_provenance import (  # noqa: E402
 )
 
 MECHANICAL_RUNNER = REPO_ROOT / "scripts/platforms/hpc/run_map_mirheo.py"
+MECHANICAL_RUNNER_HELPERS = (
+    REPO_ROOT / "scripts/platforms/hpc/_site_cli.py",
+    REPO_ROOT / "scripts/platforms/hpc/convert_map_manifest.py",
+)
 SONOVUE_ACOUSTIC_RUNNER = (
     REPO_ROOT / "scripts/workflows/emb/run_emb_free_shell_breathing_protocol.py"
 )
@@ -447,6 +451,11 @@ def _acoustic_map_row(map_payload: dict[str, Any], state_path: Path) -> dict[str
 
 def _protocol_command_args(protocol: dict[str, Any]) -> list[str]:
     fit_end = protocol.get("fit_end_dpd")
+    reset_velocities_flag = (
+        "--post-deflation-hold-reset-velocities"
+        if protocol.get("post_deflation_hold_reset_velocities", True)
+        else "--no-post-deflation-hold-reset-velocities"
+    )
     return [
         "--dt", str(protocol["dt"]),
         "--equil-steps", str(protocol["equil_steps"]),
@@ -461,7 +470,7 @@ def _protocol_command_args(protocol: dict[str, Any]) -> list[str]:
         "--post-deflation-ramp-steps", str(protocol["post_deflation_ramp_steps"]),
         "--post-deflation-hold-steps", str(protocol["post_deflation_hold_steps"]),
         "--post-deflation-hold-update-every-steps", str(protocol["post_deflation_hold_update_every_steps"]),
-        "--post-deflation-hold-reset-velocities",
+        reset_velocities_flag,
         "--radial-velocity-kick", str(protocol.get("radial_velocity_kick", 0.0)),
         "--radial-velocity-kick-mode", str(protocol.get("radial_velocity_kick_mode", "add")),
         "--solvent-mode", str(protocol["solvent_mode"]),
@@ -687,7 +696,12 @@ def materialize_direct_dpd_replay(
             ),
         },
         "runtime_source_hashes": _source_hashes(
-            (MECHANICAL_RUNNER, *MECHANICAL_EVALUATORS.values(), *ACOUSTIC_RUNTIME_SOURCES)
+            (
+                MECHANICAL_RUNNER,
+                *MECHANICAL_RUNNER_HELPERS,
+                *MECHANICAL_EVALUATORS.values(),
+                *ACOUSTIC_RUNTIME_SOURCES,
+            )
         ),
         "bubbles": entries,
     }

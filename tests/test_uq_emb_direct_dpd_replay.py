@@ -72,6 +72,7 @@ def _accepted_root(tmp_path: Path) -> Path:
                 "post_deflation_ramp_steps": 500, "post_deflation_hold_steps": 500,
                 "post_deflation_hold_update_every_steps": 10, "solvent_mode": "full", "water_shell_fsi_scale": 0.4,
                 "membrane_mass_scale": 160.0, "lim_mu_policy": "derive-from-ka", "primary_observable": "rms_radius_dpd", "fit_end_dpd": 0.25,
+                "post_deflation_hold_reset_velocities": bubble != "d4",
             }}]},
         )
         _write_json(
@@ -178,6 +179,8 @@ def test_materialize_direct_dpd_replay_writes_six_static_pairs(tmp_path: Path) -
     assert plan["runtime_activation"]["required_before_execution"] is True
     assert "mesouq_activate_site_env karolina" in plan["runtime_activation"]["shared_activation"]
     assert plan["runtime_source_hashes"]
+    assert "scripts/platforms/hpc/_site_cli.py" in plan["runtime_source_hashes"]
+    assert "scripts/platforms/hpc/convert_map_manifest.py" in plan["runtime_source_hashes"]
     assert plan["accepted_artifact_manifest_sha256"] == hashlib.sha256(
         accepted_manifest.read_bytes()
     ).hexdigest()
@@ -193,6 +196,8 @@ def test_materialize_direct_dpd_replay_writes_six_static_pairs(tmp_path: Path) -
     d4 = plan["bubbles"][3]
     assert d4["acoustic"]["status"] == "reconstructed_exact_protocol_command"
     assert "--trajectory-capture" in d4["acoustic"]["command"]
+    assert "--no-post-deflation-hold-reset-velocities" in d4["acoustic"]["command"]
+    assert "--post-deflation-hold-reset-velocities" not in d4["acoustic"]["command"]
     assert "--extend-range" in d4["mechanical"]["command"]
     assert (tmp_path / "replay/d4/acoustic/inputs/sonovue_3p20um.csv").is_file()
 

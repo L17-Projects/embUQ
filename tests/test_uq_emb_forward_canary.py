@@ -108,6 +108,40 @@ def test_mechanical_artifact_receipt_hashes_the_selected_dnn(tmp_path: Path) -> 
     ]
 
 
+@pytest.mark.parametrize("root_key", ("accepted_artifact_root", "dependency_artifact_root"))
+def test_forward_canary_rejects_output_inside_immutable_artifact_roots(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    root_key: str,
+) -> None:
+    module = _load_module()
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("structure: emb\nexperiments: []\n", encoding="utf-8")
+    accepted_root = tmp_path / "accepted"
+    dependency_root = tmp_path / "dependencies"
+    monkeypatch.setattr(module.InferenceConfig, "model_validate", lambda _config: None)
+    monkeypatch.setattr(
+        module,
+        "load_materialization_binding",
+        lambda *_args, **_kwargs: {
+            "accepted_artifact_root": str(accepted_root),
+            "dependency_artifact_root": str(dependency_root),
+        },
+    )
+    forbidden_root = accepted_root if root_key == "accepted_artifact_root" else dependency_root
+    output_path = forbidden_root / "canary.json"
+
+    with pytest.raises(ValueError, match="outside immutable artifact roots"):
+        module.run_forward_canary(
+            config_path=config_path,
+            output_path=output_path,
+            device="cpu",
+            site="karolina",
+        )
+
+    assert not output_path.exists()
+
+
 @pytest.mark.parametrize(
     ("agent", "experiment"),
     (("sonovue", "indentation"), ("definity", "compression")),
