@@ -1,0 +1,601 @@
+{
+  "artifact_root_hint": "$MESOUQ_UQ_EMB_ARTIFACT_ROOT",
+  "artifact_set_dir": "frozen_plotting_dependencies_202607",
+  "artifact_set_id": "frozen-plotting-dependencies-202607",
+  "created_at_utc": "2026-08-04T13:01:38.139862+00:00",
+  "file_count": 94,
+  "files": [
+    {
+      "path": "code/figure6/render_figure6.py",
+      "sha256": "a1d180c896b90b4de2d42729162398c2a1fac74f1f8aa6cb42194d6cff6e02c3",
+      "size_bytes": 13730
+    },
+    {
+      "path": "code/figure7/render_figure7_attempt081_variants.py",
+      "sha256": "040e066417e42ec4427c7e5e3905282b43e8afde7bcf7745c19de16390e9ec2d",
+      "size_bytes": 26317
+    },
+    {
+      "path": "code/figure7/render_figure7_with_posteriors.py",
+      "sha256": "c4ccf6e57c8c862be28abff4359a096988cab2e6ecc14c18a5380e0c0e07c64b",
+      "size_bytes": 16161
+    },
+    {
+      "path": "code/figure7/render_revision_draft_assets.py",
+      "sha256": "5e8910b88bc44f21a8627d0584bab6e340650eb475de59aa865c0d7d4f8805d1",
+      "size_bytes": 44887
+    },
+    {
+      "path": "code/figure9/render_figure9.py",
+      "sha256": "44799cfb7bddf0c66c0faf80cb1a37a8a33d66e2fdf4bba2c802c4e32a7526f4",
+      "size_bytes": 13554
+    },
+    {
+      "path": "code/figure_s2/render_ringdown_fit_method_figure.py",
+      "sha256": "94788c20b08958cb282ac13332ab36c9189aa5221cfb2393d27d41535a3d2522",
+      "size_bytes": 22910
+    },
+    {
+      "path": "code/paper_style/meso_uq/predictive_statistics.py",
+      "sha256": "880173ca09b8ae7852b2813d1a8c1b89d5f24ad9d484c87993cad1f819c66d75",
+      "size_bytes": 4482
+    },
+    {
+      "path": "code/paper_style/uqdpd_generate_reduced_story_assets.py",
+      "sha256": "e4a97a02ef71ebeae4716e3925eaa537f3fbeca27ed2b48c78c6366069712b5c",
+      "size_bytes": 73063
+    },
+    {
+      "path": "inputs/figure6/leave_one_out_rows.csv",
+      "sha256": "bac4510144606f9e4def8a8079d1e44da97bc1def9491230e97d154291d4333f",
+      "size_bytes": 115058
+    },
+    {
+      "path": "inputs/figure7/definity_phase1_overlay_780k.csv.gz",
+      "sha256": "44440a0d4017e8a7c80baa2c6a2363dc4de4cb273e04a331d5df3f837544759f",
+      "size_bytes": 15676801
+    },
+    {
+      "path": "inputs/figure7/definity_phase1_overlay_780k.manifest.json",
+      "sha256": "9118f822dfa23f2f6af9fc8625b2b54dab45338eac062a88754ac7bb1cdfb2fd",
+      "size_bytes": 19319
+    },
+    {
+      "path": "inputs/figure7/renderer_inputs/definity/likelihood_points_used_for_inference/compression_likelihood_points_2.1um.csv",
+      "sha256": "b8ae3538f19579ed33d84c1d2f36aab074b5ef0c8342b1e4a0bf5cd0a1c337eb",
+      "size_bytes": 899
+    },
+    {
+      "path": "inputs/figure7/renderer_inputs/definity/likelihood_points_used_for_inference/compression_likelihood_points_2.9um.csv",
+      "sha256": "d5e6541440cf9c7e1480d4183327c9e095915fbcde79dc891fe0e7fad68be18b",
+      "size_bytes": 533
+    },
+    {
+      "path": "inputs/figure7/renderer_inputs/definity/likelihood_points_used_for_inference/compression_likelihood_points_3.0um.csv",
+      "sha256": "09cfb08ec409b709338bd8421d905a3b98ec81e31587888882044bb1cd55b457",
+      "size_bytes": 829
+    },
+    {
+      "path": "inputs/figure7/renderer_inputs/definity/tables/definity_resonance_observations.csv",
+      "sha256": "3c4991c89530a63539a0a10a670cb66bea40e4754cc1707d1a0dae9bf34696b8",
+      "size_bytes": 159
+    },
+    {
+      "path": "inputs/figure7/renderer_inputs/definity/tables/posterior_scatter_samples.csv",
+      "sha256": "705ebe428a105a7791e1c1a1d4f1ed87a4085e9d22a1c9566fc82621e2881dbc",
+      "size_bytes": 78051419
+    },
+    {
+      "path": "inputs/figure7/renderer_inputs/definity/tables/propagation_seed_curves.csv",
+      "sha256": "34f89b975002930240c9f08c4cf0f347cd2414ad208541f8efd1bf6836febc89",
+      "size_bytes": 16850
+    },
+    {
+      "path": "inputs/figure7/renderer_inputs/definity/tables/resonance_prediction_summary.csv",
+      "sha256": "edd9ac229d880e991f94993cb49c680f922d330ad9c1e2df4bb1e79b46a7326a",
+      "size_bytes": 302
+    },
+    {
+      "path": "inputs/figure7/renderer_inputs/sonovue/artifacts/comparison_artifacts_seed_sweep/tables/propagation_seed_curves.csv",
+      "sha256": "b13d213ffd4731e6bbb2c8160530a3b893d36ea891cfc196e88b2ed753be64dd",
+      "size_bytes": 16961
+    },
+    {
+      "path": "inputs/figure7/renderer_inputs/sonovue/likelihood_points_used_for_inference/indentation_likelihood_points_3.2um.csv",
+      "sha256": "72528770f5c1ad977f68032329dc834bc390bb8bb2ccf3c1003d8b9078f0936f",
+      "size_bytes": 1094
+    },
+    {
+      "path": "inputs/figure7/renderer_inputs/sonovue/likelihood_points_used_for_inference/indentation_likelihood_points_3.4um.csv",
+      "sha256": "ab29957d93d84321cf65cc52469d1eb713fa0d4933dec2c641895c6a82e972ad",
+      "size_bytes": 761
+    },
+    {
+      "path": "inputs/figure7/renderer_inputs/sonovue/likelihood_points_used_for_inference/indentation_likelihood_points_5.8um.csv",
+      "sha256": "b4e9ad2d3f485b3300afcbb7056b5766c99abe54f21d40c8b12687d5f10f15a0",
+      "size_bytes": 723
+    },
+    {
+      "path": "inputs/figure7/renderer_inputs/sonovue_heavy/phase1_indentation_all_seed_ridge_samples.csv",
+      "sha256": "3be2e4d8a20c23e704b51a7b7f49c912a7b0d1fa7055b1f4e4698d3c81b7e8cc",
+      "size_bytes": 16917819
+    },
+    {
+      "path": "inputs/figure7/renderer_inputs/sonovue_heavy/posterior_scatter_samples.csv",
+      "sha256": "3de491ed53ddec51985888abc3eb237b2e44ce565a6ad4c5c4667fa430777b5a",
+      "size_bytes": 77206217
+    },
+    {
+      "path": "inputs/figure7/renderer_inputs/sonovue_resonance_summary.csv",
+      "sha256": "d100da22b50eb525e3316eed3aa4c155625f54da38a6a3db0f2521cd711e1ff6",
+      "size_bytes": 289
+    },
+    {
+      "path": "inputs/figure_s2/definity_7p86um/campaign_case_metrics.json",
+      "sha256": "526af1eaf7cfade3ea8c6f78bee5b83e772cfdbb440e17fefd42bedca6243d7a",
+      "size_bytes": 18206
+    },
+    {
+      "path": "inputs/figure_s2/definity_7p86um/time_series.csv",
+      "sha256": "8372ee2c55ea8f5dbcb2ee5d6835772089e17fd6a695a9fd7f19843c3ae250ce",
+      "size_bytes": 337107
+    },
+    {
+      "path": "inputs/figure_s2/free_intercept_squared_frequency_fits.csv",
+      "sha256": "91af86a461de7d2fc075c6b774cd781e79d3590c2fa15223bc7eb762dd0deb11",
+      "size_bytes": 8542
+    },
+    {
+      "path": "inputs/figure_s2/physical_resonance_labels.csv",
+      "sha256": "402545fe6d145200a2eeda74d6bfc4a2487ad9b4e70356f10de784bf4dc6773b",
+      "size_bytes": 1046759
+    },
+    {
+      "path": "inputs/figure_s2/sonovue_2p60um/campaign_case_metrics.json",
+      "sha256": "bc915d5d0c4dbc9136fd3b171d10bb36f745bff43cf3a44769d025b37c90855d",
+      "size_bytes": 15244
+    },
+    {
+      "path": "inputs/figure_s2/sonovue_2p60um/time_series.csv",
+      "sha256": "8f9304be7e616c17c60815249b2a93b6520e24e36401e4b687e316a933f07fa4",
+      "size_bytes": 263898
+    },
+    {
+      "path": "texdeps/multirow.sty",
+      "sha256": "c90dfe43124fa5965b08b0a920a15dd2e9cf05e2264e6fecc2e6da8765b22db2",
+      "size_bytes": 155
+    },
+    {
+      "path": "texdeps/revtex/README",
+      "sha256": "b047d33f9a7c79d990bcc9627baff23e2aa154fc57b2b129b7d593c8cb9c12c0",
+      "size_bytes": 8694
+    },
+    {
+      "path": "texdeps/revtex/aip/aipguide4-2.pdf",
+      "sha256": "e654c1359c7b966d6a97260cd9d42af327512c4fc54e0c62f32034fdc6af8e2e",
+      "size_bytes": 270691
+    },
+    {
+      "path": "texdeps/revtex/aip/aipguide4-2.tex",
+      "sha256": "6359a23f5eaabae9182a045967e462a0da7d8a463807a8df0a8e78f7b108898e",
+      "size_bytes": 16789
+    },
+    {
+      "path": "texdeps/revtex/aip4-2.dtx",
+      "sha256": "f4b679e2de0959d4a2f0e8376a1e197ace280593b04102f94b822b1ecdf805d9",
+      "size_bytes": 113090
+    },
+    {
+      "path": "texdeps/revtex/aip4-2.pdf",
+      "sha256": "d499e1456bf85762cb3fd1489472695aada95d3581e3e9809ee7a24d771a9518",
+      "size_bytes": 517321
+    },
+    {
+      "path": "texdeps/revtex/aps/apsguide4-2.pdf",
+      "sha256": "7b37ec4baa57551135cde50d6d47308b3d65ecedba7ab1c52b6cdb1d6cde1a4e",
+      "size_bytes": 232285
+    },
+    {
+      "path": "texdeps/revtex/aps/apsguide4-2.tex",
+      "sha256": "2f1a46c0cbb9c836eca2d876a08b67e2a980210a901213e678153f2ac9d9508d",
+      "size_bytes": 20714
+    },
+    {
+      "path": "texdeps/revtex/aps10pt4-2.rtx",
+      "sha256": "0cc5d7fab6ffd59ba5779f9ddfad990cb8a71438ea390277bafff1824bbcb8e4",
+      "size_bytes": 4721
+    },
+    {
+      "path": "texdeps/revtex/aps11pt4-2.rtx",
+      "sha256": "f0ad65dcca6ed1352c3edda5b086b678301bce743a6ac44e69d4dc34a114a6de",
+      "size_bytes": 4885
+    },
+    {
+      "path": "texdeps/revtex/aps12pt4-2.rtx",
+      "sha256": "ed800427c862eee9fec9c705ca7fb1d82dc1f6abee5598257653e89d875e94bd",
+      "size_bytes": 4805
+    },
+    {
+      "path": "texdeps/revtex/aps4-2.rtx",
+      "sha256": "52d33501cae6dfdf339efeb2a79fda0a2780d1d39d96b61a1c6a6311da6ca05e",
+      "size_bytes": 16396
+    },
+    {
+      "path": "texdeps/revtex/apsrmp4-2.rtx",
+      "sha256": "d467dd7ef50ce824be8034c503a11a5b4552d7f71d7272c71f590f31a9612549",
+      "size_bytes": 7653
+    },
+    {
+      "path": "texdeps/revtex/auguide/auguide4-2.pdf",
+      "sha256": "2ed74d48dc5f911297a716008f116fb8a29ba9199e1408424afbe336dbc2c565",
+      "size_bytes": 452319
+    },
+    {
+      "path": "texdeps/revtex/auguide/auguide4-2.tex",
+      "sha256": "6ae95a6c99da71f33e2c406d53d3a3f1a573c8e2b386c2ce8eddc173b46a21a4",
+      "size_bytes": 85974
+    },
+    {
+      "path": "texdeps/revtex/auguide/docs.sty",
+      "sha256": "8c69c2682edd6f0be6c6acb340623fefd469db9390f4163ff90fbc03defb0987",
+      "size_bytes": 3573
+    },
+    {
+      "path": "texdeps/revtex/auguide/summary4-2.pdf",
+      "sha256": "d33e3f9eeb38e783ef67d2ab4de87ad2f1b2c32f879d6e60a41cb6d9cae75123",
+      "size_bytes": 230858
+    },
+    {
+      "path": "texdeps/revtex/auguide/summary4-2.tex",
+      "sha256": "fcbc0b781bbe7e5654915d2c929c86f3051ce45917a86310e672244b1bd2509e",
+      "size_bytes": 22384
+    },
+    {
+      "path": "texdeps/revtex/ltxdocext.dtx",
+      "sha256": "18c213551a20e419ad3efc993e73977308128fefe1c40af9fab7fc9da2676c7d",
+      "size_bytes": 42603
+    },
+    {
+      "path": "texdeps/revtex/ltxdocext.pdf",
+      "sha256": "9209be4658f5ea71331b3605c2de83156965a7b2adbcfb687b0516cd966835f5",
+      "size_bytes": 324579
+    },
+    {
+      "path": "texdeps/revtex/ltxfront.dtx",
+      "sha256": "c3d5bb86d520bdc28e0567990cf2fbca3febe8a553347a4971593f11514bbf63",
+      "size_bytes": 135033
+    },
+    {
+      "path": "texdeps/revtex/ltxfront.pdf",
+      "sha256": "5bf06b574973a7ddaaa47e168012cc6291aa47ce0753d898ae13f2bf75401ff3",
+      "size_bytes": 546693
+    },
+    {
+      "path": "texdeps/revtex/ltxgrid.dtx",
+      "sha256": "9b54b52a02c534cd56e58d98a8450a00e96612a12c06427d714781cbf02d16a3",
+      "size_bytes": 262422
+    },
+    {
+      "path": "texdeps/revtex/ltxgrid.pdf",
+      "sha256": "ad5a8de5736d4177a582782c3679c85c772b7736b0ad8177616f489b9c1b80ce",
+      "size_bytes": 801858
+    },
+    {
+      "path": "texdeps/revtex/ltxutil.dtx",
+      "sha256": "b5ac7a4dd94a23079f6a6659927e39b4638a8854e9ac3d8af5f99e63b6c1834a",
+      "size_bytes": 147305
+    },
+    {
+      "path": "texdeps/revtex/ltxutil.pdf",
+      "sha256": "d56f6350130aeace9ce61c01b5e179d344d26a8aaf022cb969ca593ffe9f83fb",
+      "size_bytes": 623128
+    },
+    {
+      "path": "texdeps/revtex/revsymb4-2.sty",
+      "sha256": "7614d7446d929f49917e54c8590d7ff7408572a9d2d293d209ea718540947d3e",
+      "size_bytes": 5569
+    },
+    {
+      "path": "texdeps/revtex/revtex-bst.dtx",
+      "sha256": "66377d2606c0fb6f45106b5edc5f6cf648b654fa5c3b213e6f310385ee4257ca",
+      "size_bytes": 79743
+    },
+    {
+      "path": "texdeps/revtex/revtex4-2.cls",
+      "sha256": "58727044fa47fff2663615774f8f24baab978944bbc55f84f8dc08ef91f67358",
+      "size_bytes": 202907
+    },
+    {
+      "path": "texdeps/revtex/revtex4-2.dtx",
+      "sha256": "6575bfb049e828aee4c672462e0bfd795df1b485e9d731c04cd1862069f56254",
+      "size_bytes": 291846
+    },
+    {
+      "path": "texdeps/revtex/revtex4-2.log",
+      "sha256": "b0fb0921484d0f3f4a906dbb99cde1b6a589fbb3db1928cd516e25130824b5a4",
+      "size_bytes": 4225
+    },
+    {
+      "path": "texdeps/revtex/revtex4-2.pdf",
+      "sha256": "44f98256231f9161ad975d7fc0645fc593b25ab8f1949cf581f973c7e53c4090",
+      "size_bytes": 839993
+    },
+    {
+      "path": "texdeps/revtex/sample/aapm/aapmsamp.bib",
+      "sha256": "e0bb6865dd1974cad531b858cb1fe88c26c70cd72daeb2159840721223c013c3",
+      "size_bytes": 13187
+    },
+    {
+      "path": "texdeps/revtex/sample/aapm/aapmsamp.pdf",
+      "sha256": "4c70420e94be63964a09ee439ca05e19bad1ce0fc3d4fdb5df27000e27d2622c",
+      "size_bytes": 352536
+    },
+    {
+      "path": "texdeps/revtex/sample/aapm/aapmsamp.tex",
+      "sha256": "1ec23375ea84e41a62e3f36f024e511572ba82bd443da7710e8e3ebf309a5c5d",
+      "size_bytes": 24343
+    },
+    {
+      "path": "texdeps/revtex/sample/aapm/aapmtemplate.tex",
+      "sha256": "701a6c8173795065f7a29b8c15371798975a3c1b0c6ff822dcca1c64e9a9304c",
+      "size_bytes": 3548
+    },
+    {
+      "path": "texdeps/revtex/sample/aapm/fig_1.eps",
+      "sha256": "1b55a6957b9cc89f456e2023774a2b6f3a026f72241bc7baae98edec4aa8ba35",
+      "size_bytes": 187
+    },
+    {
+      "path": "texdeps/revtex/sample/aapm/fig_2.eps",
+      "sha256": "00e9f9bae1b570d879756ef8466e2a0a5a341438a372fe8482f1e6a6c3f40363",
+      "size_bytes": 190
+    },
+    {
+      "path": "texdeps/revtex/sample/aip/aipsamp.bib",
+      "sha256": "fd5070e090819f67bd739939089f9c1cfe36021e48bf2fa1b86348d7f950280e",
+      "size_bytes": 13145
+    },
+    {
+      "path": "texdeps/revtex/sample/aip/aipsamp.pdf",
+      "sha256": "758ca3f368bc5316a974b5b96cd027896d540361da0b4460d101e41454f58ad5",
+      "size_bytes": 377909
+    },
+    {
+      "path": "texdeps/revtex/sample/aip/aipsamp.tex",
+      "sha256": "bd67303f6988fefa1a0953706e67c16e33460a305db5bf52953a90fa60e55541",
+      "size_bytes": 24409
+    },
+    {
+      "path": "texdeps/revtex/sample/aip/aiptemplate.tex",
+      "sha256": "0db73a65d38c80ddd2e1f877bf1939e1194e190b044cec07e460a72b092ee952",
+      "size_bytes": 3357
+    },
+    {
+      "path": "texdeps/revtex/sample/aip/fig_1.eps",
+      "sha256": "1b55a6957b9cc89f456e2023774a2b6f3a026f72241bc7baae98edec4aa8ba35",
+      "size_bytes": 187
+    },
+    {
+      "path": "texdeps/revtex/sample/aip/fig_2.eps",
+      "sha256": "00e9f9bae1b570d879756ef8466e2a0a5a341438a372fe8482f1e6a6c3f40363",
+      "size_bytes": 190
+    },
+    {
+      "path": "texdeps/revtex/sample/aps/apssamp.bib",
+      "sha256": "3b2c3d8cfbe4bd01270054d2aace435616535e74c8ce9484829fd1de1a8ce4b2",
+      "size_bytes": 13050
+    },
+    {
+      "path": "texdeps/revtex/sample/aps/apssamp.pdf",
+      "sha256": "b98ea03b641732f29b6e5906050c08c02e0c917506759f53e2b26699a654ac50",
+      "size_bytes": 356378
+    },
+    {
+      "path": "texdeps/revtex/sample/aps/apssamp.tex",
+      "sha256": "9d813074afa316ce205cb7c69583b8b70ab4961084ca9626f36aff1aaa4b36ec",
+      "size_bytes": 31473
+    },
+    {
+      "path": "texdeps/revtex/sample/aps/apstemplate.tex",
+      "sha256": "39193cf43fe558ceb605e150310ae06e59600124748815d62b9269a508f4702c",
+      "size_bytes": 5754
+    },
+    {
+      "path": "texdeps/revtex/sample/aps/fig_1.eps",
+      "sha256": "c56bc8dc5307601f72b954fe59fb86417841b598604c8ac9ab6ce12f526a1551",
+      "size_bytes": 193
+    },
+    {
+      "path": "texdeps/revtex/sample/aps/fig_2.eps",
+      "sha256": "73523639e517366bef63610847c1db39ed100df6e7ab5b5e447d29cfdbd7c0c6",
+      "size_bytes": 196
+    },
+    {
+      "path": "texdeps/revtex/sample/aps/vid_1a.eps",
+      "sha256": "b2094ccb0bdd40dfa857e8ea379195b0b0d8522a50dc44b12b0484b698906d6b",
+      "size_bytes": 194
+    },
+    {
+      "path": "texdeps/revtex/sample/aps/vid_1b.eps",
+      "sha256": "bd3144b3945b5dffa35b29bc874186e6844a79b4f4b6882b5e17a2f49277f55c",
+      "size_bytes": 194
+    },
+    {
+      "path": "texdeps/revtex/sample/sor/fig_1.eps",
+      "sha256": "1b55a6957b9cc89f456e2023774a2b6f3a026f72241bc7baae98edec4aa8ba35",
+      "size_bytes": 187
+    },
+    {
+      "path": "texdeps/revtex/sample/sor/fig_2.eps",
+      "sha256": "00e9f9bae1b570d879756ef8466e2a0a5a341438a372fe8482f1e6a6c3f40363",
+      "size_bytes": 190
+    },
+    {
+      "path": "texdeps/revtex/sample/sor/sorsamp.bib",
+      "sha256": "fd5070e090819f67bd739939089f9c1cfe36021e48bf2fa1b86348d7f950280e",
+      "size_bytes": 13145
+    },
+    {
+      "path": "texdeps/revtex/sample/sor/sorsamp.pdf",
+      "sha256": "f2296230defecca06728a8b78ef92ea70c67ccb1db30f00e9e3a50439ff51761",
+      "size_bytes": 396057
+    },
+    {
+      "path": "texdeps/revtex/sample/sor/sorsamp.tex",
+      "sha256": "dccd247e3c32adc586c5679f3979c6de9d3dc87a7a423a95bc293caa60c30e95",
+      "size_bytes": 24447
+    },
+    {
+      "path": "texdeps/revtex/sample/sor/sortemplate.tex",
+      "sha256": "03a07d5e11b9dd0b479bf31db62bda57858cc39bafa98c61b029e05e71d1c5f3",
+      "size_bytes": 3357
+    },
+    {
+      "path": "texdeps/revtex.zip",
+      "sha256": "5a5ebc9831ae219b2bcf2f8b408dc07a55a9e244af1317f1f25ca187daa40d82",
+      "size_bytes": 6507631
+    },
+    {
+      "path": "texdeps/siunitx.sty",
+      "sha256": "7eb44d6db729e9d4e4595246255a77d7ea0263a3b916f98d15cc7d59c7ad2c48",
+      "size_bytes": 302
+    },
+    {
+      "path": "texdeps/tikz.sty",
+      "sha256": "e987a59a55aca105620ac9a08c829952515278af872a74c74b3a9e22db4770eb",
+      "size_bytes": 115
+    },
+    {
+      "path": "texdeps/type1cm.sty",
+      "sha256": "08da684c743fd6d9512e12fffa58ee1219d0738cc8489900d9637fce45f7ad78",
+      "size_bytes": 124
+    },
+    {
+      "path": "texdeps/type1ec.sty",
+      "sha256": "940c7120a068cb4cb6d061d6d0ffc1af998ea4a12429a0eb507772bb6f849f63",
+      "size_bytes": 124
+    }
+  ],
+  "locked": true,
+  "logical_size_bytes": 204418403,
+  "paper_id": "UQ_EMB",
+  "schema_version": "1.0",
+  "selections": [
+    {
+      "artifact_id": "paper-style-renderer",
+      "destination": "code/paper_style/uqdpd_generate_reduced_story_assets.py",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/papers/huq_emb/uqdpd_generate_reduced_story_assets.py"
+    },
+    {
+      "artifact_id": "paper-style-predictive-statistics",
+      "destination": "code/paper_style/meso_uq/predictive_statistics.py",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/src/meso_uq/predictive_statistics.py"
+    },
+    {
+      "artifact_id": "figure6-renderer",
+      "destination": "code/figure6/render_figure6.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/manuscript_figure_homogeneity_revision_20260731/code/render_figure6.py"
+    },
+    {
+      "artifact_id": "figure6-loo-rows",
+      "destination": "inputs/figure6/leave_one_out_rows.csv",
+      "source": "$MESOUQ_SCRATCH_ROOT/evidence/acoustic_emulator_validation_paper_style_20260728/leave_one_out_rows.csv"
+    },
+    {
+      "artifact_id": "figure7-top-renderer",
+      "destination": "code/figure7/render_figure7_with_posteriors.py",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperJun28/assets_resonance_revision/scripts/render_figure7_with_posteriors.py"
+    },
+    {
+      "artifact_id": "figure7-variant-renderer",
+      "destination": "code/figure7/render_figure7_attempt081_variants.py",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperJun28/assets_resonance_revision/scripts/render_figure7_attempt081_variants.py"
+    },
+    {
+      "artifact_id": "figure7-base-renderer",
+      "destination": "code/figure7/render_revision_draft_assets.py",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperJun28/assets_resonance_revision/scripts/render_revision_draft_assets.py"
+    },
+    {
+      "artifact_id": "figure7-definity-renderer-inputs",
+      "destination": "inputs/figure7/renderer_inputs/definity",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/renderer_inputs/definity"
+    },
+    {
+      "artifact_id": "figure7-sonovue-renderer-inputs",
+      "destination": "inputs/figure7/renderer_inputs/sonovue",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/renderer_inputs/sonovue"
+    },
+    {
+      "artifact_id": "figure7-sonovue-posterior",
+      "destination": "inputs/figure7/renderer_inputs/sonovue_heavy/posterior_scatter_samples.csv",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/renderer_inputs/sonovue_heavy/posterior_scatter_samples.csv"
+    },
+    {
+      "artifact_id": "figure7-sonovue-phase1-overlay",
+      "destination": "inputs/figure7/renderer_inputs/sonovue_heavy/phase1_indentation_all_seed_ridge_samples.csv",
+      "source": "$MESOUQ_SCRATCH_ROOT/evidence_archive_home_jun2026_heavy_csv/20260626_attempt-064_common-support-targetcov0p3-10seed-10k/artifacts/comparison_artifacts_seed_sweep/tables/phase1_indentation_all_seed_ridge_samples.csv"
+    },
+    {
+      "artifact_id": "figure7-sonovue-resonance-summary",
+      "destination": "inputs/figure7/renderer_inputs/sonovue_resonance_summary.csv",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/renderer_inputs/sonovue_resonance_summary.csv"
+    },
+    {
+      "artifact_id": "figure7-definity-phase1-flat",
+      "destination": "inputs/figure7/definity_phase1_overlay_780k.csv.gz",
+      "source": "$MESOUQ_SCRATCH_ROOT/papers/UQ_EMB/replay_canaries/plotting_inputs_20260804/definity_phase1_overlay_780k.csv.gz"
+    },
+    {
+      "artifact_id": "figure7-definity-phase1-manifest",
+      "destination": "inputs/figure7/definity_phase1_overlay_780k.manifest.json",
+      "source": "$MESOUQ_SCRATCH_ROOT/papers/UQ_EMB/replay_canaries/plotting_inputs_20260804/definity_phase1_overlay_780k.manifest.json"
+    },
+    {
+      "artifact_id": "figure9-renderer",
+      "destination": "code/figure9/render_figure9.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/manuscript_figure_homogeneity_revision_20260731/code/render_figure9.py"
+    },
+    {
+      "artifact_id": "figure-s2-renderer",
+      "destination": "code/figure_s2/render_ringdown_fit_method_figure.py",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/render_ringdown_fit_method_figure.py"
+    },
+    {
+      "artifact_id": "figure-s2-physical-labels",
+      "destination": "inputs/figure_s2/physical_resonance_labels.csv",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/evidence/physical_resonance_polynomial_emulators_20260722/physical_resonance_labels.csv"
+    },
+    {
+      "artifact_id": "figure-s2-response-fits",
+      "destination": "inputs/figure_s2/free_intercept_squared_frequency_fits.csv",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/evidence/free_intercept_squared_frequency_diagnostic_20260722/free_intercept_squared_frequency_fits.csv"
+    },
+    {
+      "artifact_id": "figure-s2-definity-metrics",
+      "destination": "inputs/figure_s2/definity_7p86um/campaign_case_metrics.json",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/definity_exact18_postcase6_postcase6-terminal-20260720t233543z_large448/production/definity/definity_7p86um/ka-index-020/definity_7p86um/seed-000/campaign_case_metrics.json"
+    },
+    {
+      "artifact_id": "figure-s2-definity-time-series",
+      "destination": "inputs/figure_s2/definity_7p86um/time_series.csv",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/definity_exact18_postcase6_postcase6-terminal-20260720t233543z_large448/production/definity/definity_7p86um/ka-index-020/definity_7p86um/seed-000/time_series.csv"
+    },
+    {
+      "artifact_id": "figure-s2-sonovue-metrics",
+      "destination": "inputs/figure_s2/sonovue_2p60um/campaign_case_metrics.json",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/emb_frequency_surface_sonovue_2p60_extension_20260716/production/sonovue/sonovue_2p60um/ka-index-027/sonovue_2p60um/seed-000/campaign_case_metrics.json"
+    },
+    {
+      "artifact_id": "figure-s2-sonovue-time-series",
+      "destination": "inputs/figure_s2/sonovue_2p60um/time_series.csv",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/emb_frequency_surface_sonovue_2p60_extension_20260716/production/sonovue/sonovue_2p60um/ka-index-027/sonovue_2p60um/seed-000/time_series.csv"
+    },
+    {
+      "artifact_id": "paper-texdeps",
+      "destination": "texdeps",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/_paper/v3/files/_texdeps"
+    }
+  ],
+  "source_spec": "papers/UQ_EMB/manifests/frozen_plotting_dependencies_202607.staging.json"
+}

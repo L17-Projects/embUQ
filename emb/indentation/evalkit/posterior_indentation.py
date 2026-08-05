@@ -38,6 +38,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional in lightweight test e
     MPI = _FallbackMPI()
 
 from emb.indentation.evalkit.tools import dated_print
+from meso_uq.experiments import load_experiments
 from meso_uq.noise.legacy import (
     legacy_indentation_adjusted_batch_likelihood,
     legacy_indentation_direct_standard_deviation,
@@ -56,7 +57,7 @@ from meso_uq.workflows.legacy import (
 )
 
 _CONFIG_CACHE: Dict[str, Dict[str, Any]] = {}
-_SURROGATE_CACHE: Dict[Tuple[str, float, str, str], Any] = {}
+_SURROGATE_CACHE: Dict[Tuple[str, float, str, str, str], Any] = {}
 _DUMP_FLAG: bool | None = None
 
 
@@ -129,11 +130,38 @@ def _resolve_surrogate_runtime(config: Dict[str, Any]) -> Tuple[str, int, int]:
     return resolve_legacy_surrogate_runtime(config).as_tuple()
 
 
+def _resolve_surrogate_trained_dir(project_root: str, diameter_um: float) -> Path:
+    try:
+        config = _load_config(project_root)
+    except FileNotFoundError:
+        return resolve_legacy_surrogate_trained_dir(
+            project_root, "indentation", diameter_um
+        )
+
+    for experiment in load_experiments(config, Path(project_root)):
+        if (
+            experiment.enabled
+            and experiment.name == "indentation"
+            and diameter_um in experiment.diameters
+        ):
+            diameter_label = (
+                experiment._lookup_diameter_mapping(experiment.diameter_labels, diameter_um)
+                or str(diameter_um)
+            )
+            return experiment.surrogate_dir / f"{diameter_label}um" / "trained"
+
+    return resolve_legacy_surrogate_trained_dir(project_root, "indentation", diameter_um)
+
+
 def _build_surrogate(
-    project_root: str, diameter_um: float, device: str = "cpu", backend: str = "dnn"
+    project_root: str,
+    diameter_um: float,
+    device: str = "cpu",
+    backend: str = "dnn",
+    trained_dir: Path | None = None,
 ) -> Any:
     surrogate_path = os.fspath(
-        resolve_legacy_surrogate_trained_dir(project_root, "indentation", diameter_um)
+        trained_dir or _resolve_surrogate_trained_dir(project_root, diameter_um)
     )
     if backend == "dnn":
         from emb.indentation.surrogate.evaluate import Surrogate
@@ -149,10 +177,21 @@ def _build_surrogate(
 def _get_surrogate(
     project_root: str, diameter_um: float, device: str = "cpu", backend: str = "dnn"
 ) -> Any:
-    key = (project_root, diameter_um, device, backend)
+    trained_dir = _resolve_surrogate_trained_dir(project_root, diameter_um)
+    key = (
+        project_root,
+        diameter_um,
+        os.fspath(trained_dir.resolve()),
+        device,
+        backend,
+    )
     if key not in _SURROGATE_CACHE:
         _SURROGATE_CACHE[key] = _build_surrogate(
-            project_root, diameter_um, device=device, backend=backend
+            project_root,
+            diameter_um,
+            device=device,
+            backend=backend,
+            trained_dir=trained_dir,
         )
     return _SURROGATE_CACHE[key]
 

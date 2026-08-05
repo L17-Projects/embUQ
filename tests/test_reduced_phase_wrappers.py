@@ -134,3 +134,26 @@ def test_reduced_phase3b_wrapper_forwards_device(monkeypatch) -> None:
     assert captured["cmd"][1] == str(module.MAIN_DRIVER)
     assert "--profiling" in captured["cmd"]
     assert captured["cmd"][-2:] == ["--device", "gpu"]
+
+
+def test_reduced_phase3b_wrapper_forwards_repeat_seed_mode(monkeypatch) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    module = _load_module(
+        repo_root / "reduced" / "scripts" / "run_phase_3b.py",
+        "mesouq_reduced_phase3b_repeat_seed",
+    )
+    captured = {}
+
+    monkeypatch.setattr(
+        module.subprocess,
+        "call",
+        lambda cmd, cwd=None: captured.update(cmd=cmd, cwd=cwd) or 0,
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run_phase_3b.py", "--phase3b-seed-mode", "repeat"],
+    )
+
+    assert module.main() == 0
+    assert captured["cmd"][-2:] == ["--phase3b-seed-mode", "repeat"]

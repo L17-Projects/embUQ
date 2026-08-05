@@ -96,11 +96,13 @@ def test_experiment_selection_normalizes_controls_and_geometries():
     selection = ExperimentSelection(
         structure="emb",
         name="compression",
+        lane="soft",
         geometries=[emb_geometry_id(2.9)],
         controls=["default", "default", "alternate"],
         diameters=[2.1],
     )
 
+    assert selection.lane == "soft"
     assert selection.geometries == [emb_geometry_id(2.1), emb_geometry_id(2.9)]
     assert selection.controls == ["alternate", "default"]
 
@@ -136,6 +138,219 @@ def test_inference_config_normalizes_legacy_emb_experiment_selection():
     assert config.experiments[0].structure == "emb"
     assert config.experiments[0].name == "compression"
     assert config.experiments[0].geometries == [emb_geometry_id(2.1), emb_geometry_id(2.9)]
+
+
+def test_inference_config_allows_same_experiment_with_distinct_lanes():
+    config = InferenceConfig(
+        structure="emb",
+        phase1_contract_mode="emb_direct_ka_kb",
+        prior_ka=[1.0, 130000.0],
+        prior_kb=[100.0, 1000.0],
+        prior_d0=[0.0, 0.5],
+        prior_sigma=[0.001, 0.2],
+        experiments=[
+            ExperimentSelection(structure="emb", name="resonance", lane="source3", diameters=[4.68]),
+            ExperimentSelection(structure="emb", name="resonance", lane="source4", diameters=[0.28]),
+        ],
+    )
+
+    assert config.experiments is not None
+    assert [(selection.name, selection.lane) for selection in config.experiments] == [
+        ("resonance", "source3"),
+        ("resonance", "source4"),
+    ]
+
+
+def test_inference_config_supports_direct_emb_resonance_contract():
+    config = InferenceConfig(
+        structure="emb",
+        phase1_contract_mode="emb_direct_ka_kb",
+        experiments=[{"structure": "emb", "name": "resonance", "diameters": [4.0, 3.2, 2.6]}],
+        prior_ka=[1000.0, 100000.0],
+        prior_kb=[100.0, 100000.0],
+        prior_d0=[0.0, 0.5],
+        prior_sigma=[0.001, 0.5],
+    )
+
+    assert config.structure == "emb"
+    assert config.experiments is not None
+    assert config.experiments[0].name == "resonance"
+    assert config.experiments[0].geometries == [
+        emb_geometry_id(2.6),
+        emb_geometry_id(3.2),
+        emb_geometry_id(4.0),
+    ]
+
+
+def test_inference_config_validates_artifact_resonance_evaluator_contract():
+    config = InferenceConfig(
+        structure="emb",
+        phase1_contract_mode="emb_direct_ka_kb",
+        experiments=[{"structure": "emb", "name": "resonance", "diameters": [4.0]}],
+        prior_ka=[0.0, 30000.0],
+        prior_kb=[100.0, 1000.0],
+        prior_d0=[0.0, 0.5],
+        prior_sigma=[0.001, 0.5],
+        resonance={
+            "agent": "sonovue",
+            "evaluator": {
+                "mode": "artifact_surface",
+                "artifact_path": "evidence/sonovue_surface.json",
+                "expected_fixed_kb_dpd": 7850.288865935088,
+            },
+            "excluded_diameters_um": [1.3, 0.28, 1.3],
+            "excluded_diameters_reason": "outside DPD mesh-resolution support",
+        },
+    )
+
+    assert config.resonance is not None
+    assert config.resonance.evaluator is not None
+    assert config.resonance.evaluator.mode == "artifact_surface"
+    assert config.resonance.evaluator.expected_fixed_kb_dpd == pytest.approx(7850.288865935088)
+    assert config.resonance.excluded_diameters_um == [0.28, 1.3]
+
+    bank = InferenceConfig(
+        structure="emb",
+        phase1_contract_mode="emb_direct_ka_kb",
+        experiments=[{"structure": "emb", "name": "resonance", "diameters": [4.0]}],
+        prior_ka=[500.0, 42000.0],
+        prior_kb=[100.0, 10000.0],
+        prior_d0=[0.0, 0.5],
+        prior_sigma=[0.001, 0.5],
+        resonance={
+            "agent": "sonovue",
+            "evaluator": {
+                "mode": "artifact_emulator_bank",
+                "artifact_path": "evidence/sonovue_frequency_emulator_bank.json",
+                "artifact_sha256": "b" * 64,
+                "expected_fixed_kb_dpd": 7850.288865935088,
+            },
+        },
+    )
+    assert bank.resonance is not None
+    assert bank.resonance.evaluator is not None
+    assert bank.resonance.evaluator.mode == "artifact_emulator_bank"
+
+    vacuum = InferenceConfig(
+        structure="emb",
+        phase1_contract_mode="emb_direct_ka_kb",
+        experiments=[{"structure": "emb", "name": "resonance", "diameters": [4.0]}],
+        prior_ka=[500.0, 42000.0],
+        prior_kb=[100.0, 10000.0],
+        prior_d0=[0.0, 0.5],
+        prior_sigma=[0.001, 0.5],
+        resonance={
+            "agent": "sonovue",
+            "evaluator": {"mode": "analytical_vacuum_shell"},
+        },
+    )
+    assert vacuum.resonance is not None
+    assert vacuum.resonance.evaluator is not None
+    assert vacuum.resonance.evaluator.mode == "analytical_vacuum_shell"
+
+    checksummed = InferenceConfig(
+        structure="emb",
+        phase1_contract_mode="emb_direct_ka_kb",
+        experiments=[{"structure": "emb", "name": "resonance", "diameters": [4.0]}],
+        prior_ka=[0.0, 30000.0],
+        prior_kb=[100.0, 1000.0],
+        prior_d0=[0.0, 0.5],
+        prior_sigma=[0.001, 0.5],
+        resonance={
+            "evaluator": {
+                "mode": "artifact_surface",
+                "artifact_path": "evidence/sonovue_surface.json",
+                "artifact_sha256": "A" * 64,
+            }
+        },
+    )
+    assert checksummed.resonance is not None
+    assert checksummed.resonance.evaluator is not None
+    assert checksummed.resonance.evaluator.artifact_sha256 == "a" * 64
+
+    with pytest.raises(ValueError, match="64-character hexadecimal"):
+        InferenceConfig(
+            structure="emb",
+            phase1_contract_mode="emb_direct_ka_kb",
+            experiments=[{"structure": "emb", "name": "resonance", "diameters": [4.0]}],
+            prior_ka=[0.0, 30000.0],
+            prior_kb=[100.0, 1000.0],
+            prior_d0=[0.0, 0.5],
+            prior_sigma=[0.001, 0.5],
+            resonance={
+                "evaluator": {
+                    "mode": "artifact_surface",
+                    "artifact_path": "evidence/sonovue_surface.json",
+                    "artifact_sha256": "not-a-sha",
+                }
+            },
+        )
+
+    with pytest.raises(ValueError, match="artifact_path"):
+        InferenceConfig(
+            structure="emb",
+            phase1_contract_mode="emb_direct_ka_kb",
+            experiments=[{"structure": "emb", "name": "resonance", "diameters": [4.0]}],
+            prior_ka=[0.0, 30000.0],
+            prior_kb=[100.0, 1000.0],
+            prior_d0=[0.0, 0.5],
+            prior_sigma=[0.001, 0.5],
+            resonance={"evaluator": {"mode": "artifact_surface"}},
+        )
+
+    with pytest.raises(ValueError, match="artifact_path"):
+        InferenceConfig(
+            structure="emb",
+            phase1_contract_mode="emb_direct_ka_kb",
+            experiments=[{"structure": "emb", "name": "resonance", "diameters": [4.0]}],
+            prior_ka=[0.0, 30000.0],
+            prior_kb=[100.0, 1000.0],
+            prior_d0=[0.0, 0.5],
+            prior_sigma=[0.001, 0.5],
+            resonance={
+                "evaluator": {
+                    "mode": "analytical_vacuum_shell",
+                    "artifact_path": "evidence/sonovue_surface.json",
+                }
+            },
+        )
+
+    with pytest.raises(ValueError, match="excluded_diameters_reason"):
+        InferenceConfig(
+            structure="emb",
+            phase1_contract_mode="emb_direct_ka_kb",
+            experiments=[{"structure": "emb", "name": "resonance", "diameters": [4.0]}],
+            prior_ka=[0.0, 30000.0],
+            prior_kb=[100.0, 1000.0],
+            prior_d0=[0.0, 0.5],
+            prior_sigma=[0.001, 0.5],
+            resonance={"excluded_diameters_um": [0.28]},
+        )
+
+
+def test_inference_config_direct_emb_contract_rejects_missing_ka():
+    with pytest.raises(ValueError, match="Missing required direct EMB Phase 1 prior bounds: prior_ka"):
+        InferenceConfig(
+            structure="emb",
+            phase1_contract_mode="emb_direct_ka_kb",
+            experiments=[{"structure": "emb", "name": "resonance", "diameters": [4.0]}],
+            prior_kb=[100.0, 100000.0],
+            prior_d0=[0.0, 0.5],
+            prior_sigma=[0.001, 0.5],
+        )
+
+
+def test_inference_config_rejects_unknown_phase1_contract_mode():
+    with pytest.raises(ValueError, match="Unsupported Phase 1 contract mode"):
+        InferenceConfig(
+            structure="emb",
+            phase1_contract_mode="emb_unknown",
+            experiments=[{"structure": "emb", "name": "resonance", "diameters": [4.0]}],
+            prior_ka=[1000.0, 100000.0],
+            prior_kb=[100.0, 100000.0],
+            prior_d0=[0.0, 0.5],
+            prior_sigma=[0.001, 0.5],
+        )
 
 
 def test_inference_config_supports_gv_without_emb_diameters():

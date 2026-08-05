@@ -1,0 +1,126 @@
+{
+  "schema_version": "1.0",
+  "paper_id": "UQ_EMB",
+  "artifact_set_id": "frozen-plotting-dependencies-202607",
+  "artifact_set_dir": "frozen_plotting_dependencies_202607",
+  "locked": true,
+  "source_spec_hint": "papers/UQ_EMB/manifests/frozen_plotting_dependencies_202607.staging.json",
+  "destination_root": "$MESOUQ_UQ_EMB_ARTIFACT_ROOT",
+  "entries": [
+    {
+      "artifact_id": "paper-style-renderer",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/papers/huq_emb/uqdpd_generate_reduced_story_assets.py",
+      "destination": "code/paper_style/uqdpd_generate_reduced_story_assets.py"
+    },
+    {
+      "artifact_id": "paper-style-predictive-statistics",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/mesouq_snapshot/src/meso_uq/predictive_statistics.py",
+      "destination": "code/paper_style/meso_uq/predictive_statistics.py"
+    },
+    {
+      "artifact_id": "figure6-renderer",
+      "source": "$MESOUQ_SCRATCH_ROOT/manuscript_figure_homogeneity_revision_20260731/code/render_figure6.py",
+      "destination": "code/figure6/render_figure6.py"
+    },
+    {
+      "artifact_id": "figure6-loo-rows",
+      "source": "$MESOUQ_SCRATCH_ROOT/evidence/acoustic_emulator_validation_paper_style_20260728/leave_one_out_rows.csv",
+      "destination": "inputs/figure6/leave_one_out_rows.csv"
+    },
+    {
+      "artifact_id": "figure7-top-renderer",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperJun28/assets_resonance_revision/scripts/render_figure7_with_posteriors.py",
+      "destination": "code/figure7/render_figure7_with_posteriors.py"
+    },
+    {
+      "artifact_id": "figure7-variant-renderer",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperJun28/assets_resonance_revision/scripts/render_figure7_attempt081_variants.py",
+      "destination": "code/figure7/render_figure7_attempt081_variants.py"
+    },
+    {
+      "artifact_id": "figure7-base-renderer",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperJun28/assets_resonance_revision/scripts/render_revision_draft_assets.py",
+      "destination": "code/figure7/render_revision_draft_assets.py"
+    },
+    {
+      "artifact_id": "figure7-definity-renderer-inputs",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/renderer_inputs/definity",
+      "destination": "inputs/figure7/renderer_inputs/definity"
+    },
+    {
+      "artifact_id": "figure7-sonovue-renderer-inputs",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/renderer_inputs/sonovue",
+      "destination": "inputs/figure7/renderer_inputs/sonovue"
+    },
+    {
+      "artifact_id": "figure7-sonovue-posterior",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/renderer_inputs/sonovue_heavy/posterior_scatter_samples.csv",
+      "destination": "inputs/figure7/renderer_inputs/sonovue_heavy/posterior_scatter_samples.csv"
+    },
+    {
+      "artifact_id": "figure7-sonovue-phase1-overlay",
+      "source": "$MESOUQ_SCRATCH_ROOT/evidence_archive_home_jun2026_heavy_csv/20260626_attempt-064_common-support-targetcov0p3-10seed-10k/artifacts/comparison_artifacts_seed_sweep/tables/phase1_indentation_all_seed_ridge_samples.csv",
+      "destination": "inputs/figure7/renderer_inputs/sonovue_heavy/phase1_indentation_all_seed_ridge_samples.csv"
+    },
+    {
+      "artifact_id": "figure7-sonovue-resonance-summary",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/renderer_inputs/sonovue_resonance_summary.csv",
+      "destination": "inputs/figure7/renderer_inputs/sonovue_resonance_summary.csv"
+    },
+    {
+      "artifact_id": "figure7-definity-phase1-flat",
+      "source": "$MESOUQ_SCRATCH_ROOT/papers/UQ_EMB/replay_canaries/plotting_inputs_20260804/definity_phase1_overlay_780k.csv.gz",
+      "destination": "inputs/figure7/definity_phase1_overlay_780k.csv.gz"
+    },
+    {
+      "artifact_id": "figure7-definity-phase1-manifest",
+      "source": "$MESOUQ_SCRATCH_ROOT/papers/UQ_EMB/replay_canaries/plotting_inputs_20260804/definity_phase1_overlay_780k.manifest.json",
+      "destination": "inputs/figure7/definity_phase1_overlay_780k.manifest.json"
+    },
+    {
+      "artifact_id": "figure9-renderer",
+      "source": "$MESOUQ_SCRATCH_ROOT/manuscript_figure_homogeneity_revision_20260731/code/render_figure9.py",
+      "destination": "code/figure9/render_figure9.py"
+    },
+    {
+      "artifact_id": "figure-s2-renderer",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/pipeline/render_ringdown_fit_method_figure.py",
+      "destination": "code/figure_s2/render_ringdown_fit_method_figure.py"
+    },
+    {
+      "artifact_id": "figure-s2-physical-labels",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/evidence/physical_resonance_polynomial_emulators_20260722/physical_resonance_labels.csv",
+      "destination": "inputs/figure_s2/physical_resonance_labels.csv"
+    },
+    {
+      "artifact_id": "figure-s2-response-fits",
+      "source": "$MESOUQ_WORKSPACE_ROOT/paperWeek20Jul/evidence/free_intercept_squared_frequency_diagnostic_20260722/free_intercept_squared_frequency_fits.csv",
+      "destination": "inputs/figure_s2/free_intercept_squared_frequency_fits.csv"
+    },
+    {
+      "artifact_id": "figure-s2-definity-metrics",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/definity_exact18_postcase6_postcase6-terminal-20260720t233543z_large448/production/definity/definity_7p86um/ka-index-020/definity_7p86um/seed-000/campaign_case_metrics.json",
+      "destination": "inputs/figure_s2/definity_7p86um/campaign_case_metrics.json"
+    },
+    {
+      "artifact_id": "figure-s2-definity-time-series",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/definity_exact18_postcase6_postcase6-terminal-20260720t233543z_large448/production/definity/definity_7p86um/ka-index-020/definity_7p86um/seed-000/time_series.csv",
+      "destination": "inputs/figure_s2/definity_7p86um/time_series.csv"
+    },
+    {
+      "artifact_id": "figure-s2-sonovue-metrics",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/emb_frequency_surface_sonovue_2p60_extension_20260716/production/sonovue/sonovue_2p60um/ka-index-027/sonovue_2p60um/seed-000/campaign_case_metrics.json",
+      "destination": "inputs/figure_s2/sonovue_2p60um/campaign_case_metrics.json"
+    },
+    {
+      "artifact_id": "figure-s2-sonovue-time-series",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/emb_frequency_surface_sonovue_2p60_extension_20260716/production/sonovue/sonovue_2p60um/ka-index-027/sonovue_2p60um/seed-000/time_series.csv",
+      "destination": "inputs/figure_s2/sonovue_2p60um/time_series.csv"
+    },
+    {
+      "artifact_id": "paper-texdeps",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/_paper/v3/files/_texdeps",
+      "destination": "texdeps"
+    }
+  ]
+}
