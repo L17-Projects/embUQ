@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import uuid
 from datetime import datetime, timezone
@@ -17,6 +18,9 @@ from typing import Any, Iterable
 SCHEMA_VERSION = "1.0"
 PAPER_ID = "UQ_EMB"
 MIN_FREE_HEADROOM_BYTES = 512 * 1024 * 1024
+ENVIRONMENT_VARIABLE_PATTERN = re.compile(
+    r"\$(?:\{(?P<braced>[A-Za-z_][A-Za-z0-9_]*)\}|(?P<plain>[A-Za-z_][A-Za-z0-9_]*))"
+)
 
 
 def _sha256(path: Path) -> str:
@@ -33,9 +37,15 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def _expand(value: str) -> Path:
+    for match in ENVIRONMENT_VARIABLE_PATTERN.finditer(value):
+        name = match.group("braced") or match.group("plain")
+        if name in os.environ and not os.environ[name].strip():
+            raise ValueError(f"Empty environment variable in path: {name}")
     expanded = os.path.expandvars(value)
     if "$" in expanded:
         raise ValueError(f"Unresolved environment variable in path: {value}")
+    if not expanded.strip():
+        raise ValueError(f"Expanded path is empty: {value}")
     return Path(expanded).expanduser().absolute()
 
 
@@ -109,11 +119,39 @@ def _selection(spec: dict[str, Any]) -> tuple[Path, Path, list[dict[str, Any]]]:
                 "files": files,
             }
         )
+    _reject_overlapping_targets(selected)
     return destination_parent, final_root, selected
 
 
 def _relative_source_path(source: Path, file_path: Path) -> Path:
     return Path(file_path.name) if source.is_file() else file_path.relative_to(source)
+
+
+def _target_path(item: dict[str, Any], file_path: Path) -> Path:
+    source = item["source"]
+    destination = item["destination"]
+    relative = _relative_source_path(source, file_path)
+    return destination / relative if source.is_dir() else destination
+
+
+def _reject_overlapping_targets(selected: list[dict[str, Any]]) -> None:
+    targets: dict[Path, str] = {}
+    for item in selected:
+        artifact_id = str(item["artifact_id"])
+        for file_path in item["files"]:
+            target = _target_path(item, file_path)
+            for existing, existing_artifact_id in targets.items():
+                if (
+                    target == existing
+                    or target in existing.parents
+                    or existing in target.parents
+                ):
+                    raise ValueError(
+                        "Overlapping artifact targets: "
+                        f"{existing_artifact_id!r} and {artifact_id!r} both map through "
+                        f"{existing.as_posix()!r} / {target.as_posix()!r}"
+                    )
+            targets[target] = artifact_id
 
 
 def plan_staging(spec_path: Path) -> dict[str, Any]:
@@ -163,8 +201,8 @@ def _copy_selection(selected: list[dict[str, Any]], temporary_root: Path) -> Non
         source = item["source"]
         destination = temporary_root / item["destination"]
         for file_path in item["files"]:
-            relative = _relative_source_path(source, file_path)
-            target = destination / relative if source.is_dir() else destination
+            relative_target = _target_path(item, file_path)
+            target = temporary_root / relative_target
             target.parent.mkdir(parents=True, exist_ok=True)
             stat = file_path.stat()
             inode = (stat.st_dev, stat.st_ino)
@@ -274,7 +312,14 @@ def stage_artifacts(*, spec_path: Path, manifest_path: Path) -> dict[str, Any]:
             "logical_size_bytes": _total_size(files),
             "files": files,
         }
-        _write_json(manifest_path, payload)
+        if manifest_path.exists():
+            locked_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if locked_manifest.get("artifact_set_id") != spec["artifact_set_id"]:
+                raise ValueError("Locked manifest artifact_set_id differs from staging spec")
+            if locked_manifest.get("artifact_set_dir") != spec["artifact_set_dir"]:
+                raise ValueError("Locked manifest artifact_set_dir differs from staging spec")
+        else:
+            _write_json(manifest_path, payload)
         preflight = verify_staged(root=temporary_root, manifest_path=manifest_path)
         if preflight["status"] != "PASS":
             raise RuntimeError(f"Staged artifact verification failed: {preflight}")

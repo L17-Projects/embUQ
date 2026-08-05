@@ -160,3 +160,162 @@ def test_external_artifact_stage_rejects_duplicate_artifact_ids(tmp_path: Path) 
         assert "artifact_id" in str(exc)
     else:
         raise AssertionError("Expected duplicate artifact IDs to be rejected")
+
+
+def test_external_artifact_stage_preserves_existing_locked_manifest(tmp_path: Path) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    source_file = source / "input.csv"
+    source_file.write_text("accepted\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    manifest = tmp_path / "manifest.json"
+    accepted_entry = {
+        "path": "inputs/input.csv",
+        "size_bytes": source_file.stat().st_size,
+        "sha256": module._sha256(source_file),
+    }
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": module.SCHEMA_VERSION,
+                "paper_id": module.PAPER_ID,
+                "artifact_set_id": "fixture",
+                "artifact_set_dir": "fixture-v1",
+                "locked": True,
+                "file_count": 1,
+                "logical_size_bytes": accepted_entry["size_bytes"],
+                "files": [accepted_entry],
+            }
+        ),
+        encoding="utf-8",
+    )
+    locked_bytes = manifest.read_bytes()
+    source_file.write_text("mutated\n", encoding="utf-8")
+
+    try:
+        module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+    except RuntimeError as exc:
+        assert "verification failed" in str(exc)
+    else:
+        raise AssertionError("Expected source drift from the locked manifest to be rejected")
+
+    assert manifest.read_bytes() == locked_bytes
+    assert not (tmp_path / "artifacts" / "fixture-v1").exists()
+
+
+def test_external_artifact_stage_accepts_existing_locked_manifest(tmp_path: Path) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    source_file = source / "input.csv"
+    source_file.write_text("accepted\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    manifest = tmp_path / "manifest.json"
+    accepted_entry = {
+        "path": "inputs/input.csv",
+        "size_bytes": source_file.stat().st_size,
+        "sha256": module._sha256(source_file),
+    }
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": module.SCHEMA_VERSION,
+                "paper_id": module.PAPER_ID,
+                "artifact_set_id": "fixture",
+                "artifact_set_dir": "fixture-v1",
+                "locked": True,
+                "file_count": 1,
+                "logical_size_bytes": accepted_entry["size_bytes"],
+                "files": [accepted_entry],
+            }
+        ),
+        encoding="utf-8",
+    )
+    locked_bytes = manifest.read_bytes()
+
+    report = module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+
+    assert report["status"] == "PASS"
+    assert manifest.read_bytes() == locked_bytes
+
+
+def test_external_artifact_stage_rejects_overlapping_target_files(tmp_path: Path) -> None:
+    module = _load_script()
+    directory_source = tmp_path / "directory-source"
+    directory_source.mkdir()
+    (directory_source / "latest").write_text("directory selection\n", encoding="utf-8")
+    file_source = tmp_path / "file-source"
+    file_source.write_text("file selection\n", encoding="utf-8")
+    spec = tmp_path / "spec.json"
+    spec.write_text(
+        json.dumps(
+            {
+                "schema_version": module.SCHEMA_VERSION,
+                "paper_id": module.PAPER_ID,
+                "artifact_set_id": "fixture",
+                "artifact_set_dir": "fixture-v1",
+                "locked": True,
+                "destination_root": str(tmp_path / "artifacts"),
+                "entries": [
+                    {
+                        "artifact_id": "directory",
+                        "source": str(directory_source),
+                        "destination": "run",
+                    },
+                    {
+                        "artifact_id": "file",
+                        "source": str(file_source),
+                        "destination": "run/latest",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        module.plan_staging(spec)
+    except ValueError as exc:
+        assert "Overlapping artifact targets" in str(exc)
+    else:
+        raise AssertionError("Expected overlapping staged file targets to be rejected")
+
+
+def test_external_artifact_stage_rejects_empty_environment_root(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("accepted\n", encoding="utf-8")
+    monkeypatch.setenv("EMPTY_ARTIFACT_ROOT", "")
+    spec = tmp_path / "spec.json"
+    spec.write_text(
+        json.dumps(
+            {
+                "schema_version": module.SCHEMA_VERSION,
+                "paper_id": module.PAPER_ID,
+                "artifact_set_id": "fixture",
+                "artifact_set_dir": "fixture-v1",
+                "locked": True,
+                "destination_root": "$EMPTY_ARTIFACT_ROOT",
+                "entries": [
+                    {
+                        "artifact_id": "input",
+                        "source": str(source),
+                        "destination": "inputs",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        module.plan_staging(spec)
+    except ValueError as exc:
+        assert "Empty environment variable" in str(exc)
+    else:
+        raise AssertionError("Expected an empty artifact-root variable to be rejected")
