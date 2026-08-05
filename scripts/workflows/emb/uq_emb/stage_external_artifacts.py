@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,15 +32,57 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
+def _reject_symlink_alias(path: Path, *, label: str) -> Path:
+    """Reject direct and ancestor symlinks without resolving away their spelling."""
+    absolute = path.expanduser().absolute()
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        if current.is_symlink():
+            raise ValueError(
+                f"{label} cannot be symlinks or contain symlinked path components: {current}"
+            )
+    return absolute
+
+
+def _write_json_temporary(path: Path, payload: dict[str, Any]) -> Path:
+    path = _reject_symlink_alias(path, label="JSON output")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _reject_symlink_alias(path.parent, label="JSON output parent")
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=f".{uuid.uuid4().hex}.tmp",
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
+    return temporary_path
+
+
+def _publish_json(path: Path, payload: dict[str, Any]) -> None:
+    temporary_path = _write_json_temporary(path, payload)
+    try:
+        os.replace(temporary_path, path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
 
 
 def _write_json_exclusive(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("x", encoding="utf-8") as handle:
-        handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    temporary_path = _write_json_temporary(path, payload)
+    try:
+        try:
+            os.link(temporary_path, path)
+        except FileExistsError as exc:
+            raise FileExistsError(f"Refusing to replace an existing JSON output: {path}") from exc
+    finally:
+        temporary_path.unlink(missing_ok=True)
 
 
 def _expand(value: str) -> Path:
@@ -56,14 +99,7 @@ def _expand(value: str) -> Path:
 
 
 def _reject_symlinks(root: Path) -> None:
-    current = Path(root.anchor)
-    for part in root.absolute().parts[1:]:
-        current /= part
-        if current.is_symlink():
-            raise ValueError(
-                "Artifact roots cannot be symlinks or contain symlinked path components: "
-                f"{current}"
-            )
+    root = _reject_symlink_alias(root, label="Artifact roots")
     links = sorted(path for path in root.rglob("*") if path.is_symlink())
     if links:
         rendered = ", ".join(str(path.relative_to(root)) for path in links[:20])
@@ -71,6 +107,8 @@ def _reject_symlinks(root: Path) -> None:
 
 
 def _reject_path_within_root(*, path: Path, root: Path, label: str) -> None:
+    _reject_symlink_alias(path, label=label)
+    _reject_symlink_alias(root, label="Artifact roots")
     resolved_path = path.resolve()
     resolved_root = root.resolve()
     if resolved_path == resolved_root or resolved_root in resolved_path.parents:
@@ -318,8 +356,16 @@ def _manifest_payload(
 
 def snapshot_manifest(*, spec_path: Path, manifest_path: Path) -> dict[str, Any]:
     """Create a locked acceptance manifest without staging any files."""
+    spec_path = _reject_symlink_alias(spec_path, label="Artifact staging spec")
+    manifest_path = _reject_symlink_alias(manifest_path, label="Artifact manifest")
     spec = _load_spec(spec_path)
-    _destination_parent, _final_root, selected = _selection(spec)
+    _destination_parent, final_root, selected = _selection(spec)
+    _reject_symlinks(final_root)
+    _reject_path_within_root(
+        path=manifest_path,
+        root=final_root,
+        label="Artifact manifest",
+    )
     payload = _manifest_payload(spec=spec, spec_path=spec_path, selected=selected)
     _write_json_exclusive(manifest_path, payload)
     return {
@@ -366,6 +412,20 @@ def _validate_manifest_for_spec(
 
 
 def verify_staged(*, root: Path, manifest_path: Path) -> dict[str, Any]:
+    root = _reject_symlink_alias(root, label="Artifact roots")
+    manifest_path = _reject_symlink_alias(manifest_path, label="Artifact manifest")
+    if not root.is_dir():
+        raise FileNotFoundError(f"Artifact root is not a directory: {root}")
+    _reject_path_within_root(
+        path=manifest_path,
+        root=root,
+        label="Artifact manifest",
+    )
+    _reject_existing_hardlink_within_root(
+        path=manifest_path,
+        root=root,
+        label="Artifact manifest",
+    )
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("schema_version") != SCHEMA_VERSION or manifest.get("paper_id") != PAPER_ID:
         raise ValueError("Unexpected external-artifact manifest schema or paper_id")
@@ -409,9 +469,12 @@ def verify_staged(*, root: Path, manifest_path: Path) -> dict[str, Any]:
 
 
 def stage_artifacts(*, spec_path: Path, manifest_path: Path) -> dict[str, Any]:
+    spec_path = _reject_symlink_alias(spec_path, label="Artifact staging spec")
+    manifest_path = _reject_symlink_alias(manifest_path, label="Artifact manifest")
     spec = _load_spec(spec_path)
     plan = plan_staging(spec_path)
     destination_parent, final_root, selected = _selection(spec)
+    _reject_symlinks(final_root)
     _reject_path_within_root(
         path=manifest_path,
         root=final_root,
@@ -431,6 +494,8 @@ def stage_artifacts(*, spec_path: Path, manifest_path: Path) -> dict[str, Any]:
         raise OSError(f"Insufficient free space: free={free_bytes}, required={required_bytes}")
 
     temporary_root = destination_parent / f".staging-{spec['artifact_set_dir']}-{uuid.uuid4().hex}"
+    published = False
+    completed = False
     try:
         temporary_root.mkdir(parents=False)
         _copy_selection(selected, temporary_root)
@@ -438,13 +503,17 @@ def stage_artifacts(*, spec_path: Path, manifest_path: Path) -> dict[str, Any]:
         if preflight["status"] != "PASS":
             raise RuntimeError(f"Staged artifact verification failed: {preflight}")
         temporary_root.rename(final_root)
+        published = True
         report = verify_staged(root=final_root, manifest_path=manifest_path)
         if report["status"] != "PASS":
             raise RuntimeError(f"Final artifact verification failed: {report}")
+        completed = True
         return report
     except Exception:
         if temporary_root.exists():
             shutil.rmtree(temporary_root)
+        if published and not completed and final_root.exists() and not final_root.is_symlink():
+            shutil.rmtree(final_root)
         raise
 
 
@@ -479,18 +548,18 @@ def main(argv: list[str] | None = None) -> int:
         report = plan_staging(args.spec.resolve())
     elif args.command == "snapshot":
         report = snapshot_manifest(
-            spec_path=args.spec.resolve(),
-            manifest_path=args.manifest.resolve(),
+            spec_path=args.spec.absolute(),
+            manifest_path=args.manifest.absolute(),
         )
     elif args.command == "stage":
         report = stage_artifacts(
-            spec_path=args.spec.resolve(),
-            manifest_path=args.manifest.resolve(),
+            spec_path=args.spec.absolute(),
+            manifest_path=args.manifest.absolute(),
         )
     else:
         root = args.root.absolute()
-        manifest_path = args.manifest.resolve()
-        report_path = args.report.resolve() if args.report else None
+        manifest_path = args.manifest.absolute()
+        report_path = args.report.absolute() if args.report else None
         if report_path is not None:
             _reject_path_within_root(
                 path=report_path,
@@ -509,7 +578,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         report = verify_staged(root=root, manifest_path=manifest_path)
         if report_path is not None:
-            _write_json(report_path, report)
+            _publish_json(report_path, report)
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["status"] == "PASS" else 1
 

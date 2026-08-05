@@ -175,7 +175,7 @@ def test_snapshot_rejects_manifest_inside_destination_through_parent_alias(
             source_hint="fixture",
         )
     except ValueError as exc:
-        assert "must be outside" in str(exc)
+        assert "symlinked path components" in str(exc)
     else:
         raise AssertionError("Expected aliased in-snapshot manifest to be rejected")
 
@@ -265,7 +265,7 @@ def test_verifier_rejects_report_inside_snapshot_through_parent_alias(
             ]
         )
     except ValueError as exc:
-        assert "must be outside" in str(exc)
+        assert "symlinked path components" in str(exc)
     else:
         raise AssertionError("Expected aliased in-snapshot report to be rejected")
 
@@ -395,11 +395,251 @@ def test_snapshot_rejects_symlinked_destination_before_copy(tmp_path: Path) -> N
             source_hint="fixture",
         )
     except ValueError as exc:
-        assert "destinations cannot be symlinks" in str(exc)
+        assert "symlinked path components" in str(exc)
     else:
         raise AssertionError("Expected a symlinked snapshot destination to be rejected")
 
     assert list(external.iterdir()) == []
+    assert not manifest_path.exists()
+
+
+def test_verifier_rejects_symlinked_snapshot_root_parent(tmp_path: Path) -> None:
+    module = _load_script()
+    real_parent = tmp_path / "real"
+    root = real_parent / "snapshot"
+    root.mkdir(parents=True)
+    (root / "main.tex").write_text("main\n", encoding="utf-8")
+    manifest_path = tmp_path / "manifest.json"
+    entry = module._entry(root, root / "main.tex")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": module.SCHEMA_VERSION,
+                "paper_id": module.PAPER_ID,
+                "snapshot_id": "fixture",
+                "locked": True,
+                "file_count": 1,
+                "total_size_bytes": entry["size_bytes"],
+                "files": [entry],
+            }
+        ),
+        encoding="utf-8",
+    )
+    alias_parent = tmp_path / "alias"
+    alias_parent.symlink_to(real_parent, target_is_directory=True)
+
+    try:
+        module.verify_snapshot(root=alias_parent / "snapshot", manifest_path=manifest_path)
+    except ValueError as exc:
+        assert "symlinked path components" in str(exc)
+    else:
+        raise AssertionError("Expected a symlinked snapshot-root parent to be rejected")
+
+
+def test_verifier_rejects_manifest_hardlinked_to_snapshot_member(tmp_path: Path) -> None:
+    module = _load_script()
+    root = tmp_path / "snapshot"
+    root.mkdir()
+    member = root / "main.tex"
+    member.write_text("main\n", encoding="utf-8")
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.hardlink_to(member)
+
+    try:
+        module.verify_snapshot(root=root, manifest_path=manifest_path)
+    except ValueError as exc:
+        assert "hardlink to a frozen snapshot member" in str(exc)
+    else:
+        raise AssertionError("Expected a snapshot-member-hardlinked manifest to be rejected")
+
+
+def test_verifier_rejects_report_hardlinked_to_manifest(tmp_path: Path) -> None:
+    module = _load_script()
+    root = tmp_path / "snapshot"
+    root.mkdir()
+    (root / "main.tex").write_text("main\n", encoding="utf-8")
+    manifest_path = tmp_path / "manifest.json"
+    entry = module._entry(root, root / "main.tex")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": module.SCHEMA_VERSION,
+                "paper_id": module.PAPER_ID,
+                "snapshot_id": "fixture",
+                "locked": True,
+                "file_count": 1,
+                "total_size_bytes": entry["size_bytes"],
+                "files": [entry],
+            }
+        ),
+        encoding="utf-8",
+    )
+    report_path = tmp_path / "report.json"
+    report_path.hardlink_to(manifest_path)
+    original_manifest = manifest_path.read_bytes()
+
+    try:
+        module.main(
+            [
+                "verify",
+                "--root",
+                str(root),
+                "--manifest",
+                str(manifest_path),
+                "--report",
+                str(report_path),
+            ]
+        )
+    except ValueError as exc:
+        assert "must not overwrite" in str(exc)
+    else:
+        raise AssertionError("Expected a manifest-hardlinked report to be rejected")
+
+    assert manifest_path.read_bytes() == original_manifest
+
+
+def test_verifier_rejects_report_hardlinked_to_snapshot_member(tmp_path: Path) -> None:
+    module = _load_script()
+    root = tmp_path / "snapshot"
+    root.mkdir()
+    member = root / "main.tex"
+    member.write_text("main\n", encoding="utf-8")
+    manifest_path = tmp_path / "manifest.json"
+    entry = module._entry(root, member)
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": module.SCHEMA_VERSION,
+                "paper_id": module.PAPER_ID,
+                "snapshot_id": "fixture",
+                "locked": True,
+                "file_count": 1,
+                "total_size_bytes": entry["size_bytes"],
+                "files": [entry],
+            }
+        ),
+        encoding="utf-8",
+    )
+    report_path = tmp_path / "report.json"
+    report_path.hardlink_to(member)
+    original_member = member.read_bytes()
+
+    try:
+        module.main(
+            [
+                "verify",
+                "--root",
+                str(root),
+                "--manifest",
+                str(manifest_path),
+                "--report",
+                str(report_path),
+            ]
+        )
+    except ValueError as exc:
+        assert "hardlink to a frozen snapshot member" in str(exc)
+    else:
+        raise AssertionError("Expected a snapshot-member-hardlinked report to be rejected")
+
+    assert member.read_bytes() == original_member
+
+
+def test_snapshot_rejects_source_destination_overlap(tmp_path: Path) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "main.tex").write_text("main\n", encoding="utf-8")
+
+    try:
+        module.create_snapshot(
+            source=source,
+            destination=source / "nested-snapshot",
+            manifest_path=tmp_path / "manifest.json",
+            snapshot_id="fixture",
+            source_hint="fixture",
+        )
+    except ValueError as exc:
+        assert "must not overlap" in str(exc)
+    else:
+        raise AssertionError("Expected source-contained destination to be rejected")
+
+    destination = tmp_path / "destination"
+    destination.mkdir()
+    source_within_destination = destination / "source"
+    source_within_destination.mkdir()
+    (source_within_destination / "main.tex").write_text("main\n", encoding="utf-8")
+    try:
+        module.create_snapshot(
+            source=source_within_destination,
+            destination=destination,
+            manifest_path=tmp_path / "manifest-two.json",
+            snapshot_id="fixture",
+            source_hint="fixture",
+        )
+    except ValueError as exc:
+        assert "must not overlap" in str(exc)
+    else:
+        raise AssertionError("Expected destination-containing source to be rejected")
+
+
+def test_snapshot_copy_failure_does_not_publish_destination(tmp_path: Path, monkeypatch) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "main.tex").write_text("main\n", encoding="utf-8")
+    destination = tmp_path / "destination"
+    manifest_path = tmp_path / "manifest.json"
+
+    def fail_copy(*_args, **_kwargs):
+        raise OSError("injected copy failure")
+
+    monkeypatch.setattr(module.shutil, "copytree", fail_copy)
+    try:
+        module.create_snapshot(
+            source=source,
+            destination=destination,
+            manifest_path=manifest_path,
+            snapshot_id="fixture",
+            source_hint="fixture",
+        )
+    except OSError as exc:
+        assert "injected copy failure" in str(exc)
+    else:
+        raise AssertionError("Expected injected snapshot copy failure")
+
+    assert not destination.exists()
+    assert not manifest_path.exists()
+
+
+def test_snapshot_manifest_publication_failure_removes_published_destination(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "main.tex").write_text("main\n", encoding="utf-8")
+    destination = tmp_path / "destination"
+    manifest_path = tmp_path / "manifest.json"
+
+    def fail_replace(*_args, **_kwargs):
+        raise OSError("injected manifest publication failure")
+
+    monkeypatch.setattr(module.os, "replace", fail_replace)
+    try:
+        module.create_snapshot(
+            source=source,
+            destination=destination,
+            manifest_path=manifest_path,
+            snapshot_id="fixture",
+            source_hint="fixture",
+        )
+    except OSError as exc:
+        assert "injected manifest publication failure" in str(exc)
+    else:
+        raise AssertionError("Expected injected manifest publication failure")
+
+    assert not destination.exists()
     assert not manifest_path.exists()
 
 
