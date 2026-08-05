@@ -32,6 +32,8 @@ def _files(root: Path) -> list[Path]:
 
 
 def _reject_symlinks(root: Path) -> None:
+    if root.is_symlink():
+        raise ValueError(f"Frozen snapshot roots cannot be symlinks: {root}")
     links = sorted(path for path in root.rglob("*") if path.is_symlink())
     if links:
         rendered = ", ".join(str(path.relative_to(root)) for path in links)
@@ -157,6 +159,11 @@ def create_snapshot(
 ) -> dict[str, Any]:
     if not source.is_dir():
         raise ValueError(f"Snapshot source is not a directory: {source}")
+    _reject_path_within_root(
+        path=manifest_path.absolute(),
+        root=destination.absolute(),
+        label="Snapshot manifest",
+    )
     _reject_symlinks(source)
     source_entries = _entries(source)
     if not source_entries:
@@ -220,14 +227,14 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "snapshot":
         report = create_snapshot(
-            source=args.source.resolve(),
+            source=args.source.absolute(),
             destination=args.destination,
             manifest_path=args.manifest.resolve(),
             snapshot_id=args.snapshot_id,
             source_hint=args.source_hint,
         )
     else:
-        root = args.root.resolve()
+        root = args.root.absolute()
         report_path = args.report.resolve() if args.report else None
         if report_path is not None:
             _reject_path_within_root(

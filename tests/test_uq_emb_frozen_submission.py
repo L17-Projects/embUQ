@@ -90,6 +90,69 @@ def test_snapshot_refuses_symlinks(tmp_path: Path) -> None:
         raise AssertionError("Expected symlinked snapshot source to be rejected")
 
 
+def test_verifier_rejects_symlinked_snapshot_root(tmp_path: Path) -> None:
+    module = _load_script()
+    root = tmp_path / "snapshot"
+    root.mkdir()
+    (root / "main.tex").write_text("main\n", encoding="utf-8")
+    manifest_path = tmp_path / "manifest.json"
+    entry = module._entry(root, root / "main.tex")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": module.SCHEMA_VERSION,
+                "paper_id": module.PAPER_ID,
+                "snapshot_id": "fixture",
+                "locked": True,
+                "file_count": 1,
+                "total_size_bytes": entry["size_bytes"],
+                "files": [entry],
+            }
+        ),
+        encoding="utf-8",
+    )
+    alias = tmp_path / "snapshot-alias"
+    alias.symlink_to(root, target_is_directory=True)
+
+    try:
+        module.main(
+            [
+                "verify",
+                "--root",
+                str(alias),
+                "--manifest",
+                str(manifest_path),
+            ]
+        )
+    except ValueError as exc:
+        assert "roots cannot be symlinks" in str(exc)
+    else:
+        raise AssertionError("Expected a symlinked snapshot root to be rejected")
+
+
+def test_snapshot_rejects_manifest_inside_destination(tmp_path: Path) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "main.tex").write_text("main\n", encoding="utf-8")
+    destination = tmp_path / "destination"
+
+    try:
+        module.create_snapshot(
+            source=source,
+            destination=destination,
+            manifest_path=destination / "manifest.json",
+            snapshot_id="fixture",
+            source_hint="fixture",
+        )
+    except ValueError as exc:
+        assert "must be outside" in str(exc)
+    else:
+        raise AssertionError("Expected an in-snapshot manifest to be rejected")
+
+    assert not destination.exists()
+
+
 def test_verifier_rejects_report_inside_snapshot(tmp_path: Path) -> None:
     module = _load_script()
     root = tmp_path / "snapshot"
