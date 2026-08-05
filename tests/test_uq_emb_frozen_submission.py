@@ -153,6 +153,35 @@ def test_snapshot_rejects_manifest_inside_destination(tmp_path: Path) -> None:
     assert not destination.exists()
 
 
+def test_snapshot_rejects_manifest_inside_destination_through_parent_alias(
+    tmp_path: Path,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "main.tex").write_text("main\n", encoding="utf-8")
+    real_parent = tmp_path / "real"
+    real_parent.mkdir()
+    destination = real_parent / "destination"
+    alias_parent = tmp_path / "alias"
+    alias_parent.symlink_to(real_parent, target_is_directory=True)
+
+    try:
+        module.create_snapshot(
+            source=source,
+            destination=destination,
+            manifest_path=alias_parent / "destination" / "manifest.json",
+            snapshot_id="fixture",
+            source_hint="fixture",
+        )
+    except ValueError as exc:
+        assert "must be outside" in str(exc)
+    else:
+        raise AssertionError("Expected aliased in-snapshot manifest to be rejected")
+
+    assert not destination.exists()
+
+
 def test_verifier_rejects_report_inside_snapshot(tmp_path: Path) -> None:
     module = _load_script()
     root = tmp_path / "snapshot"
@@ -193,6 +222,97 @@ def test_verifier_rejects_report_inside_snapshot(tmp_path: Path) -> None:
         raise AssertionError("Expected an in-snapshot verification report to be rejected")
 
     assert not (root / "verification.json").exists()
+
+
+def test_verifier_rejects_report_inside_snapshot_through_parent_alias(
+    tmp_path: Path,
+) -> None:
+    module = _load_script()
+    real_parent = tmp_path / "real"
+    root = real_parent / "snapshot"
+    root.mkdir(parents=True)
+    (root / "main.tex").write_text("main\n", encoding="utf-8")
+    manifest_path = tmp_path / "manifest.json"
+    entry = module._entry(root, root / "main.tex")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": module.SCHEMA_VERSION,
+                "paper_id": module.PAPER_ID,
+                "snapshot_id": "fixture",
+                "locked": True,
+                "file_count": 1,
+                "total_size_bytes": entry["size_bytes"],
+                "files": [entry],
+            }
+        ),
+        encoding="utf-8",
+    )
+    alias_parent = tmp_path / "alias"
+    alias_parent.symlink_to(real_parent, target_is_directory=True)
+    report_path = alias_parent / "snapshot" / "verification.json"
+
+    try:
+        module.main(
+            [
+                "verify",
+                "--root",
+                str(alias_parent / "snapshot"),
+                "--manifest",
+                str(manifest_path),
+                "--report",
+                str(report_path),
+            ]
+        )
+    except ValueError as exc:
+        assert "must be outside" in str(exc)
+    else:
+        raise AssertionError("Expected aliased in-snapshot report to be rejected")
+
+    assert not report_path.exists()
+
+
+def test_verifier_rejects_report_that_overwrites_manifest(tmp_path: Path) -> None:
+    module = _load_script()
+    root = tmp_path / "snapshot"
+    root.mkdir()
+    (root / "main.tex").write_text("main\n", encoding="utf-8")
+    manifest_path = tmp_path / "manifest.json"
+    entry = module._entry(root, root / "main.tex")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": module.SCHEMA_VERSION,
+                "paper_id": module.PAPER_ID,
+                "snapshot_id": "fixture",
+                "locked": True,
+                "file_count": 1,
+                "total_size_bytes": entry["size_bytes"],
+                "files": [entry],
+            }
+        ),
+        encoding="utf-8",
+    )
+    original_manifest = manifest_path.read_bytes()
+
+    try:
+        module.main(
+            [
+                "verify",
+                "--root",
+                str(root),
+                "--manifest",
+                str(manifest_path),
+                "--report",
+                str(manifest_path),
+            ]
+        )
+    except ValueError as exc:
+        assert "must not overwrite" in str(exc)
+    else:
+        raise AssertionError("Expected manifest-overwriting report to be rejected")
+
+    assert manifest_path.read_bytes() == original_manifest
 
 
 def test_verifier_writes_report_outside_snapshot(tmp_path: Path) -> None:
@@ -253,6 +373,34 @@ def test_snapshot_copies_within_size_limits(tmp_path: Path) -> None:
     assert report["status"] == "PASS"
     assert (destination / "main.tex").read_text(encoding="utf-8") == "main\n"
     assert manifest_path.is_file()
+
+
+def test_snapshot_rejects_symlinked_destination_before_copy(tmp_path: Path) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "main.tex").write_text("main\n", encoding="utf-8")
+    external = tmp_path / "external"
+    external.mkdir()
+    destination = tmp_path / "destination"
+    destination.symlink_to(external, target_is_directory=True)
+    manifest_path = tmp_path / "manifest.json"
+
+    try:
+        module.create_snapshot(
+            source=source,
+            destination=destination,
+            manifest_path=manifest_path,
+            snapshot_id="fixture",
+            source_hint="fixture",
+        )
+    except ValueError as exc:
+        assert "destinations cannot be symlinks" in str(exc)
+    else:
+        raise AssertionError("Expected a symlinked snapshot destination to be rejected")
+
+    assert list(external.iterdir()) == []
+    assert not manifest_path.exists()
 
 
 def test_snapshot_enforces_per_file_size_limit(tmp_path: Path) -> None:

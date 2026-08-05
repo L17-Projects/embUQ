@@ -81,8 +81,15 @@ def _enforce_snapshot_size_limits(entries: list[dict[str, Any]]) -> None:
 
 
 def _reject_path_within_root(*, path: Path, root: Path, label: str) -> None:
-    if path == root or root in path.parents:
+    resolved_path = path.resolve()
+    resolved_root = root.resolve()
+    if resolved_path == resolved_root or resolved_root in resolved_path.parents:
         raise ValueError(f"{label} must be outside the frozen snapshot root: {path}")
+
+
+def _reject_same_path(*, path: Path, protected_path: Path, label: str) -> None:
+    if path.resolve() == protected_path.resolve():
+        raise ValueError(f"{label} must not overwrite {protected_path}: {path}")
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -159,9 +166,11 @@ def create_snapshot(
 ) -> dict[str, Any]:
     if not source.is_dir():
         raise ValueError(f"Snapshot source is not a directory: {source}")
+    if destination.is_symlink():
+        raise ValueError(f"Snapshot destinations cannot be symlinks: {destination}")
     _reject_path_within_root(
-        path=manifest_path.absolute(),
-        root=destination.absolute(),
+        path=manifest_path,
+        root=destination,
         label="Snapshot manifest",
     )
     _reject_symlinks(source)
@@ -240,6 +249,11 @@ def main(argv: list[str] | None = None) -> int:
             _reject_path_within_root(
                 path=report_path,
                 root=root,
+                label="Verification report",
+            )
+            _reject_same_path(
+                path=report_path,
+                protected_path=args.manifest,
                 label="Verification report",
             )
         report = verify_snapshot(root=root, manifest_path=args.manifest.resolve())
