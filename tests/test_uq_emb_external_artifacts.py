@@ -129,6 +129,134 @@ def test_external_artifact_verify_detects_mutation(tmp_path: Path) -> None:
     assert report["mismatches"]
 
 
+def test_external_artifact_verify_cli_rejects_symlinked_root(tmp_path: Path) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    manifest = tmp_path / "manifest.json"
+    module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+    root = tmp_path / "artifacts" / "fixture-v1"
+    alias = tmp_path / "artifact-alias"
+    alias.symlink_to(root, target_is_directory=True)
+
+    try:
+        module.main(
+            [
+                "verify",
+                "--root",
+                str(alias),
+                "--manifest",
+                str(manifest),
+            ]
+        )
+    except ValueError as exc:
+        assert "roots cannot be symlinks" in str(exc)
+    else:
+        raise AssertionError("Expected a symlinked verification root to be rejected")
+
+
+def test_external_artifact_verify_rejects_report_inside_root(tmp_path: Path) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    manifest = tmp_path / "manifest.json"
+    module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+    root = tmp_path / "artifacts" / "fixture-v1"
+    report = root / "verification.json"
+
+    try:
+        module.main(
+            [
+                "verify",
+                "--root",
+                str(root),
+                "--manifest",
+                str(manifest),
+                "--report",
+                str(report),
+            ]
+        )
+    except ValueError as exc:
+        assert "must be outside" in str(exc)
+    else:
+        raise AssertionError("Expected an in-artifact report to be rejected")
+
+    assert not report.exists()
+
+
+def test_external_artifact_verify_rejects_aliased_report_inside_root(
+    tmp_path: Path,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    manifest = tmp_path / "manifest.json"
+    module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+    artifact_parent = tmp_path / "artifacts"
+    root = artifact_parent / "fixture-v1"
+    alias_parent = tmp_path / "artifact-parent-alias"
+    alias_parent.symlink_to(artifact_parent, target_is_directory=True)
+    report = alias_parent / "fixture-v1" / "verification.json"
+
+    try:
+        module.main(
+            [
+                "verify",
+                "--root",
+                str(root),
+                "--manifest",
+                str(manifest),
+                "--report",
+                str(report),
+            ]
+        )
+    except ValueError as exc:
+        assert "must be outside" in str(exc)
+    else:
+        raise AssertionError("Expected an aliased in-artifact report to be rejected")
+
+    assert not report.exists()
+
+
+def test_external_artifact_verify_rejects_report_overwriting_manifest(
+    tmp_path: Path,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    manifest = tmp_path / "manifest.json"
+    module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+    original_manifest = manifest.read_bytes()
+    root = tmp_path / "artifacts" / "fixture-v1"
+
+    try:
+        module.main(
+            [
+                "verify",
+                "--root",
+                str(root),
+                "--manifest",
+                str(manifest),
+                "--report",
+                str(manifest),
+            ]
+        )
+    except ValueError as exc:
+        assert "must not overwrite" in str(exc)
+    else:
+        raise AssertionError("Expected a manifest-overwriting report to be rejected")
+
+    assert manifest.read_bytes() == original_manifest
+
+
 def test_external_artifact_stage_rejects_duplicate_artifact_ids(tmp_path: Path) -> None:
     module = _load_script()
     first = tmp_path / "first.txt"
@@ -238,6 +366,52 @@ def test_external_artifact_stage_accepts_existing_locked_manifest(tmp_path: Path
 
     assert report["status"] == "PASS"
     assert manifest.read_bytes() == locked_bytes
+
+
+def test_external_artifact_stage_rejects_manifest_inside_destination(
+    tmp_path: Path,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    final_root = tmp_path / "artifacts" / "fixture-v1"
+    manifest = final_root / "manifest.json"
+
+    try:
+        module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+    except ValueError as exc:
+        assert "must be outside" in str(exc)
+    else:
+        raise AssertionError("Expected an in-artifact manifest to be rejected")
+
+    assert not final_root.exists()
+
+
+def test_external_artifact_stage_rejects_aliased_manifest_inside_destination(
+    tmp_path: Path,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    artifact_parent = tmp_path / "artifacts"
+    artifact_parent.mkdir()
+    alias_parent = tmp_path / "artifact-parent-alias"
+    alias_parent.symlink_to(artifact_parent, target_is_directory=True)
+    final_root = artifact_parent / "fixture-v1"
+    manifest = alias_parent / "fixture-v1" / "manifest.json"
+
+    try:
+        module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+    except ValueError as exc:
+        assert "must be outside" in str(exc)
+    else:
+        raise AssertionError("Expected an aliased in-artifact manifest to be rejected")
+
+    assert not final_root.exists()
 
 
 def test_external_artifact_stage_rejects_overlapping_target_files(tmp_path: Path) -> None:

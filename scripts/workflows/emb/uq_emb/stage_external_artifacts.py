@@ -58,6 +58,18 @@ def _reject_symlinks(root: Path) -> None:
         raise ValueError(f"Artifact selections cannot contain symlinks: {rendered}")
 
 
+def _reject_path_within_root(*, path: Path, root: Path, label: str) -> None:
+    resolved_path = path.resolve()
+    resolved_root = root.resolve()
+    if resolved_path == resolved_root or resolved_root in resolved_path.parents:
+        raise ValueError(f"{label} must be outside the artifact root: {path}")
+
+
+def _reject_same_path(*, path: Path, protected_path: Path, label: str) -> None:
+    if path.resolve() == protected_path.resolve():
+        raise ValueError(f"{label} must not overwrite {protected_path}: {path}")
+
+
 def _source_files(path: Path) -> list[Path]:
     if path.is_file():
         if path.is_symlink():
@@ -278,6 +290,11 @@ def stage_artifacts(*, spec_path: Path, manifest_path: Path) -> dict[str, Any]:
     spec = _load_spec(spec_path)
     plan = plan_staging(spec_path)
     destination_parent, final_root, selected = _selection(spec)
+    _reject_path_within_root(
+        path=manifest_path,
+        root=final_root,
+        label="Artifact manifest",
+    )
     if final_root.exists():
         raise ValueError(f"Artifact-set destination already exists: {final_root}")
     destination_parent.mkdir(parents=True, exist_ok=True)
@@ -362,9 +379,23 @@ def main(argv: list[str] | None = None) -> int:
             manifest_path=args.manifest.resolve(),
         )
     else:
-        report = verify_staged(root=args.root.resolve(), manifest_path=args.manifest.resolve())
-        if args.report:
-            _write_json(args.report.resolve(), report)
+        root = args.root.absolute()
+        manifest_path = args.manifest.resolve()
+        report_path = args.report.resolve() if args.report else None
+        if report_path is not None:
+            _reject_path_within_root(
+                path=report_path,
+                root=root,
+                label="Verification report",
+            )
+            _reject_same_path(
+                path=report_path,
+                protected_path=manifest_path,
+                label="Verification report",
+            )
+        report = verify_staged(root=root, manifest_path=manifest_path)
+        if report_path is not None:
+            _write_json(report_path, report)
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["status"] == "PASS" else 1
 
