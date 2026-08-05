@@ -26,12 +26,25 @@ def _sha256(path: Path) -> str:
 def export_constants(*, legacy_root: Path, output: Path) -> dict:
     legacy_root = legacy_root.expanduser().resolve()
     output = output.expanduser().resolve()
-    constants = {}
-    for diameter in DIAMETERS:
-        source = (
+    try:
+        output.relative_to(legacy_root)
+    except ValueError:
+        pass
+    else:
+        raise ValueError("Figure 9 constants output must remain outside the legacy input root")
+    sources = {
+        diameter: (
             legacy_root
             / f"indentation/surrogate/diameters/{diameter}um/data/samples_all.dat"
         )
+        for diameter in DIAMETERS
+    }
+    for source in sources.values():
+        if output == source or (output.exists() and source.exists() and output.samefile(source)):
+            raise ValueError("Figure 9 constants output must not overwrite a source dataset")
+    constants = {}
+    for diameter in DIAMETERS:
+        source = sources[diameter]
         samples = np.loadtxt(source, ndmin=2)
         if samples.shape[1] <= 7:
             raise ValueError(f"Expected at least eight columns in {source}")

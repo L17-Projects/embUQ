@@ -377,6 +377,8 @@ def test_run_phase3b_dispatches_selected_target_and_preloads(
                 "phase3b_max_gen": 5,
                 "phase3b_target_cov": 0.42,
                 "phase3b_covariance_scaling": 0.015,
+                "phase3b_target_experiments": ["compression"],
+                "phase3b_target_diameters": [2.1, 2.9],
             }
         ),
         encoding="utf-8",
@@ -410,6 +412,7 @@ def test_run_phase3b_dispatches_selected_target_and_preloads(
         device="gpu",
         diameter=2.9,
         profiling=True,
+        korali_random_seed=3104,
     )
 
     assert os.environ["HUQ_INFERENCE_CONFIG"] == str(config_path.resolve())
@@ -429,10 +432,19 @@ def test_run_phase3b_dispatches_selected_target_and_preloads(
             "profiling": True,
             "device": "gpu",
             "dataset_name": "compression_2.9um",
-            "korali_random_seed": None,
+            "korali_random_seed": 3105,
             "restart": False,
         }
     ]
+
+
+def test_run_phase3b_rejects_conflicting_cli_target_selectors(
+    phase3b_runtime,
+) -> None:
+    mod, _fake_korali, _fake_comm = phase3b_runtime
+
+    with pytest.raises(ValueError, match="either dataset_name or diameter"):
+        mod.run_phase_3b(dataset_name="compression_2.9um", diameter=2.9)
 
 
 def test_run_phase3b_offsets_seed_for_each_selected_target(

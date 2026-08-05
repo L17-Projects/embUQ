@@ -192,6 +192,229 @@ def test_replay_rejects_outputs_inside_immutable_artifact_root(
     assert not forbidden.exists()
 
 
+def test_replay_rejects_report_collision_with_materialized_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
+    artifact_root = tmp_path / "artifacts"
+    _write_artifacts(module, artifact_root, _labels())
+    output_dir = tmp_path / "output"
+
+    with pytest.raises(ValueError, match="must not overwrite a replay output"):
+        module.replay(
+            artifact_root=artifact_root,
+            output_dir=output_dir,
+            report_path=output_dir
+            / "replayed_free_intercept_squared_frequency_fits.csv",
+        )
+
+    assert not output_dir.exists()
+
+
+def test_replay_rejects_report_hardlink_to_locked_input(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
+    artifact_root = tmp_path / "artifacts"
+    _write_artifacts(module, artifact_root, _labels())
+    labels = artifact_root / "physical_labels/physical_resonance_labels.csv"
+    original = labels.read_bytes()
+    report = tmp_path / "report.json"
+    report.hardlink_to(labels)
+
+    with pytest.raises(ValueError, match="existing multi-link file"):
+        module.replay(
+            artifact_root=artifact_root,
+            report_path=report,
+            dry_run=True,
+        )
+
+    assert labels.read_bytes() == original
+
+
+def test_replay_rejects_report_hardlink_to_accepted_fit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
+    artifact_root = tmp_path / "artifacts"
+    _write_artifacts(module, artifact_root, _labels())
+    fits = artifact_root / "polynomial_fits/free_intercept_squared_frequency_fits.csv"
+    original = fits.read_bytes()
+    report = tmp_path / "report.json"
+    report.hardlink_to(fits)
+
+    with pytest.raises(ValueError, match="existing multi-link file"):
+        module.replay(
+            artifact_root=artifact_root,
+            report_path=report,
+            dry_run=True,
+        )
+
+    assert fits.read_bytes() == original
+
+
+def test_replay_rejects_report_hardlink_to_external_bank(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
+    artifact_root = tmp_path / "artifacts"
+    _write_artifacts(module, artifact_root, _labels())
+    external_banks = tmp_path / "external_banks"
+    external_banks.mkdir()
+    source_bank = next((artifact_root / "frozen_banks").iterdir())
+    bank = external_banks / source_bank.name
+    bank.write_bytes(source_bank.read_bytes())
+    original = bank.read_bytes()
+    report = tmp_path / "report.json"
+    report.hardlink_to(bank)
+
+    with pytest.raises(ValueError, match="existing multi-link file"):
+        module.replay(
+            artifact_root=artifact_root,
+            accepted_bank_dir=external_banks,
+            report_path=report,
+            dry_run=True,
+        )
+
+    assert bank.read_bytes() == original
+
+
+def test_replay_rejects_output_inside_external_bank_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
+    artifact_root = tmp_path / "artifacts"
+    _write_artifacts(module, artifact_root, _labels())
+    external_banks = tmp_path / "external_banks"
+    external_banks.mkdir()
+    source_bank = next((artifact_root / "frozen_banks").iterdir())
+    (external_banks / source_bank.name).write_bytes(source_bank.read_bytes())
+    output_dir = external_banks / "replay"
+
+    with pytest.raises(ValueError, match="accepted bank directory"):
+        module.replay(
+            artifact_root=artifact_root,
+            accepted_bank_dir=external_banks,
+            output_dir=output_dir,
+        )
+
+    assert not output_dir.exists()
+
+
+def test_replay_rejects_symlinked_artifact_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
+    artifact_root = tmp_path / "artifacts"
+    _write_artifacts(module, artifact_root, _labels())
+    alias = tmp_path / "artifact_alias"
+    alias.symlink_to(artifact_root, target_is_directory=True)
+    output_dir = tmp_path / "output"
+
+    with pytest.raises(ValueError, match="symlinked path or ancestor"):
+        module.replay(artifact_root=alias, output_dir=output_dir)
+
+    assert not output_dir.exists()
+
+
+def test_replay_rejects_parent_traversal_in_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
+    artifact_root = tmp_path / "artifacts"
+    _write_artifacts(module, artifact_root, _labels())
+    output_dir = tmp_path / "intermediate" / ".." / "output"
+
+    with pytest.raises(ValueError, match="parent traversal"):
+        module.replay(artifact_root=artifact_root, output_dir=output_dir)
+
+    assert not (tmp_path / "output").exists()
+
+
+def test_replay_rejects_report_as_output_ancestor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
+    artifact_root = tmp_path / "artifacts"
+    _write_artifacts(module, artifact_root, _labels())
+    report = tmp_path / "out"
+    output_dir = report / "replay"
+
+    with pytest.raises(ValueError, match="must not replace the output directory"):
+        module.replay(
+            artifact_root=artifact_root,
+            output_dir=output_dir,
+            report_path=report,
+        )
+
+    assert not output_dir.exists()
+
+
+@pytest.mark.parametrize("target_kind", ("output", "report"))
+def test_replay_rejects_outputs_in_enclosing_locked_root_sibling(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target_kind: str,
+) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
+    locked_root = tmp_path / "frozen_runtime_dependencies_202607"
+    artifact_root = locked_root / "acoustic_surrogates"
+    _write_artifacts(module, artifact_root, _labels())
+    target = locked_root / "sibling_output"
+    kwargs = {"artifact_root": artifact_root, "dry_run": target_kind == "report"}
+    if target_kind == "output":
+        kwargs["output_dir"] = target
+    else:
+        kwargs["report_path"] = target / "report.json"
+
+    with pytest.raises(ValueError, match="outside immutable artifact roots"):
+        module.replay(**kwargs)
+
+    assert not target.exists()
+
+
+def test_replay_rejects_existing_directory_as_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
+    artifact_root = tmp_path / "artifacts"
+    _write_artifacts(module, artifact_root, _labels())
+    report = tmp_path / "report"
+    report.mkdir()
+
+    with pytest.raises(ValueError, match="report path must be a file"):
+        module.replay(artifact_root=artifact_root, report_path=report, dry_run=True)
+
+
+def test_replay_rejects_report_collision_with_generated_bank(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "replay_receipt_provenance", lambda **_kwargs: {})
+    artifact_root = tmp_path / "artifacts"
+    _write_artifacts(module, artifact_root, _labels())
+    output_dir = tmp_path / "output"
+
+    with pytest.raises(ValueError, match="must not overwrite a replay output"):
+        module.replay(
+            artifact_root=artifact_root,
+            output_dir=output_dir,
+            report_path=output_dir / "replayed_sonovue_polynomial_bank.json",
+        )
+
+    assert not output_dir.exists()
+
+
 def test_replay_fails_clearly_on_frozen_bank_tolerance_mismatch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

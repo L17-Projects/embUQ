@@ -360,6 +360,8 @@ def run_phase_3b(
     phase3b_seed_mode: str = "increment",
     restart: bool = False,
 ):
+    if dataset_name is not None and diameter is not None:
+        raise ValueError("Use either dataset_name or diameter, not both.")
     korali_random_seed = validate_korali_random_seed(
         korali_random_seed, field_name="--korali-random-seed"
     )
@@ -375,24 +377,40 @@ def run_phase_3b(
     experiments = [exp for exp in load_experiments(config, Path(project_root)) if exp.enabled]
     surrogate_backend = _resolve_surrogate_backend(config)
     is_generic_direct_phase1 = is_generic_direct_phase1_contract(config)
-    target_experiments = None
-    target_diameters = None
-    if dataset_name is None and diameter is None:
-        target_experiments = _optional_string_list(
-            config.get("phase3b_target_experiments"),
-            name="phase3b_target_experiments",
-        )
-        target_diameters = _optional_float_list(
-            config.get("phase3b_target_diameters"),
-            name="phase3b_target_diameters",
-        )
-    selected_targets = _select_phase3b_targets(
+    target_experiments = _optional_string_list(
+        config.get("phase3b_target_experiments"),
+        name="phase3b_target_experiments",
+    )
+    target_diameters = _optional_float_list(
+        config.get("phase3b_target_diameters"),
+        name="phase3b_target_diameters",
+    )
+    accepted_targets = _select_phase3b_targets(
         experiments,
-        dataset_name=dataset_name,
-        diameter=diameter,
         experiment_names=target_experiments,
         diameters=target_diameters,
     )
+    selected_targets = accepted_targets
+    if dataset_name is not None:
+        selected_targets = [
+            target
+            for target in accepted_targets
+            if target[0].dataset_name(target[1]) == dataset_name
+        ]
+        if not selected_targets:
+            raise ValueError(f"Dataset '{dataset_name}' not found in accepted Phase 3b targets.")
+    elif diameter is not None:
+        selected_targets = [
+            target
+            for target in accepted_targets
+            if abs(float(target[1]) - float(diameter)) < 1e-9
+        ]
+        if not selected_targets:
+            raise ValueError(f"Diameter '{diameter}' not found in accepted Phase 3b targets.")
+    target_ordinals = {
+        exp.dataset_name(diameter_um): target_index
+        for target_index, (exp, diameter_um) in enumerate(accepted_targets)
+    }
     for exp, diameter_um in selected_targets:
         parameterization = surrogate_parameterization_for_experiment(exp)
         if is_generic_direct_phase1 and parameterization == DIRECT_KA_KB_SURROGATE_PARAMETERIZATION:
@@ -454,7 +472,8 @@ def run_phase_3b(
         "indentation": compute_indentation_surrogate_batch,
         "resonance": compute_emb_resonance_batch,
     }
-    for target_index, (exp, diameter_um) in enumerate(selected_targets):
+    for exp, diameter_um in selected_targets:
+        target_index = target_ordinals[exp.dataset_name(diameter_um)]
         parameterization = surrogate_parameterization_for_experiment(exp)
         if is_generic_direct_phase1 and parameterization == DIRECT_KA_KB_SURROGATE_PARAMETERIZATION:
             if exp.name != "compression":

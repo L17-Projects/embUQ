@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 
 SCRIPT = (
@@ -76,3 +77,48 @@ def test_export_overlay_preserves_source_order_and_counts(tmp_path: Path) -> Non
         "plotted_samples": 3,
     }
     assert receipt_path.is_file()
+
+
+def test_export_overlay_rejects_identical_output_paths(tmp_path: Path) -> None:
+    module = _module()
+    output = tmp_path / "overlay"
+
+    with pytest.raises(ValueError, match="outputs must not overlap"):
+        module.export_overlay(
+            sources_csv=tmp_path / "sources.csv",
+            source_manifest=tmp_path / "manifest.json",
+            output_csv=output,
+            output_manifest=output,
+        )
+
+    assert not output.exists()
+
+
+def test_export_overlay_rejects_ancestor_output_paths(tmp_path: Path) -> None:
+    module = _module()
+    output = tmp_path / "overlay"
+
+    with pytest.raises(ValueError, match="outputs must not overlap"):
+        module.export_overlay(
+            sources_csv=tmp_path / "sources.csv",
+            source_manifest=tmp_path / "manifest.json",
+            output_csv=output,
+            output_manifest=output / "receipt.json",
+        )
+
+    assert not output.exists()
+
+
+def test_export_overlay_rejects_reverse_ancestor_output_paths(tmp_path: Path) -> None:
+    module = _module()
+    output = tmp_path / "overlay"
+
+    with pytest.raises(ValueError, match="outputs must not overlap"):
+        module.export_overlay(
+            sources_csv=tmp_path / "sources.csv",
+            source_manifest=tmp_path / "manifest.json",
+            output_csv=output / "overlay.csv.gz",
+            output_manifest=output,
+        )
+
+    assert not output.exists()

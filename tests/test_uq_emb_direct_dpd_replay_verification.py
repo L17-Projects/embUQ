@@ -92,6 +92,112 @@ def test_verifier_rejects_tampered_command(tmp_path: Path) -> None:
         raise AssertionError("Expected a tampered replay command to fail")
 
 
+def test_verifier_rejects_incomplete_runtime_source_hashes(tmp_path: Path) -> None:
+    fixture_module = _module(
+        "tests/test_uq_emb_direct_dpd_replay.py", "uq_emb_direct_dpd_fixture_sources"
+    )
+    materializer = _module(
+        "scripts/workflows/emb/uq_emb/materialize_direct_dpd_replay.py",
+        "uq_emb_direct_dpd_materializer_sources",
+    )
+    verifier = _module(
+        "scripts/workflows/emb/uq_emb/verify_direct_dpd_replay_plan.py",
+        "uq_emb_direct_dpd_verifier_sources",
+    )
+    output_root = tmp_path / "replay"
+    accepted_root = fixture_module._accepted_root(tmp_path)
+    accepted_manifest = fixture_module._accepted_manifest(tmp_path, accepted_root)
+    materializer.materialize_direct_dpd_replay(
+        accepted_root=accepted_root,
+        accepted_manifest=accepted_manifest,
+        output_root=output_root,
+        site="karolina",
+        python_bin="/usr/bin/python3.11",
+    )
+    plan_path = output_root / "direct_dpd_replay_plan.json"
+    payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    payload["runtime_source_hashes"].pop(next(iter(payload["runtime_source_hashes"])))
+    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="complete runtime source set"):
+        verifier.verify(
+            plan_path,
+            ROOT / "scripts/workflows/emb/run_emb_free_shell_breathing_protocol.py",
+        )
+
+
+def test_verifier_rejects_alternate_acoustic_runner(tmp_path: Path) -> None:
+    fixture_module = _module(
+        "tests/test_uq_emb_direct_dpd_replay.py", "uq_emb_direct_dpd_fixture_runner"
+    )
+    materializer = _module(
+        "scripts/workflows/emb/uq_emb/materialize_direct_dpd_replay.py",
+        "uq_emb_direct_dpd_materializer_runner",
+    )
+    verifier = _module(
+        "scripts/workflows/emb/uq_emb/verify_direct_dpd_replay_plan.py",
+        "uq_emb_direct_dpd_verifier_runner",
+    )
+    output_root = tmp_path / "replay"
+    accepted_root = fixture_module._accepted_root(tmp_path)
+    accepted_manifest = fixture_module._accepted_manifest(tmp_path, accepted_root)
+    materializer.materialize_direct_dpd_replay(
+        accepted_root=accepted_root,
+        accepted_manifest=accepted_manifest,
+        output_root=output_root,
+        site="karolina",
+        python_bin="/usr/bin/python3.11",
+    )
+    alternate_runner = tmp_path / "alternate_runner.py"
+    alternate_runner.write_text("def load_bubbles(_path): return []\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="hashed acoustic runner"):
+        verifier.verify(
+            output_root / "direct_dpd_replay_plan.json",
+            alternate_runner,
+        )
+
+
+def test_verifier_rejects_alternate_materializer_before_import(tmp_path: Path) -> None:
+    fixture_module = _module(
+        "tests/test_uq_emb_direct_dpd_replay.py",
+        "uq_emb_direct_dpd_fixture_materializer",
+    )
+    materializer = _module(
+        "scripts/workflows/emb/uq_emb/materialize_direct_dpd_replay.py",
+        "uq_emb_direct_dpd_materializer_materializer",
+    )
+    verifier = _module(
+        "scripts/workflows/emb/uq_emb/verify_direct_dpd_replay_plan.py",
+        "uq_emb_direct_dpd_verifier_materializer",
+    )
+    output_root = tmp_path / "replay"
+    accepted_root = fixture_module._accepted_root(tmp_path)
+    accepted_manifest = fixture_module._accepted_manifest(tmp_path, accepted_root)
+    materializer.materialize_direct_dpd_replay(
+        accepted_root=accepted_root,
+        accepted_manifest=accepted_manifest,
+        output_root=output_root,
+        site="karolina",
+        python_bin="/usr/bin/python3.11",
+    )
+    marker = tmp_path / "imported.txt"
+    alternate_materializer = tmp_path / "alternate_materializer.py"
+    alternate_materializer.write_text(
+        f"from pathlib import Path\nPath({str(marker)!r}).write_text('imported')\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="repository materializer"):
+        verifier.verify(
+            output_root / "direct_dpd_replay_plan.json",
+            ROOT / "scripts/workflows/emb/run_emb_free_shell_breathing_protocol.py",
+            alternate_materializer,
+        )
+
+    assert not marker.exists()
+
+
 def test_verifier_rejects_unselected_accepted_artifact_drift(tmp_path: Path) -> None:
     fixture_module = _module(
         "tests/test_uq_emb_direct_dpd_replay.py", "uq_emb_direct_dpd_fixture_root_drift"

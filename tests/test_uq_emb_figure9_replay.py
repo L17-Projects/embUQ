@@ -88,6 +88,64 @@ def test_export_conversion_constants_uses_twice_column_median(tmp_path: Path) ->
     assert output.is_file()
 
 
+def test_export_conversion_constants_rejects_source_as_output(tmp_path: Path) -> None:
+    module = _module(EXPORT_SCRIPT, "uq_emb_figure9_conversion_export_collision")
+    legacy = tmp_path / "legacy"
+    sources = []
+    for diameter in module.DIAMETERS:
+        source = (
+            legacy
+            / f"indentation/surrogate/diameters/{diameter}um/data/samples_all.dat"
+        )
+        source.parent.mkdir(parents=True, exist_ok=True)
+        np.savetxt(source, np.zeros((1, 8), dtype=float))
+        sources.append(source)
+    original = sources[0].read_bytes()
+
+    with pytest.raises(ValueError, match="outside the legacy input root"):
+        module.export_constants(legacy_root=legacy, output=sources[0])
+
+    assert sources[0].read_bytes() == original
+
+
+def test_export_conversion_constants_rejects_new_output_inside_legacy_root(
+    tmp_path: Path,
+) -> None:
+    module = _module(EXPORT_SCRIPT, "uq_emb_figure9_conversion_export_inside")
+    legacy = tmp_path / "legacy"
+    legacy.mkdir()
+    output = legacy / "constants.json"
+
+    with pytest.raises(ValueError, match="outside the legacy input root"):
+        module.export_constants(legacy_root=legacy, output=output)
+
+    assert not output.exists()
+
+
+def test_export_conversion_constants_rejects_source_hardlink_as_output(
+    tmp_path: Path,
+) -> None:
+    module = _module(EXPORT_SCRIPT, "uq_emb_figure9_conversion_export_hardlink")
+    legacy = tmp_path / "legacy"
+    sources = []
+    for diameter in module.DIAMETERS:
+        source = (
+            legacy
+            / f"indentation/surrogate/diameters/{diameter}um/data/samples_all.dat"
+        )
+        source.parent.mkdir(parents=True, exist_ok=True)
+        np.savetxt(source, np.zeros((1, 8), dtype=float))
+        sources.append(source)
+    original = sources[0].read_bytes()
+    output = tmp_path / "constants.json"
+    output.hardlink_to(sources[0])
+
+    with pytest.raises(ValueError, match="must not overwrite a source dataset"):
+        module.export_constants(legacy_root=legacy, output=output)
+
+    assert sources[0].read_bytes() == original
+
+
 def test_figure9_verifies_locked_inputs_before_creating_output(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

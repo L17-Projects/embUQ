@@ -105,7 +105,11 @@ def verify(
     if activation.get("required_before_execution") is not True:
         raise ValueError("Replay plan does not declare the required site-runtime activation")
 
+    if materializer_path.resolve() != DEFAULT_MATERIALIZER.resolve():
+        raise ValueError("Direct-DPD verification must use the repository materializer")
     materializer = _load_materializer(materializer_path)
+    if acoustic_runner.resolve() != materializer.SONOVUE_ACOUSTIC_RUNNER.resolve():
+        raise ValueError("Direct-DPD verification must use the hashed acoustic runner")
     accepted_root = Path(str(payload.get("accepted_artifact_root", ""))).resolve()
     accepted_manifest = Path(str(payload.get("accepted_artifact_manifest", ""))).resolve()
     accepted_index = materializer._load_accepted_manifest(accepted_manifest, accepted_root)
@@ -124,8 +128,25 @@ def verify(
     if provenance.get("git_commit") != current_provenance["git_commit"]:
         raise ValueError("Replay plan Git commit does not match the current materializer checkout")
 
-    for relative, expected in (payload.get("runtime_source_hashes") or {}).items():
-        repository = Path(__file__).resolve().parents[4]
+    runtime_source_hashes = payload.get("runtime_source_hashes")
+    expected_runtime_sources = {
+        str(path.relative_to(materializer.REPO_ROOT))
+        for path in (
+            materializer.MECHANICAL_RUNNER,
+            *materializer.MECHANICAL_RUNNER_HELPERS,
+            *materializer.MECHANICAL_EVALUATORS.values(),
+            *materializer.ACOUSTIC_RUNTIME_SOURCES,
+        )
+    }
+    if (
+        not isinstance(runtime_source_hashes, dict)
+        or set(runtime_source_hashes) != expected_runtime_sources
+    ):
+        raise ValueError(
+            "Replay plan runtime_source_hashes must contain the complete runtime source set"
+        )
+    for relative, expected in runtime_source_hashes.items():
+        repository = materializer.REPO_ROOT
         _verify_hash(repository / relative, str(expected), f"Runtime source {relative}")
 
     load_bubbles = _load_runner(acoustic_runner)

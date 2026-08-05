@@ -59,6 +59,12 @@ def export_overlay(
     source_manifest = source_manifest.expanduser().resolve()
     output_csv = output_csv.expanduser().resolve()
     output_manifest = output_manifest.expanduser().resolve()
+    if (
+        output_csv == output_manifest
+        or output_csv in output_manifest.parents
+        or output_manifest in output_csv.parents
+    ):
+        raise ValueError("Figure 7 overlay CSV and manifest outputs must not overlap")
     if output_csv.exists() or output_manifest.exists():
         raise FileExistsError("Refusing to overwrite an existing Figure 7 overlay export")
 

@@ -30,7 +30,13 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[3]
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from replay_provenance import replay_receipt_provenance  # noqa: E402
+from replay_provenance import (  # noqa: E402
+    checked_replay_path,
+    replay_receipt_provenance,
+    require_output_distinct_from_inputs,
+    require_output_outside_known_locked_roots,
+    require_output_outside_locked_root,
+)
 
 
 SCHEMA_VERSION = "mesouq.uq_emb.acoustic_polynomial_replay.v1"
@@ -519,10 +525,21 @@ def replay(
 ) -> dict[str, Any]:
     """Recompute, compare, and optionally materialize bounded replay artifacts."""
 
-    artifact_root = artifact_root.expanduser().resolve()
-    labels_path = (input_labels or artifact_root / "physical_labels/physical_resonance_labels.csv").expanduser().resolve()
-    fits_path = (accepted_fits or artifact_root / "polynomial_fits/free_intercept_squared_frequency_fits.csv").expanduser().resolve()
-    banks_path = (accepted_bank_dir or artifact_root / "frozen_banks").expanduser().resolve()
+    artifact_root = checked_replay_path(artifact_root, label="artifact root")
+    labels_path = checked_replay_path(
+        input_labels or artifact_root / "physical_labels/physical_resonance_labels.csv",
+        label="physical labels",
+    )
+    fits_path = checked_replay_path(
+        accepted_fits
+        or artifact_root
+        / "polynomial_fits/free_intercept_squared_frequency_fits.csv",
+        label="accepted fits",
+    )
+    banks_path = checked_replay_path(
+        accepted_bank_dir or artifact_root / "frozen_banks",
+        label="accepted bank directory",
+    )
     for path in (labels_path, fits_path):
         if not path.is_file():
             raise FileNotFoundError(f"Required acoustic replay input is missing: {path}")
@@ -531,7 +548,11 @@ def replay(
     if output_dir is not None and dry_run:
         raise ValueError("--output-dir cannot be used with --dry-run")
     if output_dir is not None:
-        output_dir = output_dir.expanduser().resolve()
+        output_dir = require_output_outside_known_locked_roots(
+            output_path=output_dir,
+            repo_root=REPO_ROOT,
+            label="Acoustic replay output",
+        )
         try:
             output_dir.relative_to(artifact_root)
         except ValueError:
@@ -541,10 +562,28 @@ def replay(
                 "Acoustic replay output must remain outside the immutable artifact root: "
                 f"output={output_dir}, artifact_root={artifact_root}"
             )
+        output_dir = require_output_outside_locked_root(
+            output_path=output_dir,
+            locked_root=artifact_root,
+            label="Acoustic replay output",
+        )
+        if banks_path != artifact_root and artifact_root not in banks_path.parents:
+            output_dir = require_output_outside_locked_root(
+                output_path=output_dir,
+                locked_root=banks_path,
+                label="Acoustic replay output",
+                locked_root_label="accepted bank directory",
+            )
         if output_dir.exists() and any(output_dir.iterdir()):
             raise FileExistsError(f"Refusing to write into non-empty replay output: {output_dir}")
     if report_path is not None:
-        report_path = report_path.expanduser().resolve()
+        if report_path.is_dir():
+            raise ValueError("Acoustic replay report path must be a file")
+        report_path = require_output_outside_known_locked_roots(
+            output_path=report_path,
+            repo_root=REPO_ROOT,
+            label="Acoustic replay report",
+        )
         try:
             report_path.relative_to(artifact_root)
         except ValueError:
@@ -554,9 +593,38 @@ def replay(
                 "Acoustic replay report must remain outside the immutable artifact root: "
                 f"report={report_path}, artifact_root={artifact_root}"
             )
+        report_path = require_output_outside_locked_root(
+            output_path=report_path,
+            locked_root=artifact_root,
+            label="Acoustic replay report",
+        )
+        if banks_path != artifact_root and artifact_root not in banks_path.parents:
+            report_path = require_output_outside_locked_root(
+                output_path=report_path,
+                locked_root=banks_path,
+                label="Acoustic replay report",
+                locked_root_label="accepted bank directory",
+            )
+        report_path = require_output_distinct_from_inputs(
+            output_path=report_path,
+            input_paths=[labels_path, fits_path],
+            label="Acoustic replay report",
+        )
 
     labels = load_labels(labels_path)
     replay_rows = fit_replay(labels)
+    if output_dir is not None and report_path is not None:
+        if report_path == output_dir or report_path in output_dir.parents:
+            raise ValueError("Acoustic replay report must not replace the output directory")
+        generated_outputs = {
+            output_dir / "replayed_free_intercept_squared_frequency_fits.csv",
+            *(
+                output_dir / f"replayed_{agent}_polynomial_bank.json"
+                for agent in {str(row["agent"]) for row in replay_rows}
+            ),
+        }
+        if report_path in generated_outputs:
+            raise ValueError("Acoustic replay report must not overwrite a replay output")
     comparison = compare_against_frozen(
         replay_rows,
         labels,
