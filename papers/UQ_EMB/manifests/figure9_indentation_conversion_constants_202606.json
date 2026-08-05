@@ -1,0 +1,33 @@
+{
+  "diameters": {
+    "3.2": {
+      "column_count": 38,
+      "initial_diameter_dpd": 12.76,
+      "reduction": "2 * median(column)",
+      "row_count": 11999,
+      "source": "/scratch/project/eu-26-17/eubrieucb/mesouq/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/indentation/surrogate/diameters/3.2um/data/samples_all.dat",
+      "source_column_zero_based": 7,
+      "source_sha256": "635ef0871ecd3cfc56bea5e4d77b4cf3331d093dbf99c2f72f99291feadd1012"
+    },
+    "3.4": {
+      "column_count": 38,
+      "initial_diameter_dpd": 13.6,
+      "reduction": "2 * median(column)",
+      "row_count": 25236,
+      "source": "/scratch/project/eu-26-17/eubrieucb/mesouq/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/indentation/surrogate/diameters/3.4um/data/samples_all.dat",
+      "source_column_zero_based": 7,
+      "source_sha256": "b3138accbac70e1e3e35c40db0dda1a3eeaf62c148cf9d79670fd6e52559fae9"
+    },
+    "5.8": {
+      "column_count": 38,
+      "initial_diameter_dpd": 23.04,
+      "reduction": "2 * median(column)",
+      "row_count": 12000,
+      "source": "/scratch/project/eu-26-17/eubrieucb/mesouq/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/indentation/surrogate/diameters/5.8um/data/samples_all.dat",
+      "source_column_zero_based": 7,
+      "source_sha256": "fff4b13944293a4d9952bddf115e01750b97370092a3dd9bf041d98971ffcd6f"
+    }
+  },
+  "schema_version": "mesouq.uq_emb.figure9_conversion_constants.v1",
+  "status": "PASS"
+}

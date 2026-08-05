@@ -48,6 +48,10 @@ from meso_uq.noise.legacy import (
     legacy_compression_surrogate_batch_likelihood,
     legacy_compression_surrogate_likelihood,
 )
+from meso_uq.inference.emb_parameterization import (
+    direct_parameters_to_legacy_batch,
+    direct_parameters_to_legacy_vector,
+)
 from meso_uq.workflow_acceleration import (
     expand_parameter_vector,
     expand_reduced_parameters,
@@ -62,6 +66,7 @@ from meso_uq.workflows.legacy import (
 
 _CONFIG_CACHE: Dict[str, Dict[str, Any]] = {}
 _SURROGATE_CACHE: Dict[Tuple[str, float, str, str], Any] = {}
+_DIRECT_SURROGATE_CACHE: Dict[Tuple[str, float, str, str, str], Any] = {}
 
 
 def _get_worker_comm():
@@ -120,6 +125,46 @@ def _build_surrogate(
     raise ValueError(f"Unsupported surrogate backend '{backend}'.")
 
 
+def _resolve_direct_surrogate_trained_dir(project_root: str, diameter_um: float) -> Path:
+    try:
+        from meso_uq.experiments import load_experiments
+
+        config = _load_config(project_root)
+        experiments = load_experiments(config, Path(project_root))
+        matches = [
+            exp
+            for exp in experiments
+            if exp.enabled
+            and exp.name == "compression"
+            and getattr(exp, "surrogate_parameterization", "") == "direct_ka_kb"
+            and any(abs(float(candidate) - float(diameter_um)) < 1.0e-9 for candidate in exp.diameters)
+        ]
+        if len(matches) == 1:
+            exp = matches[0]
+            diameter_label = exp._lookup_diameter_mapping(exp.diameter_labels, diameter_um) or str(diameter_um)
+            return exp.surrogate_dir / f"{diameter_label}um" / "trained"
+        if len(matches) > 1:
+            raise ValueError(
+                f"Direct compression surrogate path is ambiguous for diameter {diameter_um}: "
+                f"{[exp.dataset_name(diameter_um) for exp in matches]}"
+            )
+    except Exception as exc:
+        if isinstance(exc, ValueError):
+            raise
+    return resolve_legacy_surrogate_trained_dir(project_root, "compression", diameter_um)
+
+
+def _build_direct_surrogate(
+    project_root: str, diameter_um: float, device: str = "cpu", backend: str = "dnn"
+) -> Any:
+    if backend != "dnn":
+        raise NotImplementedError("Direct ka/kb compression surrogates currently support backend='dnn' only.")
+    surrogate_path = os.fspath(_resolve_direct_surrogate_trained_dir(project_root, diameter_um))
+    from emb.compression.surrogate.evaluate import Surrogate
+
+    return Surrogate(surrogate_path, device=device)
+
+
 def _get_surrogate(
     project_root: str, diameter_um: float, device: str = "cpu", backend: str = "dnn"
 ) -> Any:
@@ -131,10 +176,28 @@ def _get_surrogate(
     return _SURROGATE_CACHE[key]
 
 
+def _get_direct_surrogate(
+    project_root: str, diameter_um: float, device: str = "cpu", backend: str = "dnn"
+) -> Any:
+    surrogate_dir = str(_resolve_direct_surrogate_trained_dir(project_root, diameter_um))
+    key = (project_root, diameter_um, device, backend, surrogate_dir)
+    if key not in _DIRECT_SURROGATE_CACHE:
+        _DIRECT_SURROGATE_CACHE[key] = _build_direct_surrogate(
+            project_root, diameter_um, device=device, backend=backend
+        )
+    return _DIRECT_SURROGATE_CACHE[key]
+
+
 def preload_compression_surrogate(
     diameter_um: float, device: str = "cpu", backend: str = "dnn"
 ) -> None:
     _get_surrogate(_resolve_project_root(), diameter_um, device=device, backend=backend)
+
+
+def preload_compression_surrogate_direct(
+    diameter_um: float, device: str = "cpu", backend: str = "dnn"
+) -> None:
+    _get_direct_surrogate(_resolve_project_root(), diameter_um, device=device, backend=backend)
 
 
 def _load_run_equil():
@@ -175,6 +238,33 @@ def compute_compression_surrogate(
         sigma,
         surrogate_standard_deviation=force_std_arr,
     ).assign_to_sample(sample)
+
+
+def compute_compression_surrogate_direct(
+    sample: Dict[str, Any],
+    displ: List[float],
+    diameter_um: float,
+    device: str = "cpu",
+    backend: str = "dnn",
+) -> None:
+    project_root = _resolve_project_root()
+    config = _load_config(project_root)
+    params = np.asarray(sample["Parameters"], dtype=np.float32).reshape(-1)
+    if params.shape != (4,):
+        raise ValueError(f"Direct compression surrogate expects [ka, kb, d0, sigma], got shape {params.shape}.")
+    legacy_params = direct_parameters_to_legacy_vector(
+        params,
+        config=config,
+        modality="compression",
+        project_root=project_root,
+    )
+    Yt, kb, b1, b2, a3, a4, d0, sigma = legacy_params.tolist()
+    surrogate = _get_direct_surrogate(
+        project_root, diameter_um, device=device, backend=backend
+    )
+    displ_corrected = [max(0.0, d - d0) for d in displ]
+    forces = surrogate.evaluate_compression(x=[Yt, kb, b1, b2, a3, a4], disp=displ_corrected)
+    legacy_compression_surrogate_likelihood(forces, sigma).assign_to_sample(sample)
 
 
 def compute_compression_surrogate_batch(
@@ -224,6 +314,43 @@ def compute_compression_surrogate_batch(
         sigma,
         surrogate_standard_deviation=force_std,
     ).assign_to_sample(sample)
+
+
+def compute_compression_surrogate_batch_direct(
+    sample: Dict[str, Any],
+    displ: List[float],
+    diameter_um: float,
+    device: str = "cuda",
+    particle_batch_size: int = 2048,
+    backend: str = "dnn",
+) -> None:
+    project_root = _resolve_project_root()
+    config = _load_config(project_root)
+    batch_params = np.asarray(sample["Batch Parameters"], dtype=np.float32)
+    if batch_params.ndim != 2 or batch_params.shape[1] != 4:
+        raise ValueError(
+            "Direct compression surrogate expects Batch Parameters with shape [batch, 4] "
+            f"for [ka, kb, d0, sigma], got {batch_params.shape}."
+        )
+    legacy_params = direct_parameters_to_legacy_batch(
+        batch_params,
+        config=config,
+        modality="compression",
+        project_root=project_root,
+    )
+    theta = legacy_params[:, :6]
+    d0 = legacy_params[:, 6]
+    sigma = legacy_params[:, 7]
+    surrogate = _get_direct_surrogate(
+        project_root, diameter_um, device=device, backend=backend
+    )
+    forces = surrogate.evaluate_compression_batch(
+        theta,
+        disp=displ,
+        d0=d0,
+        chunk_size=particle_batch_size,
+    )
+    legacy_compression_surrogate_batch_likelihood(forces, sigma).assign_to_sample(sample)
 
 
 def compute_compression(

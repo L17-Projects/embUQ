@@ -405,6 +405,54 @@ def test_build_inference_command_phase3b_dataset_filter_is_forwarded() -> None:
     assert command[command.index("--dataset-name") + 1] == "compression_2.1um"
 
 
+def test_build_inference_command_phase3b_repeat_seed_mode_is_forwarded() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "production")
+    command = build_inference_command(
+        repo_root,
+        selection,
+        stage="phase3b",
+        python_bin="python",
+        config_path=resolve_workflow_config_path(repo_root, selection),
+        output_root=resolve_workflow_output_root(repo_root, selection),
+        device="gpu",
+        korali_random_seed=3104,
+        phase3b_seed_mode="repeat",
+    )
+
+    assert command[command.index("--phase3b-seed-mode") + 1] == "repeat"
+
+
+def test_build_inference_command_rejects_phase3b_seed_mode_outside_phase3b() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "production")
+    with pytest.raises(ValueError, match="phase3b_seed_mode is only supported for phase3b"):
+        build_inference_command(
+            repo_root,
+            selection,
+            stage="phase1",
+            python_bin="python",
+            config_path=resolve_workflow_config_path(repo_root, selection),
+            output_root=resolve_workflow_output_root(repo_root, selection),
+            phase3b_seed_mode="repeat",
+        )
+
+
+def test_build_inference_command_rejects_invalid_phase3b_seed_mode() -> None:
+    repo_root = _repo_root()
+    selection = VegaWorkflowSelection("compression", "full-model", "production")
+    with pytest.raises(ValueError, match="phase3b_seed_mode must be either"):
+        build_inference_command(
+            repo_root,
+            selection,
+            stage="phase3b",
+            python_bin="python",
+            config_path=resolve_workflow_config_path(repo_root, selection),
+            output_root=resolve_workflow_output_root(repo_root, selection),
+            phase3b_seed_mode="bad-mode",
+        )
+
+
 def test_build_inference_command_rejects_phase3b_conflicting_filters() -> None:
     repo_root = _repo_root()
     selection = VegaWorkflowSelection("compression", "full-model", "production")

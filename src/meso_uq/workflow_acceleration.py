@@ -11,9 +11,12 @@ from typing import Dict, Mapping, Optional, Sequence
 
 import numpy as np
 
+from meso_uq.config.models import EMB_GENERIC_DIRECT_PHASE1_CONTRACT_MODE
+
 FIXABLE_PARAMETER_ORDER = ("b1", "b2", "a3", "a4")
 FULL_VARIABLE_ORDER = ("Yt", "kb", "b1", "b2", "a3", "a4", "d0", "sigma")
 HIERARCHICAL_VARIABLE_ORDER = tuple(name for name in FULL_VARIABLE_ORDER if name != "sigma")
+EMB_DIRECT_PHASE1_VARIABLE_ORDER = ("ka", "kb", "d0", "sigma")
 GV_CALIBRATED_PARAMETER_ORDER = ("ka", "kb", "mu", "b1", "b2", "a3", "a4", "mu_l", "c")
 GV_NUISANCE_PARAMETER_ORDER = ("sigma",)
 GV_VARIABLE_ORDER = GV_CALIBRATED_PARAMETER_ORDER + GV_NUISANCE_PARAMETER_ORDER
@@ -24,6 +27,39 @@ def require_single_rank(comm, context: str) -> None:
         raise ValueError(
             f"{context} requires a single MPI rank. Launch it with plain python or mpirun -np 1."
         )
+
+
+def validate_korali_random_seed(
+    seed: Optional[int],
+    *,
+    field_name: str = "Random Seed",
+) -> Optional[int]:
+    if seed is None:
+        return None
+    try:
+        normalized = int(seed)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"{field_name} must be a positive nonzero integer, got {seed!r}."
+        ) from exc
+    if normalized <= 0:
+        raise ValueError(
+            f"{field_name} must be positive and nonzero, got {normalized}. "
+            "Korali interprets Random Seed=0 as wall-clock time."
+        )
+    return normalized
+
+
+def apply_korali_random_seed(
+    experiment,
+    seed: Optional[int],
+    *,
+    field_name: str = "Random Seed",
+) -> Optional[int]:
+    normalized = validate_korali_random_seed(seed, field_name=field_name)
+    if normalized is not None:
+        experiment["Random Seed"] = normalized
+    return normalized
 
 
 def configure_korali_conduit(
@@ -135,17 +171,28 @@ def get_fixed_parameters(config: Mapping[str, object]) -> dict[str, float]:
     }
 
 
+def _is_generic_emb_direct_phase1_contract(config: Mapping[str, object]) -> bool:
+    return (
+        str(config.get("phase1_contract_mode") or "")
+        == EMB_GENERIC_DIRECT_PHASE1_CONTRACT_MODE
+    )
+
+
 def active_variable_names(config: Mapping[str, object]) -> list[str]:
     structure = _config_structure(config)
     if structure == "gv":
         return list(GV_VARIABLE_ORDER)
     if structure != "emb":
         raise ValueError(f"Unsupported inference structure '{structure}'.")
+    if _is_generic_emb_direct_phase1_contract(config):
+        return list(EMB_DIRECT_PHASE1_VARIABLE_ORDER)
     fixed_params = get_fixed_parameters(config)
     return [name for name in FULL_VARIABLE_ORDER if name not in fixed_params]
 
 
 def active_hierarchical_variable_names(config: Mapping[str, object]) -> list[str]:
+    if _is_generic_emb_direct_phase1_contract(config):
+        return ["ka", "kb"]
     return [name for name in active_variable_names(config) if name != "sigma"]
 
 
@@ -241,10 +288,18 @@ def phase1_prior_specs(
     *,
     prior_d0: Optional[Sequence[float]] = None,
     prior_sigma: Optional[Sequence[float]] = None,
+    prior_overrides: Optional[Mapping[str, Sequence[float]]] = None,
     include_sigma: bool = True,
     include_d0: Optional[bool] = None,
 ) -> list[tuple[str, Sequence[float]]]:
+    overrides = dict(prior_overrides or {})
+
     def _bounds_for(name: str) -> Sequence[float]:
+        if name in overrides:
+            return overrides[name]
+        prefixed_name = f"prior_{name}"
+        if prefixed_name in overrides:
+            return overrides[prefixed_name]
         if name == "d0":
             return prior_d0 if prior_d0 is not None else config.get("prior_d0", [0.0, 0.5])
         if name == "sigma":

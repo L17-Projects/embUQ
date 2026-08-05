@@ -1,0 +1,106 @@
+{
+  "artifact_root_hint": "$MESOUQ_UQ_EMB_ARTIFACT_ROOT",
+  "artifact_set_dir": "frozen_legacy_paper_runtime_complete_202606",
+  "artifact_set_id": "frozen-legacy-paper-runtime-complete-202606",
+  "created_at_utc": "2026-08-04T13:19:04.338822+00:00",
+  "file_count": 9,
+  "files": [
+    {
+      "path": "legacy_tree/_paper/v3/scripts/generate_reduced_story_assets.py",
+      "sha256": "9e4eb7d6b4790f0690421b73c18f0edb4220ac9941b68ce30a889fb2f88426e0",
+      "size_bytes": 65814
+    },
+    {
+      "path": "legacy_tree/compression/src/parameters-default.emb.yaml",
+      "sha256": "3a77652a458ba9644fc1ffcbd823791b3a7e0b9765c49e7791f611f1c531458a",
+      "size_bytes": 1640
+    },
+    {
+      "path": "legacy_tree/huq_compression/__init__.py",
+      "sha256": "2c8033297ca19f3bd268c31520ad415e5a4ccff0a06a2add447915a535ca3beb",
+      "size_bytes": 1845
+    },
+    {
+      "path": "legacy_tree/huq_compression/diameters.py",
+      "sha256": "45b866de22de79d65735793a06369401a093d86161a47491ff9111a70e64fb9d",
+      "size_bytes": 7828
+    },
+    {
+      "path": "legacy_tree/huq_compression/logging_config.py",
+      "sha256": "5c7d8ce2e30685425e6056bfcc784e4fa628033571630118a28156ef98bc0ec5",
+      "size_bytes": 9691
+    },
+    {
+      "path": "legacy_tree/huq_compression/parameters.py",
+      "sha256": "3fed31578c87f9d44f0454dc22332eb806f1ca4c302ec69a18a979c1ffff1270",
+      "size_bytes": 15788
+    },
+    {
+      "path": "legacy_tree/huq_compression/predictive_statistics.py",
+      "sha256": "ce714ef7fe7349b8e3a7d9a6a440106129885c3c3447e7f237ee3ec9e5e2bf56",
+      "size_bytes": 6669
+    },
+    {
+      "path": "legacy_tree/huq_compression/surrogate_registry.py",
+      "sha256": "bb6341a0bc21e84cc818934e3e2b7f5903032d8cbe49ddb25599188ab3fee5cd",
+      "size_bytes": 9833
+    },
+    {
+      "path": "legacy_tree/indentation/src/parameters-default.emb.yaml",
+      "sha256": "df3ad66550d3237ff9be5b177336f5ddf962f9e417a14656bfe3ca5906316bbf",
+      "size_bytes": 1275
+    }
+  ],
+  "locked": true,
+  "logical_size_bytes": 120383,
+  "paper_id": "UQ_EMB",
+  "schema_version": "1.0",
+  "selections": [
+    {
+      "artifact_id": "june-reduced-story-renderer",
+      "destination": "legacy_tree/_paper/v3/scripts/generate_reduced_story_assets.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/_paper/v3/scripts/generate_reduced_story_assets.py"
+    },
+    {
+      "artifact_id": "june-huq-init",
+      "destination": "legacy_tree/huq_compression/__init__.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/huq_compression/__init__.py"
+    },
+    {
+      "artifact_id": "june-huq-diameters",
+      "destination": "legacy_tree/huq_compression/diameters.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/huq_compression/diameters.py"
+    },
+    {
+      "artifact_id": "june-huq-logging",
+      "destination": "legacy_tree/huq_compression/logging_config.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/huq_compression/logging_config.py"
+    },
+    {
+      "artifact_id": "june-huq-parameters",
+      "destination": "legacy_tree/huq_compression/parameters.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/huq_compression/parameters.py"
+    },
+    {
+      "artifact_id": "june-huq-predictive-statistics",
+      "destination": "legacy_tree/huq_compression/predictive_statistics.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/huq_compression/predictive_statistics.py"
+    },
+    {
+      "artifact_id": "june-huq-surrogate-registry",
+      "destination": "legacy_tree/huq_compression/surrogate_registry.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/huq_compression/surrogate_registry.py"
+    },
+    {
+      "artifact_id": "june-compression-default-parameters",
+      "destination": "legacy_tree/compression/src/parameters-default.emb.yaml",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/compression/src/parameters-default.emb.yaml"
+    },
+    {
+      "artifact_id": "june-indentation-default-parameters",
+      "destination": "legacy_tree/indentation/src/parameters-default.emb.yaml",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/indentation/src/parameters-default.emb.yaml"
+    }
+  ],
+  "source_spec": "papers/UQ_EMB/manifests/frozen_legacy_paper_runtime_complete_202606.staging.json"
+}

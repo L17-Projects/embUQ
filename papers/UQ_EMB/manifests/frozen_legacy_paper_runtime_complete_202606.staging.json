@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0",
+  "paper_id": "UQ_EMB",
+  "artifact_set_id": "frozen-legacy-paper-runtime-complete-202606",
+  "artifact_set_dir": "frozen_legacy_paper_runtime_complete_202606",
+  "locked": true,
+  "source_spec_hint": "papers/UQ_EMB/manifests/frozen_legacy_paper_runtime_complete_202606.staging.json",
+  "destination_root": "$MESOUQ_UQ_EMB_ARTIFACT_ROOT",
+  "entries": [
+    {
+      "artifact_id": "june-reduced-story-renderer",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/_paper/v3/scripts/generate_reduced_story_assets.py",
+      "destination": "legacy_tree/_paper/v3/scripts/generate_reduced_story_assets.py"
+    },
+    {
+      "artifact_id": "june-huq-init",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/huq_compression/__init__.py",
+      "destination": "legacy_tree/huq_compression/__init__.py"
+    },
+    {
+      "artifact_id": "june-huq-diameters",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/huq_compression/diameters.py",
+      "destination": "legacy_tree/huq_compression/diameters.py"
+    },
+    {
+      "artifact_id": "june-huq-logging",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/huq_compression/logging_config.py",
+      "destination": "legacy_tree/huq_compression/logging_config.py"
+    },
+    {
+      "artifact_id": "june-huq-parameters",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/huq_compression/parameters.py",
+      "destination": "legacy_tree/huq_compression/parameters.py"
+    },
+    {
+      "artifact_id": "june-huq-predictive-statistics",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/huq_compression/predictive_statistics.py",
+      "destination": "legacy_tree/huq_compression/predictive_statistics.py"
+    },
+    {
+      "artifact_id": "june-huq-surrogate-registry",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/huq_compression/surrogate_registry.py",
+      "destination": "legacy_tree/huq_compression/surrogate_registry.py"
+    },
+    {
+      "artifact_id": "june-compression-default-parameters",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/compression/src/parameters-default.emb.yaml",
+      "destination": "legacy_tree/compression/src/parameters-default.emb.yaml"
+    },
+    {
+      "artifact_id": "june-indentation-default-parameters",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/jcp_june02_repro_audit_20260628/jcp_june02_repro_bundle/workspace/UQ_DPD/Hierarchical_UQ_compression/indentation/src/parameters-default.emb.yaml",
+      "destination": "legacy_tree/indentation/src/parameters-default.emb.yaml"
+    }
+  ]
+}

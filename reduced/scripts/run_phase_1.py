@@ -28,6 +28,7 @@ def main() -> int:
     parser.add_argument("--restart", action="store_true", default=False)
     parser.add_argument("--dry_run", action="store_true", default=False)
     parser.add_argument("--device", choices=["cpu", "gpu"], default="cpu")
+    parser.add_argument("--korali-random-seed", type=int, default=None)
     args = parser.parse_args()
 
     cmd = [
@@ -45,6 +46,8 @@ def main() -> int:
     if args.dry_run:
         cmd.append("--dry_run")
     cmd.extend(["--device", args.device])
+    if args.korali_random_seed is not None:
+        cmd.extend(["--korali-random-seed", str(args.korali_random_seed)])
     return subprocess.call(cmd, cwd=str(PROJECT_ROOT))
 
 

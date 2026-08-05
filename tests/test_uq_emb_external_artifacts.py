@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -42,6 +45,12 @@ def _spec(tmp_path: Path, source: Path) -> Path:
     return path
 
 
+def _snapshot(module, spec: Path, manifest: Path) -> bytes:
+    report = module.snapshot_manifest(spec_path=spec, manifest_path=manifest)
+    assert report["status"] == "PASS"
+    return manifest.read_bytes()
+
+
 def test_external_artifact_stage_and_verify(tmp_path: Path) -> None:
     module = _load_script()
     source = tmp_path / "source"
@@ -51,11 +60,13 @@ def test_external_artifact_stage_and_verify(tmp_path: Path) -> None:
     manifest = tmp_path / "manifest.json"
 
     plan = module.plan_staging(spec)
+    manifest_before = _snapshot(module, spec, manifest)
     report = module.stage_artifacts(spec_path=spec, manifest_path=manifest)
 
     assert plan["status"] == "PASS"
     assert plan["file_count"] == 1
     assert report["status"] == "PASS"
+    assert manifest.read_bytes() == manifest_before
     assert (tmp_path / "artifacts" / "fixture-v1" / "inputs" / "input.csv").is_file()
 
 
@@ -71,6 +82,7 @@ def test_external_artifact_stage_preserves_internal_hardlinks(tmp_path: Path) ->
     manifest = tmp_path / "manifest.json"
 
     plan = module.plan_staging(spec)
+    _snapshot(module, spec, manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     staged = tmp_path / "artifacts" / "fixture-v1" / "inputs"
 
@@ -139,6 +151,7 @@ def test_external_artifact_verify_detects_mutation(tmp_path: Path) -> None:
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    _snapshot(module, spec, manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     staged_file = tmp_path / "artifacts" / "fixture-v1" / "inputs" / "input.csv"
     staged_file.write_text("mutated\n", encoding="utf-8")
@@ -156,6 +169,7 @@ def test_external_artifact_verify_cli_rejects_symlinked_root(tmp_path: Path) -> 
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    _snapshot(module, spec, manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     root = tmp_path / "artifacts" / "fixture-v1"
     alias = tmp_path / "artifact-alias"
@@ -186,6 +200,7 @@ def test_external_artifact_verify_cli_rejects_symlinked_root_parent(
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    _snapshot(module, spec, manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     artifact_parent = tmp_path / "artifacts"
     alias_parent = tmp_path / "artifact-parent-alias"
@@ -214,6 +229,7 @@ def test_external_artifact_verify_rejects_report_inside_root(tmp_path: Path) -> 
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    _snapshot(module, spec, manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     root = tmp_path / "artifacts" / "fixture-v1"
     report = root / "verification.json"
@@ -247,6 +263,7 @@ def test_external_artifact_verify_rejects_aliased_report_inside_root(
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    _snapshot(module, spec, manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     artifact_parent = tmp_path / "artifacts"
     root = artifact_parent / "fixture-v1"
@@ -283,6 +300,7 @@ def test_external_artifact_verify_rejects_report_overwriting_manifest(
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    _snapshot(module, spec, manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     original_manifest = manifest.read_bytes()
     root = tmp_path / "artifacts" / "fixture-v1"
@@ -316,6 +334,7 @@ def test_external_artifact_verify_rejects_report_hardlinked_to_manifest(
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    _snapshot(module, spec, manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     original_manifest = manifest.read_bytes()
     root = tmp_path / "artifacts" / "fixture-v1"
@@ -351,6 +370,7 @@ def test_external_artifact_verify_rejects_report_hardlinked_to_artifact(
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    _snapshot(module, spec, manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     root = tmp_path / "artifacts" / "fixture-v1"
     staged_file = root / "inputs" / "input.csv"
@@ -411,45 +431,50 @@ def test_external_artifact_stage_rejects_duplicate_artifact_ids(tmp_path: Path) 
         raise AssertionError("Expected duplicate artifact IDs to be rejected")
 
 
-def test_external_artifact_stage_preserves_existing_locked_manifest(tmp_path: Path) -> None:
+def test_external_artifact_stage_requires_existing_locked_manifest(tmp_path: Path) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+
+    with pytest.raises(FileNotFoundError, match="snapshot command"):
+        module.stage_artifacts(spec_path=spec, manifest_path=tmp_path / "missing.json")
+
+
+def test_external_artifact_snapshot_refuses_manifest_overwrite(tmp_path: Path) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    manifest = tmp_path / "manifest.json"
+    original = _snapshot(module, spec, manifest)
+
+    with pytest.raises(FileExistsError):
+        module.snapshot_manifest(spec_path=spec, manifest_path=manifest)
+
+    assert manifest.read_bytes() == original
+
+
+def test_external_artifact_stage_rejects_source_mutation_without_manifest_churn(
+    tmp_path: Path,
+) -> None:
     module = _load_script()
     source = tmp_path / "source"
     source.mkdir()
     source_file = source / "input.csv"
-    source_file.write_text("accepted\n", encoding="utf-8")
+    source_file.write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
-    accepted_entry = {
-        "path": "inputs/input.csv",
-        "size_bytes": source_file.stat().st_size,
-        "sha256": module._sha256(source_file),
-    }
-    manifest.write_text(
-        json.dumps(
-            {
-                "schema_version": module.SCHEMA_VERSION,
-                "paper_id": module.PAPER_ID,
-                "artifact_set_id": "fixture",
-                "artifact_set_dir": "fixture-v1",
-                "locked": True,
-                "file_count": 1,
-                "logical_size_bytes": accepted_entry["size_bytes"],
-                "files": [accepted_entry],
-            }
-        ),
-        encoding="utf-8",
-    )
-    locked_bytes = manifest.read_bytes()
-    source_file.write_text("mutated\n", encoding="utf-8")
+    original = _snapshot(module, spec, manifest)
+    original_sha = hashlib.sha256(original).hexdigest()
+    source_file.write_text("x,y\n9,9\n", encoding="utf-8")
 
-    try:
+    with pytest.raises(RuntimeError, match="verification failed"):
         module.stage_artifacts(spec_path=spec, manifest_path=manifest)
-    except RuntimeError as exc:
-        assert "verification failed" in str(exc)
-    else:
-        raise AssertionError("Expected source drift from the locked manifest to be rejected")
 
-    assert manifest.read_bytes() == locked_bytes
+    assert hashlib.sha256(manifest.read_bytes()).hexdigest() == original_sha
     assert not (tmp_path / "artifacts" / "fixture-v1").exists()
 
 
@@ -461,27 +486,7 @@ def test_external_artifact_stage_accepts_existing_locked_manifest(tmp_path: Path
     source_file.write_text("accepted\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
-    accepted_entry = {
-        "path": "inputs/input.csv",
-        "size_bytes": source_file.stat().st_size,
-        "sha256": module._sha256(source_file),
-    }
-    manifest.write_text(
-        json.dumps(
-            {
-                "schema_version": module.SCHEMA_VERSION,
-                "paper_id": module.PAPER_ID,
-                "artifact_set_id": "fixture",
-                "artifact_set_dir": "fixture-v1",
-                "locked": True,
-                "file_count": 1,
-                "logical_size_bytes": accepted_entry["size_bytes"],
-                "files": [accepted_entry],
-            }
-        ),
-        encoding="utf-8",
-    )
-    locked_bytes = manifest.read_bytes()
+    locked_bytes = _snapshot(module, spec, manifest)
 
     report = module.stage_artifacts(spec_path=spec, manifest_path=manifest)
 
@@ -564,6 +569,7 @@ def test_external_artifact_verifier_rejects_manifest_hardlinked_to_artifact(
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    module.snapshot_manifest(spec_path=spec, manifest_path=manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     root = tmp_path / "artifacts" / "fixture-v1"
     staged_file = root / "inputs" / "input.csv"
@@ -578,7 +584,7 @@ def test_external_artifact_verifier_rejects_manifest_hardlinked_to_artifact(
         raise AssertionError("Expected an artifact-hardlinked manifest to be rejected")
 
 
-def test_external_artifact_manifest_publication_failure_removes_artifact_root(
+def test_external_artifact_snapshot_publication_failure_does_not_publish(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -589,12 +595,12 @@ def test_external_artifact_manifest_publication_failure_removes_artifact_root(
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
 
-    def fail_replace(*_args, **_kwargs):
+    def fail_link(*_args, **_kwargs):
         raise OSError("injected manifest publication failure")
 
-    monkeypatch.setattr(module.os, "replace", fail_replace)
+    monkeypatch.setattr(module.os, "link", fail_link)
     try:
-        module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+        module.snapshot_manifest(spec_path=spec, manifest_path=manifest)
     except OSError as exc:
         assert "injected manifest publication failure" in str(exc)
     else:
@@ -614,6 +620,8 @@ def test_external_artifact_cancellation_removes_published_outputs(
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    module.snapshot_manifest(spec_path=spec, manifest_path=manifest)
+    locked_manifest = manifest.read_bytes()
     real_verify = module.verify_staged
     verification_count = 0
 
@@ -632,7 +640,7 @@ def test_external_artifact_cancellation_removes_published_outputs(
     else:
         raise AssertionError("Expected injected staging cancellation")
 
-    assert not manifest.exists()
+    assert manifest.read_bytes() == locked_manifest
     assert not (tmp_path / "artifacts" / "fixture-v1").exists()
     assert not list((tmp_path / "artifacts").glob(".staging-*"))
 
@@ -646,6 +654,7 @@ def test_external_artifact_verify_rejects_duplicate_manifest_paths(
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    module.snapshot_manifest(spec_path=spec, manifest_path=manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     payload["files"].append(dict(payload["files"][0]))
@@ -723,17 +732,13 @@ def test_external_artifact_stage_rejects_overlapping_target_files(tmp_path: Path
         encoding="utf-8",
     )
 
-    try:
+    with pytest.raises(ValueError, match="Overlapping artifact targets"):
         module.plan_staging(spec)
-    except ValueError as exc:
-        assert "Overlapping artifact targets" in str(exc)
-    else:
-        raise AssertionError("Expected overlapping staged file targets to be rejected")
 
 
 def test_external_artifact_stage_rejects_empty_environment_root(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module = _load_script()
     source = tmp_path / "source"
@@ -762,9 +767,5 @@ def test_external_artifact_stage_rejects_empty_environment_root(
         encoding="utf-8",
     )
 
-    try:
+    with pytest.raises(ValueError, match="Empty environment variable"):
         module.plan_staging(spec)
-    except ValueError as exc:
-        assert "Empty environment variable" in str(exc)
-    else:
-        raise AssertionError("Expected an empty artifact-root variable to be rejected")

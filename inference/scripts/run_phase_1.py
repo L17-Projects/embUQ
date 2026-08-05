@@ -16,14 +16,29 @@ sys.path.insert(0, str(PROJECT_ROOT / "emb" / "indentation"))
 sys.path.insert(0, str(PROJECT_ROOT / "emb" / "indentation" / "evalkit"))
 from meso_uq.config import resolve_inference_config_path
 from meso_uq.experiments import load_experiments
+from meso_uq.inference.emb_parameterization import (
+    DIRECT_KA_KB_SURROGATE_PARAMETERIZATION,
+    adapt_batch_sample_for_legacy_surrogate,
+    adapt_sample_for_legacy_surrogate,
+    is_generic_direct_phase1_contract,
+    resolve_direct_compression_surrogate_surface,
+    surrogate_parameterization_for_experiment,
+)
 from meso_uq.inference import run_gv_phase1_dnn_execution, write_gv_phase1_setup_manifest
+from meso_uq.inference.emb_resonance import (
+    compute_emb_resonance,
+    compute_emb_resonance_batch,
+    preload_emb_resonance,
+)
 from meso_uq.workflows.legacy import resolve_legacy_surrogate_backend
 from meso_uq.workflow_acceleration import (
+    apply_korali_random_seed,
     configure_device_conduit,
     configure_korali_conduit,
     phase1_prior_specs,
     require_single_rank,
     to_korali_path,
+    validate_korali_random_seed,
 )
 
 
@@ -113,6 +128,41 @@ def _working_directory(path: Path):
         os.chdir(previous)
 
 
+def _copy_adapted_sample_outputs(target: dict, source: dict) -> None:
+    for key, value in source.items():
+        if key in {"Parameters", "Batch Parameters"}:
+            continue
+        target[key] = value
+
+
+def _wrap_legacy_surrogate_model(delegate, *, config: dict[str, object], modality: str):
+    def _wrapped(sample, controls, diameter_um, device="cpu"):
+        adapted = adapt_sample_for_legacy_surrogate(
+            sample,
+            config=config,
+            modality=modality,
+            project_root=PROJECT_ROOT,
+        )
+        delegate(adapted, controls, diameter_um, device=device)
+        _copy_adapted_sample_outputs(sample, adapted)
+
+    return _wrapped
+
+
+def _wrap_legacy_surrogate_batch(delegate, *, config: dict[str, object], modality: str):
+    def _wrapped(sample, controls, diameter_um, device="cuda"):
+        adapted = adapt_batch_sample_for_legacy_surrogate(
+            sample,
+            config=config,
+            modality=modality,
+            project_root=PROJECT_ROOT,
+        )
+        delegate(adapted, controls, diameter_um, device=device)
+        _copy_adapted_sample_outputs(sample, adapted)
+
+    return _wrapped
+
+
 def _prepare_experiment_environment(experiments, rank: int, output_root: Path | None = None) -> None:
     if rank != 0:
         return
@@ -121,6 +171,13 @@ def _prepare_experiment_environment(experiments, rank: int, output_root: Path | 
         for diameter_um in exp.diameters:
             datedPrint(f"[Setup] Preparing {exp.name} environment for {diameter_um} μm")
             if exp.name == "compression":
+                if surrogate_parameterization_for_experiment(exp) == DIRECT_KA_KB_SURROGATE_PARAMETERIZATION:
+                    exp.get_reference_points(diameter_um)
+                    exp.get_reference_data(diameter_um)
+                    datedPrint(
+                        f"[Setup] Direct compression data ready for {exp.dataset_name(diameter_um)}"
+                    )
+                    continue
                 prepareCompression(
                     diameter_um,
                     data_dir=str(_experiment_data_dir(exp)),
@@ -135,6 +192,9 @@ def _prepare_experiment_environment(experiments, rank: int, output_root: Path | 
                     data_prefix=_experiment_data_prefix(exp),
                     data_file=str(_experiment_data_file(exp, diameter_um)),
                 )
+            elif exp.name == "resonance":
+                exp.get_reference_points(diameter_um)
+                exp.get_reference_data(diameter_um)
             else:
                 raise ValueError(f"Unsupported experiment type '{exp.name}'")
 
@@ -173,7 +233,11 @@ def run_inference(
     output_dir: str = "_setup",
     device: str = "cpu",
     setup_only: bool = False,
+    korali_random_seed: int | None = None,
 ):
+    korali_random_seed = validate_korali_random_seed(
+        korali_random_seed, field_name="--korali-random-seed"
+    )
     config_path_resolved = _resolve_config_path(config_path)
     with open(config_path_resolved, "rb") as handle:
         config = yaml.load(handle, Loader=yaml.CLoader)
@@ -191,6 +255,7 @@ def run_inference(
     burn_in = 0 if burn_in_value is None else int(burn_in_value)
     use_surrogate = config.get("use_surrogate", True)
     surrogate_backend = _resolve_surrogate_backend(config)
+    is_generic_direct_phase1 = is_generic_direct_phase1_contract(config)
 
     experiments = [exp for exp in load_experiments(config, PROJECT_ROOT) if exp.enabled]
     if experiments and any(getattr(exp, "structure", "emb") == "gv" for exp in experiments):
@@ -246,20 +311,31 @@ def run_inference(
         compute_indentation_surrogate_batch,
         preload_indentation_surrogate,
     )
+    direct_compression_surface = resolve_direct_compression_surrogate_surface if is_generic_direct_phase1 else None
 
     korali, MPI = _load_korali_runtime()
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
 
     if use_surrogate:
-        preload_map = {
-            "compression": preload_compression_surrogate,
-            "indentation": preload_indentation_surrogate,
-        }
         if rank == 0:
             datedPrint("[Korali] Preloading surrogate models")
         for exp in experiments:
-            preload_fn = preload_map.get(exp.name)
+            parameterization = surrogate_parameterization_for_experiment(exp)
+            if is_generic_direct_phase1 and parameterization == DIRECT_KA_KB_SURROGATE_PARAMETERIZATION:
+                if exp.name != "compression":
+                    raise NotImplementedError(
+                        "Direct ka/kb surrogate parameterization is only prepared for compression lanes. "
+                        "Use surrogate_parameterization=legacy_yt_kb for non-compression experiments."
+                    )
+                preload_fn, _compute_direct_fn, _compute_direct_batch_fn = direct_compression_surface()
+            else:
+                preload_map = {
+                    "compression": preload_compression_surrogate,
+                    "indentation": preload_indentation_surrogate,
+                    "resonance": preload_emb_resonance,
+                }
+                preload_fn = preload_map.get(exp.name)
             if preload_fn is None:
                 raise ValueError(
                     f"No surrogate preload function registered for experiment '{exp.name}'"
@@ -277,23 +353,61 @@ def run_inference(
     compute_surrogate_map = {
         "compression": compute_compression_surrogate,
         "indentation": compute_indentation_surrogate,
+        "resonance": compute_emb_resonance,
     }
     compute_batch_map = {
         "compression": compute_compression_surrogate_batch,
         "indentation": compute_indentation_surrogate_batch,
+        "resonance": compute_emb_resonance_batch,
     }
     compute_mirheo_map = {
         "compression": compute_compression,
     }
 
-    def resolve_compute_model(exp_name: str):
+    def resolve_compute_model(exp):
+        exp_name = exp.name
         if use_surrogate:
+            parameterization = surrogate_parameterization_for_experiment(exp)
+            if is_generic_direct_phase1 and parameterization == DIRECT_KA_KB_SURROGATE_PARAMETERIZATION:
+                if exp_name != "compression":
+                    raise NotImplementedError(
+                        "Direct ka/kb surrogate parameterization is only prepared for compression lanes. "
+                        "Use surrogate_parameterization=legacy_yt_kb for non-compression experiments."
+                    )
+                _preload_direct_fn, compute_direct_fn, _compute_direct_batch_fn = direct_compression_surface()
+                return compute_direct_fn
             if exp_name not in compute_surrogate_map:
                 raise ValueError(f"No surrogate model registered for experiment '{exp_name}'")
+            if is_generic_direct_phase1 and exp_name in {"compression", "indentation"}:
+                return _wrap_legacy_surrogate_model(
+                    compute_surrogate_map[exp_name],
+                    config=config,
+                    modality=exp_name,
+                )
             return compute_surrogate_map[exp_name]
         if exp_name not in compute_mirheo_map:
             raise NotImplementedError(f"Mirheo model not available for experiment '{exp_name}'")
         return compute_mirheo_map[exp_name]
+
+    def resolve_batch_model(exp):
+        exp_name = exp.name
+        parameterization = surrogate_parameterization_for_experiment(exp)
+        if is_generic_direct_phase1 and parameterization == DIRECT_KA_KB_SURROGATE_PARAMETERIZATION:
+            if exp_name != "compression":
+                raise NotImplementedError(
+                    "Direct ka/kb surrogate parameterization is only prepared for compression lanes. "
+                    "Use surrogate_parameterization=legacy_yt_kb for non-compression experiments."
+                )
+            _preload_direct_fn, _compute_direct_fn, compute_direct_batch_fn = direct_compression_surface()
+            return compute_direct_batch_fn
+        batch_fn = compute_batch_map[exp_name]
+        if is_generic_direct_phase1 and exp_name in {"compression", "indentation"}:
+            return _wrap_legacy_surrogate_batch(
+                batch_fn,
+                config=config,
+                modality=exp_name,
+            )
+        return batch_fn
 
     if restart:
         phase1_root = output_root / "results_phase_1"
@@ -311,8 +425,9 @@ def run_inference(
                     raise FileNotFoundError(
                         f"No previous state found for {exp_name} under {experiment_root}"
                     )
+                apply_korali_random_seed(e, korali_random_seed)
                 e["File Output"]["Use Multiple Files"] = False
-                compute_model = resolve_compute_model(exp.name)
+                compute_model = resolve_compute_model(exp)
                 reference_points = exp.get_reference_points(diameter_um)
                 reference_data = e["Problem"].get("Reference Data")
                 if reference_data is not None:
@@ -324,7 +439,7 @@ def run_inference(
                     )
                     e["Problem"]["Reference Data"] = reference_data
                 if device == "gpu" and use_surrogate:
-                    batch_fn = compute_batch_map[exp.name]
+                    batch_fn = resolve_batch_model(exp)
                     e["Problem"]["Use Batch Evaluation"] = True
                     e["Problem"]["Batch Computational Model"] = (
                         lambda s, d=diameter_um, pts=reference_points, dev=device, fn=batch_fn: fn(
@@ -383,10 +498,13 @@ def run_inference(
                 if rank == 0:
                     datedPrint(f"[Korali] Setting up experiment: {exp_name}")
                 e = korali.Experiment()
-                compute_model = resolve_compute_model(exp.name)
+                applied_seed = apply_korali_random_seed(e, korali_random_seed)
+                compute_model = resolve_compute_model(exp)
                 if rank == 0 and not e_list:
                     model_label = "surrogate" if use_surrogate else "Mirheo"
                     datedPrint(f"[Korali] Using {model_label} model for all experiments")
+                    if applied_seed is not None:
+                        datedPrint(f"[Korali] Random Seed: {applied_seed}")
                 reference_points = exp.get_reference_points(diameter_um)
                 reference_data = exp.get_reference_data(diameter_um)
                 reference_points, reference_data = _align_reference_data(
@@ -396,7 +514,7 @@ def run_inference(
                     rank,
                 )
                 if device == "gpu" and use_surrogate:
-                    batch_fn = compute_batch_map[exp.name]
+                    batch_fn = resolve_batch_model(exp)
                     e["Problem"]["Use Batch Evaluation"] = True
                     e["Problem"]["Batch Computational Model"] = (
                         lambda s, d=diameter_um, pts=reference_points, dev=device, fn=batch_fn: fn(
@@ -433,10 +551,15 @@ def run_inference(
                 if max_gen > 0:
                     e["Solver"]["Termination Criteria"]["Max Generations"] = max_gen
 
+                prior_override_fn = getattr(exp, "phase1_prior_overrides", None)
+                prior_overrides = (
+                    prior_override_fn(diameter_um) if prior_override_fn is not None else {}
+                )
                 prior_specs = phase1_prior_specs(
                     config,
                     prior_d0=exp.prior_d0 or config.get("prior_d0", [0.0, 0.5]),
                     prior_sigma=exp.prior_sigma or config["prior_sigma"],
+                    prior_overrides=prior_overrides,
                 )
                 for i, (name, bounds) in enumerate(prior_specs):
                     e["Distributions"][i]["Name"] = f"Prior {name}"
@@ -486,6 +609,15 @@ def main(argv):
         default="cpu",
         help="cpu: Distributed MPI conduit; gpu: Sequential GPU-batch conduit (single rank)",
     )
+    parser.add_argument(
+        "--korali-random-seed",
+        type=int,
+        default=None,
+        help=(
+            "Positive nonzero Korali Random Seed. Omit to preserve Korali/default "
+            "stochastic initialization."
+        ),
+    )
     args = parser.parse_args()
 
     run_inference(
@@ -496,6 +628,7 @@ def main(argv):
         output_dir=args.output_dir,
         device=args.device,
         setup_only=args.setup_only,
+        korali_random_seed=args.korali_random_seed,
     )
 
 
