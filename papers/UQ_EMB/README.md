@@ -60,6 +60,14 @@ Definity `d2` acoustic check is retained with its exact near-MAP provenance
 (0.1482% relative offset in `k_a`) in the machine-readable collection
 manifest.
 
+The historical runtime captures are intentionally asymmetric. The SonoVue
+run copied six mechanical reference-data files into `_runtime`; those bytes
+are also present in the frozen dependency set. The accepted Definity
+materialization recorded `copied_file_count: 0`, so no Definity `_runtime`
+directory existed to freeze. Replays reconstruct both agents from the locked
+mechanical and acoustic inputs in the dependency set rather than relying on
+either historical convenience directory.
+
 Define the two site-independent roots before using the staging commands:
 
 ```bash
@@ -92,7 +100,7 @@ Verify an existing staged set without modifying it:
   --manifest papers/UQ_EMB/manifests/accepted_production_outputs_202607.files.json
 ```
 
-The DNN weights, force-spectroscopy inputs, acoustic observations, 736 physical
+The accepted DNN weights, force-spectroscopy inputs, acoustic observations, 736 physical
 frequency labels, polynomial coefficients and banks, mass-scaling evidence,
 and surrogate audit records form a separate immutable dependency set. Stage
 and verify it with:
@@ -106,6 +114,13 @@ export MESOUQ_WORKSPACE_ROOT=/home/it4i-bbenvegnen/workspace
   --root "${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/frozen_runtime_dependencies_202607" \
   --manifest papers/UQ_EMB/manifests/frozen_runtime_dependencies_202607.files.json
 ```
+
+This paper contract uses the deterministic `*_BEST.pkl` DNN artifacts. BNN
+training, Sobol, and group-holdout lanes are optional validation workflows and
+are not claimed as reproducible from this manuscript dependency set. A retained
+3.2-um BNN checkpoint is historical evidence, not a declaration that BNN
+weights exist for every accepted diameter; no accepted HBI, direct-DPD, figure,
+or manuscript replay consumes it.
 
 ## Planned command surface
 

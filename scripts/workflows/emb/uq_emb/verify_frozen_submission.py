@@ -265,8 +265,28 @@ def create_snapshot(
     _enforce_snapshot_size_limits(source_entries)
     source_total = _total_size(source_entries)
 
+    # A checked-in manifest is an immutable acceptance record. A later snapshot
+    # invocation may recreate a missing destination from the same source, but it
+    # must never silently replace the record to accommodate source drift.
+    existing_manifest = manifest_path.exists()
+    if existing_manifest:
+        source_report = verify_snapshot(root=source, manifest_path=manifest_path)
+        if source_report["status"] != "PASS":
+            raise RuntimeError(
+                "Snapshot source drifted from the existing locked manifest: "
+                f"{json.dumps(source_report, sort_keys=True)}"
+            )
+
     if destination.exists():
-        raise ValueError(f"Snapshot destination must be absent: {destination}")
+        if not existing_manifest:
+            raise ValueError(f"Snapshot destination must be absent: {destination}")
+        report = verify_snapshot(root=destination, manifest_path=manifest_path)
+        if report["status"] != "PASS":
+            raise RuntimeError(
+                "Existing snapshot destination drifted from the locked manifest: "
+                f"{json.dumps(report, sort_keys=True)}"
+            )
+        return report
     destination.parent.mkdir(parents=True, exist_ok=True)
     _reject_symlink_alias(destination.parent, label="Snapshot destination parent")
     free_bytes = shutil.disk_usage(destination.parent).free
@@ -292,26 +312,31 @@ def create_snapshot(
         if source_entries != copied_entries:
             raise RuntimeError("Copied snapshot does not match source checksums, sizes, and paths")
 
-        payload = {
-            "schema_version": SCHEMA_VERSION,
-            "paper_id": PAPER_ID,
-            "snapshot_id": snapshot_id,
-            "locked": True,
-            "created_at_utc": datetime.now(timezone.utc).isoformat(),
-            "source_hint": source_hint,
-            "snapshot_root": destination.as_posix(),
-            "file_count": len(copied_entries),
-            "total_size_bytes": _total_size(copied_entries),
-            "files": copied_entries,
-        }
-        temporary_manifest = _write_json_temporary(manifest_path, payload)
-        preflight = verify_snapshot(root=temporary_root, manifest_path=temporary_manifest)
+        if existing_manifest:
+            manifest_for_verification = manifest_path
+        else:
+            payload = {
+                "schema_version": SCHEMA_VERSION,
+                "paper_id": PAPER_ID,
+                "snapshot_id": snapshot_id,
+                "locked": True,
+                "created_at_utc": datetime.now(timezone.utc).isoformat(),
+                "source_hint": source_hint,
+                "snapshot_root": destination.as_posix(),
+                "file_count": len(copied_entries),
+                "total_size_bytes": _total_size(copied_entries),
+                "files": copied_entries,
+            }
+            temporary_manifest = _write_json_temporary(manifest_path, payload)
+            manifest_for_verification = temporary_manifest
+        preflight = verify_snapshot(root=temporary_root, manifest_path=manifest_for_verification)
         if preflight["status"] != "PASS":
             raise RuntimeError(f"Post-copy verification failed: {json.dumps(preflight, sort_keys=True)}")
         temporary_root.rename(destination)
         published = True
-        os.replace(temporary_manifest, manifest_path)
-        temporary_manifest = None
+        if temporary_manifest is not None:
+            os.replace(temporary_manifest, manifest_path)
+            temporary_manifest = None
         report = verify_snapshot(root=destination, manifest_path=manifest_path)
         if report["status"] != "PASS":
             raise RuntimeError(f"Post-publication verification failed: {json.dumps(report, sort_keys=True)}")

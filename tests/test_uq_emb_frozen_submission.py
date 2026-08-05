@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -372,6 +373,73 @@ def test_snapshot_copies_within_size_limits(tmp_path: Path) -> None:
 
     assert report["status"] == "PASS"
     assert (destination / "main.tex").read_text(encoding="utf-8") == "main\n"
+
+
+def test_snapshot_existing_manifest_rejects_source_drift_without_replacement(tmp_path: Path) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    source_file = source / "main.tex"
+    source_file.write_text("original\n", encoding="utf-8")
+    destination = tmp_path / "destination"
+    manifest_path = tmp_path / "manifest.json"
+    module.create_snapshot(
+        source=source,
+        destination=destination,
+        manifest_path=manifest_path,
+        snapshot_id="fixture",
+        source_hint="fixture",
+    )
+    original_manifest = manifest_path.read_bytes()
+    source_file.write_text("drifted\n", encoding="utf-8")
+    shutil.rmtree(destination)
+
+    try:
+        module.create_snapshot(
+            source=source,
+            destination=destination,
+            manifest_path=manifest_path,
+            snapshot_id="replacement-attempt",
+            source_hint="replacement-attempt",
+        )
+    except RuntimeError as exc:
+        assert "source drifted" in str(exc)
+    else:
+        raise AssertionError("Expected source drift against an existing manifest to fail")
+
+    assert manifest_path.read_bytes() == original_manifest
+    assert not destination.exists()
+
+
+def test_snapshot_existing_manifest_recreates_matching_destination_without_replacement(
+    tmp_path: Path,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "main.tex").write_text("original\n", encoding="utf-8")
+    destination = tmp_path / "destination"
+    manifest_path = tmp_path / "manifest.json"
+    module.create_snapshot(
+        source=source,
+        destination=destination,
+        manifest_path=manifest_path,
+        snapshot_id="fixture",
+        source_hint="fixture",
+    )
+    original_manifest = manifest_path.read_bytes()
+    shutil.rmtree(destination)
+
+    report = module.create_snapshot(
+        source=source,
+        destination=destination,
+        manifest_path=manifest_path,
+        snapshot_id="replacement-attempt",
+        source_hint="replacement-attempt",
+    )
+
+    assert report["status"] == "PASS"
+    assert manifest_path.read_bytes() == original_manifest
     assert manifest_path.is_file()
 
 
