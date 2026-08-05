@@ -426,3 +426,45 @@ def test_replay_receipt_verifies_consumed_artifact_content(
             runner=runner,
             consumed_paths=[artifact_root],
         )
+
+
+def test_replay_output_must_remain_outside_consumed_locked_roots(tmp_path: Path) -> None:
+    module = _load_module()
+    repo_root = tmp_path / "repo"
+    manifest_root = repo_root / "papers" / "UQ_EMB" / "manifests"
+    manifest_root.mkdir(parents=True)
+    artifact_root = tmp_path / "artifacts" / "frozen_runtime_dependencies_202607"
+    artifact_root.mkdir(parents=True)
+    dependency = artifact_root / "dependency.bin"
+    dependency.write_bytes(b"locked")
+
+    for name in module.DEFAULT_CLOSEOUT_MANIFESTS:
+        artifact_set_dir = name.removesuffix(".files.json")
+        files: list[Path] = []
+        root = tmp_path / "artifacts" / artifact_set_dir
+        root.mkdir(exist_ok=True)
+        if name == "frozen_runtime_dependencies_202607.files.json":
+            root = artifact_root
+            files = [dependency]
+        _write_manifest(
+            manifest_root / name,
+            artifact_set_dir=artifact_set_dir,
+            files=files,
+            root=root,
+        )
+
+    forbidden = artifact_root / "rendered"
+    with pytest.raises(ValueError, match="outside immutable consumed artifact roots"):
+        module.require_output_outside_consumed_roots(
+            output_path=forbidden,
+            repo_root=repo_root,
+            consumed_paths=[dependency],
+        )
+    assert not forbidden.exists()
+
+    allowed = tmp_path / "rendered"
+    assert module.require_output_outside_consumed_roots(
+        output_path=allowed,
+        repo_root=repo_root,
+        consumed_paths=[dependency],
+    ) == allowed.resolve()

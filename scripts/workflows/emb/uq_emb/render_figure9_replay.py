@@ -20,7 +20,10 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[3]
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from replay_provenance import replay_receipt_provenance  # noqa: E402
+from replay_provenance import (  # noqa: E402
+    replay_receipt_provenance,
+    require_output_outside_consumed_roots,
+)
 
 
 SCHEMA_VERSION = "mesouq.uq_emb.figure9_replay.v1"
@@ -124,7 +127,22 @@ def render_figure9(
     conversion_constants = conversion_constants.expanduser().resolve()
     tex_bin_dir = tex_bin_dir.expanduser().resolve()
     texdeps_dir = texdeps_dir.expanduser().resolve()
-    output_root = output_root.expanduser().resolve()
+    baseline_pdf = baseline_pdf.expanduser().resolve() if baseline_pdf is not None else None
+    consumed_paths = [
+        renderer,
+        accepted_root,
+        plotting_root,
+        old_generator,
+        conversion_constants,
+        tex_bin_dir,
+        texdeps_dir,
+        *([baseline_pdf] if baseline_pdf is not None else []),
+    ]
+    output_root = require_output_outside_consumed_roots(
+        output_path=output_root,
+        repo_root=REPO_ROOT,
+        consumed_paths=consumed_paths,
+    )
     if output_root.exists() and any(output_root.iterdir()):
         raise FileExistsError(f"Refusing to use non-empty Figure 9 output: {output_root}")
     output_root.mkdir(parents=True, exist_ok=True)
@@ -194,7 +212,6 @@ def render_figure9(
     raster_sha = _raster_sha256(output_pdf)
     baseline = None
     if baseline_pdf is not None:
-        baseline_pdf = baseline_pdf.expanduser().resolve()
         baseline_raster = _raster_sha256(baseline_pdf)
         baseline = {
             "path": str(baseline_pdf),
@@ -211,16 +228,7 @@ def render_figure9(
         "execution_provenance": replay_receipt_provenance(
             repo_root=REPO_ROOT,
             runner=Path(__file__),
-            consumed_paths=[
-                renderer,
-                accepted_root,
-                plotting_root,
-                old_generator,
-                conversion_constants,
-                tex_bin_dir,
-                texdeps_dir,
-                *([baseline_pdf] if baseline_pdf is not None else []),
-            ],
+            consumed_paths=consumed_paths,
         ),
         "renderer": {"path": str(renderer), "sha256": _sha256(renderer)},
         "base_renderer": {"path": str(module.BASE), "sha256": _sha256(module.BASE)},

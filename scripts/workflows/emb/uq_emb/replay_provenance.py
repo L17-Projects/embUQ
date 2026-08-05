@@ -176,6 +176,67 @@ def _artifact_root_for_path(path: Path, artifact_set_dir: str) -> Path | None:
     return None
 
 
+def _consumed_locked_roots(
+    *,
+    repo_root: Path,
+    consumed_paths: Iterable[Path],
+    payloads: Mapping[str, Mapping[str, Any]],
+) -> dict[tuple[str, Path], None]:
+    resolved_consumed = [
+        _checked_resolved_path(path, label="consumed path") for path in consumed_paths
+    ]
+    roots: dict[tuple[str, Path], None] = {}
+    editor_root = repo_root / "papers" / "UQ_EMB" / "editor_submission" / "review2_v1"
+    for consumed in resolved_consumed:
+        if consumed == editor_root or editor_root in consumed.parents:
+            roots[("editor_submission_review2_v1.json", editor_root)] = None
+            continue
+        if consumed == repo_root or repo_root in consumed.parents:
+            continue
+        matched = False
+        for name, payload in payloads.items():
+            artifact_set_dir = payload.get("artifact_set_dir")
+            if not isinstance(artifact_set_dir, str) or not artifact_set_dir:
+                continue
+            root = _artifact_root_for_path(consumed, artifact_set_dir)
+            if root is not None:
+                roots[(name, root)] = None
+                matched = True
+                break
+        if not matched:
+            raise ValueError(
+                f"External replay input is not covered by a locked UQ_EMB manifest: {consumed}"
+            )
+    return roots
+
+
+def require_output_outside_consumed_roots(
+    *, output_path: Path, repo_root: Path, consumed_paths: Iterable[Path]
+) -> Path:
+    """Reject replay output paths inside any immutable input artifact set."""
+    repo_root = _checked_resolved_path(repo_root, label="repository root")
+    output_path = _checked_resolved_path(output_path, label="output path")
+    manifest_root = repo_root / "papers" / "UQ_EMB" / "manifests"
+    payloads = {
+        name: _locked_manifest(manifest_root / name) for name in DEFAULT_CLOSEOUT_MANIFESTS
+    }
+    locked_roots = _consumed_locked_roots(
+        repo_root=repo_root,
+        consumed_paths=consumed_paths,
+        payloads=payloads,
+    )
+    for _name, locked_root in locked_roots:
+        try:
+            output_path.relative_to(locked_root)
+        except ValueError:
+            continue
+        raise ValueError(
+            "Replay output must remain outside immutable consumed artifact roots: "
+            f"output={output_path}, locked_root={locked_root}"
+        )
+    return output_path
+
+
 def _git(repo_root: Path, *args: str) -> str:
     result = subprocess.run(
         ["git", *args],
@@ -231,31 +292,11 @@ def replay_receipt_provenance(
         payloads[name] = _locked_manifest(path)
         manifests[name] = {"path": str(path), "sha256": sha256(path)}
 
-    resolved_consumed = [
-        _checked_resolved_path(path, label="consumed path") for path in consumed_paths
-    ]
-    roots_to_verify: dict[tuple[str, Path], None] = {}
-    editor_root = repo_root / "papers" / "UQ_EMB" / "editor_submission" / "review2_v1"
-    for consumed in resolved_consumed:
-        if consumed == editor_root or editor_root in consumed.parents:
-            roots_to_verify[("editor_submission_review2_v1.json", editor_root)] = None
-            continue
-        if consumed == repo_root or repo_root in consumed.parents:
-            continue
-        matched = False
-        for name, payload in payloads.items():
-            artifact_set_dir = payload.get("artifact_set_dir")
-            if not isinstance(artifact_set_dir, str) or not artifact_set_dir:
-                continue
-            root = _artifact_root_for_path(consumed, artifact_set_dir)
-            if root is not None:
-                roots_to_verify[(name, root)] = None
-                matched = True
-                break
-        if not matched:
-            raise ValueError(
-                f"External replay input is not covered by a locked UQ_EMB manifest: {consumed}"
-            )
+    roots_to_verify = _consumed_locked_roots(
+        repo_root=repo_root,
+        consumed_paths=consumed_paths,
+        payloads=payloads,
+    )
 
     verified_sets = {
         f"{name}:{root}": verify_locked_artifact_root(

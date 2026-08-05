@@ -26,7 +26,10 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[3]
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from replay_provenance import replay_receipt_provenance  # noqa: E402
+from replay_provenance import (  # noqa: E402
+    replay_receipt_provenance,
+    require_output_outside_consumed_roots,
+)
 
 
 SCHEMA_VERSION = "mesouq.uq_emb.figure7_replay.v1"
@@ -132,7 +135,23 @@ def render_figure7(
     renderer_inputs = renderer_inputs.expanduser().resolve()
     phase1_overlay = phase1_overlay.expanduser().resolve()
     phase1_manifest = phase1_manifest.expanduser().resolve()
-    output_dir = output_dir.expanduser().resolve()
+    tex_bin_dir = tex_bin_dir.expanduser().resolve() if tex_bin_dir is not None else None
+    texdeps_dir = texdeps_dir.expanduser().resolve() if texdeps_dir is not None else None
+    baseline_pdf = baseline_pdf.expanduser().resolve() if baseline_pdf is not None else None
+    consumed_paths = [
+        code_root,
+        renderer_inputs,
+        phase1_overlay,
+        phase1_manifest,
+        *([tex_bin_dir] if tex_bin_dir is not None else []),
+        *([texdeps_dir] if texdeps_dir is not None else []),
+        *([baseline_pdf] if baseline_pdf is not None else []),
+    ]
+    output_dir = require_output_outside_consumed_roots(
+        output_path=output_dir,
+        repo_root=REPO_ROOT,
+        consumed_paths=consumed_paths,
+    )
     if output_dir.exists() and any(output_dir.iterdir()):
         raise FileExistsError(f"Refusing to use non-empty Figure 7 output: {output_dir}")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -166,9 +185,9 @@ def render_figure7(
                 os.environ[name] = value
 
     if tex_bin_dir is not None:
-        renderer.base.TINYTEX_BIN = tex_bin_dir.expanduser().resolve()
+        renderer.base.TINYTEX_BIN = tex_bin_dir
     if texdeps_dir is not None:
-        renderer.base.TEXDEPS_DIR = texdeps_dir.expanduser().resolve()
+        renderer.base.TEXDEPS_DIR = texdeps_dir
 
     overlay, overlay_report = _load_overlay(phase1_overlay, phase1_manifest)
 
@@ -249,7 +268,6 @@ def render_figure7(
     raster_sha = _raster_sha256(output_pdf)
     baseline = None
     if baseline_pdf is not None:
-        baseline_pdf = baseline_pdf.expanduser().resolve()
         baseline_raster = _raster_sha256(baseline_pdf)
         baseline = {
             "path": str(baseline_pdf),
@@ -266,15 +284,7 @@ def render_figure7(
         "execution_provenance": replay_receipt_provenance(
             repo_root=REPO_ROOT,
             runner=Path(__file__),
-            consumed_paths=[
-                code_root,
-                renderer_inputs,
-                phase1_overlay,
-                phase1_manifest,
-                *([tex_bin_dir] if tex_bin_dir is not None else []),
-                *([texdeps_dir] if texdeps_dir is not None else []),
-                *([baseline_pdf] if baseline_pdf is not None else []),
-            ],
+            consumed_paths=consumed_paths,
         ),
         "renderer_scripts": {
             name: {"path": str(path), "sha256": _sha256(path)}
