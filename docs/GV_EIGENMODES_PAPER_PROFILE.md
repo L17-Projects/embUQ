@@ -74,6 +74,11 @@ Default tolerances:
 - mean absolute error <= `1.0 tau^-1`
 - maximum absolute error <= `5.0 tau^-1`
 
+The acceptance payload also records deterministic diagnostics over existing
+runtime artifacts: runtime/reference spans, span ratio, per-mode deltas,
+best scalar/affine fits, and a qualitative mismatch classification such as
+`compressed_spectrum`, `offset`, or `windowing_scale_mismatch`.
+
 The archive-backed replay was much tighter, with mean absolute error about
 `0.067 tau^-1` and maximum absolute error about `0.143 tau^-1`; the operational
 tolerance is wider to allow stochastic reruns while still rejecting wrong mode
