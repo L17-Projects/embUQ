@@ -112,6 +112,26 @@ def test_external_artifact_stage_rejects_symlinked_source_root(tmp_path: Path) -
         raise AssertionError("Expected a symlinked artifact root to be rejected")
 
 
+def test_external_artifact_stage_rejects_file_beneath_symlinked_parent(
+    tmp_path: Path,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    source_file = source / "input.txt"
+    source_file.write_text("content\n", encoding="utf-8")
+    alias = tmp_path / "source-alias"
+    alias.symlink_to(source, target_is_directory=True)
+    spec = _spec(tmp_path, alias / source_file.name)
+
+    try:
+        module.plan_staging(spec)
+    except ValueError as exc:
+        assert "symlinked path components" in str(exc)
+    else:
+        raise AssertionError("Expected a file under a symlinked parent to be rejected")
+
+
 def test_external_artifact_verify_detects_mutation(tmp_path: Path) -> None:
     module = _load_script()
     source = tmp_path / "source"
@@ -490,6 +510,27 @@ def test_external_artifact_stage_rejects_manifest_inside_destination(
     assert not final_root.exists()
 
 
+def test_external_artifact_stage_rejects_manifest_inside_selected_source(
+    tmp_path: Path,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    manifest = source / "manifest.json"
+
+    try:
+        module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+    except ValueError as exc:
+        assert "outside selected artifact sources" in str(exc)
+    else:
+        raise AssertionError("Expected an in-source manifest to be rejected")
+
+    assert not manifest.exists()
+    assert not (tmp_path / "artifacts" / "fixture-v1").exists()
+
+
 def test_external_artifact_stage_rejects_symlinked_destination_parent(
     tmp_path: Path,
 ) -> None:
@@ -561,6 +602,66 @@ def test_external_artifact_manifest_publication_failure_removes_artifact_root(
 
     assert not (tmp_path / "artifacts" / "fixture-v1").exists()
     assert not manifest.exists()
+
+
+def test_external_artifact_cancellation_removes_published_outputs(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    manifest = tmp_path / "manifest.json"
+    real_verify = module.verify_staged
+    verification_count = 0
+
+    def interrupt_final_verification(*, root, manifest_path):
+        nonlocal verification_count
+        verification_count += 1
+        if verification_count == 2:
+            raise KeyboardInterrupt
+        return real_verify(root=root, manifest_path=manifest_path)
+
+    monkeypatch.setattr(module, "verify_staged", interrupt_final_verification)
+    try:
+        module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+    except KeyboardInterrupt:
+        pass
+    else:
+        raise AssertionError("Expected injected staging cancellation")
+
+    assert not manifest.exists()
+    assert not (tmp_path / "artifacts" / "fixture-v1").exists()
+    assert not list((tmp_path / "artifacts").glob(".staging-*"))
+
+
+def test_external_artifact_verify_rejects_duplicate_manifest_paths(
+    tmp_path: Path,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    manifest = tmp_path / "manifest.json"
+    module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["files"].append(dict(payload["files"][0]))
+    payload["file_count"] = 2
+    payload["logical_size_bytes"] *= 2
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+    try:
+        module.verify_staged(
+            root=tmp_path / "artifacts" / "fixture-v1",
+            manifest_path=manifest,
+        )
+    except ValueError as exc:
+        assert "Duplicate external-artifact manifest path" in str(exc)
+    else:
+        raise AssertionError("Expected duplicate manifest paths to be rejected")
 
 
 def test_external_artifact_stage_rejects_aliased_manifest_inside_destination(
