@@ -17,9 +17,11 @@ FORWARD_RTOL = 1.0e-6
 FORWARD_ATOL = 1.0e-8
 IGNORED_KEYS = frozenset(
     {
+        "accepted_artifact_root",
         "config_path",
         "config_sha256",
         "data_file",
+        "dependency_artifact_root",
         "git_branch",
         "hostname",
         "materialization_receipt",

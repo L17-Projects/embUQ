@@ -46,7 +46,9 @@ def _receipt(
         "materialization_receipt": f"{root}/config.materialization.json",
         "materialization_receipt_sha256": ("5" if site == "karolina" else "6") * 64,
         "source_config_sha256": "7" * 64,
+        "accepted_artifact_root": f"{root}/accepted",
         "accepted_manifest_sha256": "1" * 64,
+        "dependency_artifact_root": f"{root}/dependencies",
         "dependency_manifest_sha256": "2" * 64,
         "accepted_source_verification": {
             "status": "PASS",
