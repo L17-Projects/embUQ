@@ -6,7 +6,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
+import tempfile
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -31,9 +34,21 @@ def _files(root: Path) -> list[Path]:
     return sorted(path for path in root.rglob("*") if path.is_file())
 
 
+def _reject_symlink_alias(path: Path, *, label: str) -> Path:
+    """Reject direct and ancestor symlinks without resolving away their spelling."""
+    absolute = path.expanduser().absolute()
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        if current.is_symlink():
+            raise ValueError(
+                f"{label} cannot be symlinks or contain symlinked path components: {current}"
+            )
+    return absolute
+
+
 def _reject_symlinks(root: Path) -> None:
-    if root.is_symlink():
-        raise ValueError(f"Frozen snapshot roots cannot be symlinks: {root}")
+    root = _reject_symlink_alias(root, label="Frozen snapshot roots")
     links = sorted(path for path in root.rglob("*") if path.is_symlink())
     if links:
         rendered = ", ".join(str(path.relative_to(root)) for path in links)
@@ -81,6 +96,8 @@ def _enforce_snapshot_size_limits(entries: list[dict[str, Any]]) -> None:
 
 
 def _reject_path_within_root(*, path: Path, root: Path, label: str) -> None:
+    _reject_symlink_alias(path, label=label)
+    _reject_symlink_alias(root, label="Frozen snapshot roots")
     resolved_path = path.resolve()
     resolved_root = root.resolve()
     if resolved_path == resolved_root or resolved_root in resolved_path.parents:
@@ -88,13 +105,54 @@ def _reject_path_within_root(*, path: Path, root: Path, label: str) -> None:
 
 
 def _reject_same_path(*, path: Path, protected_path: Path, label: str) -> None:
-    if path.resolve() == protected_path.resolve():
+    same_existing_file = (
+        path.exists()
+        and protected_path.exists()
+        and os.path.samefile(path, protected_path)
+    )
+    if path.resolve() == protected_path.resolve() or same_existing_file:
         raise ValueError(f"{label} must not overwrite {protected_path}: {path}")
 
 
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
+def _reject_existing_hardlink_within_root(*, path: Path, root: Path, label: str) -> None:
+    if not path.exists():
+        return
+    path_stat = path.stat()
+    for member in _files(root):
+        member_stat = member.stat()
+        if (path_stat.st_dev, path_stat.st_ino) == (member_stat.st_dev, member_stat.st_ino):
+            raise ValueError(
+                f"{label} must not be a hardlink to a frozen snapshot member: {member}"
+            )
+
+
+def _write_json_temporary(path: Path, payload: dict[str, Any]) -> Path:
+    path = _reject_symlink_alias(path, label="JSON output")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _reject_symlink_alias(path.parent, label="JSON output parent")
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=f".{uuid.uuid4().hex}.tmp",
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
+    return temporary_path
+
+
+def _publish_json(path: Path, payload: dict[str, Any]) -> None:
+    temporary_path = _write_json_temporary(path, payload)
+    try:
+        os.replace(temporary_path, path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
 
 
 def _load_manifest(path: Path) -> dict[str, Any]:
@@ -112,6 +170,16 @@ def _load_manifest(path: Path) -> dict[str, Any]:
 
 
 def verify_snapshot(*, root: Path, manifest_path: Path) -> dict[str, Any]:
+    root = _reject_symlink_alias(root, label="Frozen snapshot roots")
+    manifest_path = _reject_symlink_alias(manifest_path, label="Snapshot manifest")
+    if not root.is_dir():
+        raise FileNotFoundError(f"Frozen snapshot root is not a directory: {root}")
+    _reject_path_within_root(path=manifest_path, root=root, label="Snapshot manifest")
+    _reject_existing_hardlink_within_root(
+        path=manifest_path,
+        root=root,
+        label="Snapshot manifest",
+    )
     manifest = _load_manifest(manifest_path)
     actual_entries = _entries(root)
     expected_entries = manifest.get("files")
@@ -164,13 +232,30 @@ def create_snapshot(
     snapshot_id: str,
     source_hint: str,
 ) -> dict[str, Any]:
+    source = _reject_symlink_alias(source, label="Snapshot source")
+    destination = _reject_symlink_alias(destination, label="Snapshot destination")
+    manifest_path = _reject_symlink_alias(manifest_path, label="Snapshot manifest")
     if not source.is_dir():
         raise ValueError(f"Snapshot source is not a directory: {source}")
-    if destination.is_symlink():
-        raise ValueError(f"Snapshot destinations cannot be symlinks: {destination}")
+    source_resolved = source.resolve()
+    destination_resolved = destination.resolve()
+    if (
+        source_resolved == destination_resolved
+        or source_resolved in destination_resolved.parents
+        or destination_resolved in source_resolved.parents
+    ):
+        raise ValueError(
+            "Snapshot source and destination must not overlap: "
+            f"source={source}, destination={destination}"
+        )
     _reject_path_within_root(
         path=manifest_path,
         root=destination,
+        label="Snapshot manifest",
+    )
+    _reject_path_within_root(
+        path=manifest_path,
+        root=source,
         label="Snapshot manifest",
     )
     _reject_symlinks(source)
@@ -180,9 +265,30 @@ def create_snapshot(
     _enforce_snapshot_size_limits(source_entries)
     source_total = _total_size(source_entries)
 
-    if destination.exists() and any(destination.iterdir()):
-        raise ValueError(f"Snapshot destination must be absent or empty: {destination}")
+    # A checked-in manifest is an immutable acceptance record. A later snapshot
+    # invocation may recreate a missing destination from the same source, but it
+    # must never silently replace the record to accommodate source drift.
+    existing_manifest = manifest_path.exists()
+    if existing_manifest:
+        source_report = verify_snapshot(root=source, manifest_path=manifest_path)
+        if source_report["status"] != "PASS":
+            raise RuntimeError(
+                "Snapshot source drifted from the existing locked manifest: "
+                f"{json.dumps(source_report, sort_keys=True)}"
+            )
+
+    if destination.exists():
+        if not existing_manifest:
+            raise ValueError(f"Snapshot destination must be absent: {destination}")
+        report = verify_snapshot(root=destination, manifest_path=manifest_path)
+        if report["status"] != "PASS":
+            raise RuntimeError(
+                "Existing snapshot destination drifted from the locked manifest: "
+                f"{json.dumps(report, sort_keys=True)}"
+            )
+        return report
     destination.parent.mkdir(parents=True, exist_ok=True)
+    _reject_symlink_alias(destination.parent, label="Snapshot destination parent")
     free_bytes = shutil.disk_usage(destination.parent).free
     required_bytes = source_total + MIN_FREE_HEADROOM_BYTES
     if free_bytes < required_bytes:
@@ -190,28 +296,59 @@ def create_snapshot(
             f"Insufficient free space for snapshot: free={free_bytes}, required={required_bytes}"
         )
 
-    shutil.copytree(source, destination, copy_function=shutil.copy2, dirs_exist_ok=True)
-    copied_entries = _entries(destination)
-    if source_entries != copied_entries:
-        raise RuntimeError("Copied snapshot does not match source checksums, sizes, and paths")
+    temporary_root = Path(
+        tempfile.mkdtemp(
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            suffix=f".{uuid.uuid4().hex}.tmp",
+        )
+    )
+    temporary_manifest: Path | None = None
+    published = False
+    completed = False
+    try:
+        shutil.copytree(source, temporary_root, copy_function=shutil.copy2, dirs_exist_ok=True)
+        copied_entries = _entries(temporary_root)
+        if source_entries != copied_entries:
+            raise RuntimeError("Copied snapshot does not match source checksums, sizes, and paths")
 
-    payload = {
-        "schema_version": SCHEMA_VERSION,
-        "paper_id": PAPER_ID,
-        "snapshot_id": snapshot_id,
-        "locked": True,
-        "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "source_hint": source_hint,
-        "snapshot_root": destination.as_posix(),
-        "file_count": len(copied_entries),
-        "total_size_bytes": _total_size(copied_entries),
-        "files": copied_entries,
-    }
-    _write_json(manifest_path, payload)
-    report = verify_snapshot(root=destination, manifest_path=manifest_path)
-    if report["status"] != "PASS":
-        raise RuntimeError(f"Post-copy verification failed: {json.dumps(report, sort_keys=True)}")
-    return report
+        if existing_manifest:
+            manifest_for_verification = manifest_path
+        else:
+            payload = {
+                "schema_version": SCHEMA_VERSION,
+                "paper_id": PAPER_ID,
+                "snapshot_id": snapshot_id,
+                "locked": True,
+                "created_at_utc": datetime.now(timezone.utc).isoformat(),
+                "source_hint": source_hint,
+                "snapshot_root": destination.as_posix(),
+                "file_count": len(copied_entries),
+                "total_size_bytes": _total_size(copied_entries),
+                "files": copied_entries,
+            }
+            temporary_manifest = _write_json_temporary(manifest_path, payload)
+            manifest_for_verification = temporary_manifest
+        preflight = verify_snapshot(root=temporary_root, manifest_path=manifest_for_verification)
+        if preflight["status"] != "PASS":
+            raise RuntimeError(f"Post-copy verification failed: {json.dumps(preflight, sort_keys=True)}")
+        temporary_root.rename(destination)
+        published = True
+        if temporary_manifest is not None:
+            os.replace(temporary_manifest, manifest_path)
+            temporary_manifest = None
+        report = verify_snapshot(root=destination, manifest_path=manifest_path)
+        if report["status"] != "PASS":
+            raise RuntimeError(f"Post-publication verification failed: {json.dumps(report, sort_keys=True)}")
+        completed = True
+        return report
+    finally:
+        if temporary_manifest is not None:
+            temporary_manifest.unlink(missing_ok=True)
+        if temporary_root.exists():
+            shutil.rmtree(temporary_root)
+        if published and not completed and destination.exists() and not destination.is_symlink():
+            shutil.rmtree(destination)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -238,13 +375,14 @@ def main(argv: list[str] | None = None) -> int:
         report = create_snapshot(
             source=args.source.absolute(),
             destination=args.destination,
-            manifest_path=args.manifest.resolve(),
+            manifest_path=args.manifest.absolute(),
             snapshot_id=args.snapshot_id,
             source_hint=args.source_hint,
         )
     else:
         root = args.root.absolute()
-        report_path = args.report.resolve() if args.report else None
+        manifest_path = args.manifest.absolute()
+        report_path = args.report.absolute() if args.report else None
         if report_path is not None:
             _reject_path_within_root(
                 path=report_path,
@@ -253,12 +391,17 @@ def main(argv: list[str] | None = None) -> int:
             )
             _reject_same_path(
                 path=report_path,
-                protected_path=args.manifest,
+                protected_path=manifest_path,
                 label="Verification report",
             )
-        report = verify_snapshot(root=root, manifest_path=args.manifest.resolve())
+            _reject_existing_hardlink_within_root(
+                path=report_path,
+                root=root,
+                label="Verification report",
+            )
+        report = verify_snapshot(root=root, manifest_path=manifest_path)
         if report_path is not None:
-            _write_json(report_path, report)
+            _publish_json(report_path, report)
 
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["status"] == "PASS" else 1

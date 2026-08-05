@@ -52,6 +52,76 @@ the persistent artifact root:
 They will be addressed through manifests and explicit staging commands. No
 paper workflow may depend on symlinks into working directories.
 
+The locked accepted-output set contains only the successful July 24 SonoVue
+and July 27 Definity 50k states, their accepted direct-DPD checks, the
+paper-figure exports, and their audit records. Interrupted and cancelled HBI
+states, failed materializations, and Python caches are excluded. The accepted
+Definity `d2` acoustic check is retained with its exact near-MAP provenance
+(0.1482% relative offset in `k_a`) in the machine-readable collection
+manifest.
+
+The historical runtime captures are intentionally asymmetric. The SonoVue
+run copied six mechanical reference-data files into `_runtime`; those bytes
+are also present in the frozen dependency set. The accepted Definity
+materialization recorded `copied_file_count: 0`, so no Definity `_runtime`
+directory existed to freeze. Replays reconstruct both agents from the locked
+mechanical and acoustic inputs in the dependency set rather than relying on
+either historical convenience directory.
+
+Define the two site-independent roots before using the staging commands:
+
+```bash
+export MESOUQ_SCRATCH_ROOT=/scratch/project/eu-26-17/eubrieucb/mesouq
+export MESOUQ_UQ_EMB_ARTIFACT_ROOT="${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/artifacts"
+```
+
+Plan the copy and inspect its size without writing any artifact:
+
+```bash
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py plan \
+  --spec papers/UQ_EMB/manifests/accepted_production_outputs_202607.staging.json
+```
+
+Stage the immutable set. The command copies into a temporary directory,
+preserves internal hardlinks, computes SHA-256 values, verifies the temporary
+copy, and only then publishes it atomically:
+
+```bash
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py stage \
+  --spec papers/UQ_EMB/manifests/accepted_production_outputs_202607.staging.json \
+  --manifest papers/UQ_EMB/manifests/accepted_production_outputs_202607.files.json
+```
+
+Verify an existing staged set without modifying it:
+
+```bash
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py verify \
+  --root "${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/accepted_production_outputs_202607" \
+  --manifest papers/UQ_EMB/manifests/accepted_production_outputs_202607.files.json
+```
+
+The accepted DNN weights, force-spectroscopy inputs, acoustic observations, 736 physical
+frequency labels, polynomial coefficients and banks, mass-scaling evidence,
+and surrogate audit records form a separate immutable dependency set. Stage
+and verify it with:
+
+```bash
+export MESOUQ_WORKSPACE_ROOT=/home/it4i-bbenvegnen/workspace
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py stage \
+  --spec papers/UQ_EMB/manifests/frozen_runtime_dependencies_202607.staging.json \
+  --manifest papers/UQ_EMB/manifests/frozen_runtime_dependencies_202607.files.json
+/usr/bin/python3.11 scripts/workflows/emb/uq_emb/stage_external_artifacts.py verify \
+  --root "${MESOUQ_UQ_EMB_ARTIFACT_ROOT}/frozen_runtime_dependencies_202607" \
+  --manifest papers/UQ_EMB/manifests/frozen_runtime_dependencies_202607.files.json
+```
+
+This paper contract uses the deterministic `*_BEST.pkl` DNN artifacts. BNN
+training, Sobol, and group-holdout lanes are optional validation workflows and
+are not claimed as reproducible from this manuscript dependency set. A retained
+3.2-um BNN checkpoint is historical evidence, not a declaration that BNN
+weights exist for every accepted diameter; no accepted HBI, direct-DPD, figure,
+or manuscript replay consumes it.
+
 ## Planned command surface
 
 The closeout adds separate, frozen commands for data preparation, DNN training,

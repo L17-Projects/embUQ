@@ -1,0 +1,2586 @@
+{
+  "artifact_root_hint": "$MESOUQ_UQ_EMB_ARTIFACT_ROOT",
+  "artifact_set_dir": "accepted_production_outputs_202607",
+  "artifact_set_id": "accepted-production-outputs-202607",
+  "created_at_utc": "2026-08-04T11:04:14.297894+00:00",
+  "file_count": 442,
+  "files": [
+    {
+      "path": "definity/config/definity_accepted_production50k.yaml",
+      "sha256": "53696362655d7b1346297e083c241add3f7404ace33781dd5a272a31408433e1",
+      "size_bytes": 7680
+    },
+    {
+      "path": "definity/direct_dpd/README.md",
+      "sha256": "9794729b20dbcc254305a6b091f091166e74f53396b4cd9c9b6f9317c7e8c43b",
+      "size_bytes": 1894
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/accepted_map_values.csv",
+      "sha256": "4dbf7f5abd6868eac24db206dfd668349866ace83a3b83c8be61bc1024a221ff",
+      "size_bytes": 817
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/design/production_design.csv",
+      "sha256": "978551174d9b37957c2cbb182a2e2fbb50aebf4cb2d340104819cbd416c05855",
+      "size_bytes": 1609
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/campaign_case_map_values.csv",
+      "sha256": "c94ee60781f40a435b6459b0166462f4b054594b90c44f49421cf4affe9e1793",
+      "size_bytes": 817
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/campaign_case_metrics.json",
+      "sha256": "9efbde434c13a69bed9940264c50c913826e8d1bcfb3923c3b1c5e2eadd72311",
+      "size_bytes": 15388
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/fsi_parameters.json",
+      "sha256": "233b97f053db29204e20b7692d69b778b7af3605afa1a38ae046285e7a129c99",
+      "size_bytes": 592
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/membrane_elastic_override.json",
+      "sha256": "483d3cc1535778f86a6bb999165d0bc6d2827cb618adf29e322e29e3ac587fa9",
+      "size_bytes": 468
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/membrane_mass_parameters.json",
+      "sha256": "d3447cdea93a298da8a7b21e73a9568de53525884f1b9e7d3f67ce835bb7b9a3",
+      "size_bytes": 575
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/mode_purity_timeseries.csv",
+      "sha256": "e37c87b3b290b8ad163a76216d341dc7ec5c70bf04ff93991e1dc81d0671f3ec",
+      "size_bytes": 110760
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/plots/definity_2p1um_mode_purity.png",
+      "sha256": "148d9aa8e44b39c53bf0bf5b5cf31a69863aecd7dbde18fa4b9c539f9e1b36bc",
+      "size_bytes": 232080
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/plots/definity_2p1um_rms_radius_spectrum.png",
+      "sha256": "2a3f540e18c3900fd08d37762b09ecbfa3e5f60f013378ce8cbb97badfecca31",
+      "size_bytes": 65365
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/plots/definity_2p1um_rms_radius_timeseries.png",
+      "sha256": "326f8037e1b33c1aa3f25583aa3b58140d8752a35aa848fe531f1232dfd32fe1",
+      "size_bytes": 87868
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/post_deflation_coordinate_hold.json",
+      "sha256": "f4c226dabcef1b4ae99e061bf71441f17e87c096ecae37de3738d5c94e92c6a1",
+      "size_bytes": 664
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/post_equilibration_prestrain.json",
+      "sha256": "ed314a91e8468c7a31e136a91c4e26fb223f50ba2afe932bd6c55227deae9165",
+      "size_bytes": 589
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/post_equilibration_shape_displacement.json",
+      "sha256": "7f3eb660a524a098acd6b17623553a3dfa05c5702afdbac172212f9c5fe3db23",
+      "size_bytes": 74
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/post_equilibration_velocity_kick.json",
+      "sha256": "5edfba15c7e48ea7d1dc5f04b0de00b85ab4da2a7d05243e7bf98b9fcf54ae52",
+      "size_bytes": 104
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/result.json",
+      "sha256": "de673a236944b83ca1ecabbfb1044487c749fc4301a64157c9109469147fa019",
+      "size_bytes": 170013
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/setup_manifest.json",
+      "sha256": "4aa206cb12b1eae26763216a652d53d0c5e30ffa9fdf017a1ba5342114ebc737",
+      "size_bytes": 5095
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/simulation/logs/mirheo_00000000.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/simulation/logs/mirheo_00000001.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/simulation/mesh/emb00001.off",
+      "sha256": "992f77284b47b1380ab1c7c530cd61d1555f9946af0687111b5c0821b113bef7",
+      "size_bytes": 184095
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/simulation/microbubble/sphere_icosphere.py",
+      "sha256": "af5966f7157831e31bab44c7a0d3d6d8d5d79ee566f1db025344ffb062327977",
+      "size_bytes": 736
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/simulation/parameter/parameters-default00001.yaml",
+      "sha256": "c195ba966d3825daa060f1dac055d80dc98606637713cf69f740c752ac05e789",
+      "size_bytes": 857
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/simulation/parameter/parameters-default00001eq.yaml",
+      "sha256": "c195ba966d3825daa060f1dac055d80dc98606637713cf69f740c752ac05e789",
+      "size_bytes": 857
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/simulation/parameter/parameters.prms00001.yaml",
+      "sha256": "9e9020fe5a78e9b8a8a9eb7318a129c1fdc29ccd841f26dafc4c2a58eac72f25",
+      "size_bytes": 203
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/simulation/parameter/parameters00001.yaml",
+      "sha256": "563b24e37ca12279343beb131911f9d52f1009f2c29a513d3cbfdcc72c69225a",
+      "size_bytes": 704
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/simulation/pin/emb.csv",
+      "sha256": "7fae5b35143712ff742584a9a824afed3c1393a4b3d86f0c46a94cee37655c0c",
+      "size_bytes": 49813
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/simulation/posq.txt",
+      "sha256": "a229fc2a451fb0836dbab134717a46d3506a46b729095ef1300da23ddb94640b",
+      "size_bytes": 175
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/definity_2p1um/seed-000/time_series.csv",
+      "sha256": "124898441fd97bb0f547552cdb1cd6f6bd20b468fc9b09955064bf263adb618d",
+      "size_bytes": 253350
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/manifest.json",
+      "sha256": "1852336d11daa0faef3fff017155a4126ce0c65c5ee6c8318e8e3fc9eee138d6",
+      "size_bytes": 180359
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/report.md",
+      "sha256": "f9ea9dfbfe9f1f7ce7561e2b52ab74cd125672c480194fb4db59d9d8115606e9",
+      "size_bytes": 1933
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d1/fullfluid_campaign/production/definity/definity_2p1um/ka-index-000/summary.csv",
+      "sha256": "2b748206d3bd939879179676e16525577b8939587d6816fd72ca162f41b7dd2d",
+      "size_bytes": 1653
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/campaign_case_metrics.json",
+      "sha256": "3ac12f1297abb22bf60445e90e829b21cc10bd16c4bccf80d327a84ac656f978",
+      "size_bytes": 17232
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/fsi_parameters.json",
+      "sha256": "98cd0df4f230003d579201c64aee02fba8b6a9dd21bf25b517930fd3843d1d11",
+      "size_bytes": 591
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/membrane_elastic_override.json",
+      "sha256": "0c3001dc0d70a8220078b8fedf9e941a3560fcbe715033c71b5880a08f20060d",
+      "size_bytes": 437
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/membrane_mass_parameters.json",
+      "sha256": "ace6b0839cc78145f8875f9c0c4a25f3653eebda8938becdeda9177537f50ce7",
+      "size_bytes": 570
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/mode_purity_timeseries.csv",
+      "sha256": "86e56dd341d0464243adf000ce034fbec5e1903f709e9d59175895bdb90e0d56",
+      "size_bytes": 110544
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/plots/definity_2p90um_mode_purity.png",
+      "sha256": "33a0bd591b24fd053fbb062553da132d9a185c04db6194b112287377e0008cad",
+      "size_bytes": 197619
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/plots/definity_2p90um_rms_radius_spectrum.png",
+      "sha256": "bf8fd870ced4a1a734e69863d4ce56328819ca3108f916f6d32785a3d323662f",
+      "size_bytes": 71435
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/plots/definity_2p90um_rms_radius_timeseries.png",
+      "sha256": "7fc303d55e2bd93d7e86b9aaf9c3e1e422bf7d038eccf3ef13992fe84b5e616c",
+      "size_bytes": 88653
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/post_deflation_coordinate_hold.json",
+      "sha256": "cb01eccfd83bd9e8f0e00668859fe56d83c58b73e76eb18c63923355c1322058",
+      "size_bytes": 665
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/post_equilibration_prestrain.json",
+      "sha256": "eac9ef48020cd1cb38d92593009ea4b085e817d32d81d69d0190cb3109b0b53c",
+      "size_bytes": 603
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/post_equilibration_shape_displacement.json",
+      "sha256": "7f3eb660a524a098acd6b17623553a3dfa05c5702afdbac172212f9c5fe3db23",
+      "size_bytes": 74
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/post_equilibration_velocity_kick.json",
+      "sha256": "5edfba15c7e48ea7d1dc5f04b0de00b85ab4da2a7d05243e7bf98b9fcf54ae52",
+      "size_bytes": 104
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/result.json",
+      "sha256": "a3a8ec1ccece2586f2c8f9f76e1472230b86d1e1bbfc2a3486fbb88838d5257d",
+      "size_bytes": 225011
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/setup_manifest.json",
+      "sha256": "1b7cf6b6c91315b3d72be71f65715ee5d37d62f09004adedb9f267929444576f",
+      "size_bytes": 5087
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/simulation/logs/mirheo_00000000.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/simulation/logs/mirheo_00000001.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/simulation/mesh/emb00001.off",
+      "sha256": "8c39b9575d96ef95c9656a86f0e451f7325541b744d6d9e9b8c8e337b0c94c23",
+      "size_bytes": 184095
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/simulation/microbubble/sphere_icosphere.py",
+      "sha256": "af5966f7157831e31bab44c7a0d3d6d8d5d79ee566f1db025344ffb062327977",
+      "size_bytes": 736
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/simulation/parameter/parameters-default00001.yaml",
+      "sha256": "bc5f62b30b97d0d6201e8ee7a1fbf6501e8893d470ca639c794362893356ddf5",
+      "size_bytes": 857
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/simulation/parameter/parameters-default00001eq.yaml",
+      "sha256": "bc5f62b30b97d0d6201e8ee7a1fbf6501e8893d470ca639c794362893356ddf5",
+      "size_bytes": 857
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/simulation/parameter/parameters.prms00001.yaml",
+      "sha256": "7ef67cd2c57a7437dcd58d072e6f18fb05b77352f9142653f9acd77a029a6a7c",
+      "size_bytes": 180
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/simulation/parameter/parameters00001.yaml",
+      "sha256": "f8d93042e798661998658d72d136549b957061b0a4afa00bc7830f18d2a2ab4f",
+      "size_bytes": 674
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/simulation/pin/emb.csv",
+      "sha256": "e956890fb206619e0be8a7703db0bedd8c7601ee978ab65da06b317e0da9f765",
+      "size_bytes": 50318
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/simulation/posq.txt",
+      "sha256": "82406a329fdbe74e175754973d161f2877f0c1d980d53c9b40a1aa4e50a365cc",
+      "size_bytes": 175
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct/time_series.csv",
+      "sha256": "f67642e9ed121be2f0c5d8db87bc14fb16020b75ee9d09cd147e278d71de2b1a",
+      "size_bytes": 308843
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/accepted_map_values.csv",
+      "sha256": "537106af34376f5456da9937136711efbf1a7f359eacb164639ca14c2db07ce9",
+      "size_bytes": 816
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/design/production_design.csv",
+      "sha256": "8e552aaefb69bf697d9223ded04868f1e84767f920421bd6d8c3e0cc64f4174d",
+      "size_bytes": 1606
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/campaign_case_map_values.csv",
+      "sha256": "b7bdf1079e791a07c082966e5fb0dbff960f6abf1784f58a13dd455d39c174a4",
+      "size_bytes": 816
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/campaign_case_metrics.json",
+      "sha256": "68694f034db8616d5209c55a1f13dc8463db2727ac2aa75f607de774b7fd13c5",
+      "size_bytes": 15448
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/fsi_parameters.json",
+      "sha256": "c08a1e4e8f5bec981c78f139592e82b6a66fe96b8e56110fe256802f875ae343",
+      "size_bytes": 592
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/membrane_elastic_override.json",
+      "sha256": "5d1cafe72db4868a089e51eeec197b8cc531fd02667e065e39c3c0090264afd9",
+      "size_bytes": 469
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/membrane_mass_parameters.json",
+      "sha256": "87b364217704f8023641dbefd2823099e7f376bd84bf167d789875329ce73f51",
+      "size_bytes": 572
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/mode_purity_timeseries.csv",
+      "sha256": "4b9bc87913f45d093746d1f19573eecb92bf3abde3051d26c57051b0e2cb8a30",
+      "size_bytes": 110478
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/plots/definity_3p0um_mode_purity.png",
+      "sha256": "0d11cb5db77b64c74b28a7eb9fcace011730f960ae204c88cc37624767329532",
+      "size_bytes": 204567
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/plots/definity_3p0um_rms_radius_spectrum.png",
+      "sha256": "49096c724d223a39af5f3c021faaa850770d5ce3d934d7424c9978a268796a5a",
+      "size_bytes": 73213
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/plots/definity_3p0um_rms_radius_timeseries.png",
+      "sha256": "304caca8c2e2d3df3f010ae5e5b0bbdb7afa0243a27fae31ebf01ca9b5105c18",
+      "size_bytes": 87066
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/post_deflation_coordinate_hold.json",
+      "sha256": "f5570a08691eea049b8f6d282512e916a4be97068dd676b0aa91ce1ae2b540a9",
+      "size_bytes": 665
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/post_equilibration_prestrain.json",
+      "sha256": "2c73483937b583cee0a220ea565b7b1db359b003cc87d696f3b1eb08ce339728",
+      "size_bytes": 602
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/post_equilibration_shape_displacement.json",
+      "sha256": "7f3eb660a524a098acd6b17623553a3dfa05c5702afdbac172212f9c5fe3db23",
+      "size_bytes": 74
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/post_equilibration_velocity_kick.json",
+      "sha256": "5edfba15c7e48ea7d1dc5f04b0de00b85ab4da2a7d05243e7bf98b9fcf54ae52",
+      "size_bytes": 104
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/result.json",
+      "sha256": "81855978a908169da66bf984efcb5612e0007165e73669548562e2812608a74f",
+      "size_bytes": 169960
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/setup_manifest.json",
+      "sha256": "7ca86bc00dbc6349ae4abb5b4a0a565013e083ca56987265532b478b58d77640",
+      "size_bytes": 5095
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/simulation/logs/mirheo_00000000.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/simulation/logs/mirheo_00000001.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/simulation/mesh/emb00001.off",
+      "sha256": "7648a3e548ea3f17c218ecf3b9c5f52b097bad419a8f1d153e5929cfeecc2621",
+      "size_bytes": 184095
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/simulation/microbubble/sphere_icosphere.py",
+      "sha256": "af5966f7157831e31bab44c7a0d3d6d8d5d79ee566f1db025344ffb062327977",
+      "size_bytes": 736
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/simulation/parameter/parameters-default00001.yaml",
+      "sha256": "9859244ef58b44d6fa8b71934931b0be06f6740d2bf91fe09822d3c0e13d6423",
+      "size_bytes": 857
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/simulation/parameter/parameters-default00001eq.yaml",
+      "sha256": "9859244ef58b44d6fa8b71934931b0be06f6740d2bf91fe09822d3c0e13d6423",
+      "size_bytes": 857
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/simulation/parameter/parameters.prms00001.yaml",
+      "sha256": "b37fb55f43a0402051d458ec9bf1e6907a1b37a0c83ebcec28f0302b63288ed7",
+      "size_bytes": 203
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/simulation/parameter/parameters00001.yaml",
+      "sha256": "e9b187dc89aaab5fb2efbdbe78c587912548b5888bbcc534e1593a1a1fd886f3",
+      "size_bytes": 700
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/simulation/pin/emb.csv",
+      "sha256": "791c9094acc47af940f40c3ec178aab84d29df9669eed6412bfa5d9cc697f828",
+      "size_bytes": 50374
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/simulation/posq.txt",
+      "sha256": "82406a329fdbe74e175754973d161f2877f0c1d980d53c9b40a1aa4e50a365cc",
+      "size_bytes": 175
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/definity_3p0um/seed-000/time_series.csv",
+      "sha256": "de8c94a55a9bb4092fff9ee5758c9b85db123f3ef56353df60c37bf4f801aa87",
+      "size_bytes": 253890
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/manifest.json",
+      "sha256": "363ac718ebc5f810cc4a9140e09e285239023b8cc8a1f3337d4115b90b16423a",
+      "size_bytes": 180306
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/report.md",
+      "sha256": "72c5c8aa8fdd54820d7ca399c1d9552127c449ef86bd5a894dfa36587c26bcdd",
+      "size_bytes": 1933
+    },
+    {
+      "path": "definity/direct_dpd/acoustic/d3/fullfluid_campaign/production/definity/definity_3p0um/ka-index-000/summary.csv",
+      "sha256": "201b37cb20442e4edc379552d76e14377db7627a1d6576b100ed8fa3fde80283",
+      "size_bytes": 1658
+    },
+    {
+      "path": "definity/direct_dpd/code/collect_definity_direct_map_results.py",
+      "sha256": "e86c67485f924c193de888bf5d1396ce9966bd9403eed4a0071b3518341721f2",
+      "size_bytes": 13446
+    },
+    {
+      "path": "definity/direct_dpd/code/materialize_definity_direct_map_dpd.py",
+      "sha256": "034f7e4c70ed953b21778119cdb919d429f79fcfc18cab01e8f2258ff9fdac18",
+      "size_bytes": 21096
+    },
+    {
+      "path": "definity/direct_dpd/final_state_completion.json",
+      "sha256": "4bd7dbc03972a582a4442bb990b039d4f3af5a22c349d30a8dfaadb91ec39e9f",
+      "size_bytes": 1851
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597050_0.err",
+      "sha256": "bbf09e02293dd5ce070baac7062b0d65d27a3a4d60a38ef4e470a2436f5f519c",
+      "size_bytes": 4050
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597050_0.out",
+      "sha256": "9ea83c4df32033ef52cff2ae7e5e84ba77af7a0e30697eaa7990e408ed13380d",
+      "size_bytes": 64
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597050_1.err",
+      "sha256": "e7357ebfbc0b8ae226cd2a95f6dbefa9c29a2af2bacb8139dcea0a613125f7cb",
+      "size_bytes": 4050
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597050_1.out",
+      "sha256": "9ea83c4df32033ef52cff2ae7e5e84ba77af7a0e30697eaa7990e408ed13380d",
+      "size_bytes": 64
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597050_2.err",
+      "sha256": "7aeb18ca6fc471052fef84a4a14d5e2bcf71f48d1c6fcf9a2ad7165eab8eba3a",
+      "size_bytes": 4050
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597050_2.out",
+      "sha256": "9ea83c4df32033ef52cff2ae7e5e84ba77af7a0e30697eaa7990e408ed13380d",
+      "size_bytes": 64
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597056_0.err",
+      "sha256": "1083778a6a645bd40617587b85abcf86e3019384b1b320f5c35b1c28f1ad7538",
+      "size_bytes": 3037
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597056_0.out",
+      "sha256": "9ea83c4df32033ef52cff2ae7e5e84ba77af7a0e30697eaa7990e408ed13380d",
+      "size_bytes": 64
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597056_1.err",
+      "sha256": "2f372c0bfea43f1e5f29a23f76629d4f8ad7c8503f6d0c305ad400133ec19d7e",
+      "size_bytes": 3037
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597056_1.out",
+      "sha256": "9ea83c4df32033ef52cff2ae7e5e84ba77af7a0e30697eaa7990e408ed13380d",
+      "size_bytes": 64
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597056_2.err",
+      "sha256": "5fdcc09b55446ec049cdd9a5ab8eb43851fcf12c2c7b3a495dae20578b018f8d",
+      "size_bytes": 3037
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597056_2.out",
+      "sha256": "9ea83c4df32033ef52cff2ae7e5e84ba77af7a0e30697eaa7990e408ed13380d",
+      "size_bytes": 64
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597066_0.err",
+      "sha256": "29f297a558d39989b1e6ee9e8c2c4228d0df75d4d959e5a81443d71cb1ac9108",
+      "size_bytes": 1257
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597066_0.out",
+      "sha256": "f23ccc6c968a38cbc88853804980bf8c6eaf6ca260cb6a06a9eaa2d3df2a6ca3",
+      "size_bytes": 402
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597066_1.err",
+      "sha256": "6eb0f11694d7a60692ef4075f3412c050778e2df93b4778a287de7e9a7304d49",
+      "size_bytes": 1257
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597066_1.out",
+      "sha256": "29f93fccb86d51728d77ffafc318b9ca0df8f8ebd1ea430227d8cd3e3cf03bea",
+      "size_bytes": 402
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597066_2.err",
+      "sha256": "538a9bdd6899c8ac25c05c8f962c89bed8f88470a5c8ea9540694f05265a0a0b",
+      "size_bytes": 1257
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597066_2.out",
+      "sha256": "8bdad44c122f554ff4368bb0f8a1126fed297a1e7fd2bb9bd6db8d43d7e559c8",
+      "size_bytes": 402
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597074_0.err",
+      "sha256": "c6234e04d3de053a8162a8d961f6514ed5d042fef6ae3e88744162f5d2ce641a",
+      "size_bytes": 640
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597074_0.out",
+      "sha256": "b6f9b47b222fee44cf8c0d54d5755f7f8973267de7278aa49f57efcc1900158f",
+      "size_bytes": 1971
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597074_1.err",
+      "sha256": "7dd5be991ea0721686c1aad0be3f77147862e93de3350d49a7cb0922c2974e78",
+      "size_bytes": 796
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597074_1.out",
+      "sha256": "75e55192dcca70e1403574a73d45f9216f8e6a97e62e9f449215fc7a3d9ea2bd",
+      "size_bytes": 1637
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597074_2.err",
+      "sha256": "c6234e04d3de053a8162a8d961f6514ed5d042fef6ae3e88744162f5d2ce641a",
+      "size_bytes": 640
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597074_2.out",
+      "sha256": "36dc4c6aca09b6accc211821479098d042ddfb8df186d74a4cccbeb8da7a3d52",
+      "size_bytes": 1971
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597139_1.err",
+      "sha256": "00cfc969359b013f7693b5a5a3e6c6ee8403e23256c2b1b19e8dd55ba399b40e",
+      "size_bytes": 3369
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597139_1.out",
+      "sha256": "9ea83c4df32033ef52cff2ae7e5e84ba77af7a0e30697eaa7990e408ed13380d",
+      "size_bytes": 64
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597142_1.err",
+      "sha256": "8be3873ee8e8066fc769fc219226d7ea64067d46dc10b55093fec0225ca19484",
+      "size_bytes": 796
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597142_1.out",
+      "sha256": "75e55192dcca70e1403574a73d45f9216f8e6a97e62e9f449215fc7a3d9ea2bd",
+      "size_bytes": 1637
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597196_0.err",
+      "sha256": "c6234e04d3de053a8162a8d961f6514ed5d042fef6ae3e88744162f5d2ce641a",
+      "size_bytes": 640
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597196_0.out",
+      "sha256": "b6f9b47b222fee44cf8c0d54d5755f7f8973267de7278aa49f57efcc1900158f",
+      "size_bytes": 1971
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597196_1.err",
+      "sha256": "e356fdb3c9c782ebfd311133b5db1c29d9adbee4b66fa230eae6ce0c0a62da20",
+      "size_bytes": 3367
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597196_1.out",
+      "sha256": "9ea83c4df32033ef52cff2ae7e5e84ba77af7a0e30697eaa7990e408ed13380d",
+      "size_bytes": 64
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597196_2.err",
+      "sha256": "c6234e04d3de053a8162a8d961f6514ed5d042fef6ae3e88744162f5d2ce641a",
+      "size_bytes": 640
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597196_2.out",
+      "sha256": "36dc4c6aca09b6accc211821479098d042ddfb8df186d74a4cccbeb8da7a3d52",
+      "size_bytes": 1971
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597201_1.err",
+      "sha256": "f1224d77f542d5af440c47f016e4cb4b2a27a7a11f1a9924ff03fe7970b15cbb",
+      "size_bytes": 796
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4597201_1.out",
+      "sha256": "75e55192dcca70e1403574a73d45f9216f8e6a97e62e9f449215fc7a3d9ea2bd",
+      "size_bytes": 1637
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4598811_1.err",
+      "sha256": "3487d2ade7cd68454e0dc448d8af9114a8c11a7294dc4bc4f10e9ae19eecdd10",
+      "size_bytes": 3369
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4598811_1.out",
+      "sha256": "9ea83c4df32033ef52cff2ae7e5e84ba77af7a0e30697eaa7990e408ed13380d",
+      "size_bytes": 64
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4598813_1.err",
+      "sha256": "4dcd454aace9f242667613668436be6169d0e1fa47494f4575fa28c521fae6a6",
+      "size_bytes": 789
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4598813_1.out",
+      "sha256": "75e55192dcca70e1403574a73d45f9216f8e6a97e62e9f449215fc7a3d9ea2bd",
+      "size_bytes": 1637
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4598994_1.err",
+      "sha256": "dfab45fc3a3c26e98ac67abd45afa29aa3db2ac80dc9ebafae57220eb2e931d1",
+      "size_bytes": 789
+    },
+    {
+      "path": "definity/direct_dpd/logs/acoustic-4598994_1.out",
+      "sha256": "75e55192dcca70e1403574a73d45f9216f8e6a97e62e9f449215fc7a3d9ea2bd",
+      "size_bytes": 1637
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597049_0.err",
+      "sha256": "09f5ab6c834562e084efba807c4d33bc05b98dc460f75412d1252e3cb97b9f2c",
+      "size_bytes": 1850
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597049_0.out",
+      "sha256": "9ea83c4df32033ef52cff2ae7e5e84ba77af7a0e30697eaa7990e408ed13380d",
+      "size_bytes": 64
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597049_1.err",
+      "sha256": "4a20e1dfcf0b40f1d7c442f6b1706d68e989e3d3e2dbb7f36c552b039c51a41e",
+      "size_bytes": 1851
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597049_1.out",
+      "sha256": "9ea83c4df32033ef52cff2ae7e5e84ba77af7a0e30697eaa7990e408ed13380d",
+      "size_bytes": 64
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597049_2.err",
+      "sha256": "9316b5b01f8b451a88a4ecb7c6ffe6080b7fce2ca74943ebaab4eea0824b599f",
+      "size_bytes": 1851
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597049_2.out",
+      "sha256": "9ea83c4df32033ef52cff2ae7e5e84ba77af7a0e30697eaa7990e408ed13380d",
+      "size_bytes": 64
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597055_0.err",
+      "sha256": "78387a42bc284a9c4a9d4fb3106c6dd7f8cccf47a7cee78ec9b65419658d375c",
+      "size_bytes": 1257
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597055_0.out",
+      "sha256": "6f09c0229a4fd3d022fdada15d02ca07c89f182b77e5a8d16175b61e5d2a0046",
+      "size_bytes": 1964
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597055_1.err",
+      "sha256": "f55dd0bafd14be99ee5204b054bb033f97c3bb9c2d18835699859568bede08d4",
+      "size_bytes": 1256
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597055_1.out",
+      "sha256": "4dcd501d45b5cdb294e2352a37e977bc12e726ac2b8c03f0c17c3491d737eed1",
+      "size_bytes": 1690
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597055_2.err",
+      "sha256": "07b2caf73e756b9f64d97d9f00fd6044527e4ee82279c14a51a9407f527fcb3b",
+      "size_bytes": 1256
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597055_2.out",
+      "sha256": "280f4696e6e7b9a6ae8016525fd1d9256f6518a85cc0a7ce651d34231660cac3",
+      "size_bytes": 1690
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597065_0.err",
+      "sha256": "c6234e04d3de053a8162a8d961f6514ed5d042fef6ae3e88744162f5d2ce641a",
+      "size_bytes": 640
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597065_0.out",
+      "sha256": "cb78a2edc8d0a26589868b2d736d8199d4128d2203326327084250354ffda7f0",
+      "size_bytes": 1014
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597065_1.err",
+      "sha256": "c6234e04d3de053a8162a8d961f6514ed5d042fef6ae3e88744162f5d2ce641a",
+      "size_bytes": 640
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597065_1.out",
+      "sha256": "db96510b9e3d675927813882a03679fa4a8cf4168e7e97260df42a9337024ef6",
+      "size_bytes": 1014
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597065_2.err",
+      "sha256": "c6234e04d3de053a8162a8d961f6514ed5d042fef6ae3e88744162f5d2ce641a",
+      "size_bytes": 640
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597065_2.out",
+      "sha256": "d176f65729da780d3dd2a9936b0535d3637a4f9f221997af6f924a225e2748e8",
+      "size_bytes": 1014
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597073_0.err",
+      "sha256": "8471ea37d3ce7f72da50e576eeea162c2717d0f937b468f4d9df357bb44a9a58",
+      "size_bytes": 753
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597073_0.out",
+      "sha256": "9ea83c4df32033ef52cff2ae7e5e84ba77af7a0e30697eaa7990e408ed13380d",
+      "size_bytes": 64
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597073_1.err",
+      "sha256": "c6234e04d3de053a8162a8d961f6514ed5d042fef6ae3e88744162f5d2ce641a",
+      "size_bytes": 640
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597073_1.out",
+      "sha256": "e43268baa3978c535bf0bec1c4ef0ab79b3e779d2edc3dd74b3080cfb32916ee",
+      "size_bytes": 1017
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597073_2.err",
+      "sha256": "c6234e04d3de053a8162a8d961f6514ed5d042fef6ae3e88744162f5d2ce641a",
+      "size_bytes": 640
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597073_2.out",
+      "sha256": "f01ad5c4a2474210c4338e097372d351d931434a4a189e268084f676fcab96e5",
+      "size_bytes": 1017
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597195_0.err",
+      "sha256": "c6234e04d3de053a8162a8d961f6514ed5d042fef6ae3e88744162f5d2ce641a",
+      "size_bytes": 640
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-4597195_0.out",
+      "sha256": "4665f5e6257c59c82ee9be8062dbafebac962f4287c20825a31a122b1e37a1bb",
+      "size_bytes": 1091
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-d1-long-4597463.err",
+      "sha256": "c6234e04d3de053a8162a8d961f6514ed5d042fef6ae3e88744162f5d2ce641a",
+      "size_bytes": 640
+    },
+    {
+      "path": "definity/direct_dpd/logs/compression-d1-long-4597463.out",
+      "sha256": "1ca5be57355d3886ec24cb200483883a5547cbb4fc9fe3ea6aef1e4f92ed3971",
+      "size_bytes": 953
+    },
+    {
+      "path": "definity/direct_dpd/mechanical/d1/map_workflow/map_mirheo/map_json/compression_2.1um_map.json",
+      "sha256": "7dfdaa0c85355f066935518ae82700e2939e937e35a968e84eed9eca29b87d55",
+      "size_bytes": 295
+    },
+    {
+      "path": "definity/direct_dpd/mechanical/d1/map_workflow/map_mirheo/map_mirheo_manifest.json",
+      "sha256": "31c2df1b1c3b37bfdb3a60fdaaa8e8bc6019ea6dfb6f24f64bcc295adc2de2be",
+      "size_bytes": 9870
+    },
+    {
+      "path": "definity/direct_dpd/mechanical/d1/map_workflow/map_mirheo/results/compression_2.1um_result.json",
+      "sha256": "fc5c24ce3c8db4362cccc7690931c891e17f1cef03703078aaf1bc7d3d337c94",
+      "size_bytes": 1287
+    },
+    {
+      "path": "definity/direct_dpd/mechanical/d1/map_workflow/map_phase3b/phase3b_map_manifest.json",
+      "sha256": "fc7f171fc832d69cd3b559cc56dcd580a4243cc8dfa8f760a5837daa5d432836",
+      "size_bytes": 598
+    },
+    {
+      "path": "definity/direct_dpd/mechanical/d2/map_workflow/map_mirheo/map_json/compression_2.9um_map.json",
+      "sha256": "68e05fdf3504a201f30e7adfaf55fb2b148ec0244b8175154308a1fe5fee93d7",
+      "size_bytes": 291
+    },
+    {
+      "path": "definity/direct_dpd/mechanical/d2/map_workflow/map_mirheo/map_mirheo_manifest.json",
+      "sha256": "cd5ab4e9c7b8f2792916037169cdd7c2c8d9d4b955ae05ffb2cb0f5c98c10190",
+      "size_bytes": 9864
+    },
+    {
+      "path": "definity/direct_dpd/mechanical/d2/map_workflow/map_mirheo/results/compression_2.9um_result.json",
+      "sha256": "b9f0f7dd3a3483a04ccc6623955aadce573c905001ee6f843c6af1c058afff0f",
+      "size_bytes": 1255
+    },
+    {
+      "path": "definity/direct_dpd/mechanical/d2/map_workflow/map_phase3b/phase3b_map_manifest.json",
+      "sha256": "04466bf9ac37507580b8f471d8bb95383e8aaccf59412b048087cc520042f50c",
+      "size_bytes": 593
+    },
+    {
+      "path": "definity/direct_dpd/mechanical/d3/map_workflow/map_mirheo/map_json/compression_3.0um_map.json",
+      "sha256": "b2cc77efafd587599ae4e4bf67d2c2cca935116413811d59afa2e229a32811b4",
+      "size_bytes": 293
+    },
+    {
+      "path": "definity/direct_dpd/mechanical/d3/map_workflow/map_mirheo/map_mirheo_manifest.json",
+      "sha256": "4ca1be84eaa3fec2725a0299b57b3b705528cae0736e9770c83909db19fcd331",
+      "size_bytes": 9868
+    },
+    {
+      "path": "definity/direct_dpd/mechanical/d3/map_workflow/map_mirheo/results/compression_3.0um_result.json",
+      "sha256": "05e808e53037dd75e814633f48c4a3b29bae3afc0784fb69e74876216ef4baef",
+      "size_bytes": 1299
+    },
+    {
+      "path": "definity/direct_dpd/mechanical/d3/map_workflow/map_phase3b/phase3b_map_manifest.json",
+      "sha256": "8b691b9e146c200b0406b402b6209100845f677ae73799fcbaa4976193d18df5",
+      "size_bytes": 596
+    },
+    {
+      "path": "definity/direct_dpd/paper_facing/figures/Figure_9_audit_preview.png",
+      "sha256": "749ac0dac82057ebf6d8d88c5d476eef51157f1243c8eea8cc676817ef5c2473",
+      "size_bytes": 78999
+    },
+    {
+      "path": "definity/direct_dpd/paper_facing/figures/Figure_9_main_candidate_direct_map_confirmation.pdf",
+      "sha256": "9d788cfe9dfd5d3f5d6a5422352778cce21853be29b121ca6487678ba47e60c6",
+      "size_bytes": 174839
+    },
+    {
+      "path": "definity/direct_dpd/paper_facing/figures/Figure_9_main_candidate_direct_map_confirmation.png",
+      "sha256": "144e591c69a6a3a067fe6ae896be75c86d3f40e1664cfeaae6001787d40fbacd",
+      "size_bytes": 437025
+    },
+    {
+      "path": "definity/direct_dpd/paper_facing/figures/Figure_9_main_candidate_direct_map_confirmation_metrics.csv",
+      "sha256": "472fa33815a02fa49b2095f63c018bc3f02e65fbb45fb93a2dbec083986fe1cb",
+      "size_bytes": 3425
+    },
+    {
+      "path": "definity/direct_dpd/paper_facing/figures/Figure_9_main_candidate_direct_map_confirmation_metrics.json",
+      "sha256": "3629e28c6394576172a24b28f57f30481a9450a773ee39b25248631ede6a1584",
+      "size_bytes": 5396
+    },
+    {
+      "path": "definity/direct_dpd/paper_facing/figures/direct_map_figure_manifest.json",
+      "sha256": "1689fe25dac17c637e03f58381e053c19cb36aa66b4f7e64a10dec7458dd6ad9",
+      "size_bytes": 5584
+    },
+    {
+      "path": "definity/direct_dpd/paper_facing/render_combined_direct_map_confirmation.py",
+      "sha256": "dc42b58ef2b9112c44def0d953d548838fe85488eb3a0fbcaa2ac015a35f0568",
+      "size_bytes": 5495
+    },
+    {
+      "path": "definity/direct_dpd/postprocessed/collection_manifest.json",
+      "sha256": "c802a0c85ea91a7ecec735694f75a2d21eac28fe15e33e4af6d01cb6fecf4792",
+      "size_bytes": 17935
+    },
+    {
+      "path": "definity/direct_dpd/postprocessed/definity_direct_map_acoustic_comparison.csv",
+      "sha256": "23f6bbb19647ba2853cf371ed444aa625960febb7610adf6a4954cfd5e10a32c",
+      "size_bytes": 2811
+    },
+    {
+      "path": "definity/direct_dpd/preparation_manifest.json",
+      "sha256": "6c204c863927eb691b885214a8fa507ffa246aafb89535c7a2795aa2c55482d0",
+      "size_bytes": 2192
+    },
+    {
+      "path": "definity/direct_dpd/runtime/jobs/acoustic-d1.sh",
+      "sha256": "35a688044339015830a99818ede5d9ea9a3135cd052ff73788f0444b3babd14c",
+      "size_bytes": 1511
+    },
+    {
+      "path": "definity/direct_dpd/runtime/jobs/acoustic-d2.sh",
+      "sha256": "a1d29d5b66ecc222c61d9ca5e17dd514407c5d9569ca97817824969469b96257",
+      "size_bytes": 1511
+    },
+    {
+      "path": "definity/direct_dpd/runtime/jobs/acoustic-d3.sh",
+      "sha256": "0206d0a781458f41e6dc0ea3d087a869398b36d9be635917883f809c7ba3c1a6",
+      "size_bytes": 1511
+    },
+    {
+      "path": "definity/direct_dpd/runtime/jobs/compression-d1.sh",
+      "sha256": "7c60f657f00d2b130c95a79eeb3cc5be518f37de913d97ef72aa8af07fb79210",
+      "size_bytes": 1020
+    },
+    {
+      "path": "definity/direct_dpd/runtime/jobs/compression-d2.sh",
+      "sha256": "95fdceed7aafb97962dbdc6dae3fa42e058f82074abc22f7ef33570dd6097cdc",
+      "size_bytes": 1020
+    },
+    {
+      "path": "definity/direct_dpd/runtime/jobs/compression-d3.sh",
+      "sha256": "44f9639d97a8acf86ffca704e15810d8a352f0f3aa04615861b85a6a31725ed9",
+      "size_bytes": 1020
+    },
+    {
+      "path": "definity/direct_dpd/runtime/launch_manifest.json",
+      "sha256": "8d05e6d5ad3df4419ee2ee033dc332020f57d9709ac8502261fceabca9946a7a",
+      "size_bytes": 10474
+    },
+    {
+      "path": "definity/hbi/logs/run.stderr.log",
+      "sha256": "29a0b028075bc53caf8eb4f1444712ccba194e464b023c7467fcbba898db7f5e",
+      "size_bytes": 948
+    },
+    {
+      "path": "definity/hbi/logs/run.stdout.log",
+      "sha256": "fa875d644cdb54df33ff8286004cc3307685d7294035fa89c13b6ef07533d170",
+      "size_bytes": 57424
+    },
+    {
+      "path": "definity/hbi/receipts/config_validation_bypass.txt",
+      "sha256": "016332afba8bbdbdd6d5de21bc1f1dfa4b40f6b024fd0f0d09f999d60de61b07",
+      "size_bytes": 85
+    },
+    {
+      "path": "definity/hbi/receipts/restart_audit.json",
+      "sha256": "3bc8776d50b29c56160cb0c9b7cf46fb19077882da19ece7398ba57c9394afe7",
+      "size_bytes": 878
+    },
+    {
+      "path": "definity/hbi/receipts/runtime_config.yaml",
+      "sha256": "cfd91713e2ae0d08b6cb2793a59ee5edc5fa7ba53d5269e8999fe7f42bfe3dad",
+      "size_bytes": 7682
+    },
+    {
+      "path": "definity/hbi/receipts/runtime_config_materialization.json",
+      "sha256": "7f9ed1205b47098158e8e3ada0c0a0183837c411789f6a0a0a0663bc4b4648b5",
+      "size_bytes": 2135
+    },
+    {
+      "path": "definity/hbi/receipts/source_config_validation_bypass.txt",
+      "sha256": "b70825c8b4d463d5ae3044b25627d034a1c94c4521380b47793fad72f7c6cc2e",
+      "size_bytes": 115
+    },
+    {
+      "path": "definity/hbi/receipts/three_target_state_verification.json",
+      "sha256": "0c4e3200cddb694c68b71fc105f5d641de098146a717afdc814de932ead481d8",
+      "size_bytes": 3562
+    },
+    {
+      "path": "definity/hbi/results_phase_1/compression_2.1um/genLatest.json",
+      "sha256": "5f37a0c71540d34749af715c898b7f67269cbd279277e8ac12d7c46cefd2e19d",
+      "size_bytes": 98437305
+    },
+    {
+      "path": "definity/hbi/results_phase_1/compression_2.1um/latest",
+      "sha256": "5f37a0c71540d34749af715c898b7f67269cbd279277e8ac12d7c46cefd2e19d",
+      "size_bytes": 98437305
+    },
+    {
+      "path": "definity/hbi/results_phase_1/compression_2.9um/genLatest.json",
+      "sha256": "da4f7d8d9f3c2998c3dccddb5e0b2545bab37f444fcedcef29e51ee2ca602cb8",
+      "size_bytes": 74300455
+    },
+    {
+      "path": "definity/hbi/results_phase_1/compression_2.9um/latest",
+      "sha256": "da4f7d8d9f3c2998c3dccddb5e0b2545bab37f444fcedcef29e51ee2ca602cb8",
+      "size_bytes": 74300455
+    },
+    {
+      "path": "definity/hbi/results_phase_1/compression_3.0um/genLatest.json",
+      "sha256": "2342b5d520ee468443e388838a7b3dab83a8b39213f6bf538c660d2723399c77",
+      "size_bytes": 93527775
+    },
+    {
+      "path": "definity/hbi/results_phase_1/compression_3.0um/latest",
+      "sha256": "2342b5d520ee468443e388838a7b3dab83a8b39213f6bf538c660d2723399c77",
+      "size_bytes": 93527775
+    },
+    {
+      "path": "definity/hbi/results_phase_1/resonance_source3_source3/genLatest.json",
+      "sha256": "5c8fdea20c6d9e45c89ef0e28312de0caa477ff7b8c36ba5fefce54c9b62cd4a",
+      "size_bytes": 76752138
+    },
+    {
+      "path": "definity/hbi/results_phase_1/resonance_source3_source3/latest",
+      "sha256": "5c8fdea20c6d9e45c89ef0e28312de0caa477ff7b8c36ba5fefce54c9b62cd4a",
+      "size_bytes": 76752138
+    },
+    {
+      "path": "definity/hbi/results_phase_2/genLatest.json",
+      "sha256": "944a4424eb3c7f0d2da826043d9248598b3708c10c1fb386ea72564b9949bf6e",
+      "size_bytes": 425923460
+    },
+    {
+      "path": "definity/hbi/results_phase_2/latest",
+      "sha256": "944a4424eb3c7f0d2da826043d9248598b3708c10c1fb386ea72564b9949bf6e",
+      "size_bytes": 425923460
+    },
+    {
+      "path": "definity/hbi/results_phase_3b/compression_2.1um/genLatest.json",
+      "sha256": "8bc3d74f077da1952102ece0e78f56b209c9bdad79026bb5ac097d022a871b6d",
+      "size_bytes": 604263034
+    },
+    {
+      "path": "definity/hbi/results_phase_3b/compression_2.1um/latest",
+      "sha256": "8bc3d74f077da1952102ece0e78f56b209c9bdad79026bb5ac097d022a871b6d",
+      "size_bytes": 604263034
+    },
+    {
+      "path": "definity/hbi/results_phase_3b/compression_2.9um/genLatest.json",
+      "sha256": "6c6ad0174159d76d5dfaefd04eefd8c8c2797df5ad372ee84244da413fa42cd3",
+      "size_bytes": 586269596
+    },
+    {
+      "path": "definity/hbi/results_phase_3b/compression_2.9um/latest",
+      "sha256": "6c6ad0174159d76d5dfaefd04eefd8c8c2797df5ad372ee84244da413fa42cd3",
+      "size_bytes": 586269596
+    },
+    {
+      "path": "definity/hbi/results_phase_3b/compression_3.0um/genLatest.json",
+      "sha256": "1eb1d40eadd914be66fb54820a5ea8fc591c73646147705e328def3ccb3fb236",
+      "size_bytes": 598902409
+    },
+    {
+      "path": "definity/hbi/results_phase_3b/compression_3.0um/latest",
+      "sha256": "1eb1d40eadd914be66fb54820a5ea8fc591c73646147705e328def3ccb3fb236",
+      "size_bytes": 598902409
+    },
+    {
+      "path": "definity/hbi/stage_timings.jsonl",
+      "sha256": "224e3de880184d8c68031304c3e373cb0ca72b053a09f0b830f7112ac1ae7742",
+      "size_bytes": 226
+    },
+    {
+      "path": "shared/figures/combined_50k/audit/figure7_8_independent_audit.json",
+      "sha256": "e3f08e114bc2b41858e71415ed54546d755ee8a8a2ed1ca384cece4a53c06fd0",
+      "size_bytes": 1036
+    },
+    {
+      "path": "shared/figures/combined_50k/audit/figure7_user_acceptance.json",
+      "sha256": "ad563de3ec7a3518ce2da2c5241aa5351f698bad5f25cf4fa962539b09d1a306",
+      "size_bytes": 709
+    },
+    {
+      "path": "shared/figures/combined_50k/audit/figure8_aggregate_compatibility_audit.json",
+      "sha256": "43d50263713e4bf3968ed8af1f41f37b4ec527f31124b92e3b894b788d3e9c60",
+      "size_bytes": 1127
+    },
+    {
+      "path": "shared/figures/combined_50k/audit/figure8_independent_audit.json",
+      "sha256": "b83914ffc85bbe7c0c756e2d3697ee2dad65b607437a078c60ff477ddff61967",
+      "size_bytes": 1111
+    },
+    {
+      "path": "shared/figures/combined_50k/audit/figure9_standalone_independent_audit.json",
+      "sha256": "1d71cb417846c16f6001cf7818689c3ec6860d5644322d1e3e884a87fc15e47b",
+      "size_bytes": 1329
+    },
+    {
+      "path": "shared/figures/combined_50k/data/definity/acoustic_joint_posterior_samples.csv",
+      "sha256": "d4e9e1281c6a8d4a1a03e51a28f932ba12344dcb0261c1c9658f06c9d6f039b4",
+      "size_bytes": 175073784
+    },
+    {
+      "path": "shared/figures/combined_50k/data/definity/acoustic_posterior_predictive.csv",
+      "sha256": "a937870e6a9612b58d81d3ccf10b276d95382823d89c8e7019532413ea7351c6",
+      "size_bytes": 6745
+    },
+    {
+      "path": "shared/figures/combined_50k/data/definity/figure7_posterior_cloud_samples.csv",
+      "sha256": "aaefebb6dfbc9c4b277423e7a00152733e889fa28650208fe06ed27ee281e26e",
+      "size_bytes": 79300497
+    },
+    {
+      "path": "shared/figures/combined_50k/data/definity/mechanical_posterior_predictive_curves.csv",
+      "sha256": "088d1a18ba73140537e05922d4ed59ac69b2be860046249017653df037871f87",
+      "size_bytes": 158953
+    },
+    {
+      "path": "shared/figures/combined_50k/data/definity/mechanical_propagation_quantile_audit.csv",
+      "sha256": "007a7fde9f8f8e94a68c51df907922fa6bf5d374d2d8b336d0df9eb824a81d25",
+      "size_bytes": 5634
+    },
+    {
+      "path": "shared/figures/combined_50k/data/definity/mechanical_reference_points.csv",
+      "sha256": "313f1b401ce69480e351e0c0f7c18b310d1e66ba2fc45e06bddbf44b87f7bdc0",
+      "size_bytes": 10621
+    },
+    {
+      "path": "shared/figures/combined_50k/data/definity/mechanical_resonance_predictions.csv",
+      "sha256": "47e2cb1fcfe532b4b941b5695afabef732cd0473592b2cc2af43173319a69ee6",
+      "size_bytes": 2248
+    },
+    {
+      "path": "shared/figures/combined_50k/data/definity/paper_asset_data_manifest.json",
+      "sha256": "f03e731ba3dfe225f6751d31b34bd470803cc15155841d99e0e6e9142cb01728",
+      "size_bytes": 5637
+    },
+    {
+      "path": "shared/figures/combined_50k/data/definity/paper_asset_data_manifest.yaml",
+      "sha256": "b10bc3d6930386f4eac327e8caa103a814ba7978d7238c5807b14dbdbb92ee7b",
+      "size_bytes": 4979
+    },
+    {
+      "path": "shared/figures/combined_50k/data/sonovue/acoustic_joint_posterior_samples.csv",
+      "sha256": "a1e92b217e6ae7e95344865a0d50567c91c1318372666a898f75ab253db3376b",
+      "size_bytes": 34575443
+    },
+    {
+      "path": "shared/figures/combined_50k/data/sonovue/acoustic_posterior_predictive.csv",
+      "sha256": "25a86438a41297ecbe16e832830efc3db2fced06c738adfd9974bc10a54ab780",
+      "size_bytes": 1773
+    },
+    {
+      "path": "shared/figures/combined_50k/data/sonovue/figure7_posterior_cloud_samples.csv",
+      "sha256": "cd04e0f00c9fca72b337947056a357664bd2bcd440cd49aa8829791b6b1655bd",
+      "size_bytes": 78253916
+    },
+    {
+      "path": "shared/figures/combined_50k/data/sonovue/mechanical_posterior_predictive_curves.csv",
+      "sha256": "ab9a79b565fee51ea418ddd7a40c9560dfecd12ad68cdbacd7b66473d9df35cd",
+      "size_bytes": 158846
+    },
+    {
+      "path": "shared/figures/combined_50k/data/sonovue/mechanical_propagation_quantile_audit.csv",
+      "sha256": "6af05099509a1e9f27b2718088bdf68783ff98a29f72d897bb300524510c8eb4",
+      "size_bytes": 5596
+    },
+    {
+      "path": "shared/figures/combined_50k/data/sonovue/mechanical_reference_points.csv",
+      "sha256": "649a0c4ce3b379c06962435119b5fd7c8ea9651b53a1b1beda0c1afe2ca8b70b",
+      "size_bytes": 11912
+    },
+    {
+      "path": "shared/figures/combined_50k/data/sonovue/mechanical_resonance_predictions.csv",
+      "sha256": "9c1cfe00637f132c8685cc0c4959cb8831a79a249c9fb45d7b3cf2cba2c0c2f8",
+      "size_bytes": 3912
+    },
+    {
+      "path": "shared/figures/combined_50k/data/sonovue/paper_asset_data_manifest.json",
+      "sha256": "888759f09db73531fdd24e2d1551f9bb153de09ec0efe47a39ff200f566f3d86",
+      "size_bytes": 6079
+    },
+    {
+      "path": "shared/figures/combined_50k/data/sonovue/paper_asset_data_manifest.yaml",
+      "sha256": "63cd238746409d89beabf86a96dfc97304c518f42acc1e951099e6889f560cd9",
+      "size_bytes": 5361
+    },
+    {
+      "path": "shared/figures/combined_50k/definity_export_manifest.stdout.yaml",
+      "sha256": "55b22977170c16f6d95042e578f487942f7058dbe3da0fcb736f9992ffb48cab",
+      "size_bytes": 4980
+    },
+    {
+      "path": "shared/figures/combined_50k/figure_checksums.sha256",
+      "sha256": "0e8f25f1b6327b61e15ea42e91cc07581eae1be541da4da713bed90da5bfc730",
+      "size_bytes": 728
+    },
+    {
+      "path": "shared/figures/combined_50k/figures/Figure_7.pdf",
+      "sha256": "c5843da1ed6ccab60afeb14edc87005d6739c30a419aec2089c0b1b799c1b5ae",
+      "size_bytes": 430902
+    },
+    {
+      "path": "shared/figures/combined_50k/figures/Figure_7.png",
+      "sha256": "2ed1e8fa89ff03f473936011594ccba080974875691a416f94d51399766e0222",
+      "size_bytes": 686197
+    },
+    {
+      "path": "shared/figures/combined_50k/figures/Figure_7_with_ka_kb_posteriors.pdf",
+      "sha256": "7707b83c69c887ef973001144d2074f9396755725ec164f3d703d50a5400ed84",
+      "size_bytes": 350298
+    },
+    {
+      "path": "shared/figures/combined_50k/figures/Figure_7_with_ka_kb_posteriors.png",
+      "sha256": "2ed1e8fa89ff03f473936011594ccba080974875691a416f94d51399766e0222",
+      "size_bytes": 686197
+    },
+    {
+      "path": "shared/figures/combined_50k/figures/Figure_8.pdf",
+      "sha256": "f215f26cd7c0f2aa6e40b5908119bf00852c96f5c4f5c556c5388479a0f04360",
+      "size_bytes": 157205
+    },
+    {
+      "path": "shared/figures/combined_50k/figures/Figure_8.png",
+      "sha256": "f385848521bffc656995d59a61f93d373a147f5c6cd5e03a2358302c683db869",
+      "size_bytes": 707698
+    },
+    {
+      "path": "shared/figures/combined_50k/figures/Figure_8_main_candidate_resonance_augmented_propagation.pdf",
+      "sha256": "0a8fe78df171904375f584adf12e83d50b8e9745390ec5f8473db12ad2206da3",
+      "size_bytes": 50582
+    },
+    {
+      "path": "shared/figures/combined_50k/figures/Figure_8_main_candidate_resonance_augmented_propagation.png",
+      "sha256": "f385848521bffc656995d59a61f93d373a147f5c6cd5e03a2358302c683db869",
+      "size_bytes": 707698
+    },
+    {
+      "path": "shared/figures/combined_50k/figures/jun30_exact_renderer_report.json",
+      "sha256": "01df09f7b07970e076c807c11aa6a8599cb095359b562c6d34650f8f4ce24641",
+      "size_bytes": 10119
+    },
+    {
+      "path": "shared/figures/combined_50k/figures/jun30_variants/Figure_7_attempt081_v6_ka_kb_posteriors.pdf",
+      "sha256": "7707b83c69c887ef973001144d2074f9396755725ec164f3d703d50a5400ed84",
+      "size_bytes": 350298
+    },
+    {
+      "path": "shared/figures/combined_50k/figures/jun30_variants/Figure_7_attempt081_v6_ka_kb_posteriors.png",
+      "sha256": "2ed1e8fa89ff03f473936011594ccba080974875691a416f94d51399766e0222",
+      "size_bytes": 686197
+    },
+    {
+      "path": "shared/figures/combined_50k/figures/jun30_variants/Figure_7_attempt081_v6_ka_kb_posteriors_manifest.json",
+      "sha256": "399b0545da2c9746a363ee308860b748b6c22750ffc56d82e272e6ea58082b8d",
+      "size_bytes": 8291
+    },
+    {
+      "path": "shared/figures/combined_50k/screen/definity_contraction.csv",
+      "sha256": "2abec83f04845d9aac1e7a4e8668494b5d06b97d3370caa40d123798ba5f4941",
+      "size_bytes": 821
+    },
+    {
+      "path": "shared/figures/combined_50k/screen/definity_contraction.stdout.csv",
+      "sha256": "2abec83f04845d9aac1e7a4e8668494b5d06b97d3370caa40d123798ba5f4941",
+      "size_bytes": 821
+    },
+    {
+      "path": "shared/figures/combined_50k/screen/sonovue_contraction.csv",
+      "sha256": "c31443e49e279db1c877176fec75aa3caa838d0b361cfea994e696cbddce42c4",
+      "size_bytes": 826
+    },
+    {
+      "path": "shared/figures/combined_50k/screen/sonovue_contraction.stdout.csv",
+      "sha256": "c31443e49e279db1c877176fec75aa3caa838d0b361cfea994e696cbddce42c4",
+      "size_bytes": 826
+    },
+    {
+      "path": "shared/figures/combined_50k/sonovue_export_manifest.stdout.yaml",
+      "sha256": "ef8193333ec32303d68dce7be54fcf4c94143bead91e89a6a92c856878efbf89",
+      "size_bytes": 5362
+    },
+    {
+      "path": "shared/figures/render_revision/code/render_figure7_bin_revision.py",
+      "sha256": "19083e6484cb6c511f6c10e9c70e49401ccef7c8e7b84aa2fb26b74b9d0af1d3",
+      "size_bytes": 3531
+    },
+    {
+      "path": "shared/figures/render_revision/code/render_figure9_likelihood_consistent.py",
+      "sha256": "407e01f47acc5c8bc515bae99f9b7b5be7ec84ed60afbb7e931a3f4deca8e05d",
+      "size_bytes": 9185
+    },
+    {
+      "path": "shared/figures/render_revision/code/render_revision_draft_assets_20260630_reference.py",
+      "sha256": "e89c43e35e6c84953d87d6fa641185f3f8ded25d25a362549bd684352395090f",
+      "size_bytes": 45933
+    },
+    {
+      "path": "shared/figures/render_revision/code/verify_figure9_accepted_near_map.py",
+      "sha256": "82cbcde38de8eec8689e161cd26cfe5c2b18038d4832c2678bcd51931bb73202",
+      "size_bytes": 3289
+    },
+    {
+      "path": "shared/figures/render_revision/final/f8/Figure_7_main_candidate_ka_kb_localization.pdf",
+      "sha256": "f509a296c2fdff37fb062f20329a07e993d41992e3ce3ee6771bb4b5c8e77fac",
+      "size_bytes": 423496
+    },
+    {
+      "path": "shared/figures/render_revision/final/f8/Figure_7_main_candidate_ka_kb_localization.png",
+      "sha256": "e1dcf3976cb677d9868493a00e5923747f9a042264339479ff1ad0ee5fc048e1",
+      "size_bytes": 632406
+    },
+    {
+      "path": "shared/figures/render_revision/final/f8/Figure_8_main_candidate_mechanical_propagation.pdf",
+      "sha256": "bc5b018063ae19fcc21a8a93251a70d689692f250ba2c5cdbe9d088f5b57826f",
+      "size_bytes": 117555
+    },
+    {
+      "path": "shared/figures/render_revision/final/f8/Figure_8_main_candidate_mechanical_propagation.png",
+      "sha256": "f4f633adb85afe1d87c2ecba9cedefba7b2863dc8fe085074bd331ddb4e4ce4f",
+      "size_bytes": 428467
+    },
+    {
+      "path": "shared/figures/render_revision/final/f8/Figure_8_main_candidate_resonance_augmented_propagation.pdf",
+      "sha256": "bef0dbef54405a4acd658fdc274d62365c7bf3b8866f9fc91a56049140c0f65e",
+      "size_bytes": 157205
+    },
+    {
+      "path": "shared/figures/render_revision/final/f8/Figure_8_main_candidate_resonance_augmented_propagation.png",
+      "sha256": "55053f0297680b7c98b0a9eb8e707b4f333e01cdfd5249617ad1d94e14894613",
+      "size_bytes": 540075
+    },
+    {
+      "path": "shared/figures/render_revision/final/f8/Figure_SX_ka_kb_localization_full_scatter.pdf",
+      "sha256": "7e7c6f24b1bac8798058500010164f7567e580405c8656e44ee0567cc6fbed95",
+      "size_bytes": 835037
+    },
+    {
+      "path": "shared/figures/render_revision/final/f8/Figure_SX_ka_kb_localization_full_scatter.png",
+      "sha256": "2f97ab5eb66fdbccd32c6056392150b83f0c8248f748daedf3e4721c9bc7d4b9",
+      "size_bytes": 1933557
+    },
+    {
+      "path": "shared/figures/render_revision/final/f8/Figure_SX_resonance_frequency_propagation.pdf",
+      "sha256": "210876017a0f7bfb84c21e74d4e47f489d32590970c286abf8487ee5790c1524",
+      "size_bytes": 86512
+    },
+    {
+      "path": "shared/figures/render_revision/final/f8/Figure_SX_resonance_frequency_propagation.png",
+      "sha256": "c510668721ed3fecdfab37d8676c0f9285addf992930d12031b7f5f0f01bcef0",
+      "size_bytes": 136579
+    },
+    {
+      "path": "shared/figures/render_revision/final/f8/draft_figure_manifest.json",
+      "sha256": "94b21fa808fbbf05ed8dd83b0ca2c4eee6aafae5585e8af175a492df8cd5be0d",
+      "size_bytes": 6468
+    },
+    {
+      "path": "shared/figures/render_revision/final/f9_accepted_near_map_legends_20260728/Figure_9_main_candidate_direct_map_confirmation.pdf",
+      "sha256": "9a052ab4e6ccff32c65489045acf4242d09578f4cdcd05877390746f08922a8f",
+      "size_bytes": 36811
+    },
+    {
+      "path": "shared/figures/render_revision/final/f9_accepted_near_map_legends_20260728/Figure_9_main_candidate_direct_map_confirmation.png",
+      "sha256": "e339108a0acd039af21792a392685fe1879c2381139882d6771457089d0fb059",
+      "size_bytes": 560766
+    },
+    {
+      "path": "shared/figures/render_revision/final/f9_accepted_near_map_legends_20260728/Figure_9_main_candidate_direct_map_confirmation_metrics.csv",
+      "sha256": "468051c0ed43eb2060d470efc81f92c7b114451f582e8afa6b7026a96d91fa01",
+      "size_bytes": 4257
+    },
+    {
+      "path": "shared/figures/render_revision/final/f9_accepted_near_map_legends_20260728/figure9_likelihood_consistent_manifest.json",
+      "sha256": "d1ce27657bc043e55bb1fca3b28aef0b445db25dca5ace2a9868c4b2503c73ad",
+      "size_bytes": 4682
+    },
+    {
+      "path": "shared/figures/render_revision/rendering_revision_manifest.json",
+      "sha256": "e56173bf475643d2a8f7d80ba0336f18d6f52a325c25b4871871acef2d84dce5",
+      "size_bytes": 1938
+    },
+    {
+      "path": "sonovue/config/sonovue_liked_candidate_production50k.yaml",
+      "sha256": "bbd436009282db52ed41763d0348f1452ab1bb553e5bbdb39b5ba09a79932f3a",
+      "size_bytes": 6253
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/logs/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/logs/stdout.log",
+      "sha256": "e73aea8de317d7d72d18f003d4c2c81da0de018d451294868cc8b673a1d33722",
+      "size_bytes": 1571
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/manifest.json",
+      "sha256": "288fc82d51829939e5ceafe7d1e7768b5c911b0c42d6ecd89de2886f6392b63c",
+      "size_bytes": 143823
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/report.md",
+      "sha256": "5de18bc7db2f77f43ad021f37ff75fab4f27434fbe331e71997fddb28d2b51d1",
+      "size_bytes": 1737
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/fsi_parameters.json",
+      "sha256": "a9813069a3218bbc756ee87a7b21f8054c192e9b250ea519601fe9afaa41d2af",
+      "size_bytes": 590
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/membrane_elastic_override.json",
+      "sha256": "a99b31ff26a6fd8bb1b6b89e5a3be8833025fee12fc5435d76f7a5375c6580f1",
+      "size_bytes": 471
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/membrane_mass_parameters.json",
+      "sha256": "fbad43679f1c61f328d7cb93ba1863a61a20cdaedae0e17da27f08f634a34991",
+      "size_bytes": 588
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/mode_purity_timeseries.csv",
+      "sha256": "3e5b5f27da6b54c25efc10882f10a2b55a6c7d9e5b26ce525f5eedb3c3e190d8",
+      "size_bytes": 110861
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/plots/sonovue_3p20um_mode_purity.png",
+      "sha256": "db482049ef3b20905e4bd2bdf77d477f5d7492aef9e628d5e1622420da507240",
+      "size_bytes": 175252
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/plots/sonovue_3p20um_rms_radius_spectrum.png",
+      "sha256": "61900c59a75e26657348d9136598ea5bce2fcc806ad8254be68d84cc193c75a4",
+      "size_bytes": 75713
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/plots/sonovue_3p20um_rms_radius_timeseries.png",
+      "sha256": "eb3138099f8bfb7de92e9ed37e0b92bcc10dde7bbd8e386ed9f4cc34f242a730",
+      "size_bytes": 84041
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/post_deflation_coordinate_hold.json",
+      "sha256": "b31d98fe2ac40d02a3fa11287c8da256a4cbeba90218863bca14f604b8e5a796",
+      "size_bytes": 668
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/post_equilibration_prestrain.json",
+      "sha256": "5f47e219fff14e592e4b2cacaf79ab7bff420de59245385a201c76f7dd614fce",
+      "size_bytes": 605
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/post_equilibration_shape_displacement.json",
+      "sha256": "7f3eb660a524a098acd6b17623553a3dfa05c5702afdbac172212f9c5fe3db23",
+      "size_bytes": 74
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/post_equilibration_velocity_kick.json",
+      "sha256": "5edfba15c7e48ea7d1dc5f04b0de00b85ab4da2a7d05243e7bf98b9fcf54ae52",
+      "size_bytes": 104
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/result.json",
+      "sha256": "1df42286cf9b5a2bb6cd433f2cf45cba34ac89df71286de9c54ad800fc7ef4ba",
+      "size_bytes": 135724
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/setup_manifest.json",
+      "sha256": "d7a20870c1d89cf61f53373a73aa6abee849ef58efa0ca53e43d14e363e436d4",
+      "size_bytes": 4965
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/simulation/logs/mirheo_00000000.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/simulation/logs/mirheo_00000001.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/simulation/mesh/emb00001.off",
+      "sha256": "2547b2c4bb5b329ad5d6e68740482a035a3dbdb17bbed482540ba71192f41b05",
+      "size_bytes": 184095
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/simulation/microbubble/sphere_icosphere.py",
+      "sha256": "af5966f7157831e31bab44c7a0d3d6d8d5d79ee566f1db025344ffb062327977",
+      "size_bytes": 736
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/simulation/parameter/parameters-default00001.yaml",
+      "sha256": "006578ac52eb5f37adb0271a051491c5986c8f169d9ad13dcc40198126920be6",
+      "size_bytes": 804
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/simulation/parameter/parameters-default00001eq.yaml",
+      "sha256": "006578ac52eb5f37adb0271a051491c5986c8f169d9ad13dcc40198126920be6",
+      "size_bytes": 804
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/simulation/parameter/parameters.prms00001.yaml",
+      "sha256": "67502985c9c5b28fa5630388b1b08c93be4f7b218ba5d2086eff13cbd7cb9a8c",
+      "size_bytes": 202
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/simulation/parameter/parameters00001.yaml",
+      "sha256": "9f2049bc27b2a0cf906c51df42819d40fed1e8eb644381573a91c2416ae88815",
+      "size_bytes": 718
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/simulation/pin/emb.csv",
+      "sha256": "1225904cc0e47347b0e4feb8395887c2d70989741f52a0a2fd1d5f1573fc8017",
+      "size_bytes": 41228
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/simulation/posq.txt",
+      "sha256": "27d8d876e33e1456aad7de133aa81314fdc6b0bee0fafc4930bd8496537171ce",
+      "size_bytes": 175
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/sonovue_3p20um/seed-000/time_series.csv",
+      "sha256": "7a4925b7f3f343f0df5d0fbaeaca06cfcd21dc8324cbe5d4f4030fccbacda36a",
+      "size_bytes": 239005
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d4/summary.csv",
+      "sha256": "cfe5c4ec7b1d573f362f7571d19961f8285d9714f2c49978fbe9b58a6013d067",
+      "size_bytes": 1565
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/logs/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/logs/stdout.log",
+      "sha256": "9bb3dbd6a06801761755594808797c6a8d533e2ad77a8c8c2991f93cdb89a353",
+      "size_bytes": 1571
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/manifest.json",
+      "sha256": "7e5b0918f88010bbf66921796b31a10931dc37dd194e92eadc42118d94dd20dd",
+      "size_bytes": 143221
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/report.md",
+      "sha256": "9f0aac1234e03315353558a536fadcbbab92cba61b73339617c6146d9c8ebc95",
+      "size_bytes": 1737
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/fsi_parameters.json",
+      "sha256": "7eb99b17a6bc56af8485d009fbb1a3cd73bc977b1d104b677ff74482a9930269",
+      "size_bytes": 592
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/membrane_elastic_override.json",
+      "sha256": "618ca602ceb22b944cae7c7d7000f142783d836cb28f9784eadfede56741fc28",
+      "size_bytes": 466
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/membrane_mass_parameters.json",
+      "sha256": "79981ddf71b5cafb54c62cc6ed7588893ebd73300ecedcde8897cf6f67a4248d",
+      "size_bytes": 587
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/mode_purity_timeseries.csv",
+      "sha256": "eddb9555308b8f86177ea27185631c5f33aa1ce7dcc58024ee95508da1f59da7",
+      "size_bytes": 110404
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/plots/sonovue_3p40um_mode_purity.png",
+      "sha256": "c483cfd341133cfb1b66e407fc9c5d9ffd4706e3d4fd559e2c7dada61928c9db",
+      "size_bytes": 194037
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/plots/sonovue_3p40um_rms_radius_spectrum.png",
+      "sha256": "88eb4128d6bc24ac69a339bda6088b682533561e19a91bd459a33e801a02d589",
+      "size_bytes": 71716
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/plots/sonovue_3p40um_rms_radius_timeseries.png",
+      "sha256": "996ff21f519751ff632975b8d577cd9b1435f88283589def25c446ac1f64a9de",
+      "size_bytes": 85692
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/post_deflation_coordinate_hold.json",
+      "sha256": "88df9fbe8f0ff9902501207b477d00437e3ef16ba4a6b46c8ef3b78ac59803eb",
+      "size_bytes": 668
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/post_equilibration_prestrain.json",
+      "sha256": "aa314637eb3d58f04f5e9d883aff70526a443e9a0f37ec19fb00703eabebb298",
+      "size_bytes": 605
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/post_equilibration_shape_displacement.json",
+      "sha256": "7f3eb660a524a098acd6b17623553a3dfa05c5702afdbac172212f9c5fe3db23",
+      "size_bytes": 74
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/post_equilibration_velocity_kick.json",
+      "sha256": "5edfba15c7e48ea7d1dc5f04b0de00b85ab4da2a7d05243e7bf98b9fcf54ae52",
+      "size_bytes": 104
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/result.json",
+      "sha256": "573872f3851c4cb0dba511789d183da5624cef2ddc51731bba37dd22ee534bab",
+      "size_bytes": 135194
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/setup_manifest.json",
+      "sha256": "ddec2a8bca961802fd431183da1d899af996459b208127a1df601874c21417b0",
+      "size_bytes": 4962
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/simulation/logs/mirheo_00000000.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/simulation/logs/mirheo_00000001.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/simulation/mesh/emb00001.off",
+      "sha256": "908d0f899a213954b726d7919b41d14aa21c5ad6c84375f0861314027163fe9d",
+      "size_bytes": 184095
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/simulation/microbubble/sphere_icosphere.py",
+      "sha256": "af5966f7157831e31bab44c7a0d3d6d8d5d79ee566f1db025344ffb062327977",
+      "size_bytes": 736
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/simulation/parameter/parameters-default00001.yaml",
+      "sha256": "321ad0c9ef116f32b7f6d89bde2c537210ad8428b4449408c228476e02495440",
+      "size_bytes": 805
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/simulation/parameter/parameters-default00001eq.yaml",
+      "sha256": "321ad0c9ef116f32b7f6d89bde2c537210ad8428b4449408c228476e02495440",
+      "size_bytes": 805
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/simulation/parameter/parameters.prms00001.yaml",
+      "sha256": "047430f52f10ce4e9ff24046bb40018bd165df55e710696898a22db5d9000d12",
+      "size_bytes": 200
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/simulation/parameter/parameters00001.yaml",
+      "sha256": "57c3b385410649cba24038443a4c60f08037e826b1f4f65569bec7173799a674",
+      "size_bytes": 714
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/simulation/pin/emb.csv",
+      "sha256": "9c4cff67e772415cb2fc41d853f099666d3d3b4ab8b2ab5a828934cccd02d42e",
+      "size_bytes": 41527
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/simulation/posq.txt",
+      "sha256": "e344fb978873db9a32bbd8d8d8f522531a5a766bcd54873581b96c04f3fb8f16",
+      "size_bytes": 175
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/sonovue_3p40um/seed-000/time_series.csv",
+      "sha256": "60c288bfe945555b6a632e0005a35f5b00b4e3c61e4ad053a044edbf588b43b4",
+      "size_bytes": 238918
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d5/summary.csv",
+      "sha256": "20e762f949cd85c7e4839c2cd800b944d9a0fde80b6e58c56e54c9283ae6fb79",
+      "size_bytes": 1562
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/logs/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/logs/stdout.log",
+      "sha256": "b0168ebf9be1966358c695ef2097647f8ae03256e985eddba6c9b2cdcd73faaa",
+      "size_bytes": 1571
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/manifest.json",
+      "sha256": "ff65bde543310001436bd76de7299c336bbc272f2d6f3726b2b2fd9e5597cc20",
+      "size_bytes": 142814
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/report.md",
+      "sha256": "f60811667412986b9d66aaf9e8cf8b9812042ddb9a77f870f1c7ecadc181b9f8",
+      "size_bytes": 1735
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/fsi_parameters.json",
+      "sha256": "92595d63109b2d0a2e74954efbb0d728a3118e1c9a24e1a17b092cb348665fc3",
+      "size_bytes": 592
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/membrane_elastic_override.json",
+      "sha256": "38e4370a402d7c1c051db19fab7f952c9d544871be5262f4d5f1fc2e787aa901",
+      "size_bytes": 474
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/membrane_mass_parameters.json",
+      "sha256": "8b05278f8cd4b070fe5ea02ad015c8ec75ba0bd4c13285448653940ef684e4f1",
+      "size_bytes": 588
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/mode_purity_timeseries.csv",
+      "sha256": "87d97ac5bd084d00136844cb557e67543e48da56050f7fba63a022d674795391",
+      "size_bytes": 110275
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/plots/sonovue_5p80um_mode_purity.png",
+      "sha256": "d470b0de0020ea5c2d90ae0350f7a550faf369e29f9fce641131a0bfe015b018",
+      "size_bytes": 173188
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/plots/sonovue_5p80um_rms_radius_spectrum.png",
+      "sha256": "1a7c88996fe4e67cbd9bea6ad7e8da7350a9525ecf2456717f973f6d5a8d906c",
+      "size_bytes": 75323
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/plots/sonovue_5p80um_rms_radius_timeseries.png",
+      "sha256": "d07a1ac7958f4bf766b41eb1b5c1e612fe6a65973a8a627585b0e92cfc311ac7",
+      "size_bytes": 80206
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/post_deflation_coordinate_hold.json",
+      "sha256": "0ce708410d9da4a01662f61e6b2d750a877d73268dfc19b51ab33e22881f9f08",
+      "size_bytes": 656
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/post_equilibration_prestrain.json",
+      "sha256": "78889ce38cfce5bdcafa2fe20577acdfa6bfe736a4f03f82be9ffc1913fa51d8",
+      "size_bytes": 595
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/post_equilibration_shape_displacement.json",
+      "sha256": "7f3eb660a524a098acd6b17623553a3dfa05c5702afdbac172212f9c5fe3db23",
+      "size_bytes": 74
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/post_equilibration_velocity_kick.json",
+      "sha256": "5edfba15c7e48ea7d1dc5f04b0de00b85ab4da2a7d05243e7bf98b9fcf54ae52",
+      "size_bytes": 104
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/result.json",
+      "sha256": "cff8e10bf3e74a249b464152920919197952d6dd59a7aeb9e76df9900e1d88a4",
+      "size_bytes": 134835
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/setup_manifest.json",
+      "sha256": "23c1e15ed28c70465d6dd6c9994a9a6b9050d6ff7c9753607148364f5b31b24b",
+      "size_bytes": 4967
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/simulation/logs/mirheo_00000000.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/simulation/logs/mirheo_00000001.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/simulation/mesh/emb00001.off",
+      "sha256": "d33004d47cf6bb29fa3c9023eb9920c6bbd66c3671670361ec32e02e23370e99",
+      "size_bytes": 185157
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/simulation/microbubble/sphere_icosphere.py",
+      "sha256": "af5966f7157831e31bab44c7a0d3d6d8d5d79ee566f1db025344ffb062327977",
+      "size_bytes": 736
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/simulation/parameter/parameters-default00001.yaml",
+      "sha256": "8d040c32d6b687108617afde96abd11c9045eac41a1d86b8f31c9e1281fa1683",
+      "size_bytes": 806
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/simulation/parameter/parameters-default00001eq.yaml",
+      "sha256": "8d040c32d6b687108617afde96abd11c9045eac41a1d86b8f31c9e1281fa1683",
+      "size_bytes": 806
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/simulation/parameter/parameters.prms00001.yaml",
+      "sha256": "35a72b7bda6242a28b824c54e0d58c20febbdc4d4a2502a75de739919ef012f3",
+      "size_bytes": 205
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/simulation/parameter/parameters00001.yaml",
+      "sha256": "ac769c488a6dcd7e41621eff3b14d2a75d5c317289bbbbed5a59de9f4594a790",
+      "size_bytes": 720
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/simulation/pin/emb.csv",
+      "sha256": "5e287f41391d4f44de5bc3833b258db0a4804992b8b5e8bb9cf3ac90f3f7ae40",
+      "size_bytes": 43217
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/simulation/posq.txt",
+      "sha256": "f9035da6eacd453dcd03afa2fbf5f9f5c4638543a253b43188d852c281425a64",
+      "size_bytes": 175
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/sonovue_5p80um/seed-000/time_series.csv",
+      "sha256": "dcd5899f364a72c9a4b73ac883cb3ce398c8783ae942b2b2116b8a6c685448ea",
+      "size_bytes": 239841
+    },
+    {
+      "path": "sonovue/direct_dpd/acoustic/d6/summary.csv",
+      "sha256": "6dfaa7587b9032a750525eb38179969d3ffc480fe03e9318cdec0e6558678d62",
+      "size_bytes": 1571
+    },
+    {
+      "path": "sonovue/direct_dpd/evidence/forward_model_comparison/sonovue_3.2um_selected_fit_analysis.json",
+      "sha256": "a067d9733e9e6a51cfebfd76da7793d0038d70f2d54e7633083e32ec04516538",
+      "size_bytes": 13780
+    },
+    {
+      "path": "sonovue/direct_dpd/evidence/forward_model_comparison/sonovue_3.4um_selected_fit_analysis.json",
+      "sha256": "3a29d8ac4ba19d5da0d9f5ce9e971f0757d2f2bcb1be2ad1a269f0d671cf4d90",
+      "size_bytes": 13800
+    },
+    {
+      "path": "sonovue/direct_dpd/evidence/forward_model_comparison/sonovue_5.8um_selected_fit_analysis.json",
+      "sha256": "f0fbea44d982d1b29ca08d65699ab9b689fe25af59d0b91c926d613d1dcfdc21",
+      "size_bytes": 13832
+    },
+    {
+      "path": "sonovue/direct_dpd/evidence/forward_model_comparison/sonovue_direct_breathing_fit_overlays.pdf",
+      "sha256": "248802bd3e749d9ecf03371736d4cb1ec92193051dca26fc0d26ec220ab97fe8",
+      "size_bytes": 32037
+    },
+    {
+      "path": "sonovue/direct_dpd/evidence/forward_model_comparison/sonovue_direct_breathing_fit_overlays.png",
+      "sha256": "ece0eb6abc62b0acfce3bbbfccd40b2629be54ea6b8d4f909d56f7a534484499",
+      "size_bytes": 201677
+    },
+    {
+      "path": "sonovue/direct_dpd/evidence/forward_model_comparison/sonovue_direct_map_acoustic_comparison.csv",
+      "sha256": "12130d043f4e523c66e6c5fb72a9beb70395aadf30e54a6aaa35502516e971a4",
+      "size_bytes": 3055
+    },
+    {
+      "path": "sonovue/direct_dpd/evidence/forward_model_comparison/sonovue_direct_map_compatibility_metrics.json",
+      "sha256": "641bbcab985ad701e744c3271103f1c7f1c3058bf24a9bd31a729ae015512dc7",
+      "size_bytes": 14613
+    },
+    {
+      "path": "sonovue/direct_dpd/evidence/forward_model_comparison/sonovue_direct_map_mechanical_comparison.csv",
+      "sha256": "862ab60070afc1552308384c3b10d7fe5925163e1cf22547c9285baf7f5b6994",
+      "size_bytes": 19166
+    },
+    {
+      "path": "sonovue/direct_dpd/evidence/forward_model_comparison/sonovue_direct_map_validation.pdf",
+      "sha256": "d0846320cbe845bbcaad6328acce4f1c487b487fd5259a113427b2e476752a05",
+      "size_bytes": 23407
+    },
+    {
+      "path": "sonovue/direct_dpd/evidence/forward_model_comparison/sonovue_direct_map_validation.png",
+      "sha256": "08569e7c766bd37cf77c71b431e56291d73abf7b001b894d3a60d059a4f08314",
+      "size_bytes": 301847
+    },
+    {
+      "path": "sonovue/direct_dpd/inputs/breathing_frequency/production_map_values.csv",
+      "sha256": "d366503c675c39d64b46676691b9f998b66da43c14c69036f284d662fc05cdbd",
+      "size_bytes": 1876
+    },
+    {
+      "path": "sonovue/direct_dpd/inputs/breathing_frequency/sonovue_3p20um.csv",
+      "sha256": "1fe689e6b1e00cfac1d29ac5a7142391f637cb94136c885f5cbb188796d50fb5",
+      "size_bytes": 767
+    },
+    {
+      "path": "sonovue/direct_dpd/inputs/breathing_frequency/sonovue_3p40um.csv",
+      "sha256": "f3b486cbe75221012506e7d6c0744e4d401cbefaf1c838bcae693a1591dd0e66",
+      "size_bytes": 764
+    },
+    {
+      "path": "sonovue/direct_dpd/inputs/breathing_frequency/sonovue_5p80um.csv",
+      "sha256": "490178e2b2e37ad1b250766dba127618f59ab13c0749ba07b5b5136cd13cb88a",
+      "size_bytes": 769
+    },
+    {
+      "path": "sonovue/direct_dpd/inputs/force_spectroscopy/indentation_3.2um_map.json",
+      "sha256": "6004777ab27800b4e7d99839554fddae93c58ec2ddf97b23741e6049977df43c",
+      "size_bytes": 704
+    },
+    {
+      "path": "sonovue/direct_dpd/inputs/force_spectroscopy/indentation_3.4um_map.json",
+      "sha256": "a691a33690c1ba2087a352c826aaa9f0720800b45a5c2835e31f375104fbbdd7",
+      "size_bytes": 700
+    },
+    {
+      "path": "sonovue/direct_dpd/inputs/force_spectroscopy/indentation_5.8um_map.json",
+      "sha256": "11cc4e5a619d2643fc5cc2af0900b53860a50c1f311d3174350f6ef268897669",
+      "size_bytes": 707
+    },
+    {
+      "path": "sonovue/direct_dpd/inputs/manifest.json",
+      "sha256": "df22bccb31d2a0f64fae565eec3978deae53931c09b36390e5c43e3561cbcba6",
+      "size_bytes": 3884
+    },
+    {
+      "path": "sonovue/direct_dpd/mechanical/d4/provenance.json",
+      "sha256": "be52a5d56811c9700411f09c15b65ad40982b2e80ae3058d00de5d5a1dfa3814",
+      "size_bytes": 8702
+    },
+    {
+      "path": "sonovue/direct_dpd/mechanical/d4/result.json",
+      "sha256": "30754acb471cf6d33d041b46a16e2e352e4ad98dbf73af712a5af5d1fd1110ca",
+      "size_bytes": 1281
+    },
+    {
+      "path": "sonovue/direct_dpd/mechanical/d4/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "sonovue/direct_dpd/mechanical/d4/stdout.log",
+      "sha256": "8b6040e3d68ddff6c60619d3fd2583e11a8c5e73c8ca2bc27db6dc9776b24d89",
+      "size_bytes": 9299
+    },
+    {
+      "path": "sonovue/direct_dpd/mechanical/d5/provenance.json",
+      "sha256": "bfca675a360fc3bc0755990039034bbee6bb45fc87b4c9f2040bb67debcdb22c",
+      "size_bytes": 8700
+    },
+    {
+      "path": "sonovue/direct_dpd/mechanical/d5/result.json",
+      "sha256": "89a76997cb1896e247934bb5fca04aecfab1efc8654a00278cf32fcf7a540d21",
+      "size_bytes": 1280
+    },
+    {
+      "path": "sonovue/direct_dpd/mechanical/d5/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "sonovue/direct_dpd/mechanical/d5/stdout.log",
+      "sha256": "897882c21c017ad0db37293b850c79a02bd15fd8b681ba62874d45e29c26aa00",
+      "size_bytes": 9393
+    },
+    {
+      "path": "sonovue/direct_dpd/mechanical/d6/provenance.json",
+      "sha256": "bd7b5319eaa9f4fea3be3e999a40016af9f7cdc924a391469a2c6c6fa6510042",
+      "size_bytes": 8688
+    },
+    {
+      "path": "sonovue/direct_dpd/mechanical/d6/result.json",
+      "sha256": "05d6176cb09a4d2dc9c30d6a1deb77729559309f30b7f7830a24033ae87c4469",
+      "size_bytes": 1277
+    },
+    {
+      "path": "sonovue/direct_dpd/mechanical/d6/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "sonovue/direct_dpd/mechanical/d6/stdout.log",
+      "sha256": "80dc1519a917f9f38f64f8b57ca7016fb4f27a2f5f6985389092098afd1aec69",
+      "size_bytes": 9268
+    },
+    {
+      "path": "sonovue/direct_dpd/paper_facing/figures/Figure_9_main_candidate_direct_map_confirmation_main_metrics.csv",
+      "sha256": "c4fe2e01e1c1a8c3d869a4851f6a9cceca91f47a528f8b944267b7a5abbd760b",
+      "size_bytes": 1565
+    },
+    {
+      "path": "sonovue/direct_dpd/paper_facing/figures/Figure_9_main_candidate_direct_map_confirmation_metrics.csv",
+      "sha256": "c4fe2e01e1c1a8c3d869a4851f6a9cceca91f47a528f8b944267b7a5abbd760b",
+      "size_bytes": 1565
+    },
+    {
+      "path": "sonovue/direct_dpd/paper_facing/figures/Figure_9_main_candidate_direct_map_confirmation_metrics.json",
+      "sha256": "5582ac9993cacad5922cc79d90b29b1d11fb1393aa238dc4c9d21eab8e397628",
+      "size_bytes": 2389
+    },
+    {
+      "path": "sonovue/direct_dpd/paper_facing/figures/Figure_9_sonovue_direct_map_confirmation.pdf",
+      "sha256": "ea8fc758b3724e7c7e71ba6f7b9da086f1aa0895334177c99288f8a6dabfad6e",
+      "size_bytes": 30675
+    },
+    {
+      "path": "sonovue/direct_dpd/paper_facing/figures/Figure_9_sonovue_direct_map_confirmation.png",
+      "sha256": "cb9b4102d5b4d4462d3eb09d5e0192c4226db3c6e30105aaec1ea968873ea3a8",
+      "size_bytes": 287096
+    },
+    {
+      "path": "sonovue/direct_dpd/paper_facing/figures/direct_map_figure_manifest.json",
+      "sha256": "8341341c06e8d6e94a8988d61c7ffb60aced148f8dbff6e8bafb3a568b1bef75",
+      "size_bytes": 2489
+    },
+    {
+      "path": "sonovue/direct_dpd/paper_facing/render_direct_map_confirmation_july.py",
+      "sha256": "ae969e18cf10bb7f846acf2c512bbe91b9623ff2cdf76a912b45015d999dac8e",
+      "size_bytes": 30121
+    },
+    {
+      "path": "sonovue/hbi/logs/run.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "sonovue/hbi/logs/run.stdout.log",
+      "sha256": "f1763f98ef706eb9f850a741b606bbe46acea1472a8111bcd96167d1100ad00b",
+      "size_bytes": 64476
+    },
+    {
+      "path": "sonovue/hbi/receipts/config_validation.json",
+      "sha256": "52471a908b2dcd6331d0168c68a1b8651f6730d227ebe208aec9978f5156174b",
+      "size_bytes": 14284
+    },
+    {
+      "path": "sonovue/hbi/receipts/runtime_config.yaml",
+      "sha256": "8361f12227b60258c170c385ce7fe1efa5f858b094ee71171d58a448d1a1550e",
+      "size_bytes": 6345
+    },
+    {
+      "path": "sonovue/hbi/receipts/runtime_config_materialization.json",
+      "sha256": "e524bd9b935f4bd268df3017932371c68d09bc5e72788a4565fc338898608e1c",
+      "size_bytes": 4081
+    },
+    {
+      "path": "sonovue/hbi/receipts/source_config_validation.json",
+      "sha256": "9d677e9d86cb116fc302eaabcbbdf0b68db5428bd86444e50bf4346b3e4f3f01",
+      "size_bytes": 14297
+    },
+    {
+      "path": "sonovue/hbi/results_phase_1/indentation_3.2um/genLatest.json",
+      "sha256": "ecf1480cc39b2cb7665e97c630884a3bc0e884448127cc7729577cf5decd30c0",
+      "size_bytes": 116177682
+    },
+    {
+      "path": "sonovue/hbi/results_phase_1/indentation_3.2um/latest",
+      "sha256": "ecf1480cc39b2cb7665e97c630884a3bc0e884448127cc7729577cf5decd30c0",
+      "size_bytes": 116177682
+    },
+    {
+      "path": "sonovue/hbi/results_phase_1/indentation_3.4um/genLatest.json",
+      "sha256": "1349667d6d81349304af4dabaf970acb49f030f5fd8475156c1ff04be33b0a70",
+      "size_bytes": 92895048
+    },
+    {
+      "path": "sonovue/hbi/results_phase_1/indentation_3.4um/latest",
+      "sha256": "1349667d6d81349304af4dabaf970acb49f030f5fd8475156c1ff04be33b0a70",
+      "size_bytes": 92895048
+    },
+    {
+      "path": "sonovue/hbi/results_phase_1/indentation_5.8um/genLatest.json",
+      "sha256": "96d569c7a88d01960168ba10eb2b67ea2cc4c56bba07d6f9cebb929ca7b584fd",
+      "size_bytes": 89936680
+    },
+    {
+      "path": "sonovue/hbi/results_phase_1/indentation_5.8um/latest",
+      "sha256": "96d569c7a88d01960168ba10eb2b67ea2cc4c56bba07d6f9cebb929ca7b584fd",
+      "size_bytes": 89936680
+    },
+    {
+      "path": "sonovue/hbi/results_phase_1/resonance_2.6um/genLatest.json",
+      "sha256": "97306ee23a563cffd693e38aad022d92e5bad7684c695dbab6dd53f0c4663922",
+      "size_bytes": 44145300
+    },
+    {
+      "path": "sonovue/hbi/results_phase_1/resonance_2.6um/latest",
+      "sha256": "97306ee23a563cffd693e38aad022d92e5bad7684c695dbab6dd53f0c4663922",
+      "size_bytes": 44145300
+    },
+    {
+      "path": "sonovue/hbi/results_phase_1/resonance_3.2um/genLatest.json",
+      "sha256": "f68b737d3197c6081157afa9e05806db9f594460eb47b5ca4c4dc78e22d7e17c",
+      "size_bytes": 43888973
+    },
+    {
+      "path": "sonovue/hbi/results_phase_1/resonance_3.2um/latest",
+      "sha256": "f68b737d3197c6081157afa9e05806db9f594460eb47b5ca4c4dc78e22d7e17c",
+      "size_bytes": 43888973
+    },
+    {
+      "path": "sonovue/hbi/results_phase_1/resonance_4.0um/genLatest.json",
+      "sha256": "57f5e3e880b2400f0457f450fc2a2e26a8c99f112172656fa00a398b693b2d61",
+      "size_bytes": 43887733
+    },
+    {
+      "path": "sonovue/hbi/results_phase_1/resonance_4.0um/latest",
+      "sha256": "57f5e3e880b2400f0457f450fc2a2e26a8c99f112172656fa00a398b693b2d61",
+      "size_bytes": 43887733
+    },
+    {
+      "path": "sonovue/hbi/results_phase_2/genLatest.json",
+      "sha256": "5adc45c4bb659a1d81929f660a2262cb73b87c2b74beef20ebfe4c1c98e5273c",
+      "size_bytes": 527212448
+    },
+    {
+      "path": "sonovue/hbi/results_phase_2/latest",
+      "sha256": "5adc45c4bb659a1d81929f660a2262cb73b87c2b74beef20ebfe4c1c98e5273c",
+      "size_bytes": 527212448
+    },
+    {
+      "path": "sonovue/hbi/results_phase_3b/indentation_3.2um/genLatest.json",
+      "sha256": "fa811a9ae1da7f618223131f73e0fb39402fa679cf3a3137812bd5c49c7558a0",
+      "size_bytes": 741814878
+    },
+    {
+      "path": "sonovue/hbi/results_phase_3b/indentation_3.2um/latest",
+      "sha256": "fa811a9ae1da7f618223131f73e0fb39402fa679cf3a3137812bd5c49c7558a0",
+      "size_bytes": 741814878
+    },
+    {
+      "path": "sonovue/hbi/results_phase_3b/indentation_3.4um/genLatest.json",
+      "sha256": "208b0ee92df65fccb301833917d1b18c0c06a8f45be9a5498e62158abab096e7",
+      "size_bytes": 716768312
+    },
+    {
+      "path": "sonovue/hbi/results_phase_3b/indentation_3.4um/latest",
+      "sha256": "208b0ee92df65fccb301833917d1b18c0c06a8f45be9a5498e62158abab096e7",
+      "size_bytes": 716768312
+    },
+    {
+      "path": "sonovue/hbi/results_phase_3b/indentation_5.8um/genLatest.json",
+      "sha256": "c0765b5f769930efd2f7e32b0599b35d0b43d80b5aa34b94b75e994b43f7cc73",
+      "size_bytes": 713649136
+    },
+    {
+      "path": "sonovue/hbi/results_phase_3b/indentation_5.8um/latest",
+      "sha256": "c0765b5f769930efd2f7e32b0599b35d0b43d80b5aa34b94b75e994b43f7cc73",
+      "size_bytes": 713649136
+    },
+    {
+      "path": "sonovue/hbi/results_phase_3b/resonance_2.6um/genLatest.json",
+      "sha256": "7ff98f9807b8944fa228b49797b4d3bce3ec2b57563965e08fa0ac0fc84150a6",
+      "size_bytes": 664475332
+    },
+    {
+      "path": "sonovue/hbi/results_phase_3b/resonance_2.6um/latest",
+      "sha256": "7ff98f9807b8944fa228b49797b4d3bce3ec2b57563965e08fa0ac0fc84150a6",
+      "size_bytes": 664475332
+    },
+    {
+      "path": "sonovue/hbi/results_phase_3b/resonance_3.2um/genLatest.json",
+      "sha256": "7a495a5437f6c5c61241e8218abe6cd6ce93c443a719b973b8c7b16c025177a8",
+      "size_bytes": 663965336
+    },
+    {
+      "path": "sonovue/hbi/results_phase_3b/resonance_3.2um/latest",
+      "sha256": "7a495a5437f6c5c61241e8218abe6cd6ce93c443a719b973b8c7b16c025177a8",
+      "size_bytes": 663965336
+    },
+    {
+      "path": "sonovue/hbi/results_phase_3b/resonance_4.0um/genLatest.json",
+      "sha256": "dcdcd719ef4f1948c39361c36ae233c80a0e90ecd78688f4aac9cf33a9d26de0",
+      "size_bytes": 663960770
+    },
+    {
+      "path": "sonovue/hbi/results_phase_3b/resonance_4.0um/latest",
+      "sha256": "dcdcd719ef4f1948c39361c36ae233c80a0e90ecd78688f4aac9cf33a9d26de0",
+      "size_bytes": 663960770
+    },
+    {
+      "path": "sonovue/hbi/runtime_inputs/reference_data/indentation/data_morris_3.19.csv",
+      "sha256": "6be74ffb62b347ebab6e48c7dab2fde90131be0d2b5c99c58138eac8771aacc5",
+      "size_bytes": 1340
+    },
+    {
+      "path": "sonovue/hbi/runtime_inputs/reference_data/indentation/data_morris_3.40.csv",
+      "sha256": "e0054a2b4b71a77eeea0870f17802aab05c500982d833edd6a7a92b9a0ca3c47",
+      "size_bytes": 1874
+    },
+    {
+      "path": "sonovue/hbi/runtime_inputs/reference_data/indentation/data_morris_5.76.csv",
+      "sha256": "eda893365ea473d2ce33ef2ee2606b922b771c364638862c75351288ed9af836",
+      "size_bytes": 945
+    },
+    {
+      "path": "sonovue/hbi/runtime_inputs/reference_data/indentation/indentation_data_3.2um.dat",
+      "sha256": "7c420a88f07f1afdecf4ad3234e80aa7974160de1115386a0e7a6d86e18b337c",
+      "size_bytes": 1496
+    },
+    {
+      "path": "sonovue/hbi/runtime_inputs/reference_data/indentation/indentation_data_3.4um.dat",
+      "sha256": "e7f4ef72352bf87f8dffe53f9cdd0beb51978d2c16048ff1679ef610c0649aed",
+      "size_bytes": 1046
+    },
+    {
+      "path": "sonovue/hbi/runtime_inputs/reference_data/indentation/indentation_data_5.8um.dat",
+      "sha256": "dce8fa1c9689dd9dfa0e874e1e1d54ecc93ca47f8da0cd43834dd2735c270b3a",
+      "size_bytes": 996
+    },
+    {
+      "path": "sonovue/hbi/stage_timings.jsonl",
+      "sha256": "fab8ede50350f9c5808466a84d621a6e73cebb64d856b34dd28a09f17b96ab9a",
+      "size_bytes": 224
+    }
+  ],
+  "locked": true,
+  "logical_size_bytes": 15750500577,
+  "paper_id": "UQ_EMB",
+  "schema_version": "1.0",
+  "selections": [
+    {
+      "artifact_id": "sonovue-production-config",
+      "destination": "sonovue/config/sonovue_liked_candidate_production50k.yaml",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/config/sonovue_liked_candidate_production50k.yaml"
+    },
+    {
+      "artifact_id": "sonovue-hbi-runtime-inputs",
+      "destination": "sonovue/hbi/runtime_inputs",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/_runtime"
+    },
+    {
+      "artifact_id": "sonovue-hbi-logs",
+      "destination": "sonovue/hbi/logs",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/logs"
+    },
+    {
+      "artifact_id": "sonovue-hbi-receipts",
+      "destination": "sonovue/hbi/receipts",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/receipts"
+    },
+    {
+      "artifact_id": "sonovue-hbi-stage-timings",
+      "destination": "sonovue/hbi/stage_timings.jsonl",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/stage_timings.jsonl"
+    },
+    {
+      "artifact_id": "sonovue-phase1-indentation-3p2",
+      "destination": "sonovue/hbi/results_phase_1/indentation_3.2um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_1/indentation_3.2um"
+    },
+    {
+      "artifact_id": "sonovue-phase1-indentation-3p4",
+      "destination": "sonovue/hbi/results_phase_1/indentation_3.4um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_1/indentation_3.4um"
+    },
+    {
+      "artifact_id": "sonovue-phase1-indentation-5p8",
+      "destination": "sonovue/hbi/results_phase_1/indentation_5.8um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_1/indentation_5.8um"
+    },
+    {
+      "artifact_id": "sonovue-phase1-acoustic-2p6",
+      "destination": "sonovue/hbi/results_phase_1/resonance_2.6um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_1/resonance_2.6um"
+    },
+    {
+      "artifact_id": "sonovue-phase1-acoustic-3p2",
+      "destination": "sonovue/hbi/results_phase_1/resonance_3.2um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_1/resonance_3.2um"
+    },
+    {
+      "artifact_id": "sonovue-phase1-acoustic-4p0",
+      "destination": "sonovue/hbi/results_phase_1/resonance_4.0um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_1/resonance_4.0um"
+    },
+    {
+      "artifact_id": "sonovue-phase2",
+      "destination": "sonovue/hbi/results_phase_2",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_2"
+    },
+    {
+      "artifact_id": "sonovue-phase3b-indentation-3p2",
+      "destination": "sonovue/hbi/results_phase_3b/indentation_3.2um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_3b/indentation_3.2um"
+    },
+    {
+      "artifact_id": "sonovue-phase3b-indentation-3p4",
+      "destination": "sonovue/hbi/results_phase_3b/indentation_3.4um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_3b/indentation_3.4um"
+    },
+    {
+      "artifact_id": "sonovue-phase3b-indentation-5p8",
+      "destination": "sonovue/hbi/results_phase_3b/indentation_5.8um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_3b/indentation_5.8um"
+    },
+    {
+      "artifact_id": "sonovue-phase3b-acoustic-2p6",
+      "destination": "sonovue/hbi/results_phase_3b/resonance_2.6um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_3b/resonance_2.6um"
+    },
+    {
+      "artifact_id": "sonovue-phase3b-acoustic-3p2",
+      "destination": "sonovue/hbi/results_phase_3b/resonance_3.2um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_3b/resonance_3.2um"
+    },
+    {
+      "artifact_id": "sonovue-phase3b-acoustic-4p0",
+      "destination": "sonovue/hbi/results_phase_3b/resonance_4.0um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_3b/resonance_4.0um"
+    },
+    {
+      "artifact_id": "sonovue-direct-inputs",
+      "destination": "sonovue/direct_dpd/inputs",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/inputs"
+    },
+    {
+      "artifact_id": "sonovue-direct-mechanical-d4",
+      "destination": "sonovue/direct_dpd/mechanical/d4",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/runs/force_spectroscopy/3.2um"
+    },
+    {
+      "artifact_id": "sonovue-direct-mechanical-d5",
+      "destination": "sonovue/direct_dpd/mechanical/d5",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/runs/force_spectroscopy/3.4um"
+    },
+    {
+      "artifact_id": "sonovue-direct-mechanical-d6",
+      "destination": "sonovue/direct_dpd/mechanical/d6",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/runs/force_spectroscopy/5.8um"
+    },
+    {
+      "artifact_id": "sonovue-direct-acoustic-d4",
+      "destination": "sonovue/direct_dpd/acoustic/d4",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/runs/breathing_frequency/sonovue_3p20um"
+    },
+    {
+      "artifact_id": "sonovue-direct-acoustic-d5",
+      "destination": "sonovue/direct_dpd/acoustic/d5",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/runs/breathing_frequency/sonovue_3p40um"
+    },
+    {
+      "artifact_id": "sonovue-direct-acoustic-d6",
+      "destination": "sonovue/direct_dpd/acoustic/d6",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/runs/breathing_frequency/sonovue_5p80um"
+    },
+    {
+      "artifact_id": "sonovue-direct-comparison-evidence",
+      "destination": "sonovue/direct_dpd/evidence/forward_model_comparison",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/evidence/forward_model_comparison"
+    },
+    {
+      "artifact_id": "sonovue-direct-paper-figures",
+      "destination": "sonovue/direct_dpd/paper_facing/figures",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/paper_facing_20260727/figures"
+    },
+    {
+      "artifact_id": "sonovue-direct-paper-renderer",
+      "destination": "sonovue/direct_dpd/paper_facing/render_direct_map_confirmation_july.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/paper_facing_20260727/render_direct_map_confirmation_july.py"
+    },
+    {
+      "artifact_id": "definity-production-config",
+      "destination": "definity/config/definity_accepted_production50k.yaml",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/config/definity_accepted_production50k.yaml"
+    },
+    {
+      "artifact_id": "definity-hbi-logs",
+      "destination": "definity/hbi/logs",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/logs"
+    },
+    {
+      "artifact_id": "definity-hbi-receipts",
+      "destination": "definity/hbi/receipts",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/receipts"
+    },
+    {
+      "artifact_id": "definity-hbi-stage-timings",
+      "destination": "definity/hbi/stage_timings.jsonl",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/stage_timings.jsonl"
+    },
+    {
+      "artifact_id": "definity-phase1-compression-2p1",
+      "destination": "definity/hbi/results_phase_1/compression_2.1um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/results_phase_1/compression_2.1um"
+    },
+    {
+      "artifact_id": "definity-phase1-compression-2p9",
+      "destination": "definity/hbi/results_phase_1/compression_2.9um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/results_phase_1/compression_2.9um"
+    },
+    {
+      "artifact_id": "definity-phase1-compression-3p0",
+      "destination": "definity/hbi/results_phase_1/compression_3.0um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/results_phase_1/compression_3.0um"
+    },
+    {
+      "artifact_id": "definity-phase1-grouped-acoustic-source3",
+      "destination": "definity/hbi/results_phase_1/resonance_source3_source3",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/results_phase_1/resonance_source3_source3"
+    },
+    {
+      "artifact_id": "definity-phase2",
+      "destination": "definity/hbi/results_phase_2",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/results_phase_2"
+    },
+    {
+      "artifact_id": "definity-phase3b-compression-2p1",
+      "destination": "definity/hbi/results_phase_3b/compression_2.1um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/results_phase_3b/compression_2.1um"
+    },
+    {
+      "artifact_id": "definity-phase3b-compression-2p9",
+      "destination": "definity/hbi/results_phase_3b/compression_2.9um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/results_phase_3b/compression_2.9um"
+    },
+    {
+      "artifact_id": "definity-phase3b-compression-3p0",
+      "destination": "definity/hbi/results_phase_3b/compression_3.0um",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/results_phase_3b/compression_3.0um"
+    },
+    {
+      "artifact_id": "definity-direct-runtime-manifest",
+      "destination": "definity/direct_dpd/runtime/launch_manifest.json",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/materialized/launch_manifest.json"
+    },
+    {
+      "artifact_id": "definity-direct-runtime-jobs",
+      "destination": "definity/direct_dpd/runtime/jobs",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/materialized/jobs"
+    },
+    {
+      "artifact_id": "definity-direct-mechanical-d1",
+      "destination": "definity/direct_dpd/mechanical/d1",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/materialized/mechanical/d1"
+    },
+    {
+      "artifact_id": "definity-direct-mechanical-d2",
+      "destination": "definity/direct_dpd/mechanical/d2",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/materialized/mechanical/d2"
+    },
+    {
+      "artifact_id": "definity-direct-mechanical-d3",
+      "destination": "definity/direct_dpd/mechanical/d3",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/materialized/mechanical/d3"
+    },
+    {
+      "artifact_id": "definity-direct-acoustic-d1",
+      "destination": "definity/direct_dpd/acoustic/d1",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/materialized/acoustic/d1"
+    },
+    {
+      "artifact_id": "definity-direct-acoustic-d2-near-map",
+      "destination": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/definity_exact32_5pct_karolina_20260717T104600Z/production/definity/definity_2p90um/ka-index-014/definity_2p90um/seed-000"
+    },
+    {
+      "artifact_id": "definity-direct-acoustic-d3",
+      "destination": "definity/direct_dpd/acoustic/d3",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/materialized/acoustic/d3"
+    },
+    {
+      "artifact_id": "definity-direct-logs",
+      "destination": "definity/direct_dpd/logs",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/logs"
+    },
+    {
+      "artifact_id": "definity-direct-collection-manifest",
+      "destination": "definity/direct_dpd/postprocessed/collection_manifest.json",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/postprocessed/collection_manifest.json"
+    },
+    {
+      "artifact_id": "definity-direct-acoustic-comparison",
+      "destination": "definity/direct_dpd/postprocessed/definity_direct_map_acoustic_comparison.csv",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/postprocessed/definity_direct_map_acoustic_comparison.csv"
+    },
+    {
+      "artifact_id": "definity-direct-preparation-manifest",
+      "destination": "definity/direct_dpd/preparation_manifest.json",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/preparation_manifest.json"
+    },
+    {
+      "artifact_id": "definity-direct-final-state",
+      "destination": "definity/direct_dpd/final_state_completion.json",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/final_state_completion.json"
+    },
+    {
+      "artifact_id": "definity-direct-readme",
+      "destination": "definity/direct_dpd/README.md",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/README.md"
+    },
+    {
+      "artifact_id": "definity-direct-materializer",
+      "destination": "definity/direct_dpd/code/materialize_definity_direct_map_dpd.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/scripts/materialize_definity_direct_map_dpd.py"
+    },
+    {
+      "artifact_id": "definity-direct-collector",
+      "destination": "definity/direct_dpd/code/collect_definity_direct_map_results.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/postprocess/collect_definity_direct_map_results.py"
+    },
+    {
+      "artifact_id": "definity-direct-paper-renderer",
+      "destination": "definity/direct_dpd/paper_facing/render_combined_direct_map_confirmation.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/paper_facing_20260727/render_combined_direct_map_confirmation.py"
+    },
+    {
+      "artifact_id": "definity-direct-paper-figures",
+      "destination": "definity/direct_dpd/paper_facing/figures",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/paper_facing_20260727/figures"
+    },
+    {
+      "artifact_id": "combined-render-data",
+      "destination": "shared/figures/combined_50k/data",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/data"
+    },
+    {
+      "artifact_id": "combined-render-figures",
+      "destination": "shared/figures/combined_50k/figures",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/figures"
+    },
+    {
+      "artifact_id": "combined-render-audits",
+      "destination": "shared/figures/combined_50k/audit",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/audit"
+    },
+    {
+      "artifact_id": "combined-render-screens",
+      "destination": "shared/figures/combined_50k/screen",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/screen"
+    },
+    {
+      "artifact_id": "combined-render-checksums",
+      "destination": "shared/figures/combined_50k/figure_checksums.sha256",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/figure_checksums.sha256"
+    },
+    {
+      "artifact_id": "combined-render-definity-export-manifest",
+      "destination": "shared/figures/combined_50k/definity_export_manifest.stdout.yaml",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/definity_export_manifest.stdout.yaml"
+    },
+    {
+      "artifact_id": "combined-render-sonovue-export-manifest",
+      "destination": "shared/figures/combined_50k/sonovue_export_manifest.stdout.yaml",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/sonovue_export_manifest.stdout.yaml"
+    },
+    {
+      "artifact_id": "combined-render-revision-code-f7",
+      "destination": "shared/figures/render_revision/code/render_figure7_bin_revision.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/combined_50k_render_revision_20260728/code/render_figure7_bin_revision.py"
+    },
+    {
+      "artifact_id": "combined-render-revision-code-f9",
+      "destination": "shared/figures/render_revision/code/render_figure9_likelihood_consistent.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/combined_50k_render_revision_20260728/code/render_figure9_likelihood_consistent.py"
+    },
+    {
+      "artifact_id": "combined-render-revision-code-june",
+      "destination": "shared/figures/render_revision/code/render_revision_draft_assets_20260630_reference.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/combined_50k_render_revision_20260728/code/render_revision_draft_assets_20260630_reference.py"
+    },
+    {
+      "artifact_id": "combined-render-revision-code-near-map-audit",
+      "destination": "shared/figures/render_revision/code/verify_figure9_accepted_near_map.py",
+      "source": "$MESOUQ_SCRATCH_ROOT/combined_50k_render_revision_20260728/code/verify_figure9_accepted_near_map.py"
+    },
+    {
+      "artifact_id": "combined-render-revision-manifest",
+      "destination": "shared/figures/render_revision/rendering_revision_manifest.json",
+      "source": "$MESOUQ_SCRATCH_ROOT/combined_50k_render_revision_20260728/rendering_revision_manifest.json"
+    },
+    {
+      "artifact_id": "combined-render-revision-f8",
+      "destination": "shared/figures/render_revision/final/f8",
+      "source": "$MESOUQ_SCRATCH_ROOT/combined_50k_render_revision_20260728/final/f8"
+    },
+    {
+      "artifact_id": "combined-render-revision-f9-near-map",
+      "destination": "shared/figures/render_revision/final/f9_accepted_near_map_legends_20260728",
+      "source": "$MESOUQ_SCRATCH_ROOT/combined_50k_render_revision_20260728/final/f9_accepted_near_map_legends_20260728"
+    }
+  ],
+  "source_spec": "papers/UQ_EMB/manifests/accepted_production_outputs_202607.staging.json"
+}
