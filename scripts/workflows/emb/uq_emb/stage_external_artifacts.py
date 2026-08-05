@@ -143,9 +143,8 @@ def _reject_existing_hardlink_within_root(*, path: Path, root: Path, label: str)
 
 
 def _source_files(path: Path) -> list[Path]:
+    path = _reject_symlink_alias(path, label="Artifact selections")
     if path.is_file():
-        if path.is_symlink():
-            raise ValueError(f"Artifact selections cannot contain symlinks: {path}")
         return [path]
     if not path.is_dir():
         raise ValueError(f"Artifact source does not exist: {path}")
@@ -354,12 +353,47 @@ def _manifest_payload(
     }
 
 
+def _index_manifest_entries(entries: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    indexed: dict[str, dict[str, Any]] = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ValueError("External-artifact manifest file entries must be mappings")
+        path = entry.get("path")
+        if not isinstance(path, str) or not path:
+            raise ValueError("External-artifact manifest file paths must be non-empty strings")
+        if path in indexed:
+            raise ValueError(f"Duplicate external-artifact manifest path: {path}")
+        indexed[path] = entry
+    return indexed
+
+
+def _reject_path_within_sources(
+    *,
+    path: Path,
+    selected: list[dict[str, Any]],
+    label: str,
+) -> None:
+    resolved_path = path.resolve()
+    for item in selected:
+        source = Path(item["source"])
+        resolved_source = source.resolve()
+        if resolved_path == resolved_source or (
+            source.is_dir() and resolved_source in resolved_path.parents
+        ):
+            raise ValueError(f"{label} must be outside selected artifact sources: {path}")
+
+
 def snapshot_manifest(*, spec_path: Path, manifest_path: Path) -> dict[str, Any]:
     """Create a locked acceptance manifest without staging any files."""
     spec_path = _reject_symlink_alias(spec_path, label="Artifact staging spec")
     manifest_path = _reject_symlink_alias(manifest_path, label="Artifact manifest")
     spec = _load_spec(spec_path)
     _destination_parent, final_root, selected = _selection(spec)
+    _reject_path_within_sources(
+        path=manifest_path,
+        selected=selected,
+        label="Artifact manifest",
+    )
     _reject_symlinks(final_root)
     _reject_path_within_root(
         path=manifest_path,
@@ -436,7 +470,11 @@ def verify_staged(*, root: Path, manifest_path: Path) -> dict[str, Any]:
     if not isinstance(expected, list):
         raise ValueError("External-artifact manifest files must be a list")
     actual_by_path = {entry["path"]: entry for entry in actual}
-    expected_by_path = {entry["path"]: entry for entry in expected}
+    expected_by_path = _index_manifest_entries(expected)
+    if int(manifest.get("file_count", -1)) != len(expected):
+        raise ValueError("External-artifact manifest file_count does not match files")
+    if int(manifest.get("logical_size_bytes", -1)) != _total_size(expected):
+        raise ValueError("External-artifact manifest logical_size_bytes does not match files")
     missing = sorted(set(expected_by_path) - set(actual_by_path))
     unexpected = sorted(set(actual_by_path) - set(expected_by_path))
     mismatches: list[dict[str, Any]] = []
@@ -472,8 +510,13 @@ def stage_artifacts(*, spec_path: Path, manifest_path: Path) -> dict[str, Any]:
     spec_path = _reject_symlink_alias(spec_path, label="Artifact staging spec")
     manifest_path = _reject_symlink_alias(manifest_path, label="Artifact manifest")
     spec = _load_spec(spec_path)
-    plan = plan_staging(spec_path)
     destination_parent, final_root, selected = _selection(spec)
+    _reject_path_within_sources(
+        path=manifest_path,
+        selected=selected,
+        label="Artifact manifest",
+    )
+    plan = plan_staging(spec_path)
     _reject_symlinks(final_root)
     _reject_path_within_root(
         path=manifest_path,
@@ -509,12 +552,11 @@ def stage_artifacts(*, spec_path: Path, manifest_path: Path) -> dict[str, Any]:
             raise RuntimeError(f"Final artifact verification failed: {report}")
         completed = True
         return report
-    except Exception:
+    finally:
         if temporary_root.exists():
             shutil.rmtree(temporary_root)
         if published and not completed and final_root.exists() and not final_root.is_symlink():
             shutil.rmtree(final_root)
-        raise
 
 
 def _parser() -> argparse.ArgumentParser:
