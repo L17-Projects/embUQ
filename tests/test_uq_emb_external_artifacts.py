@@ -247,7 +247,7 @@ def test_external_artifact_verify_rejects_aliased_report_inside_root(
             ]
         )
     except ValueError as exc:
-        assert "must be outside" in str(exc)
+        assert "symlinked path components" in str(exc)
     else:
         raise AssertionError("Expected an aliased in-artifact report to be rejected")
 
@@ -490,6 +490,79 @@ def test_external_artifact_stage_rejects_manifest_inside_destination(
     assert not final_root.exists()
 
 
+def test_external_artifact_stage_rejects_symlinked_destination_parent(
+    tmp_path: Path,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    real_parent = tmp_path / "real-artifacts"
+    real_parent.mkdir()
+    alias_parent = tmp_path / "artifact-parent-alias"
+    alias_parent.symlink_to(real_parent, target_is_directory=True)
+    spec = _spec(tmp_path, source)
+    payload = json.loads(spec.read_text(encoding="utf-8"))
+    payload["destination_root"] = str(alias_parent)
+    spec.write_text(json.dumps(payload), encoding="utf-8")
+
+    try:
+        module.stage_artifacts(spec_path=spec, manifest_path=tmp_path / "manifest.json")
+    except ValueError as exc:
+        assert "symlinked path components" in str(exc)
+    else:
+        raise AssertionError("Expected a symlinked artifact destination parent to be rejected")
+
+
+def test_external_artifact_verifier_rejects_manifest_hardlinked_to_artifact(
+    tmp_path: Path,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    manifest = tmp_path / "manifest.json"
+    module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+    root = tmp_path / "artifacts" / "fixture-v1"
+    staged_file = root / "inputs" / "input.csv"
+    aliased_manifest = tmp_path / "manifest-alias.json"
+    aliased_manifest.hardlink_to(staged_file)
+
+    try:
+        module.verify_staged(root=root, manifest_path=aliased_manifest)
+    except ValueError as exc:
+        assert "hardlink to an artifact file" in str(exc)
+    else:
+        raise AssertionError("Expected an artifact-hardlinked manifest to be rejected")
+
+
+def test_external_artifact_manifest_publication_failure_removes_artifact_root(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = _load_script()
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    spec = _spec(tmp_path, source)
+    manifest = tmp_path / "manifest.json"
+
+    def fail_replace(*_args, **_kwargs):
+        raise OSError("injected manifest publication failure")
+
+    monkeypatch.setattr(module.os, "replace", fail_replace)
+    try:
+        module.stage_artifacts(spec_path=spec, manifest_path=manifest)
+    except OSError as exc:
+        assert "injected manifest publication failure" in str(exc)
+    else:
+        raise AssertionError("Expected injected manifest publication failure")
+
+    assert not (tmp_path / "artifacts" / "fixture-v1").exists()
+    assert not manifest.exists()
+
+
 def test_external_artifact_stage_rejects_aliased_manifest_inside_destination(
     tmp_path: Path,
 ) -> None:
@@ -508,7 +581,7 @@ def test_external_artifact_stage_rejects_aliased_manifest_inside_destination(
     try:
         module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     except ValueError as exc:
-        assert "must be outside" in str(exc)
+        assert "symlinked path components" in str(exc)
     else:
         raise AssertionError("Expected an aliased in-artifact manifest to be rejected")
 
