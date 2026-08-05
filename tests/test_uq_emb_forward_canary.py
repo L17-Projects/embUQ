@@ -117,6 +117,7 @@ def test_forward_canary_rejects_output_inside_immutable_artifact_roots(
     module = _load_module()
     config_path = tmp_path / "config.yaml"
     config_path.write_text("structure: emb\nexperiments: []\n", encoding="utf-8")
+    monkeypatch.setenv("HUQ_INFERENCE_CONFIG", str(config_path))
     accepted_root = tmp_path / "accepted"
     dependency_root = tmp_path / "dependencies"
     monkeypatch.setattr(module.InferenceConfig, "model_validate", lambda _config: None)
