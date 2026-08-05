@@ -7,11 +7,24 @@ import argparse
 import gzip
 import hashlib
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[3]
+sys.path.insert(0, str(SCRIPT_DIR))
+
+from replay_provenance import (  # noqa: E402
+    checked_replay_path,
+    require_output_outside_known_locked_roots,
+    require_output_outside_locked_root,
+)
 
 
 SCHEMA_VERSION = "mesouq.uq_emb.figure7_phase1_overlay.v1"
@@ -55,10 +68,20 @@ def _extract_state(
 def export_overlay(
     *, sources_csv: Path, source_manifest: Path, output_csv: Path, output_manifest: Path
 ) -> dict[str, Any]:
-    sources_csv = sources_csv.expanduser().resolve()
-    source_manifest = source_manifest.expanduser().resolve()
-    output_csv = output_csv.expanduser().resolve()
-    output_manifest = output_manifest.expanduser().resolve()
+    sources_csv = checked_replay_path(sources_csv, label="Figure 7 source table")
+    source_manifest = checked_replay_path(
+        source_manifest, label="Figure 7 source manifest"
+    )
+    output_csv = require_output_outside_known_locked_roots(
+        output_path=output_csv,
+        repo_root=REPO_ROOT,
+        label="Figure 7 overlay CSV",
+    )
+    output_manifest = require_output_outside_known_locked_roots(
+        output_path=output_manifest,
+        repo_root=REPO_ROOT,
+        label="Figure 7 overlay manifest",
+    )
     if (
         output_csv == output_manifest
         or output_csv in output_manifest.parents
@@ -74,11 +97,37 @@ def export_overlay(
     if missing:
         raise ValueError(f"Missing source-table columns: {sorted(missing)}")
 
+    state_paths = [
+        checked_replay_path(
+            Path(str(row["state_path"])), label="Figure 7 Phase-1 state"
+        )
+        for _, row in sources.reset_index(drop=True).iterrows()
+    ]
+    consumed_roots = {sources_csv.parent, source_manifest.parent}
+    if state_paths:
+        consumed_roots.add(
+            Path(os.path.commonpath([str(path.parent) for path in state_paths]))
+        )
+    for root in consumed_roots:
+        output_csv = require_output_outside_locked_root(
+            output_path=output_csv,
+            locked_root=root,
+            label="Figure 7 overlay CSV",
+            locked_root_label="consumed Figure 7 source root",
+        )
+        output_manifest = require_output_outside_locked_root(
+            output_path=output_manifest,
+            locked_root=root,
+            label="Figure 7 overlay manifest",
+            locked_root_label="consumed Figure 7 source root",
+        )
+
     frames: list[pd.DataFrame] = []
     source_receipts: list[dict[str, Any]] = []
     loaded_samples = 0
-    for row_index, row in sources.reset_index(drop=True).iterrows():
-        state_path = Path(str(row["state_path"])).expanduser().resolve()
+    for (row_index, row), state_path in zip(
+        sources.reset_index(drop=True).iterrows(), state_paths, strict=True
+    ):
         if not state_path.is_file():
             raise FileNotFoundError(state_path)
         ka, kb, loaded = _extract_state(

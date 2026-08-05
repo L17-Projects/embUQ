@@ -92,6 +92,13 @@ def _integer_field(payload: dict[str, Any], key: str, context: str) -> int:
     return value
 
 
+def _text_field(payload: dict[str, Any], key: str, context: str) -> str:
+    value = payload.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"Missing or invalid integrity field {context}.{key}")
+    return value
+
+
 def _validate_integrity_fields(payload: dict[str, Any], context: str) -> None:
     for key in (
         "config_sha256",
@@ -103,25 +110,108 @@ def _validate_integrity_fields(payload: dict[str, Any], context: str) -> None:
     ):
         _sha256_field(payload, key, context)
 
+    accepted_manifest_sha256 = _sha256_field(
+        payload, "accepted_manifest_sha256", context
+    )
+    accepted_artifact_root = _text_field(payload, "accepted_artifact_root", context)
+    accepted_artifact_root_path = Path(accepted_artifact_root)
+    if (
+        not accepted_artifact_root_path.is_absolute()
+        or ".." in accepted_artifact_root_path.parts
+    ):
+        raise ValueError(f"Invalid accepted artifact root in {context}")
+    source_config_sha256 = _sha256_field(payload, "source_config_sha256", context)
     accepted = _mapping(payload, "accepted_source_verification", context)
     accepted_context = f"{context}.accepted_source_verification"
     if accepted.get("status") != "PASS":
         raise ValueError(f"Integrity verification did not pass: {accepted_context}")
-    _sha256_field(accepted, "manifest_sha256", accepted_context)
+    accepted_source_manifest_sha256 = _sha256_field(
+        accepted, "manifest_sha256", accepted_context
+    )
+    if accepted_source_manifest_sha256 != accepted_manifest_sha256:
+        raise ValueError(
+            f"Accepted-source manifest hash differs from receipt in {accepted_context}"
+        )
+    accepted_source_root = _text_field(accepted, "root", accepted_context)
+    if accepted_source_root != accepted_artifact_root:
+        raise ValueError(
+            f"Accepted-source root differs from receipt artifact root in {accepted_context}"
+        )
+    accepted_source_manifest = _text_field(accepted, "manifest", accepted_context)
     accepted_count = _integer_field(accepted, "file_count", accepted_context)
     accepted_size = _integer_field(accepted, "logical_size_bytes", accepted_context)
     members = accepted.get("members")
     if not isinstance(members, list) or not members:
         raise ValueError(f"Missing integrity members in {accepted_context}")
     member_size = 0
+    member_paths: set[Path] = set()
+    member_hashes: set[str] = set()
     for index, member in enumerate(members):
         if not isinstance(member, dict):
             raise ValueError(f"Invalid integrity member {accepted_context}.members[{index}]")
         member_context = f"{accepted_context}.members[{index}]"
-        _sha256_field(member, "sha256", member_context)
+        member_path = _text_field(member, "path", member_context)
+        member_path_object = Path(member_path)
+        if not member_path_object.is_absolute() or ".." in member_path_object.parts:
+            raise ValueError(f"Invalid integrity member path in {member_context}")
+        try:
+            relative_member_path = member_path_object.relative_to(
+                accepted_artifact_root_path
+            )
+        except ValueError as exc:
+            raise ValueError(
+                f"Integrity member escapes accepted artifact root in {member_context}"
+            ) from exc
+        if relative_member_path in member_paths:
+            raise ValueError(f"Duplicate integrity member path in {accepted_context}")
+        member_paths.add(relative_member_path)
+        member_hashes.add(_sha256_field(member, "sha256", member_context))
         member_size += _integer_field(member, "size_bytes", member_context)
     if accepted_count != len(members) or accepted_size != member_size:
         raise ValueError(f"Integrity totals differ from members in {accepted_context}")
+    if source_config_sha256 not in member_hashes:
+        raise ValueError(
+            f"Accepted-source members do not bind the source config in {accepted_context}"
+        )
+
+    accepted_root = _mapping(payload, "accepted_root_verification", context)
+    accepted_root_context = f"{context}.accepted_root_verification"
+    if accepted_root.get("status") != "PASS":
+        raise ValueError(f"Integrity verification did not pass: {accepted_root_context}")
+    accepted_root_manifest_sha256 = _sha256_field(
+        accepted_root, "manifest_sha256", accepted_root_context
+    )
+    if accepted_root_manifest_sha256 != accepted_manifest_sha256:
+        raise ValueError(
+            f"Accepted-root manifest hash differs from receipt in {accepted_root_context}"
+        )
+    if _text_field(accepted_root, "root", accepted_root_context) != accepted_source_root:
+        raise ValueError(
+            f"Accepted-root path differs from selected-source root in {accepted_root_context}"
+        )
+    if (
+        _text_field(accepted_root, "manifest", accepted_root_context)
+        != accepted_source_manifest
+    ):
+        raise ValueError(
+            f"Accepted-root manifest differs from selected-source manifest in "
+            f"{accepted_root_context}"
+        )
+    accepted_root_count = _integer_field(
+        accepted_root, "file_count", accepted_root_context
+    )
+    accepted_root_size = _integer_field(
+        accepted_root, "logical_size_bytes", accepted_root_context
+    )
+    if accepted_root_count == 0 or accepted_root_size == 0:
+        raise ValueError(
+            f"Accepted-root integrity totals are empty in {accepted_root_context}"
+        )
+    if accepted_root_count < accepted_count or accepted_root_size < accepted_size:
+        raise ValueError(
+            f"Accepted-root integrity totals do not cover selected sources in "
+            f"{accepted_root_context}"
+        )
 
     dependencies = _mapping(payload, "dependency_verification", context)
     dependency_context = f"{context}.dependency_verification"

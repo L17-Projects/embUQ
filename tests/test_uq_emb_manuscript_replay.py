@@ -71,15 +71,23 @@ def test_compile_manuscript_stages_frozen_files_and_checks_baseline(
         lambda **kwargs: provenance_calls.append(kwargs) or {},
     )
     real_run = subprocess.run
+    monkeypatch.setattr(
+        module.shutil,
+        "which",
+        lambda name: f"/verified/tex/bin/{name}",
+    )
+    dispatched_commands = []
 
     def fake_run(command, *, cwd, check, **kwargs):
         if command[0] == "git":
             return real_run(command, cwd=cwd, check=check, **kwargs)
         assert check is True
+        dispatched_commands.append(command)
         env = kwargs["env"]
         assert env["SOURCE_DATE_EPOCH"] == "1785834096"
-        if command[0] != "pdflatex":
+        if command[0] == "/verified/tex/bin/bibtex":
             return
+        assert command[0] == "/verified/tex/bin/pdflatex"
         stem = Path(command[-1]).stem
         (cwd / f"{stem}.pdf").write_bytes(f"compiled {stem}".encode())
         (cwd / f"{stem}.log").write_text("clean log\n", encoding="utf-8")
@@ -106,6 +114,10 @@ def test_compile_manuscript_stages_frozen_files_and_checks_baseline(
         isinstance(path, Path)
         for path in provenance_calls[0]["consumed_paths"]
     )
+    assert {command[0] for command in dispatched_commands} == {
+        "/verified/tex/bin/pdflatex",
+        "/verified/tex/bin/bibtex",
+    }
     assert (build_root / "uq_emb_manuscript_replay_receipt.json").is_file()
 
 

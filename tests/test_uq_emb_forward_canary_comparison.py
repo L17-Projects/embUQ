@@ -66,6 +66,14 @@ def _receipt(
                 }
             ],
         },
+        "accepted_root_verification": {
+            "status": "PASS",
+            "root": f"{root}/accepted",
+            "manifest": f"{root}/accepted.json",
+            "manifest_sha256": "1" * 64,
+            "file_count": 2,
+            "logical_size_bytes": 8192,
+        },
         "dependency_verification": {
             "status": "PASS",
             "root": f"{root}/dependencies",
@@ -202,6 +210,7 @@ def test_comparison_rejects_symmetric_integrity_field_omission(tmp_path: Path) -
         payload.pop("source_config_sha256")
         for verification_key in (
             "accepted_source_verification",
+            "accepted_root_verification",
             "dependency_verification",
         ):
             verification = payload[verification_key]
@@ -224,6 +233,95 @@ def test_comparison_rejects_symmetric_integrity_field_omission(tmp_path: Path) -
     _write(vega, payloads[1])
 
     with pytest.raises(ValueError, match="source_config_sha256"):
+        module.compare_receipts(karolina, vega, expected_agent="sonovue")
+
+
+def test_comparison_rejects_missing_whole_root_verification(tmp_path: Path) -> None:
+    module = _load_module()
+    karolina = tmp_path / "karolina.json"
+    vega = tmp_path / "vega.json"
+    karolina_payload = _receipt("karolina", "/scratch")
+    vega_payload = _receipt("vega", "/ceph")
+    karolina_payload.pop("accepted_root_verification")
+    vega_payload.pop("accepted_root_verification")
+    _write(karolina, karolina_payload)
+    _write(vega, vega_payload)
+
+    with pytest.raises(ValueError, match="accepted_root_verification"):
+        module.compare_receipts(karolina, vega, expected_agent="sonovue")
+
+
+def test_comparison_rejects_conflicting_whole_root_manifest_hash(
+    tmp_path: Path,
+) -> None:
+    module = _load_module()
+    karolina = tmp_path / "karolina.json"
+    vega = tmp_path / "vega.json"
+    karolina_payload = _receipt("karolina", "/scratch")
+    vega_payload = _receipt("vega", "/ceph")
+    karolina_payload["accepted_root_verification"]["manifest_sha256"] = "0" * 64
+    vega_payload["accepted_root_verification"]["manifest_sha256"] = "0" * 64
+    _write(karolina, karolina_payload)
+    _write(vega, vega_payload)
+
+    with pytest.raises(ValueError, match="Accepted-root manifest hash differs"):
+        module.compare_receipts(karolina, vega, expected_agent="sonovue")
+
+
+def test_comparison_rejects_duplicate_selected_source_member_paths(
+    tmp_path: Path,
+) -> None:
+    module = _load_module()
+    karolina = tmp_path / "karolina.json"
+    vega = tmp_path / "vega.json"
+    karolina_payload = _receipt("karolina", "/scratch")
+    vega_payload = _receipt("vega", "/ceph")
+    for payload in (karolina_payload, vega_payload):
+        member = dict(payload["accepted_source_verification"]["members"][0])
+        member["path"] = member["path"].replace("/accepted/", "/accepted//")
+        payload["accepted_source_verification"]["members"].append(member)
+        payload["accepted_source_verification"]["file_count"] = 2
+        payload["accepted_source_verification"]["logical_size_bytes"] = 15360
+    _write(karolina, karolina_payload)
+    _write(vega, vega_payload)
+
+    with pytest.raises(ValueError, match="Duplicate integrity member path"):
+        module.compare_receipts(karolina, vega, expected_agent="sonovue")
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    (
+        ("root", "Accepted-source root differs"),
+        ("member_path", "escapes accepted artifact root"),
+        ("member_hash", "do not bind the source config"),
+    ),
+)
+def test_comparison_rejects_unbound_selected_source_provenance(
+    tmp_path: Path, mutation: str, message: str
+) -> None:
+    module = _load_module()
+    karolina = tmp_path / "karolina.json"
+    vega = tmp_path / "vega.json"
+    payloads = [
+        _receipt("karolina", "/scratch"),
+        _receipt("vega", "/ceph"),
+    ]
+    for payload in payloads:
+        if mutation == "root":
+            payload["accepted_source_verification"]["root"] += "-other"
+        elif mutation == "member_path":
+            payload["accepted_source_verification"]["members"][0]["path"] = (
+                "/outside/config.yaml"
+            )
+        else:
+            payload["accepted_source_verification"]["members"][0]["sha256"] = (
+                "0" * 64
+            )
+    _write(karolina, payloads[0])
+    _write(vega, payloads[1])
+
+    with pytest.raises(ValueError, match=message):
         module.compare_receipts(karolina, vega, expected_agent="sonovue")
 
 

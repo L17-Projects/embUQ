@@ -168,13 +168,13 @@ def compile_manuscript(
         target_started = time.monotonic()
         stem = Path(target).stem
         latex_command = [
-            pdflatex,
+            str(pdflatex_path),
             "-interaction=nonstopmode",
             "-halt-on-error",
             "-file-line-error",
             target,
         ]
-        commands = [latex_command, [bibtex, stem]]
+        commands = [latex_command, [str(bibtex_path), stem]]
         for command in commands:
             subprocess.run(command, cwd=build_root, env=environment, check=True)
         post_bibtex_passes = 0
