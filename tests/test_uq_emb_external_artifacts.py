@@ -149,6 +149,7 @@ def test_external_artifact_verify_cli_rejects_symlinked_root(tmp_path: Path) -> 
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    _snapshot(module, spec, manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     root = tmp_path / "artifacts" / "fixture-v1"
     alias = tmp_path / "artifact-alias"
@@ -207,6 +208,7 @@ def test_external_artifact_verify_rejects_report_inside_root(tmp_path: Path) -> 
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    _snapshot(module, spec, manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     root = tmp_path / "artifacts" / "fixture-v1"
     report = root / "verification.json"
@@ -240,6 +242,7 @@ def test_external_artifact_verify_rejects_aliased_report_inside_root(
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    _snapshot(module, spec, manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     artifact_parent = tmp_path / "artifacts"
     root = artifact_parent / "fixture-v1"
@@ -276,6 +279,7 @@ def test_external_artifact_verify_rejects_report_overwriting_manifest(
     (source / "input.csv").write_text("x,y\n1,2\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
+    _snapshot(module, spec, manifest)
     module.stage_artifacts(spec_path=spec, manifest_path=manifest)
     original_manifest = manifest.read_bytes()
     root = tmp_path / "artifacts" / "fixture-v1"
@@ -459,27 +463,7 @@ def test_external_artifact_stage_accepts_existing_locked_manifest(tmp_path: Path
     source_file.write_text("accepted\n", encoding="utf-8")
     spec = _spec(tmp_path, source)
     manifest = tmp_path / "manifest.json"
-    accepted_entry = {
-        "path": "inputs/input.csv",
-        "size_bytes": source_file.stat().st_size,
-        "sha256": module._sha256(source_file),
-    }
-    manifest.write_text(
-        json.dumps(
-            {
-                "schema_version": module.SCHEMA_VERSION,
-                "paper_id": module.PAPER_ID,
-                "artifact_set_id": "fixture",
-                "artifact_set_dir": "fixture-v1",
-                "locked": True,
-                "file_count": 1,
-                "logical_size_bytes": accepted_entry["size_bytes"],
-                "files": [accepted_entry],
-            }
-        ),
-        encoding="utf-8",
-    )
-    locked_bytes = manifest.read_bytes()
+    locked_bytes = _snapshot(module, spec, manifest)
 
     report = module.stage_artifacts(spec_path=spec, manifest_path=manifest)
 
