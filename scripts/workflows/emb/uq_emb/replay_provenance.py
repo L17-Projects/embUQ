@@ -361,6 +361,10 @@ def load_materialization_binding(
         Path(str(payload.get("source_config", ""))), label="receipt source config"
     )
     expected_source_root = artifact_root / ACCEPTED_SET
+    accepted_root_verification = verify_locked_artifact_root(
+        root=expected_source_root,
+        manifest_path=manifest_root / f"{ACCEPTED_SET}.files.json",
+    )
     try:
         source_config.relative_to(expected_source_root)
     except ValueError as exc:
@@ -398,6 +402,12 @@ def load_materialization_binding(
                 f"Materialization receipt has invalid accepted {stage} seed: {value!r}"
             )
         normalized_stage_seeds[stage] = value
+    phase3b_seed_mode = payload.get("accepted_phase3b_seed_mode")
+    if phase3b_seed_mode not in {"repeat", "increment"}:
+        raise ValueError(
+            "Materialization receipt lacks a valid accepted Phase 3b seed mode: "
+            f"{phase3b_seed_mode!r}"
+        )
     seed_log = _checked_resolved_path(
         Path(str(payload.get("accepted_stage_seed_log", ""))), label="receipt accepted seed log"
     )
@@ -417,15 +427,22 @@ def load_materialization_binding(
     accepted_manifest_payload = _locked_manifest(
         manifest_root / f"{ACCEPTED_SET}.files.json"
     )
-    locked_stage_seeds = _accepted_stage_seeds(
+    locked_seed_provenance = _accepted_stage_seeds(
         accepted_root=expected_source_root,
         accepted_hashes=_manifest_hashes(accepted_manifest_payload),
         seed_log_relative=AGENT_PATHS[agent]["stage_seed_log"],
-    )["accepted_stage_seeds"]
+    )
+    locked_stage_seeds = locked_seed_provenance["accepted_stage_seeds"]
     if normalized_stage_seeds != locked_stage_seeds:
         raise ValueError(
             "Materialization receipt accepted stage seeds differ from locked accepted provenance: "
             f"{normalized_stage_seeds} != {locked_stage_seeds}"
+        )
+    if phase3b_seed_mode != locked_seed_provenance["accepted_phase3b_seed_mode"]:
+        raise ValueError(
+            "Materialization receipt Phase 3b seed mode differs from locked accepted provenance: "
+            f"{phase3b_seed_mode} != "
+            f"{locked_seed_provenance['accepted_phase3b_seed_mode']}"
         )
     return {
         "materialization_receipt": str(receipt_path),
@@ -436,7 +453,11 @@ def load_materialization_binding(
         "accepted_manifest_sha256": payload.get("accepted_manifest_sha256"),
         "dependency_manifest_sha256": payload.get("dependency_manifest_sha256"),
         "accepted_source_verification": accepted_source_verification,
+        "accepted_root_verification": accepted_root_verification,
         "dependency_verification": dependency_verification,
+        "accepted_artifact_root": str(expected_source_root),
+        "dependency_artifact_root": str(dependency_root),
         "accepted_stage_seeds": normalized_stage_seeds,
+        "accepted_phase3b_seed_mode": phase3b_seed_mode,
         "accepted_stage_seed_log_sha256": payload["accepted_stage_seed_log_sha256"],
     }

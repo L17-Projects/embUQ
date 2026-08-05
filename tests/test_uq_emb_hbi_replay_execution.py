@@ -30,6 +30,9 @@ def _binding(config_path: Path) -> dict[str, object]:
     return {
         "config_sha256": sha256(config_path),
         "accepted_stage_seeds": {"phase1": 1101, "phase2": 2101, "phase3b": 3104},
+        "accepted_phase3b_seed_mode": "repeat",
+        "accepted_artifact_root": str(config_path.parent / "accepted"),
+        "dependency_artifact_root": str(config_path.parent / "dependencies"),
     }
 
 
@@ -48,6 +51,7 @@ def test_execute_uses_private_snapshot_and_records_accepted_stage_seeds(
     def build_commands(**kwargs):
         captured["config_path"] = kwargs["config_path"]
         captured["stage_seeds"] = kwargs["stage_seeds"]
+        captured["phase3b_seed_mode"] = kwargs["phase3b_seed_mode"]
         return "definity", 10_000, [[stage] for stage in kwargs["stages"]]
 
     monkeypatch.setattr(module, "build_replay_commands", build_commands)
@@ -66,12 +70,38 @@ def test_execute_uses_private_snapshot_and_records_accepted_stage_seeds(
     assert captured["config_path"] == snapshot
     assert captured["stage_seeds"] == {"phase1": 1101, "phase2": 2101, "phase3b": 3104}
     assert receipt["accepted_stage_seeds"] == captured["stage_seeds"]
+    assert captured["phase3b_seed_mode"] == "repeat"
     assert [item["korali_random_seed"] for item in receipt["stage_results"]] == [
         1101,
         2101,
         3104,
     ]
     assert all(item["run_input_before"] == item["run_input_after"] for item in receipt["stage_results"])
+    assert receipt["stage_results"][-1]["phase3b_seed_mode"] == "repeat"
+
+
+@pytest.mark.parametrize("locked_key", ("accepted_artifact_root", "dependency_artifact_root"))
+def test_replay_rejects_output_inside_locked_artifact_root(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, locked_key: str
+) -> None:
+    module = _load(REPLAY_SCRIPT, f"uq_emb_hbi_replay_locked_output_{locked_key}")
+    config_path = tmp_path / "materialized.yaml"
+    config_path.write_text("replay: accepted\n", encoding="utf-8")
+    binding = _binding(config_path)
+    forbidden_output = Path(str(binding[locked_key])) / "replay"
+    monkeypatch.setattr(module, "load_materialization_binding", lambda path, **_: binding)
+
+    with pytest.raises(ValueError, match="outside immutable artifact roots"):
+        module.run_replay(
+            config_path=config_path,
+            output_root=forbidden_output,
+            python_bin="/verified/python",
+            site="karolina",
+            stages=["phase1"],
+            execute=False,
+        )
+
+    assert not forbidden_output.exists()
 
 
 @pytest.mark.parametrize("stage", ("phase1", "phase2", "phase3b"))

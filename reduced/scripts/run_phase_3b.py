@@ -29,6 +29,11 @@ def main() -> int:
     parser.add_argument("--dataset-name", type=str, default=None)
     parser.add_argument("--diameter", type=float, default=None)
     parser.add_argument("--korali-random-seed", type=int, default=None)
+    parser.add_argument(
+        "--phase3b-seed-mode",
+        choices=["repeat", "increment"],
+        default="increment",
+    )
     args = parser.parse_args()
 
     cmd = [
@@ -48,6 +53,8 @@ def main() -> int:
         cmd.extend(["--diameter", str(args.diameter)])
     if args.korali_random_seed is not None:
         cmd.extend(["--korali-random-seed", str(args.korali_random_seed)])
+    if args.phase3b_seed_mode != "increment":
+        cmd.extend(["--phase3b-seed-mode", args.phase3b_seed_mode])
     return subprocess.call(cmd, cwd=str(PROJECT_ROOT))
 
 

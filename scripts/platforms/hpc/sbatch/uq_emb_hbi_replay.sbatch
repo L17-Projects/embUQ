@@ -13,6 +13,7 @@ if [[ ${!legacy_name+x} ]]; then
 fi
 
 REPO_ROOT="${REPO_ROOT:-${SLURM_SUBMIT_DIR:-$(pwd)}}"
+export REPO_ROOT
 SITE_ARG=""
 args=()
 while [[ $# -gt 0 ]]; do

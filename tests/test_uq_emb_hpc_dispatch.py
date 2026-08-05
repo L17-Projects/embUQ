@@ -21,7 +21,7 @@ def _fake_sbatch(tmp_path: Path) -> tuple[Path, Path]:
     executable = bin_dir / "sbatch"
     executable.write_text(
         "#!/usr/bin/env bash\n"
-        "printf '%s\\n' \"$MESOUQ_SITE\" \"$@\" > \"$SBATCH_RECEIPT\"\n",
+        "printf '%s\\n' \"$MESOUQ_SITE\" \"$REPO_ROOT\" \"$@\" > \"$SBATCH_RECEIPT\"\n",
         encoding="utf-8",
     )
     executable.chmod(0o755)
@@ -61,8 +61,45 @@ def test_neutral_uq_emb_launcher_submits_selected_site_wrapper(
     lines = receipt.read_text(encoding="utf-8").splitlines()
     assert lines == [
         site,
+        str(REPO_ROOT),
         "--partition=diagnostic",
         str(REPO_ROOT / f"scripts/platforms/{site}/sbatch/{launcher}"),
+    ]
+
+
+@pytest.mark.parametrize("launcher", LAUNCHERS)
+def test_neutral_uq_emb_launcher_exports_defaulted_repo_root(
+    tmp_path: Path,
+    launcher: str,
+) -> None:
+    bin_dir, receipt = _fake_sbatch(tmp_path)
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "SBATCH_RECEIPT": str(receipt),
+    }
+    env.pop("REPO_ROOT", None)
+    env.pop("MESOUQ_SITE", None)
+    result = subprocess.run(
+        [
+            "bash",
+            str(REPO_ROOT / "scripts/platforms/hpc/sbatch" / launcher),
+            "--site",
+            "karolina",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    lines = receipt.read_text(encoding="utf-8").splitlines()
+    assert lines == [
+        "karolina",
+        str(REPO_ROOT),
+        str(REPO_ROOT / f"scripts/platforms/karolina/sbatch/{launcher}"),
     ]
 
 

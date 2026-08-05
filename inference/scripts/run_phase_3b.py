@@ -354,11 +354,14 @@ def run_phase_3b(
     dataset_name: str | None = None,
     diameter: float | None = None,
     korali_random_seed: int | None = None,
+    phase3b_seed_mode: str = "increment",
     restart: bool = False,
 ):
     korali_random_seed = validate_korali_random_seed(
         korali_random_seed, field_name="--korali-random-seed"
     )
+    if phase3b_seed_mode not in {"repeat", "increment"}:
+        raise ValueError("phase3b_seed_mode must be either 'repeat' or 'increment'.")
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     config_path_resolved = _resolve_config_path(config_path)
@@ -490,7 +493,13 @@ def run_phase_3b(
             device=device,
             dataset_name=exp.dataset_name(diameter_um),
             korali_random_seed=(
-                None if korali_random_seed is None else korali_random_seed + target_index
+                None
+                if korali_random_seed is None
+                else (
+                    korali_random_seed
+                    if phase3b_seed_mode == "repeat"
+                    else korali_random_seed + target_index
+                )
             ),
             restart=restart,
         )
@@ -517,9 +526,15 @@ def main(argv):
         type=int,
         default=None,
         help=(
-            "Positive nonzero Korali Random Seed. When multiple Phase 3b datasets "
-            "are selected, this is a base seed incremented by selected-target order."
+            "Positive nonzero Korali Random Seed. The selected-target handling is "
+            "controlled by --phase3b-seed-mode."
         ),
+    )
+    parser.add_argument(
+        "--phase3b-seed-mode",
+        choices=["repeat", "increment"],
+        default="increment",
+        help="repeat uses one seed for every selected target; increment uses base plus target order.",
     )
     args = parser.parse_args()
     run_phase_3b(
@@ -530,6 +545,7 @@ def main(argv):
         dataset_name=args.dataset_name,
         diameter=args.diameter,
         korali_random_seed=args.korali_random_seed,
+        phase3b_seed_mode=args.phase3b_seed_mode,
         restart=args.restart,
     )
 

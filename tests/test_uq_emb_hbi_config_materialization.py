@@ -247,6 +247,7 @@ def test_materialize_validates_frozen_inputs_and_writes_receipt(tmp_path: Path) 
         "phase2": 2101,
         "phase3b": 3104,
     }
+    assert receipt["accepted_phase3b_seed_mode"] == "repeat"
     assert receipt["accepted_stage_seed_log_sha256"] == _sha256(seed_log)
     assert len(receipt["provenance"]["git_commit"]) == 40
     assert yaml.safe_load(output_config.read_text(encoding="utf-8"))["out"] == str(
@@ -324,6 +325,9 @@ def test_accepted_stage_seeds_recovers_phase3b_base_seed(
         "phase2": 2101,
         "phase3b": 3104,
     }
+    assert provenance["accepted_phase3b_seed_mode"] == (
+        "repeat" if len(set(phase3b_records)) == 1 else "increment"
+    )
 
 
 @pytest.mark.parametrize("phase3b_records", ((3104, 3106), (3104, 3105, 3107)))

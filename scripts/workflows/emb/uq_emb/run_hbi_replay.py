@@ -72,6 +72,7 @@ def build_replay_commands(
     python_bin: str,
     stages: list[str],
     stage_seeds: dict[str, int],
+    phase3b_seed_mode: str | None = None,
 ) -> tuple[str, int, list[list[str]]]:
     _config, agent, population = _load_and_validate_config(config_path)
     selection = VegaWorkflowSelection(
@@ -91,6 +92,7 @@ def build_replay_commands(
             device="gpu",
             phase2_backend="native-cuda" if stage == "phase2" else None,
             korali_random_seed=stage_seeds[stage],
+            phase3b_seed_mode=phase3b_seed_mode if stage == "phase3b" else None,
         )
         for stage in stages
     ]
@@ -200,6 +202,16 @@ def run_replay(
     output_root = output_root.expanduser().resolve()
     _validate_stage_selection_and_freshness(output_root, stages)
     config_binding = load_materialization_binding(config_path, repo_root=REPO_ROOT)
+    for key in ("accepted_artifact_root", "dependency_artifact_root"):
+        locked_root = Path(str(config_binding[key])).resolve()
+        try:
+            output_root.relative_to(locked_root)
+        except ValueError:
+            continue
+        raise ValueError(
+            "HBI replay output must remain outside immutable artifact roots: "
+            f"output={output_root}, locked_root={locked_root}"
+        )
     stage_seeds = config_binding["accepted_stage_seeds"]
     if set(stage_seeds) != set(VALID_STAGES):
         raise ValueError(f"Materialization binding has invalid accepted stage seeds: {stage_seeds}")
@@ -215,6 +227,7 @@ def run_replay(
         python_bin=python_bin,
         stages=stages,
         stage_seeds=stage_seeds,
+        phase3b_seed_mode=config_binding["accepted_phase3b_seed_mode"],
     )
 
     receipt_path = output_root / "uq_emb_hbi_replay_receipt.json"
@@ -255,6 +268,11 @@ def run_replay(
                 {
                     "stage": stage,
                     "korali_random_seed": stage_seeds[stage],
+                    "phase3b_seed_mode": (
+                        config_binding["accepted_phase3b_seed_mode"]
+                        if stage == "phase3b"
+                        else None
+                    ),
                     "status": "passed",
                     "wall_seconds": time.monotonic() - stage_started,
                     "run_input_before": before,

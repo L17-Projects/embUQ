@@ -480,6 +480,52 @@ def test_run_phase3b_offsets_seed_for_each_selected_target(
     assert [call["korali_random_seed"] for call in run_calls] == [3104, 3105]
 
 
+def test_run_phase3b_repeats_seed_for_each_selected_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase3b_runtime,
+) -> None:
+    mod, _fake_korali, _fake_comm = phase3b_runtime
+    config_path = tmp_path / "phase3b.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "surrogate": {"backend": "bnn"},
+                "phase3b_target_experiments": ["compression"],
+                "phase3b_target_diameters": [2.1, 2.9],
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_root = tmp_path / "output"
+    (output_root / "results_phase_2" / "latest").mkdir(parents=True)
+    for diameter in (2.1, 2.9):
+        (output_root / "results_phase_1" / f"compression_{diameter}um" / "latest").mkdir(
+            parents=True
+        )
+
+    experiment = types.SimpleNamespace(
+        name="compression",
+        enabled=True,
+        diameters=[2.1, 2.9],
+        dataset_name=lambda diameter_um: f"compression_{diameter_um}um",
+        get_reference_points=lambda diameter_um: [diameter_um],
+    )
+    monkeypatch.setattr(mod, "load_experiments", lambda config, root: [experiment])
+    monkeypatch.setattr(mod, "preload_compression_surrogate", lambda *args, **kwargs: None)
+    run_calls = []
+    monkeypatch.setattr(mod, "run_phase_3b_dataset", lambda **kwargs: run_calls.append(kwargs))
+
+    mod.run_phase_3b(
+        config_path=str(config_path),
+        output_dir=str(output_root),
+        korali_random_seed=3104,
+        phase3b_seed_mode="repeat",
+    )
+
+    assert [call["korali_random_seed"] for call in run_calls] == [3104, 3104]
+
+
 def test_run_phase3b_rejects_unknown_preload_target(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

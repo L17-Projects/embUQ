@@ -120,6 +120,7 @@ def _binding(tmp_path: Path, materialize_module) -> tuple[Path, Path]:
         "dependency_manifest_sha256": _sha256(dependency_manifest),
         "provenance": {"git_commit": "abc123", "git_status_clean": True},
         "accepted_stage_seeds": {"phase1": 1101, "phase2": 2101, "phase3b": 3104},
+        "accepted_phase3b_seed_mode": "repeat",
         "accepted_stage_seed_log": str(seed_log),
         "accepted_stage_seed_log_sha256": _sha256(seed_log),
     }
@@ -158,6 +159,31 @@ def test_materialization_binding_enforces_semantic_manifest_and_git_state(
     assert binding["config_semantic_sha256"]
     assert binding["accepted_manifest_sha256"]
     assert binding["dependency_manifest_sha256"]
+    assert binding["accepted_root_verification"]["status"] == "PASS"
+    assert binding["accepted_phase3b_seed_mode"] == "repeat"
+
+
+def test_materialization_binding_rejects_unconsumed_accepted_root_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_module()
+    import materialize_hbi_config
+
+    config_path, repo_root = _binding(tmp_path, materialize_hbi_config)
+    receipt = json.loads(
+        config_path.with_suffix(".materialization.json").read_text(encoding="utf-8")
+    )
+    accepted_root = Path(receipt["artifact_root"]) / materialize_hbi_config.ACCEPTED_SET
+    (accepted_root / "unconsumed.txt").write_text("drift\n", encoding="utf-8")
+    monkeypatch.setattr(
+        module,
+        "_git",
+        lambda _root, *args: "abc123" if args == ("rev-parse", "HEAD") else "",
+    )
+
+    with pytest.raises(ValueError, match="inventory mismatch"):
+        module.load_materialization_binding(config_path, repo_root=repo_root)
 
 
 @pytest.mark.parametrize(

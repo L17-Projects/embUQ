@@ -117,6 +117,7 @@ def _accepted_stage_seeds(
     log_path = _verified_file(accepted_root, seed_log_relative, accepted_hashes)
     text = log_path.read_text(encoding="utf-8", errors="replace")
     seeds: dict[str, int] = {}
+    phase3b_seed_mode: str | None = None
     for stage, pattern in _STAGE_SEED_PATTERNS.items():
         values = [int(value) for value in pattern.findall(text)]
         if not values:
@@ -135,6 +136,7 @@ def _accepted_stage_seeds(
                     "one contiguous sequence from that base: "
                     f"{values}"
                 )
+            phase3b_seed_mode = "repeat" if set(values) == {base} else "increment"
         elif len(set(values)) != 1:
             raise ValueError(
                 f"Locked accepted HBI {stage} log has inconsistent Korali seeds: {values}"
@@ -144,6 +146,7 @@ def _accepted_stage_seeds(
         seeds[stage] = min(values) if stage == "phase3b" else values[0]
     return {
         "accepted_stage_seeds": seeds,
+        "accepted_phase3b_seed_mode": phase3b_seed_mode,
         "accepted_stage_seed_log": str(log_path),
         "accepted_stage_seed_log_sha256": _sha256(log_path),
     }

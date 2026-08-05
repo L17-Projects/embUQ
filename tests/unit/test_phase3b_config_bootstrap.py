@@ -117,6 +117,7 @@ def test_phase3b_main_forwards_device_and_paths(monkeypatch):
         dataset_name=None,
         diameter=None,
         korali_random_seed=None,
+        phase3b_seed_mode="increment",
         restart=False,
     ):
         captured["profiling"] = profiling
@@ -126,6 +127,7 @@ def test_phase3b_main_forwards_device_and_paths(monkeypatch):
         captured["dataset_name"] = dataset_name
         captured["diameter"] = diameter
         captured["korali_random_seed"] = korali_random_seed
+        captured["phase3b_seed_mode"] = phase3b_seed_mode
         captured["restart"] = restart
 
     monkeypatch.setattr(module, "run_phase_3b", _fake_run_phase_3b)
@@ -156,5 +158,6 @@ def test_phase3b_main_forwards_device_and_paths(monkeypatch):
         "dataset_name": "compression_2.1um",
         "diameter": None,
         "korali_random_seed": None,
+        "phase3b_seed_mode": "increment",
         "restart": False,
     }
