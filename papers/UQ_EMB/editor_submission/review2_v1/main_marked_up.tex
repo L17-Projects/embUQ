@@ -1,0 +1,506 @@
+\documentclass[%
+%DIF LATEXDIFF DIFFERENCE FILE
+%DIF DEL /home/it4i-bbenvegnen/workspace/paperJun28/source_rebuild/bundle_review1_v6/main.tex   Mon Jun  8 08:31:24 2026
+%DIF ADD main.tex                                                                               Mon Aug  3 18:00:23 2026
+ aip,
+ jcp,
+ amsmath,amssymb,
+ preprint,%
+%reprint,%
+]{revtex4-1}
+
+
+\usepackage{graphicx}
+\usepackage{dcolumn}
+\usepackage{bm}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+\usepackage{tikz}
+
+\usepackage{xr}
+%\externaldocument[SI-]{si}
+%DIF PREAMBLE EXTENSION ADDED BY LATEXDIFF
+%DIF UNDERLINE PREAMBLE %DIF PREAMBLE
+\RequirePackage[normalem]{ulem} %DIF PREAMBLE
+\RequirePackage{color}\definecolor{RED}{rgb}{1,0,0}\definecolor{BLUE}{rgb}{0,0,1} %DIF PREAMBLE
+\providecommand{\DIFadd}[1]{{\protect\color{blue}\uwave{#1}}} %DIF PREAMBLE
+\providecommand{\DIFdel}[1]{{\protect\color{red}\sout{#1}}} %DIF PREAMBLE
+%DIF SAFE PREAMBLE %DIF PREAMBLE
+\providecommand{\DIFaddbegin}{} %DIF PREAMBLE
+\providecommand{\DIFaddend}{} %DIF PREAMBLE
+\providecommand{\DIFdelbegin}{} %DIF PREAMBLE
+\providecommand{\DIFdelend}{} %DIF PREAMBLE
+\providecommand{\DIFmodbegin}{} %DIF PREAMBLE
+\providecommand{\DIFmodend}{} %DIF PREAMBLE
+%DIF FLOATSAFE PREAMBLE %DIF PREAMBLE
+\providecommand{\DIFaddFL}[1]{\DIFadd{#1}} %DIF PREAMBLE
+\providecommand{\DIFdelFL}[1]{\DIFdel{#1}} %DIF PREAMBLE
+\providecommand{\DIFaddbeginFL}{} %DIF PREAMBLE
+\providecommand{\DIFaddendFL}{} %DIF PREAMBLE
+\providecommand{\DIFdelbeginFL}{} %DIF PREAMBLE
+\providecommand{\DIFdelendFL}{} %DIF PREAMBLE
+%DIF AMSMATHULEM PREAMBLE %DIF PREAMBLE
+\makeatletter %DIF PREAMBLE
+\let\sout@orig\sout %DIF PREAMBLE
+\renewcommand{\sout}[1]{\ifmmode\text{\sout@orig{\ensuremath{#1}}}\else\sout@orig{#1}\fi} %DIF PREAMBLE
+\makeatother %DIF PREAMBLE
+%DIF END PREAMBLE EXTENSION ADDED BY LATEXDIFF
+
+\begin{document}
+
+\title{Hierarchical Bayesian calibration of mesoscopic models for ultrasound contrast agents from force spectroscopy data}
+
+\author{Brieuc Benvegnen}
+\thanks{These authors contributed equally to this work.}
+\affiliation{Universitat de Barcelona Institute of Complex Systems (UBICS),
+C/ Martí i Franqués 1, 08028 Barcelona, Spain}
+
+\author{Nikolaos Ntarakas}
+\thanks{These authors contributed equally to this work.}
+\affiliation{Theory Department, National Institute of Chemistry,
+Hajdrihova 19, 1001 Ljubljana, Slovenia}
+\affiliation{Department of Physics, Faculty of Mathematics and Physics,
+University of Ljubljana, Jadranska 19, 1000 Ljubljana, Slovenia}
+
+\author{Tilen Potisk}
+\affiliation{Theory Department, National Institute of Chemistry,
+Hajdrihova 19, 1001 Ljubljana, Slovenia}
+\affiliation{Department of Physics, Faculty of Mathematics and Physics,
+University of Ljubljana, Jadranska 19, 1000 Ljubljana, Slovenia}
+
+\author{Ignacio Pagonabarraga}
+\affiliation{Universitat de Barcelona Institute of Complex Systems (UBICS),
+C/ Martí i Franqués 1, 08028 Barcelona, Spain}
+
+\author{Matej Praprotnik}
+\email[Author to whom correspondence should be addressed: ]{praprot@cmm.ki.si}
+\affiliation{Universitat de Barcelona Institute of Complex Systems (UBICS),
+C/ Martí i Franqués 1, 08028 Barcelona, Spain}
+\affiliation{Theory Department, National Institute of Chemistry,
+Hajdrihova 19, 1001 Ljubljana, Slovenia}
+\affiliation{Department of Physics, Faculty of Mathematics and Physics,
+University of Ljubljana, Jadranska 19, 1000 Ljubljana, Slovenia}
+
+\begin{abstract}
+Ultrasound-guided drug and gene delivery (\textsc{usdg}) is a promising non-invasive approach for targeted therapeutic applications. Mechanical properties of encapsulated microbubbles (\textsc{emb}s), which serve as contrast agents, affect their interactions with ultrasound and are thus critical to the success of \textsc{usdg}. Accurate calibration of particle-based \textsc{emb} models is challenging as Bayesian inference with dissipative particle dynamics (\textsc{dpd}) is prohibitively computationally expensive. We employ a surrogate-accelerated Bayesian calibration workflow that combines deep neural network (\textsc{dnn}) surrogates \DIFaddbegin \DIFadd{and polynomial surrogates}\DIFaddend , transitional Markov chain Monte Carlo sampling, and hierarchical regularization across \textsc{emb} diameters. Using this framework, we construct data-informed models of the commercial agents Definity and SonoVue, and infer their force field parameters from published compression\DIFdelbegin \DIFdel{and indentation}\DIFdelend \DIFaddbegin \DIFadd{, indentation, and acoustic }\DIFaddend experiments. The presented methodology can be used to derive bespoke, data-informed models for a wide range of contrast agents, including gas vesicles, \textsc{emb}s with diverse capsids consisting of lipids, proteins, or polymers, and functionalized with ligands.
+\end{abstract}
+
+\maketitle
+
+\section{Introduction}
+
+Encapsulated microbubbles (\textsc{emb}s) are a class of engineered soft materials with gas cores surrounded by elastic shells, composed of a lipid, protein or polymer shell and typically 1 to 10\,\textmu m in diameter~\citep{stride2009physical,ferrara2007ultrasound}. These structures serve dual roles in biomedical applications: as ultrasound contrast agents that enhance diagnostic imaging through acoustic scattering~\citep{klibanov2006microbubble,datta2008ultrasound}, and as targeted drug delivery vehicles capable of payload release upon ultrasonic excitation~\citep{ferrara2007ultrasound,sirsi2014state,stride2010cavitation,coussios2008applications}. The mechanical properties of \textsc{emb} shells, particularly their elastic modulus, bending rigidity, and response to compression, critically determine bubble stability under physiological flow conditions, acoustic \DIFdelbegin \DIFdel{resonance behavior}\DIFdelend \DIFaddbegin \DIFadd{response}\DIFaddend , and rupture thresholds for controlled drug release~\citep{stride2009physical,guo2013investigation,stride2010cavitation,konofagou2012optimization}. Accurate characterization of these mechanical properties enables rational design of \textsc{emb}s optimized for specific clinical applications, including targeted chemotherapy delivery to tumor vasculature~\citep{tinkov2009microbubbles,tinkov2010new} and blood--brain barrier permeabilization for neurotherapeutics~\citep{hynynen2001noninvasive}. However, systematic quantification of \textsc{emb} mechanical parameters with rigorous uncertainty bounds remains an open challenge, limiting predictive modeling of \textsc{emb} behavior in complex in vivo environments.
+
+Experimental characterization of \textsc{emb} mechanical properties typically employs atomic force microscopy (\textsc{afm}) compression~\citep{glynos2009polymeric,glynos2009nanomechanics}, micropipette aspiration~\citep{evans1989aspiration} or ultrasonic attenuation measurements~\citep{church1995effects,coussios2008applications}. \textsc{afm} compression provides direct force-displacement relationships at nanometer resolution but is subject to experimental uncertainties, including contact point determination, tip-sample alignment artifacts, and batch-to-batch variability in \textsc{emb} synthesis~\cite{glynos2009nanomechanics,tu2009estimating}. Translating these force-displacement curves into fundamental material properties (e.g., Young's modulus, bending modulus) requires computational models that can simulate \textsc{emb} deformation under realistic experimental conditions. Continuum models based on finite element methods offer computational efficiency and have been widely used to model \textsc{emb} dynamics in fluid and vascular environments~\citep{zhang2018mechanics,guo2024ultrasound}, but make strong assumptions about shell constitutive behavior (e.g., Neo-Hookean elasticity) and cannot capture heterogeneities at the molecular scale of shell composition. Particle-based mesoscopic simulations, particularly dissipative particle dynamics (\textsc{dpd}), provide a complementary approach that explicitly represents the shell microstructure through coarse-grained particles interacting via prescribed force fields~\citep{groot1997dissipative,espanol1995statistical}. Our previous work demonstrated that \textsc{dpd} models with isotropic elasticity and bending resistance can accurately reproduce \textsc{emb} compression behavior across multiple shell-chemistry compositions~\citep{ntarakas2025dissipative}. However, \textsc{dpd} simulations require 30--60 minutes per parameter configuration on modern \textsc{gpu}s (e.g. \textsc{nvidia} A40), making systematic parameter space exploration prohibitively expensive. A single Bayesian inference run that requires $10^5$ likelihood evaluations would already consume roughly $3\times10^{6}$-- $6\times10^{6}$~\textsc{gpu}-minutes, i.e. about 5.7--11.4 \textsc{gpu}-years, even before accounting for repeated phases, restarts, or the one-time generation of surrogate-training data, making direct \textsc{dpd}-based Bayesian uncertainty quantification intractable in the present setup.
+\textsc{uq} constitutes a framework for addressing imperfections in models, simulations, and experimental data \citep{angelikopoulos2012bayesian}. By representing unknown parameters and model discrepancies as distributions instead of fixed values, \textsc{uq} enables predictions that reflect both expected behavior and associated confidence, which is essential for making reliable, data-informed decisions in complex systems. Bayesian inference serves as a framework for \textsc{uq} through parameter estimation with quantified uncertainties~\citep{gelman2013bayesian,gregory2005bayesian,nordman2025bayesian,amoudruz2025bayesian}, transforming point estimates into probability distributions that capture both data informativeness and prior knowledge. Hierarchical Bayesian \textsc{uq} extends this framework to settings with multiple datasets or experimental conditions, allowing parameters to vary across conditions while sharing a common structure \citep{wu2016fusing}. This enables information sharing, improves parameter identifiability, and yields a more realistic representation of variability in complex systems. In molecular and mesoscopic simulations, Bayesian approaches have been used to calibrate force fields for proteins~\citep{cailliez2014calibration}, polymers~\citep{zhang2014polymer}, and soft materials~\citep{angelikopoulos2012bayesian}. The computational bottleneck of repeated forward model evaluations can be mitigated with surrogate modeling, using fast approximations such as Gaussian processes, neural networks, or polynomial chaos expansions that learn input-output relationships from a limited training dataset~\citep{rasmussen2006gaussian,wu2022multi}. Deep neural network (\textsc{dnn}) surrogates are particularly attractive for high-dimensional nonlinear systems because they can reproduce complex input-output maps with large speedups over direct simulation~\citep{raissi2019physics,lu2021deepxde}. Bayesian optimization has also emerged as an efficient strategy for refining model parameters in computationally expensive settings, where each evaluation requires a forward simulation \citep{ray2025refining}. By combining a surrogate model with an acquisition function, it enables adaptive exploration of the parameter space and rapid identification of optimal coarse-grained representations with minimal simulation cost. For Bayesian sampling, the transitional Markov chain Monte Carlo (\textsc{tmcmc}) methods~\citep{ching2007transitional,beck2002bayesian} efficiently explore complex posterior distributions through a sequence of intermediate distributions. When multiple experimental datasets are available, hierarchical Bayesian models enable information sharing across conditions while preserving dataset-specific variability~\DIFdelbegin \DIFdel{\mbox{%DIFAUXCMD
+\citep{gelman2013bayesian,gelman2006multilevel,economides2021hierarchical}}\hskip0pt%DIFAUXCMD
+}\DIFdelend \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\citep{gelman2013bayesian,gelman2006multilevel,economides2021hierarchical,amoudruz2023stress}}\hskip0pt%DIFAUXCMD
+}\DIFaddend . The present study combines these components to calibrate particle-based \textsc{emb} models with uncertainty estimates. Previous Bayesian approaches in molecular simulations assess predictive performance by verifying whether experimental observations fall within posterior predictive confidence intervals \DIFdelbegin \DIFdel{\mbox{%DIFAUXCMD
+\cite{economides2021hierarchical}}\hskip0pt%DIFAUXCMD
+}\DIFdelend \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\cite{economides2021hierarchical,amoudruz2023stress}}\hskip0pt%DIFAUXCMD
+}\DIFaddend . Although this offers a qualitative measure of agreement, it does not quantify the degree of calibration. Predictive agreement is then assessed in Results using posterior-predictive intervals and a complementary scoring-rule diagnostic.
+
+The objective of this study is to calibrate a high-fidelity numerical \textsc{emb} model from \DIFdelbegin \DIFdel{compression and indentation }\DIFdelend \DIFaddbegin \DIFadd{force spectroscopy and acoustic }\DIFaddend data with quantified uncertainty (see Fig.~\ref{fig:overview} for a schematic overview of the entire workflow). To make this feasible, we combine \textsc{dnn} \DIFaddbegin \DIFadd{and polynomial }\DIFaddend surrogates trained on \textsc{dpd} simulations with \textsc{tmcmc} sampling. We first use surrogate-based sensitivity analysis to determine which parameters of the membrane force field are informed by the present quasi-static data. The inference then focuses on the elastic terms supported by the data, \DIFaddbegin \DIFadd{uses acoustic-frequency measurements as a complementary constraint on the same reduced elastic parameterization, }\DIFaddend compares independent and hierarchically regularized calibrations, and returns to the full force field only as a \DIFdelbegin \DIFdel{final }\DIFdelend consistency check.
+
+We first validate the surrogates and then use the full model only to identify which parameters are relevant in the present quasi-static regime. Next, we infer reduced-model posteriors independently for each diameter, pool \DIFaddbegin \DIFadd{mechanical and acoustic }\DIFaddend information hierarchically across diameters, propagate the resulting uncertainty to \DIFdelbegin \DIFdel{the response curves}\DIFdelend \DIFaddbegin \DIFadd{both force spectroscopy and acoustic observables}\DIFaddend , compare representative simulation outcomes with the experimental data, and finally rerun the full nonlinear model \DIFdelbegin \DIFdel{as a last }\DIFdelend \DIFaddbegin \DIFadd{against the retained linear force spectroscopy data only as a }\DIFaddend sanity check. \DIFaddbegin \DIFadd{Acoustic-frequency observations were selected as the additional experimental observable to make the calibration directly relevant to future large-scale acoustic simulations. }\DIFaddend The Methods section describes the \textsc{dpd} simulations, experimental-data preprocessing, \DIFdelbegin \DIFdel{surrogate construction }\DIFdelend \DIFaddbegin \DIFadd{construction of the }\textsc{\DIFadd{dnn}} \DIFadd{and polynomial surrogates}\DIFaddend , hierarchical Bayesian formulation, uncertainty propagation, and computational implementation used throughout the study. Our central claim is that a surrogate-accelerated Bayesian workflow can calibrate a high-fidelity numerical \textsc{emb} model with quantified uncertainty and that, in the present quasi-static regime, \DIFdelbegin \DIFdel{the data constrain }\DIFdelend \DIFaddbegin \DIFadd{force spectroscopy data in the linear regime identify compatible $(k_a,k_b)$ regions while the acoustic constraint localizes those regions primarily through }\DIFaddend $k_a$\DIFdelbegin \DIFdel{and $k_b$ and support a reduced force field description}\DIFdelend . The evidence comes from four checks: dominant $k_a/k_b$ sensitivities, \DIFdelbegin \DIFdel{stable independent and hierarchical }\DIFdelend \DIFaddbegin \DIFadd{acoustically constrained }\DIFaddend reduced posteriors, close full-vs-reduced \textsc{map} overlays, and close reduced-vs-full posterior-predictive continuous ranked probability score (\textsc{crps}).
+
+\begin{figure}%[H]%[!htb]
+    \centering
+    \includegraphics[width=1.0\linewidth]{Figure_1.png}
+    \caption{Hierarchical Bayesian \textsc{uq}-driven multiscale workflow from experiments through large-scale simulations and \DIFdelbeginFL \DIFdelFL{deep neural network (}\textsc{\DIFdelFL{dnn}}%DIFAUXCMD
+\DIFdelFL{) surrogates }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{surrogate models }\DIFaddendFL to a data-informed \textsc{emb} model. (a) Mechanical experiments, such as indentation or compression, \DIFdelbeginFL \DIFdelFL{capture the response of soft microstructures and }\DIFdelendFL provide \DIFdelbeginFL \DIFdelFL{datasets in the form of }\DIFdelendFL force-displacement curves\DIFaddbeginFL \DIFaddFL{, while acoustic measurements provide frequency observations}\DIFaddendFL . (b) A mesoscopic model \cite{ntarakas2025dissipative}, solved using \textsc{gpu}-accelerated simulations, \DIFdelbeginFL \DIFdelFL{reproduces this behavior }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{produces linear mechanical and acoustic-frequency responses }\DIFaddendFL through effective model parameters, generating an ensemble of responses across the parameter space. (c) A hierarchical Bayesian uncertainty quantification (\textsc{uq}) workflow, combined with \textsc{dnn} \DIFaddbeginFL \DIFaddFL{and polynomial }\DIFaddendFL surrogates (based on the ensemble of generated simulation data), enables efficient parameter inference from experimental data with quantified uncertainty. (d) The inferred posteriors, specifically the Maximum A Posteriori (\textsc{map}) values of the probability distributions, are then used to parameterize a calibrated \textsc{emb} model for subsequent large-scale simulations.}
+    \label{fig:overview}
+\end{figure}
+
+\section{Methods}
+\label{sec:methods}
+
+\begin{figure}%[t]
+\centering
+\includegraphics[width=1.\textwidth]{Figure_2.pdf}
+\caption{Workflow diagram for the hierarchical Bayesian inference of data-informed \textsc{emb} models. $\mathcal{M}_{d_1,d_2,d_3}$ denote models of Definity bubbles, while $\mathcal{M}_{d_4,d_5,d_6}$ denote SonoVue bubbles. Throughout the workflow, the index $d_i$ labels the bubble diameter, with $(d_i)_{i=1,2,3,4,5,6}$ corresponding to $2.1$, $2.9$, $3.0$, $3.2$, $3.4$, and $5.8\,\mu$m, respectively. For each bubble $i$, the \textsc{dpd} model $\mathcal{M}_{d_i}$ generates \DIFaddbeginFL \DIFaddFL{mechanical and acoustic }\DIFaddendFL training data used to construct a \textsc{dnn} surrogate \DIFdelbeginFL \DIFdelFL{$S_{d_i}$}\DIFdelendFL \DIFaddbeginFL \DIFaddFL{$\mathcal{S}_{d_i}$ and a polynomial surrogate $\mathcal{A}_{d_i}$}\DIFaddendFL , \DIFdelbeginFL \DIFdelFL{which }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{respectively. The mechanical surrogate }\DIFaddendFL is subsequently reduced to \DIFdelbeginFL \DIFdelFL{$S_{d_i}^{0}$ }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{$\mathcal{S}_{d_i}^{0}$ }\DIFaddendFL through sensitivity analysis and suppression of nonlinear terms. \DIFdelbeginFL \DIFdelFL{Each reduced }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{Independent inference combines each mechanical }\DIFaddendFL surrogate \DIFdelbeginFL \DIFdelFL{is then combined }\DIFdelendFL with the corresponding compression (top row) or indentation (bottom row) \DIFdelbeginFL \DIFdelFL{experiments in a Bayesian calibration workflow consisting of an independent inference step}\DIFdelendFL \DIFaddbeginFL \DIFaddFL{experiment}\DIFaddendFL , yielding model parameters $\theta_{d_i}$\DIFdelbeginFL \DIFdelFL{, followed by a hierarchical }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{. Hierarchical }\DIFaddendFL inference \DIFdelbeginFL \DIFdelFL{step, yielding }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{additionally includes the acoustic observations and yields }\DIFaddendFL regularized parameters $\tilde{\theta}_{d_i}$. The resulting calibrated model $\mathcal{M}_{d_i}(\tilde{\theta}_{d_i})$ is finally \DIFdelbeginFL \DIFdelFL{validated }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{checked }\DIFaddendFL against the corresponding \DIFdelbeginFL \DIFdelFL{experimental }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{force spectroscopy }\DIFaddendFL data \DIFaddbeginFL \DIFaddFL{in the retained linear regime}\DIFaddendFL .}
+\label{fig:workflow}
+\end{figure}
+
+
+%\textbf{\\\textsc{dpd} simulations}
+\subsection{\textsc{dpd} simulations}
+\label{sec:meth:dpd}
+
+\noindent All mesoscale simulations were performed using \textsc{dpd}, a particle-based method well suited for modeling soft matter systems with explicit hydrodynamics~\citep{groot1997dissipative}. In \textsc{dpd}, each particle represents a coarse-grained cluster of molecules and evolves according to Newton's equations of motion. The total force acting on the particle $i$ is given by
+\begin{equation}
+\label{eq:forces_dpd}
+\mathbf{F}_i = \sum_{j \neq i} \left(\mathbf{F}_{ij}^{\mathrm{C}} + \mathbf{F}_{ij}^{\mathrm{D}} + \mathbf{F}_{ij}^{\mathrm{R}} \right) + \mathbf{F}_i^{\mathrm{shell}},
+\end{equation}
+where $\mathbf{F}_{ij}^{\mathrm{C}}$, $\mathbf{F}_{ij}^{\mathrm{D}}$, and $\mathbf{F}_{ij}^{\mathrm{R}}$ are the conservative, dissipative, and random pairwise forces, respectively, and $\mathbf{F}_i^{\mathrm{shell}}$ denotes the elastic forces arising from the encapsulating microbubble shell.
+
+The conservative force between particles $i$ and $j$ is defined as
+\begin{equation}
+\mathbf{F}_{ij}^{\mathrm{C}} =
+\begin{cases}
+a_{ij} \left(1 - r_{ij}/r_c \right) \hat{\mathbf{r}}_{ij}, & r_{ij} < r_c, \\
+0, & r_{ij} \geq r_c,
+\end{cases}
+\end{equation}
+where $r_{ij}$ is the interparticle distance, $\hat{\mathbf{r}}_{ij}$ the corresponding unit vector, and $r_c$ the cutoff radius. Dissipative and random forces are given by
+\begin{align}
+\mathbf{F}_{ij}^{\mathrm{D}} &= -\gamma \, \omega^{\mathrm{D}}(r_{ij}) 
+\left(\hat{\mathbf{r}}_{ij} \cdot \mathbf{v}_{ij} \right) \hat{\mathbf{r}}_{ij}, \\
+\label{eq:noise_dpd}
+\mathbf{F}_{ij}^{\mathrm{R}} &= \sigma_\mathrm{DPD} \, \omega^{\mathrm{R}}(r_{ij}) \, \xi_{ij} \, \Delta t^{-1/2} \hat{\mathbf{r}}_{ij},
+\end{align}
+where $\mathbf{v}_{ij}$ is the relative velocity, $\xi_{ij}$ is a zero-mean unit-variance Gaussian random variable, and $\Delta t$ is the integration time step. The \textsc{dpd} fluid is simulated in reduced units following Ref.~\cite{ntarakas2025dissipative}. The cutoff radius is set to $r_c=1$ in simulation units and corresponds to $250~\mathrm{nm}$ in physical units, while the thermal energy is set to $k_B T=1$ and corresponds to room-temperature thermal energy. The water number density is set to $n_d=3$, which fixes the water-bead mass scale through the physical density of water. The dissipative coefficient is set to $\gamma=3.5$, and the random-force amplitude is fixed by the fluctuation--dissipation relation $ \sigma_\mathrm{DPD}^2=2\gamma k_B T$. The dissipative weight function is $\omega^{\mathrm{D}}(r)=(1-r/r_c)^2$ for $r<r_c$.
+
+The encapsulating microbubble shell was modeled as a triangulated elastic surface immersed in a \textsc{dpd} solvent. Consistent with the fixed-thickness assumption used in the reference \textsc{afm} analyses \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\cite{buchner2012,morris2014mechanical}}\hskip0pt%DIFAUXCMD
+}\DIFaddend , the shell was treated as a thin membrane with a nominal thickness of $5~\mathrm{nm}$. Each vertex of the triangulation corresponds to a \textsc{dpd} particle, and elastic forces are obtained as derivatives of a discrete shell energy\DIFaddbegin \DIFadd{, inspired by recent data-driven red blood cell models \mbox{%DIFAUXCMD
+\cite{walchli2020load,economides2021hierarchical,amoudruz2022simulations,amoudruz2023stress,amoudruz2024volume,amoudruz2025scalable}}\hskip0pt%DIFAUXCMD
+}\DIFaddend . Using expressions adopted from our previous work \cite{ntarakas2025dissipative}, the active shell energy in the present \textsc{emb} workflow is
+\begin{equation}
+E_{\mathrm{shell}} = E_{\mathrm{stretch}} + E_{\mathrm{bend}}.
+\end{equation}
+In-plane elastic deformations are described by
+\begin{equation} \label{stretch_ene}
+  E_{\mathrm{stretch}} = \frac{k_a}{2} \sum_{t=1}^{N_t} A_t^0[\alpha_t^2 + a_3 \alpha_t^3 + a_4 \alpha_t^4] + \mu \sum_{t=1}^{N_t} A_t^0[\beta_t + b_1 \alpha_t \beta_t + b_2 \beta_t^2],
+\end{equation}
+where $\alpha_t$ and $\beta_t$ are the area and shear strain invariants of the triangle $t$ and $A_t^0$ is the area of triangle $t$. This expression also includes nonlinear terms (coefficients $a_3, a_4, b_1$, $b_2$). Bending resistance is modeled via a dihedral-angle potential,
+\begin{equation} \label{bend_ene}
+  E_{\mathrm{bend}} = k_b\sum_{\langle i,j\rangle} \left[1-\cos(\theta_{ij}-\theta_{ij}^0)\right],
+\end{equation}
+with $\theta_{ij}$ and $\theta_{ij}^0$ the actual and spontaneous angles between two adjacent triangles \DIFaddbegin \DIFadd{\mbox{%DIFAUXCMD
+\cite{bian2020bending}}\hskip0pt%DIFAUXCMD
+}\DIFaddend . We report the inferred in-plane stretching scale directly as $k_a$. We infer $k_b$ independently, as the stretching--bending relationship is model-dependent and less reliable for coated microbubbles. In contrast, we retain an isotropic in-plane law \cite{lim2002stomatocyte,Lim_H_W2009-hl}, since the data constrain only the dominant stiffness and do not support identification of a separate shear modulus. Accordingly, $\mu$ is not inferred independently and is related to $k_a$ through 
+\begin{equation}
+\mu = \frac{1-\nu}{1+\nu}\,k_a,
+\end{equation}
+which gives $\mu = k_a/3$ for the fixed Poisson ratio $\nu=0.5$ used throughout. The higher-order nonlinear elastic parameters $(b_1, b_2, a_3, a_4)$ are introduced to account for the large strains encountered in strongly deformed red blood cell morphologies, where linear elasticity fails, and these terms capture the strain-hardening response of the spectrin cytoskeleton, resulting in a marked increase in membrane stiffness and deformation energy at large strain \cite{lim2002stomatocyte,Lim_H_W2009-hl,bozic2012role}.
+
+Both the surrounding liquid and the encapsulated gas were modeled explicitly using \textsc{dpd} particles. No-through boundary conditions at the membrane were enforced using a bounce-back mechanism~\citep{revenga1999boundary,fedosov2010multiscale}, while interfacial slip conditions were controlled by tuning the dissipative coupling parameters between shell, water, and gas particles. The treatment of the gas phase, including pressure compensation and ideal-gas behavior, follows exactly the methodology described in Ref.\DIFdelbegin \DIFdel{\,cite}%DIFDELCMD < {%%%
+\DIFdel{ntarakas2025dissipative}%DIFDELCMD < }%%%
+\DIFdelend \DIFaddbegin \DIFadd{~\mbox{%DIFAUXCMD
+\cite{ntarakas2025dissipative}}\hskip0pt%DIFAUXCMD
+}\DIFaddend . All simulations were performed using the \textsc{gpu}-accelerated \textsc{dpd} framework \textsc{mirheo} \cite{alexeev2020mirheo}. To ensure computational feasibility while preserving the relevant elastic physics, all elastic moduli of the shell were uniformly downscaled by a factor $f_{scale} = 0.0074$ \cite{ntarakas2025dissipative}, which preserves the F\"oppl--von K\'arm\'an number \cite{paulose2012fluctuating} and thus the equilibrium and deformation behavior of the shell. Physical forces were recovered by rescaling during post-processing \cite{ntarakas2025dissipative}. The mechanical response of the shell was characterized by extracting force–displacement relations through two distinct simulation protocols: indentation and compression.
+
+
+Indentation simulations mimic \textsc{afm} indentation experiments by applying equal and opposite external forces to sets of shell vertices located near the top and bottom poles of the microbubble, see Fig.~\ref{fig:dpd_scheme}(a). The equatorial vertices were constrained in the axial direction to suppress rigid-body motion. For each applied force level, the system was equilibrated quasi-statically, and the resulting axial displacement of the shell was recorded. Force--displacement curves were obtained by prescribing the force and measuring the displacement. Parallel-plate compression simulations were implemented using two rigid plates represented by a dense collection of frozen particles, see Fig.~\ref{fig:dpd_scheme}(b). The plates were pinned to move only along the axial direction and displaced quasi-statically toward the microbubble. After equilibration, the reaction force exerted by the shell on the plates was recorded. In this case, force--displacement curves were obtained by prescribing displacement and measuring the resulting reaction force. More information about the reference experimental setups can be found in Section S2 in the supplementary material.
+
+\DIFaddbegin \DIFadd{Acoustic response data were generated by isotropically compressing each equilibrated bubble by 5\%, releasing it, and recording the relaxation of the root-mean-square bubble radius. The relaxation was fitted with a damped sinusoid. Writing $\omega_d$ for the fitted damped angular frequency and $\lambda$ for the decay rate, we define the resonance frequency as $f_{\mathrm{res}}=(\omega_d^2-\lambda^2)^{1/2}/(2\pi)$ (Section S5 in the supplementary material). Although the breathing frequency can be extracted using the principal-component analysis (PCA) employed in Ref.~\mbox{%DIFAUXCMD
+\cite{ntarakas2025dissipative}}\hskip0pt%DIFAUXCMD
+, we selected the relaxation protocol because its shorter simulation time reduces the cost of generating the training data for the polynomial surrogates. We nonetheless confirmed that our procedure agrees with the PCA estimates, with a mean absolute relative difference of 3.2\% and a maximum of 5.9\% (Table S7 in the supplementary material). In the PCA protocol, we identify the breathing mode as the PCA eigenvector having the largest absolute overlap with uniform radial motion, following the radial mode-projection criterion of Ref.~\mbox{%DIFAUXCMD
+\cite{papez2023subthz}}\hskip0pt%DIFAUXCMD
+.
+}
+
+\DIFaddend \begin{figure}
+    \centering
+    \includegraphics[width=1.0\linewidth]{Figure_3.png}
+    \caption{A schematic representation of the \textsc{dpd} simulations implemented in this work. (a) Indentation simulations are performed on a SonoVue microbubble (gold) by applying a pair of equal and opposite forces to a small fraction of vertices at the top and bottom of a microbubble. (b) The plate compression is implemented by displacing a set of frozen \textsc{dpd} particles, representing a large cantilever used in the compression of a Definity microbubble (ink).}
+    \label{fig:dpd_scheme}
+\end{figure}
+
+
+%\textbf{\\Deep neural network (\textsc{dnn}) surrogates}
+\subsection{\DIFdelbegin \DIFdel{Deep neural network (}\textsc{\DIFdel{dnn}}%DIFAUXCMD
+\DIFdel{) surrogates}\DIFdelend \DIFaddbegin \DIFadd{Surrogates}\DIFaddend }
+\label{sec:methods_surrogates}
+
+  \noindent Direct evaluation of the mechanical \DIFdelbegin \DIFdel{response }\DIFdelend \DIFaddbegin \DIFadd{and acoustic responses }\DIFaddend of an \textsc{emb} with \textsc{dpd} simulations is computationally expensive, making it impractical \DIFdelbegin \DIFdel{as the forward model in }\DIFdelend \DIFaddbegin \DIFadd{within }\DIFaddend large-population Bayesian inference runs. \DIFdelbegin \DIFdel{Therefore, we replaced the }\DIFdelend \DIFaddbegin \DIFadd{Each }\DIFaddend \textsc{dpd} \DIFdelbegin \DIFdel{solver and corresponding models $(M_{d_i})_{i \in [1,6]}$ with }\DIFdelend \DIFaddbegin \DIFadd{model $\mathcal{M}_{d_i}$ therefore generates mechanical and acoustic simulation data used to construct a }\DIFaddend \textsc{dnn} \DIFdelbegin \DIFdel{surrogate models $(S_{d_i})_{i \in [1,6]}$ trained on simulation data , and used these surrogates as fast emulators }\DIFdelend \DIFaddbegin \DIFadd{surrogate $\mathcal{S}_{d_i}$ for force spectroscopy and a polynomial surrogate $\mathcal{A}_{d_i}$ for resonance frequency, respectively. The surrogates replaced the corresponding }\textsc{\DIFadd{dpd}} \DIFadd{models }\DIFaddend during inference and uncertainty propagation (see Fig.~\ref{fig:workflow} for details). In all cases, the surrogate was trained to approximate \textsc{dpd} outputs for a fixed \textsc{emb} model and a fixed \textsc{emb} diameter. Six \DIFaddbegin \textsc{\DIFadd{dnn}} \DIFaddend surrogates were constructed, one for each of the three \DIFaddbegin \DIFadd{mechanically calibrated }\DIFaddend diameters within both \textsc{emb} models. Compression surrogates predicted force at prescribed displacement, whereas indentation surrogates predicted displacement at prescribed force. All surrogate inputs were written directly in terms of $(k_a,k_b,\ldots)$, consistent with the parameterization used throughout the Results section. We trained a separate surrogate per diameter and \DIFdelbegin \DIFdel{stored }\DIFdelend \DIFaddbegin \DIFadd{retained }\DIFaddend the best-performing model for each diameter for use in the inference pipeline. Implementation details, including how the best model was selected, are summarized in \DIFdelbegin \DIFdel{Sections S3 and }\DIFdelend \DIFaddbegin \DIFadd{Section }\DIFaddend S5 \DIFaddbegin \DIFadd{in the supplementary
+  material.
+}
+
+\DIFadd{For the acoustic response, we fitted one polynomial surrogate per simulated diameter using frequencies extracted from }\textsc{\DIFadd{dpd}} \DIFadd{relaxation simulations. The resonance frequency $f_{\mathrm{res}}$ is insensitive to $k_b$: varying $k_b$ across its admissible range changed the frequency by less than 0.5\% in our numerical tests. This is expected because uniform radial motion preserves the shell angles by symmetry, so the bending term does not contribute to the restoring force at leading order and the frequency is governed primarily by $k_a$. Small-amplitude radial oscillations can be formulated as the generalized eigenvalue problem $\mathbf{K}(k_a)\mathbf{u}=\omega^2\mathbf{M}\mathbf{u}$, making the squared frequency the natural quantity to approximate. We therefore define
+}\begin{equation}
+\DIFadd{f_{\mathrm{res},d_i}^2(k_a)=a_{0,d_i}+a_{1,d_i}k_a+a_{2,d_i}k_a^2,
+}\end{equation}
+\DIFadd{and the surrogate $\mathcal{A}_{d_i}(k_a)$ predicts the value of $f_{\mathrm{res}}$ given by this fitted relation. The quadratic is the lowest-order form that captures the curvature observed in the simulated data. Each polynomial surrogate is evaluated only within its simulated $k_a$ range. Frequency extraction, polynomial-surrogate definition, simulated $k_a$ ranges, and validation are detailed in Section S5 }\DIFaddend in the supplementary material.
+
+%\textbf{\\Bayesian inference framework}
+\subsection{Bayesian inference framework}
+\label{sec:meth:bayes}
+
+\noindent We calibrated the \textsc{emb} force field parameters with \textsc{tmcmc}~\cite{ching2007transitional} as implemented in \textsc{korali}~\cite{martin2022korali}. The full and reduced workflows share the same inferential structure; unless otherwise stated, the reported results correspond to the reduced model, in which $(b_1,b_2,a_3,a_4) = (0,0,0,0)$, while the full model is used \DIFdelbegin \DIFdel{as a final }\DIFdelend \DIFaddbegin \DIFadd{only for a spectroscopy }\DIFaddend consistency check. For each diameter-specific reference curve $i$, the reference dataset is a set of $N_i$ paired observations $\mathcal{D}_i = \{(x_{ij}, y_{ij})\}_{j=1}^{N_i}$. For compression (resp. indentation) experiments, $x_{ij}$ denotes displacement (resp. force) and $y_{ij}$ denotes force (resp. displacement). The diameter-specific parameter vector is $\Theta_{d_i} = \bigl(k_a, k_b, b_1, b_2, a_3, a_4, d_0\bigr)_{d_i}$, where $(k_a,k_b,b_1,b_2,a_3,a_4)$ are the constitutive parameters and $d_0$ is a calibration offset. It is introduced to absorb uncertainty in the experimental bubble-cantilever contact position, since the \textsc{dpd} setup does not explicitly model the details of the cantilever adhesion to the bubble during initial contact. The observation-noise amplitude is denoted separately by $\sigma_{d_i}$ and is shared across all points of a given curve. For clarity, we omit the explicit diameter dependence in $\Theta_{d_i}$ and $\sigma_{d_i}$ in this section and write $\Theta_i$ and $\sigma_{i}$ instead. The calculations are presented in terms of the full parameter set $\Theta_i$ but apply equally to the reduced parameter set  $\theta_i$. 
+
+We use a Gaussian likelihood with multiplicative noise: the per-point standard deviation $s_{ij}(\Theta_{i})$ is proportional to the model prediction $s_{ij}(\Theta_{i}) = \sigma_{i}\,\hat{y}_{ij}$,
+where $\sigma_i$ is the diameter-specific observation-noise amplitude. This yields
+\begin{equation}
+P(\mathcal{D}_i \mid \Theta_{i}, \sigma_i) = \prod_{j=1}^{N_i} \mathcal{N}\!\left(y_{ij} \,\middle|\, \hat{y}_{ij},\, s_{ij}(\Theta_{i})^2\right).
+\end{equation}
+In the independent inference step, each diameter $d_i$ of each \textsc{emb} model is treated independently. We assign independent uniform priors to all components of $\Theta_{i}$ and sample the diameter-specific posterior,
+\begin{equation}
+P(\Theta_{i} \mid \mathcal{D}_i)\ \propto\ P(\mathcal{D}_i \mid \Theta_{i})\,P(\Theta_{i}).
+\end{equation}
+\DIFdelbegin \DIFdel{For the full model, the production }\DIFdelend \DIFaddbegin \DIFadd{The }\DIFaddend prior and hyperprior ranges \DIFaddbegin \DIFadd{for the spectroscopy-only full model and the acoustically conditioned reduced model }\DIFaddend are summarized in Table \DIFdelbegin \DIFdel{S3 }\DIFdelend \DIFaddbegin \DIFadd{S4 }\DIFaddend in the supplementary material. The reduced-model workflow
+  uses the same \DIFaddbegin \DIFadd{mechanical }\DIFaddend likelihood, data, and phase structure, but fixed $(b_1,b_2,a_3,a_4)=(0,0,0,0)$ and infers only $(k_a,k_b,d_0,\sigma)$. These
+  reduced independent inference runs provide the baseline single-diameter posteriors used in Results before information is pooled hierarchically across
+  diameters. Hierarchical regularization was performed separately within each bubble type; no sharing was performed across types. \DIFaddbegin \DIFadd{The reduced workflow
+  additionally conditions the hierarchical stage on acoustic measurements evaluated using the acoustic surrogates described above. }\DIFaddend To
+  pool information across diameters, we introduce hyperparameters for each Definity and
+  SonoVue \textsc{emb} model
+  \begin{equation}
+  \psi = \{(m_k,\tau_k)\}_{k\in\mathcal{K}},\qquad
+  k\in\mathcal{K}=\{k_a,k_b,b_1,b_2,a_3,a_4,d_0\}
+  \end{equation}
+  with Gaussian conditional priors for the hierarchical parameters $\Theta_{i,k}\mid\psi \sim \mathcal{N}(m_k,\tau_k^2)$, and uniform hyperpriors on
+  $(m_k,\tau_k)_k$. For each parameter $k\in\mathcal{K}$, the conditional prior was truncated to the corresponding admissible range reported in Table
+  \DIFdelbegin \DIFdel{S3 }\DIFdelend \DIFaddbegin \DIFadd{S4 }\DIFaddend in the supplementary material. The \DIFaddbegin \DIFadd{mechanical and acoustic }\DIFaddend observation-noise \DIFdelbegin \DIFdel{parameter $\sigma_i$ is }\DIFdelend \DIFaddbegin \DIFadd{amplitudes are inferred independently for each dataset and are }\DIFaddend not
+  hierarchically pooled\DIFdelbegin \DIFdel{and is inferred independently for each diameter}\DIFdelend \DIFaddbegin \DIFadd{. The hyperparameter posterior for each }\textsc{\DIFadd{emb}} \DIFadd{model is conditioned on both the mechanical datasets $\mathcal{D}_i$ and the acoustic observations $f_j$,
+  }\begin{equation}
+  \DIFadd{P(\psi \mid \{\mathcal{D}_i\},\{f_j\})
+  \propto
+  P(\psi)
+  \prod_i P(\mathcal{D}_i\mid\psi)
+  \prod_j P(f_j\mid\psi).
+  }\end{equation}
+  \DIFadd{Each mechanical and acoustic dataset contributes a separate marginal likelihood under the same }\textsc{\DIFadd{emb}} \DIFadd{hierarchy, with its own parameter vector and observation-noise amplitude}\DIFaddend . \textsc{tmcmc} is then used to sample the hyperparameter posterior implied by the hierarchical model.
+  Operationally, this phase learns the priors used by the final hierarchical posteriors; it is therefore an intermediate hierarchical-learning step rather than a standalone result. Hierarchical pooling produces the final diameter-specific posteriors reported in this work. This yields, for each
+  bubble $i$, a posterior conditioned on hierarchical priors inferred \DIFdelbegin \DIFdel{from the three diameters }\DIFdelend \DIFaddbegin \DIFadd{jointly from the separate mechanical and acoustic datasets }\DIFaddend of the same
+  \textsc{emb} model,
+  \begin{equation}
+  P(\Theta_i,\sigma_i \mid \mathcal{D}_i, \psi) \ \propto\ P(\mathcal{D}_i \mid \Theta_i,\sigma_i )\,P(\Theta_i \mid \psi)\,P(\sigma_i), \qquad \psi
+  \sim P(\psi \mid \{\mathcal{D}_i\}\DIFaddbegin \DIFadd{,\{f_j\}}\DIFaddend )
+  \end{equation}
+  where $i$ runs over the diameters of each \textsc{emb} model. The \textsc{map} estimate was approximated by the posterior sample with the largest
+  log-posterior value.
+
+%\textbf{\\Uncertainty Propagation}
+\subsection{Uncertainty Propagation}
+\label{sec:meth:propagation}
+
+\noindent Once the posterior distribution has been estimated, we propagate this uncertainty to the predicted response through the \DIFdelbegin \DIFdel{trained }\textsc{\DIFdel{dnn}} %DIFAUXCMD
+\DIFdelend \DIFaddbegin \DIFadd{corresponding mechanical or acoustic }\DIFaddend surrogate. For any output quantity of interest $y$, the posterior predictive distribution is
+\begin{equation}
+P\!\left(y \mid \mathcal{D}_i\right)
+=
+\int
+P\!\left(y \mid \Theta_i, \sigma_i\right)\,
+P\!\left(\Theta_i, \sigma_i \mid \mathcal{D}_i\right)\,
+d\Theta_i\, d\sigma_i
+\;\approx\;
+\frac{1}{N}\sum_{k=1}^{N}
+P\!\left(y \mid \Theta_i^{(k)}, \sigma_i^{(k)}\right),
+\end{equation}
+where $(\Theta_i^{(k)},\sigma_i^{(k)}) \sim P(\Theta_i,\sigma_i \mid \mathcal{D}_i)$ are samples from the posterior retained for propagation. Here, $P(\Theta_i,\sigma_i \mid \mathcal{D}_i)$ denotes the posterior used for propagation, namely the final hierarchically regularized diameter-specific posterior in the hierarchical stage. In our case, $y$ is the response evaluated along the experimental grid, namely force at fixed displacement for compression and displacement at fixed force for indentation. For each posterior sample, the surrogate provides a mean response, while the observation model assigns a Gaussian uncertainty with standard deviation $\sigma_i^{(k)} \hat{y}^{(k)}$ proportional to that prediction. The posterior predictive distribution at each grid point is therefore represented as a Gaussian mixture induced by the ensemble of posterior samples. In practice, we drew $N=5{,}000$ posterior samples and evaluated the corresponding predictive distribution pointwise along the experimental reference grid. Posterior medians and central predictive intervals, including the posterior median and the pointwise 90\% posterior predictive
+interval reported in this paper, were then obtained by numerical inversion of the corresponding cumulative distribution function (\textsc{cdf}) at each grid point. These posterior predictive bands are therefore fully consistent with the same heteroscedastic Gaussian likelihood used during inference, and were used to assess coverage against the experimental observations. \DIFaddbegin \DIFadd{Acoustic predictive intervals were obtained analogously by propagating posterior samples through the corresponding acoustic surrogates and combining the predictions with the inferred acoustic observation noise.
+}\DIFaddend 
+
+%\textbf{\\Continuous ranked probability score (\textsc{crps})}
+\subsection{Continuous ranked probability score (\textsc{crps})}
+\label{sec:meth:crps}
+
+\noindent To complement interval inclusion with one proper scoring rule, we also report the \textsc{crps} for the six datasets discussed in Results~\citep{gneiting2007strictly,gneiting2007probabilistic,hersbach2000decomposition}. For a retained experimental point $j$ with observed response $y_j$ and pointwise posterior predictive \textsc{cdf} $F_j$, the score is
+\begin{equation}
+\mathrm{CRPS}(F_j,y_j)=\int_{-\infty}^{\infty}\left(F_j(z)-\mathbf{1}\{z\ge y_j\}\right)^2\,dz \, ,
+\end{equation}
+with lower values indicating better probabilistic agreement. In the present workflow, $F_j$ is the pointwise Gaussian mixture induced by the propagated posterior samples and the heteroscedastic noise model above. The posterior-predictive bands shown in the figures are obtained from pointwise quantiles of this mixture distribution, computed by numerical inversion of the corresponding \textsc{cdf}. For \textsc{crps}, we approximate the same pointwise posterior predictive distribution by Monte Carlo: for each retained posterior sample, we draw one response from its associated Gaussian component, compute the empirical ensemble \textsc{crps} at point $j$, and then average over the retained points of each curve to obtain the reported mean \textsc{crps}. The reported values are further averaged over five independent Monte Carlo replicates. We use \textsc{crps} because, unlike coverage alone, it rewards both calibration and sharpness under the same posterior predictive distribution.
+
+%\textbf{\\Transitional Markov Chain Monte Carlo (\textsc{tmcmc})}
+\subsection{Transitional Markov Chain Monte Carlo (\textsc{tmcmc})}
+\label{sec:meth:tmcmc}
+
+\noindent Posterior sampling was performed with \textsc{tmcmc} as implemented in \textsc{korali}~\citep{martin2022korali} and executed in parallel with \textsc{mpi}. \textsc{tmcmc} builds a sequence of intermediate tempered distributions connecting prior and posterior, which improves robustness in parameter spaces that are broad, correlated, or otherwise difficult to explore directly. The numerical \textsc{tmcmc} settings used in production are reported in Section \DIFdelbegin \DIFdel{S4 }\DIFdelend \DIFaddbegin \DIFadd{S6 }\DIFaddend in the supplementary material.
+
+
+
+%\textbf{\\Computational Implementation}
+\subsection{Computational Implementation}
+\label{sec:meth:implementation}
+
+\noindent All workflows were executed on a high-performance computing environment consisting of multi-core \textsc{cpu} nodes and \textsc{cuda}-capable \textsc{gpu} nodes. Direct \textsc{dpd} simulations were performed with \textsc{mirheo}, while Bayesian inference used \textsc{korali} with \textsc{mpi} parallelization. \DIFdelbegin \DIFdel{Surrogate models were trained }\DIFdelend \DIFaddbegin \DIFadd{The }\textsc{\DIFadd{dnn}} \DIFadd{and polynomial surrogates were constructed }\DIFaddend and evaluated in Python using PyTorch and standard scientific Python libraries, with all workflow settings provided through \textsc{yaml} configuration files. More computational details can be found in Section S1 in the supplementary material.
+
+
+\section{Results and Discussion}
+\label{sec:results}
+
+Results are reported for two \textsc{emb} models of commercial agents with different lipid shells (Definity and SonoVue) and three bubble diameters per \textsc{emb} model. Definity models are calibrated using experimental data from \textsc{afm} compression, whereas SonoVue models are calibrated with data from \textsc{afm} indentation. The inference conditions on one reprocessed published curve per diameter (see Fig. S1 in the supplementary material); the exact source references and retained point counts are summarized in Table \DIFdelbegin \DIFdel{S2 }\DIFdelend \DIFaddbegin \DIFadd{S3 }\DIFaddend in the supplementary material. \DIFaddbegin \DIFadd{The published force spectroscopy curves contain an initial linear loading regime followed by a nonlinear response at larger deformation, but the likelihood uses only the retained points in the linear regime listed in Table S3. }\DIFaddend We first use the full membrane force field only to establish the sensitivity structure of the inverse problem and then, from the sensitivity section onward, carry a reduced model with membrane parameters $(k_a,k_b)$ through the main-text inference workflow, treating $d_0$ and $\sigma$ separately as calibration and noise parameters. The full model is rerun only \DIFdelbegin \DIFdel{in the final }\DIFdelend \DIFaddbegin \DIFadd{against the same retained force spectroscopy data in the }\DIFaddend sanity-check section. 
+
+\subsection{{\textsc{dpd}} force field and \textsc{dnn} surrogate validation}
+\label{sec:res:dpd_surrogate}
+
+\begin{figure}%[t]
+\centering
+\includegraphics[width=0.98\linewidth]{Figure_4.pdf}
+\caption{Grouped-holdout \DIFaddbeginFL \textsc{\DIFaddFL{dnn}} \DIFaddendFL surrogate validation. Panels (a–b) compare held-out \textsc{dpd} curves with the corresponding \textsc{dnn} predictions for representative $\mathcal{S}_{d_2}$ \DIFaddbeginFL \DIFaddFL{and $\mathcal{S}_{d_4}$ surrogates for Definity }\DIFaddendFL (ink) and \DIFdelbeginFL \DIFdelFL{$\mathcal{S}_{d_4}$ }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{SonoVue }\DIFaddendFL (gold)\DIFdelbeginFL \DIFdelFL{surrogates}\DIFdelendFL \DIFaddbeginFL \DIFaddFL{, respectively; open circles denote held-out }\textsc{\DIFaddFL{dpd}} \DIFaddFL{points and solid lines denote surrogate predictions}\DIFaddendFL . Panels (c–d) summarize, for each \textsc{emb} model, the median and $90^{th}$-percentile held-out-curve relative $L^2$ errors from the grouped parameter-set holdout audit\DIFaddbeginFL \DIFaddFL{; filled circles and open diamonds denote these statistics, respectively}\DIFaddendFL .}
+\label{fig:surrogate_validation_curves}
+\end{figure}
+
+We consider six \textsc{dpd} models $(\mathcal{M}_{d_i})_{i \in [1,6]}$, which share the same physical formulation and parameterization~\citep{ntarakas2025dissipative}, but correspond to different experimental conditions (see Fig.~\ref{fig:workflow}, block \textcircled{1}). Models $\mathcal{M}_{d_1}, \mathcal{M}_{d_2}, \mathcal{M}_{d_3}$ describe Definity bubbles~\cite{lindner2002microvascular,datta2008ultrasound,baseri2010multi} (compression experiments) for fixed diameters ($d_1, d_2, d_3$) respectively, while $\mathcal{M}_{d_4}, \mathcal{M}_{d_5}, \mathcal{M}_{d_6}$ describe SonoVue bubbles~\cite{schneider1999sonovue,demene2021transcranial,tu2009estimating,guo2013investigation,de2007compression} (indentation experiments) for fixed diameters ($d_4, d_5, d_6$) respectively. Throughout, \DIFdelbegin \DIFdel{the index }\DIFdelend $d_i$ denotes the bubble diameter\DIFaddbegin \DIFadd{. The six diameters, in $\mu\mathrm{m}$, are $d_1=2.1$}\DIFaddend , \DIFdelbegin \DIFdel{with $(d_i)_{i=1,\dots,6} = (2.1,\,2.9,\,3.0,\,3.2,\,3.4,\,5.8)\,\mu\mathrm{m}$}\DIFdelend \DIFaddbegin \DIFadd{$d_2=2.9$, $d_3=3.0$, $d_4=3.2$, $d_5=3.4$, and $d_6=5.8$}\DIFaddend . We simulate the \textsc{dpd} models using the high-performance \textsc{mirheo} software package \cite{alexeev2020mirheo}. In the compression experiment with Definity, the \textsc{dpd} simulation returns the reaction force as a function of imposed displacement through an explicit plate-contact geometry. In the indentation experiment with SonoVue, it returns the bubble diameter change as a function of applied force under the prescribed loading protocol. These \textsc{dpd} outputs are therefore directly comparable to the corresponding experimental measurements. The membrane force field of each model $\mathcal{M}_{d_i}$ is parameterized by a stretching stiffness $k_a$, a bending modulus $k_b$, nonlinear elastic coefficients $(b_1, b_2, a_3, a_4)$, and a displacement offset $d_0$ used to align the curves. These parameters are collected in the associated vector $\Theta_{d_i} = (k_a, k_b, b_1, b_2, a_3, a_4, d_0)_{d_i}$ while the observation-noise amplitude $\sigma_{d_i}$ is treated separately as a diameter-specific parameter. Full details of the \textsc{dpd} setup and parameter definitions are provided in the Methods section.
+
+To enable Bayesian inference at scale, we train \textsc{dnn} surrogates to predict the output of the \textsc{dpd} models on thousands of simulated curves. Each \textsc{dpd} model~$\mathcal{M}_{d_i}$ is subsequently replaced by its surrogate counterpart~$\mathcal{S}_{d_i}$ (see Fig.~\ref{fig:workflow}, block~\textcircled{2}) during inference, enabling efficient Bayesian calibration. Surrogate selection is performed via an architecture sweep, retaining the \textsc{dnn} with the lowest \DIFdelbegin \DIFdel{validation mean-squared error. To assess surrogate accuracy a posteriori, we further adopt a stricter grouped parameter-set holdout , excluding }\DIFdelend \DIFaddbegin \DIFadd{grouped-holdout median relative $L^2$ error. The grouped holdout excludes }\DIFaddend entire simulated curves \DIFdelbegin \DIFdel{during validation, to complement the pointwise production split}\DIFdelend \DIFaddbegin \DIFadd{from training and therefore evaluates generalization to unseen parameter sets}\DIFaddend ~\cite{ma2020eating}. In this \DIFdelbegin \DIFdel{unseen-curve audit}\DIFdelend \DIFaddbegin \DIFadd{validation}\DIFaddend , the median relative $L^2$ error over the full loading branch remains low: less than 2.1\% for Definity surrogates and less than 2.6\% for SonoVue surrogates (see Table \DIFdelbegin \DIFdel{S1 }\DIFdelend \DIFaddbegin \DIFadd{S2 }\DIFaddend in the supplementary material). Fig.~\ref{fig:surrogate_validation_curves} combines representative grouped-holdout curves in real units with a compact across-diameter summary based on the median and 90th-percentile held-out-curve relative $L^2$ errors, showing low surrogate error for most held-out simulated curves. Representative held-out grouped-validation curves are collected in Fig. S2 in the supplementary material. Combined with their orders-of-magnitude speedup over direct simulation, these surrogate errors are low enough to make the subsequent \textsc{tmcmc}-based calibration computationally tractable, see Methods section.
+
+\subsection{Sensitivity analysis motivates a reduced membrane model}
+\label{sec:res:sensitivity}
+
+\begin{figure}%[htb!]%[t]
+\centering
+\includegraphics[width=0.98\linewidth]{Figure_5.pdf}
+\caption{Range-averaged first-order Sobol sensitivity indices for representative diameters of each \textsc{emb} model. The bars report the loading-range-averaged first-order index for each material parameter for (a) Definity ($\mathcal{S}_{d_2}$, ink) and (b) SonoVue ($\mathcal{S}_{d_4}$, gold); error bars denote the corresponding averaged Sobol confidence estimates. Only the material parameters are shown.}
+\label{fig:sensitivity}
+\end{figure}
+
+To determine which force field parameters can be constrained by force spectroscopy data, we quantify the global sensitivities of the \DIFaddbegin \textsc{\DIFadd{dnn}} \DIFaddend surrogates over the experimentally explored range using first-order Sobol indices \cite{herman2017salib}. Details of the sensitivity analysis are given in Section \DIFdelbegin \DIFdel{S6 }\DIFdelend \DIFaddbegin \DIFadd{S7 }\DIFaddend in the supplementary material. The resulting hierarchy is clear: the response is governed primarily by the stretching stiffness $k_a$ and the bending modulus $k_b$, while the nonlinear coefficients $(b_1,b_2,a_3,a_4)$ contribute only weakly within the loading regime probed here. Fig.~\ref{fig:sensitivity} reports range-averaged first-order indices for representative surrogates $\mathcal{S}_{d_2}$ and $\mathcal{S}_{d_4}$. For $\mathcal{S}_{d_2}$, the indices assign approximately $66\%$ of the variance to $k_a$ and $28\%$ to $k_b$. For $\mathcal{S}_{d_4}$, the same averaged analysis assigns approximately $45\%$ to $k_a$ and $33\%$ to $k_b$. In both cases, the nonlinear terms remain negligible compared to the two elastic parameters, with bar heights clustered near zero within their confidence intervals. These representative panels are shown because they reflect the same dominant $k_a/k_b$ sensitivity structure observed separately for Definity and SonoVue surrogates. 
+
+These sensitivity results indicate which parameters the present data are likely to constrain: in this deformation regime, the data primarily inform $(k_a,k_b)$, while the nonlinear terms are expected to remain weakly constrained. This motivates the concrete modeling decision adopted in the remainder of this study: after this section, the inference uses a reduced membrane force field with $(k_a,k_b)$ as the shell-mechanics parameters, while $d_0$ and $\sigma$ are retained separately as calibration and noise parameters. In practice, for each bubble $i$, we use the surrogates $\mathcal{S}_{d_i}^0$ obtained by setting the $\mathcal{S}_{d_i}$ nonlinear parameters $(b_1, b_2, a_3, a_4)$ to zero and we use the notation $\theta_{d_i}$ to refer to the associated reduced set of parameters (see Fig.~\ref{fig:workflow}, block \textcircled{2}): $\theta_{d_i} = (k_a, k_b, d_0)_{d_i}$. We return to the full models only in the \DIFdelbegin \DIFdel{final Results subsection }\DIFdelend \DIFaddbegin \DIFadd{Results section }\DIFaddend as a safety check on this reduction. 
+
+\subsection{Hierarchical Bayesian inference of the reduced model}
+\label{sec:res:phase1}
+\DIFdelbegin %DIFDELCMD < \begin{figure}%%%
+%DIF < [htb!]%[t]
+%DIFDELCMD < \centering
+%DIFDELCMD < \includegraphics[width=0.98\textwidth]{Figure_6.pdf}
+%DIFDELCMD < %%%
+%DIFDELCMD < \caption{%
+{%DIFAUXCMD
+\DIFdelFL{Representative reduced-model independent posterior marginals for $\mathcal{\theta}_{d_2}$ and $\mathcal{\theta}_{d_4}$. Panels (a–d) correspond to $\mathcal{\theta}_{d_2}$ (ink) and (e–h) to $\mathcal{\theta}_{d_4}$ (gold). 
+The reduced independent inferences yield well-defined posteriors for the membrane parameters $(k_a,k_b)$, the calibration parameter $d_0$, and the noise parameter $\sigma$.}}
+%DIFAUXCMD
+%DIFDELCMD < \label{fig:phase1_reduced_representative}
+%DIFDELCMD < \end{figure}
+%DIFDELCMD < 
+
+%DIFDELCMD < %%%
+\DIFdelend To establish a results baseline, we first perform independent Bayesian calibrations for each diameter using only the reduced models \DIFaddbegin \DIFadd{and force spectroscopy data in the retained linear regime }\DIFaddend (see Fig.~\ref{fig:workflow}, block \textcircled{3}). For each bubble $i$ (compression experiment using Definity: 2.1, 2.9, and 3.0~$\mu$m; indentation experiment using SonoVue: 3.2, 3.4, and 5.8~$\mu$m), we run a separate \textsc{tmcmc} inference using the \textsc{korali} software framework \cite{martin2022korali} and the corresponding \textsc{dnn} surrogate as the forward model, where $d_0$ is an auxiliary curve-alignment parameter and $\sigma$ controls the (relative) observation noise model (Methods). \DIFdelbegin \DIFdel{At this reduced-model level, independent Bayesian calibrationsalready yield well-defined single-diameter posterior marginals $P(k_a)$, $P(k_b)$}\DIFdelend \DIFaddbegin \DIFadd{These spectroscopy-only calibrations}\DIFaddend , \DIFdelbegin \DIFdel{$P(d_0)$, and $P(\sigma)$. The Definity model posteriors are already sharply localized in all four inferred quantities, while the SonoVue model posteriors remain broader but still resolve a stable reduced parameter set. The value of $\sigma$ is on the order of $2.5-5\%$ of the model output, indicating that the inferred observation noise corresponds to a small fraction of the model output across the explored regime }\DIFdelend \DIFaddbegin \DIFadd{shown as grey areas in Fig.~\ref{fig:phase1_vs_phase3b_reduced_summary}, identify extended compatible regions in the $(k_a,k_b)$ plane rather than a unique parameter pair. This ridge-like degeneracy is consistent with the continuum analysis in Ref.~\mbox{%DIFAUXCMD
+\cite{lytra2020modeling}}\hskip0pt%DIFAUXCMD
+, where the Reissner regime predicts the slope of the response curve to be proportional to $\sqrt{k_a k_b}$}\DIFaddend . 
+\DIFaddbegin 
+
+\DIFadd{The approach adopted by these authors to solve the degeneracy is to use the nonlinear part of the force--displacement curve to separate shell parameters.
+However, this route is not usable in the present }\textsc{\DIFadd{dpd}} \DIFadd{model because the }\textsc{\DIFadd{dpd}} \DIFadd{pressure is chosen to be lower than the real values to ensure stable simulations and therefore does not reproduce the experimental internal/external pressure state of real bubbles. In particular, the internal gas pressure is low and is not increased during volume compression as in a physical bubble. Consequently, the nonlinear stiffening described in Ref.~\mbox{%DIFAUXCMD
+\cite{lytra2020modeling} }\hskip0pt%DIFAUXCMD
+as a result of the response of the shell to gas compression is not captured at comparable deformations. Instead, the present }\textsc{\DIFadd{dpd}} \textsc{\DIFadd{emb}} \DIFadd{models leave the intended elastic regime and show nonphysical rupture or interpenetration. We therefore use acoustic frequency measurements as an independent constraint on $k_a$. The frequency observables are evaluated using the acoustic surrogates described in Methods. Before including the acoustic data in the hierarchy, we assessed the underlying polynomial surrogates by leave-one-out validation at every diameter associated with a retained acoustic measurement.
+}
+
+\begin{figure}%DIF > [!htb]%[t]
+\centering
+\includegraphics[width=0.98\linewidth]{Figure_6.pdf}
+\caption{\DIFaddFL{Polynomial acoustic surrogate validation. Panels (a) and (b) compare held-out squared }\textsc{\DIFaddFL{dpd}} \DIFaddFL{resonance frequencies with polynomial-surrogate predictions at representative diameters associated with retained acoustic measurements for Definity (ink) and SonoVue (gold), respectively; open circles denote held-out squared }\textsc{\DIFaddFL{dpd}} \DIFaddFL{resonance frequencies and solid lines denote surrogate predictions. Panels (c) and (d) summarize the leave-one-out relative errors in $f_{\mathrm{res}}$ at all diameters associated with retained acoustic measurements (Refs.~\mbox{%DIFAUXCMD
+\cite{goertz2006pulse,vandermeer2004sonovue}}\hskip0pt%DIFAUXCMD
+); filled circles show the median and open diamonds show the $90^{th}$ percentile.}}
+\label{fig:polynomial_surrogate_validation}
+\label{fig:phase1_reduced_representative}
+\end{figure}
+
+\DIFaddend Fig.~\DIFdelbegin \DIFdel{\ref{fig:phase1_reduced_representative} depicts representative reduced marginals for $\mathcal{\theta}_{d_2}$ and $\mathcal{\theta}_{d_4}$ and the associated inferred noises. These independent single-diameter calibrations therefore establish the baseline reduced-model information content of each curve before pooling information across diameters}\DIFdelend \DIFaddbegin \DIFadd{\ref{fig:polynomial_surrogate_validation} shows that the diameter-specific relative $L^2$ errors in $f_{\mathrm{res}}$ range from 0.9--4.9\% for Definity and 0.3--0.5\% for SonoVue. These results support the use of the polynomial surrogates as acoustic surrogates in the subsequent hierarchical inference}\DIFaddend .
+
+
+\label{sec:res:phase2}
+\begin{figure}%[!htb]%[t]
+\centering
+\includegraphics[width=\textwidth]{Figure_7.pdf}
+\caption{Reduced-model posterior \DIFdelbeginFL \DIFdelFL{centers and 90\% intervals for }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{clouds from }\DIFaddendFL independent \DIFaddbeginFL \DIFaddFL{force spectroscopy inference }\DIFaddendFL and hierarchical \DIFdelbeginFL \DIFdelFL{inferences }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{inference conditioned jointly on force spectroscopy and acoustic data }\DIFaddendFL for the dominant elastic parameters $k_a$ and $k_b$ \DIFdelbeginFL \DIFdelFL{(\textsc{dpd} units)}\DIFdelendFL . Each point denotes \DIFdelbeginFL \DIFdelFL{the }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{a }\DIFaddendFL posterior \DIFdelbeginFL \DIFdelFL{median, }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{sample. The top }\DIFaddendFL and \DIFdelbeginFL \DIFdelFL{each interval denotes }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{side marginal traces show }\DIFaddendFL the \DIFdelbeginFL \DIFdelFL{central 90\% range}\DIFdelendFL \DIFaddbeginFL \DIFaddFL{corresponding one-dimensional posterior densities for $k_a$ and $k_b$}\DIFaddendFL . \DIFdelbeginFL \DIFdelFL{Panels }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{Panel }\DIFaddendFL (a\DIFdelbeginFL \DIFdelFL{–b}\DIFdelendFL ) \DIFdelbeginFL \DIFdelFL{correspond }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{corresponds }\DIFaddendFL to Definity \textsc{emb}s (ink), and \DIFdelbeginFL \DIFdelFL{panels }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{panel }\DIFaddendFL (\DIFdelbeginFL \DIFdelFL{c–d}\DIFdelendFL \DIFaddbeginFL \DIFaddFL{b}\DIFaddendFL ) to SonoVue \textsc{emb}s (gold). \DIFdelbeginFL \DIFdelFL{This compact comparison illustrates how }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{Pale grey point clouds show regions compatible with }\DIFaddendFL the \DIFdelbeginFL \DIFdelFL{priors learned }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{force spectroscopy data }\DIFaddendFL in the \DIFdelbeginFL \DIFdelFL{hierarchical inference regularize }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{linear regime, while ink and gold point clouds show }\DIFaddendFL the \DIFdelbeginFL \DIFdelFL{final reduced }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{hierarchical }\DIFaddendFL posteriors \DIFdelbeginFL \DIFdelFL{relative to the independent reduced posteriors}\DIFdelendFL \DIFaddbeginFL \DIFaddFL{conditioned jointly on force spectroscopy and acoustic data for Definity and SonoVue, respectively}\DIFaddendFL .}
+\label{fig:phase1_vs_phase3b_reduced_summary}
+\end{figure}
+For both Definity and SonoVue models, we then infer hierarchical hyperparameters for the reduced models to quantify how $(k_a, k_b, d_0)$ vary across diameters \DIFaddbegin \DIFadd{while conditioning on the mechanical and acoustic observations }\DIFaddend (Methods, sec.~\ref{sec:meth:bayes}). For each \textsc{emb} model, this step pools information across its three \DIFdelbegin \DIFdel{diameters }\DIFdelend \DIFaddbegin \DIFadd{mechanically calibrated diameters and the acoustic observations }\DIFaddend to learn hierarchical priors that regularize the \DIFdelbegin \DIFdel{independently inferred }\DIFdelend \DIFaddbegin \DIFadd{diameter-specific }\DIFaddend posteriors. Using these learned priors, we subsequently perform diameter-specific \textsc{tmcmc} inference for the three diameters of each \textsc{emb} model (see Fig.~\ref{fig:workflow}, block \textcircled{3}). For each bubble $i$, these posteriors $P(\tilde\theta_{d_i})$ constitute the \DIFdelbegin \DIFdel{final }\DIFdelend reduced-model distributions used downstream for propagated-response bands, Maximum A Posteriori (\textsc{map}) extraction, and \DIFaddbegin \DIFadd{spectroscopy-only }\DIFaddend full-model consistency checks. Fig.~\ref{fig:phase1_vs_phase3b_reduced_summary} compares the \DIFdelbegin \DIFdel{medians and 90\% credible intervals of these posteriors $P(\tilde\theta_{d_i})$ with those obtained from independent reduced-model inferences $P(\theta_{d_i})$, for the elastic parameters. For Definity models, the hierarchy modifies the posteriors only moderately and preserves the same identifiable region. For SonoVue models, the results exhibit stronger pooling across diameters. The key observation is that in both cases, the posteriors remain }\DIFdelend \DIFaddbegin \DIFadd{broad regions compatible with the force spectroscopy data in the linear regime with hierarchical posteriors conditioned jointly on force spectroscopy and acoustic data in the $(k_a,k_b)$ plane. The hierarchical posteriors cover a substantially narrower part of the mechanical compatibility ridge while retaining }\DIFaddend diameter-specific \DIFdelbegin \DIFdel{, while incorporating shared information across the diameters of }\DIFdelend \DIFaddbegin \DIFadd{structure within }\DIFaddend each \textsc{emb} model.
+
+\begin{figure}%[!htb]%[t]
+\centering
+\includegraphics[width=\textwidth]{Figure_8.pdf}
+\caption{Reduced-model posterior \DIFdelbeginFL \DIFdelFL{predictive bands}\DIFdelendFL \DIFaddbeginFL \DIFaddFL{propagation}\DIFaddendFL . Panels (a) and (b) show \DIFdelbeginFL \DIFdelFL{the }\DIFdelendFL Definity (ink) \DIFaddbeginFL \DIFaddFL{compression }\DIFaddendFL and SonoVue (gold) \DIFdelbeginFL \DIFdelFL{models}\DIFdelendFL \DIFaddbeginFL \DIFaddFL{indentation responses}\DIFaddendFL , respectively, with all three diameters overlaid in each case. For each diameter, \DIFdelbeginFL \DIFdelFL{the }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{colored }\DIFaddendFL lines denote the reduced hierarchical posterior median response, \DIFdelbeginFL \DIFdelFL{the }\DIFdelendFL shaded \DIFdelbeginFL \DIFdelFL{region denotes the }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{bands denote central }\DIFaddendFL 90\% posterior predictive \DIFdelbeginFL \DIFdelFL{band}\DIFdelendFL \DIFaddbeginFL \DIFaddFL{intervals}\DIFaddendFL , and \DIFdelbeginFL \DIFdelFL{the }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{open }\DIFaddendFL circles denote \DIFaddbeginFL \DIFaddFL{force spectroscopy data in }\DIFaddendFL the \DIFdelbeginFL \DIFdelFL{experimental points}\DIFdelendFL \DIFaddbeginFL \DIFaddFL{retained linear regime}\DIFaddendFL . \DIFaddbeginFL \DIFaddFL{Panels (c) and (d) show posterior medians and intervals propagated through the acoustic surrogates together with acoustic observations shown as open circles. Experimental data are from Refs.~\mbox{%DIFAUXCMD
+\cite{buchner2012,morris2014mechanical,vandermeer2004sonovue,goertz2006pulse}}\hskip0pt%DIFAUXCMD
+.}\DIFaddendFL }
+\label{fig:reduced_bands_all}
+\end{figure}
+\DIFdelbegin \DIFdel{We assess predictive agreement in the reduced-model posterior by propagating, for each bubble $i$, samples from the reduced hierarchical posterior $P(\tilde\theta_{d_i})$ together with the inferred associated noise parameter $\sigma$ through the }\textsc{\DIFdel{dnn}} %DIFAUXCMD
+\DIFdel{surrogate $\mathcal{S}_{d_i}^0$ on the experimental reference grid (Methods). }\DIFdelend \DIFaddbegin \DIFadd{Fig.~\ref{fig:reduced_bands_all} shows that the jointly conditioned posteriors remain compatible with both the retained force spectroscopy data and the acoustic observations. In }\DIFaddend Fig.~\ref{fig:reduced_bands_all}\DIFdelbegin \DIFdel{reports the resulting reduced-model posterior predictive bands together with the reduced median response and the experimental points. The reduced posterior predictive bands reproduce the dominant experimental trends with good fidelity, with coverage ranging from 93.1\% to 100.0\%. These results therefore show that the reduced models are in good agreement with the experimental curves once both posterior parameter uncertainty and inferred observation noise are propagated through the surrogates. }\DIFdelend \DIFaddbegin \DIFadd{(c), the available Definity frequency measurements concern bubbles larger than $d_1$--$d_3$, whereas the predictions are reported at $d_1$--$d_3$. The shared Definity hierarchy transfers this information to $d_1$--$d_3$ under the assumption that all Definity datasets arise from a common parameter population. No empirical frequency--diameter relation is fitted or extrapolated.
+}\DIFaddend 
+
+\label{sec:res:map_confirmation}
+
+To confirm that the surrogate-based reduced calibrations remain faithful to the underlying particle-based model at representative reduced-model \textsc{map} parameter sets, we compare reduced-model \textsc{map} curves from \textsc{dnn}-guided inferences with direct \textsc{dpd} runs (see Fig.~\ref{fig:workflow}, block \textcircled{4}). Because propagating full posterior uncertainty directly through the \textsc{dpd} simulations would require prohibitively many expensive evaluations, we restrict the direct confirmation in the present paper to sparse \textsc{map}-level overlays. For both Definity and SonoVue models, the direct reduced-model \textsc{map} \textsc{dpd} responses compare well with the experimental \DIFdelbegin \DIFdel{data}\DIFdelend \DIFaddbegin \DIFadd{force spectroscopy data in the linear regime}\DIFaddend . Fig.~\ref{fig:map_confirmation_reduced} displays \DIFdelbegin \DIFdel{this comparison for $\mathcal{M}_{d_2}(\tilde\theta_{d_2})$ and $\mathcal{M}_{d_4}(\tilde\theta_{d_4})$. For these two direct checks, the relative $L^2$ discrepancy over the overlapping force range between the direct }\DIFdelend \DIFaddbegin \DIFadd{these mechanical comparisons together with direct }\DIFaddend \textsc{dpd} \DIFdelbegin \DIFdel{response and the reference curve is 2.50\% for $\mathcal{M}_{d_2}$ and 3.36\% for $\mathcal{M}_{d_4}$.
+This provides a representative direct }\textsc{\DIFdel{dpd}}%DIFAUXCMD
+\DIFdel{-side consistency check at reduced-model }\textsc{\DIFdel{map}} %DIFAUXCMD
+\DIFdel{points. 
+}\DIFdelend \DIFaddbegin \DIFadd{resonance frequencies for all six bubbles.
+}\DIFaddend 
+
+\begin{figure}%[!htb]%[t]
+\centering
+\includegraphics[width=\textwidth]{Figure_9.pdf}
+\caption{\DIFdelbeginFL \DIFdelFL{Representative }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{Direct }\textsc{\DIFaddFL{dpd}} \DIFaddFL{consistency checks at the }\DIFaddendFL reduced-model \textsc{map} \DIFdelbeginFL \DIFdelFL{confirmation against direct }\textsc{\DIFdelFL{dpd}} %DIFAUXCMD
+\DIFdelFL{simulations}\DIFdelendFL \DIFaddbeginFL \DIFaddFL{values for all six bubbles}\DIFaddendFL . Panels (a) and (b) \DIFdelbeginFL \DIFdelFL{depict $\mathcal{M}_{d_2}(\tilde\theta_{d_2})$ }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{compare force spectroscopy data in the linear regime with direct }\textsc{\DIFaddFL{dpd}} \DIFaddFL{responses for Definity }\DIFaddendFL (ink) and \DIFdelbeginFL \DIFdelFL{$\mathcal{M}_{d_4}(\tilde\theta_{d_4})$ }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{SonoVue }\DIFaddendFL (gold), respectively. \DIFdelbeginFL \DIFdelFL{In each panel, the circles denote the experimental data, }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{Panels (c) }\DIFaddendFL and \DIFdelbeginFL \DIFdelFL{the dashed line denotes a sparse 15-point }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{(d) compare acoustic observations with }\DIFaddendFL direct \textsc{dpd} \DIFdelbeginFL \DIFdelFL{response evaluated }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{resonance frequencies }\DIFaddendFL at the \DIFdelbeginFL \DIFdelFL{reduced-model }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{corresponding }\DIFaddendFL \textsc{map} \DIFdelbeginFL \DIFdelFL{parameters}\DIFdelendFL \DIFaddbeginFL \DIFaddFL{values}\DIFaddendFL . \DIFaddbeginFL \DIFaddFL{Experimental data are from Refs.~\mbox{%DIFAUXCMD
+\cite{buchner2012,morris2014mechanical,vandermeer2004sonovue,goertz2006pulse}}\hskip0pt%DIFAUXCMD
+.}\DIFaddendFL }
+\label{fig:map_confirmation_reduced}
+\end{figure}
+
+\DIFaddbegin \DIFadd{The final reduced hierarchical }\textsc{\DIFadd{map}} \DIFadd{values of the dominant elastic parameters are summarized in Table~\ref{tab:map_parameters_reduced}.
+}
+
+\DIFaddend \label{sec:res:reduced_model}
+
+\DIFdelbegin \DIFdel{After carrying the reduced model through the main inference workflows, we rerun the full force field inference once for the Definity and SonoVue models to check whether the weakly informed nonlinear terms materially change the fitted response. Using the surrogate forward models with the }\textsc{\DIFdel{map}} %DIFAUXCMD
+\DIFdel{parameter sets, }\DIFdelend \DIFaddbegin \DIFadd{Separately from the acoustically conditioned reduced workflow, we retain the spectroscopy-only full-versus-reduced comparison as a sanity check on the reduced parameterization. In this comparison, the full and reduced force fields are calibrated to the same force spectroscopy data, and }\DIFaddend we quantify the discrepancy between \DIFdelbegin \DIFdel{the full and reduced }\DIFdelend \DIFaddbegin \DIFadd{their }\DIFaddend \textsc{map} \DIFaddbegin \DIFadd{surrogate }\DIFaddend responses via the relative $L^2$ difference, $100\lVert y_{\mathrm{full}}^{\mathrm{MAP}}-y_{\mathrm{red}}^{\mathrm{MAP}}\rVert_2/\lVert y_{\mathrm{full}}^{\mathrm{MAP}}\rVert_2$.
+The worst-case discrepancy across diameters remains below 1.2\% for Definity and below 1.9\% for SonoVue. Fig.~\ref{fig:full_vs_reduced_map_overlay} compares the full- and reduced-model \textsc{map} surrogates in real units, showing that the two workflows are close at the level of the fitted response. This \DIFaddbegin \DIFadd{spectroscopy-only }\DIFaddend agreement is further supported by the \textsc{crps} \cite{matheson1976scoring,hersbach2000decomposition}, which measures how closely the full posterior predictive distribution matches the observed data while rewarding both calibration and sharpness, and shows comparable performance of the full and reduced models in terms of coverage and statistical consistency with the reference data (\DIFdelbegin \DIFdel{Table S4 }\DIFdelend \DIFaddbegin \DIFadd{Tables S5 and S6 }\DIFaddend in the supplementary material). Together with the \textsc{map} overlays, these results show that the reduced and full \DIFaddbegin \DIFadd{force spectroscopy }\DIFaddend workflows have similar posterior-predictive \textsc{crps} values. We therefore use the full workflow here only as a confirmatory safety check. The practical conclusion is that, in the present quasi-static regime, the nonlinear elastic terms are weakly informed and the reduced model captures the dominant behavior \DIFaddbegin \DIFadd{in the linear regime }\DIFaddend that the data can support.
+\DIFdelbegin \DIFdel{The final reduced hierarchical }\textsc{\DIFdel{map}} %DIFAUXCMD
+\DIFdel{values of the dominant elastic parameters are summarized in Table~\ref{tab:map_parameters_reduced}.
+}\DIFdelend 
+
+\begin{figure}%[!htb]%[t]
+\centering
+\includegraphics[width=\textwidth]{Figure_10.pdf}
+\caption{\DIFdelbeginFL \DIFdelFL{Final full- }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{Full- }\DIFaddendFL versus reduced-model surrogate sanity check. Panels (a) and (b) show Definity (ink) and SonoVue (gold), respectively. In both panels, the solid lines denote the reduced-model \textsc{map} surrogate responses, while the symbols denote the full-model \textsc{map} surrogate responses. The figure provides a direct \textsc{map}-level overlay check, showing that the full and reduced workflows are close in the present quasi-static regime.}
+\label{fig:full_vs_reduced_map_overlay}
+\end{figure}
+
+\begin{table}
+\caption{\label{tab:map_parameters_reduced}
+Reduced hierarchical \textsc{map} values of the dominant elastic parameters
+across different types and diameters \DIFdelbeginFL \DIFdelFL{(\textsc{dpd} units)}\DIFdelendFL .}
+\begin{ruledtabular}
+\scriptsize
+\begin{tabular}{lccc}
+Type & Diameter & $k_a$ & $k_b$ \\
+\hline
+& $d_1$ (2.1 $\mu$m) & \DIFdelbeginFL \DIFdelFL{7,843.2 }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{8,970.6 }\DIFaddendFL & \DIFdelbeginFL \DIFdelFL{192.1 }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{144.5 }\DIFaddendFL \\
+Definity & $d_2$ (2.9 $\mu$m) & \DIFdelbeginFL \DIFdelFL{18,797.6 }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{17,786.1 }\DIFaddendFL & \DIFdelbeginFL \DIFdelFL{915.8 }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{926.9 }\DIFaddendFL \\
+& $d_3$ (3.0 $\mu$m) & \DIFdelbeginFL \DIFdelFL{13,797.8 }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{16,594.4 }\DIFaddendFL & \DIFdelbeginFL \DIFdelFL{432.5 }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{241.6 }\DIFaddendFL \\
+\hline
+& $d_4$ (3.2 $\mu$m) & \DIFdelbeginFL \DIFdelFL{15,009.1 }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{10,657.5 }\DIFaddendFL & \DIFdelbeginFL \DIFdelFL{12,569.4 }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{18,326.8 }\DIFaddendFL \\
+SonoVue & $d_5$ (3.4 $\mu$m) & \DIFdelbeginFL \DIFdelFL{1,656.0 }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{9,915.9 }\DIFaddendFL & \DIFdelbeginFL \DIFdelFL{12,739.3 }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{2,037.1 }\DIFaddendFL \\
+& $d_6$ (5.8 $\mu$m) & \DIFdelbeginFL \DIFdelFL{20,766.9 }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{11,268.4 }\DIFaddendFL & \DIFdelbeginFL \DIFdelFL{12,635.1 }\DIFdelendFL \DIFaddbeginFL \DIFaddFL{26,823.1 }\DIFaddendFL \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}
+
+In both \textsc{emb} types, the stretching and bending responses dominate the observable force--displacement behavior, whereas the nonlinear coefficients remain only weakly constrained (Sections~\ref{sec:res:sensitivity} and \ref{sec:res:phase1}). That is why we adopted a reduced model immediately after the sensitivity analysis and retained the full model only for the \DIFdelbegin \DIFdel{final }\DIFdelend \DIFaddbegin \DIFadd{spectroscopy }\DIFaddend sanity check in Sec.~\ref{sec:res:reduced_model}. This choice was later supported by stable reduced posteriors before and after hierarchical pooling, and close full-vs-reduced \textsc{map} overlays and posterior-predictive \textsc{crps}. This result implies that the nonlinear interactions are weakly constrained by the present experiments and do not significantly improve the fitted response in this regime. With the reduced parameterization fixed, the hierarchical inference step then serves to regularize \DIFdelbegin \DIFdel{diameter-specific }\DIFdelend reduced-model posteriors through population-level structure learned in the hyperparameter inference phase (Sec.~\ref{sec:res:phase2}).
+
+As can be seen in Table~\ref{tab:map_parameters_reduced}, the inferred values of $k_a$ and $k_b$ differ across bubble diameters. This is not surprising since the microbubbles used in experiments differ in shell thickness, lipid packing and loading history. This is physically important because in the thin shell limit the in-plane elastic constants scale linearly with shell thickness, whereas the bending stiffness scales with the cube of the thickness. As a result even relatively small variations in the thickness can produce substantial differences in the effective mechanical response. The reported diameter dependent values of $k_a$ and $k_b$ should therefore be understood as effective coefficients describing each microbubble within the present modeling framework.
+
+A separate source of uncertainty comes from curve alignment. In force--deformation measurements of \textsc{emb}, uncertainty in the precise location of first contact introduces a systematic ambiguity in the deformation coordinate. A calibrated quantity $d_0$ was therefore introduced to compensate for the initial loading state and alignment uncertainty in the reference curves, which are not explicitly represented in the present \textsc{dpd} model. It accounts for a real experimental ambiguity associated with contact-point determination and prevents that ambiguity from being attributed to shell stiffness. The scope of these conclusions is also limited by the experimental regime. The data are quasi-static and low dimensional, over a limited loading range, for six diameter-specific datasets. Validating the full force field would require additional observables, such as dynamic acoustic response. Finally, the uncertainty estimates are conditional on the surrogate pipeline. The workflow relies on surrogates \DIFdelbegin \DIFdel{trained on }\DIFdelend \DIFaddbegin \DIFadd{constructed from }\DIFaddend finite simulation databases. The \DIFdelbegin \DIFdel{validation }\DIFdelend \DIFaddbegin \DIFadd{grouped-holdout }\textsc{\DIFadd{dnn}} \DIFaddend errors reported in Table \DIFdelbegin \DIFdel{S1 }\DIFdelend \DIFaddbegin \DIFadd{S2 }\DIFaddend in the supplementary material \DIFaddbegin \DIFadd{and the leave-one-out polynomial errors reported in Fig.~\ref{fig:polynomial_surrogate_validation} }\DIFaddend are low enough to make the inference tractable and credible, but \DIFdelbegin \DIFdel{the }\DIFdelend \DIFaddbegin \DIFadd{neither }\DIFaddend surrogate error is \DIFdelbegin \DIFdel{not }\DIFdelend zero. In the current workflow, \DIFdelbegin \DIFdel{that surrogate error is effectively }\DIFdelend \DIFaddbegin \DIFadd{these surrogate errors are }\DIFaddend treated as zero during inference and propagation, so only parameter uncertainty and the inferred observation noise enter the displayed posterior predictive bands. A related limitation concerns direct simulation validation. The paper does not report posterior predictive bands computed directly with the underlying particle-based model itself: propagating a large posterior ensemble through \textsc{dpd} would be prohibitively expensive with the current simulation cost. Likewise, the direct \textsc{dpd} overlays reported in Results are representative \textsc{map}-level checks only; they are useful confirmation runs at selected parameter points, but not exhaustive validations over all diameters or over full posterior regions.
+
+\section{Conclusion}
+
+In this work, we developed data-informed \textsc{dpd} models that quantify the stretching stiffness and bending modulus of two types of lipid-\textsc{emb}s using a surrogate-accelerated Bayesian inference framework. Our models accounted for variations in \textsc{emb} size, elastic parameters, displacement offset, and measurement noise. Model parameters were calibrated against \DIFdelbegin \DIFdel{three }\DIFdelend \DIFaddbegin \DIFadd{the linear regime of three force spectroscopy }\DIFaddend datasets for each \textsc{emb} type, \DIFdelbegin \DIFdel{based on force spectroscopy compression and indentation measurements}\DIFdelend \DIFaddbegin \DIFadd{together with acoustic-frequency observations entering the hierarchical calibration}\DIFaddend . The use of \textsc{dnn} \DIFdelbegin \DIFdel{surrogates }\DIFdelend \DIFaddbegin \DIFadd{mechanical surrogates and polynomial acoustic surrogates }\DIFaddend enabled efficient posterior sampling while maintaining high fidelity to the underlying \textsc{dpd} simulations. Parameter uncertainties were propagated through forward predictions to assess model robustness and transferability.
+
+In addition to these uncertainties, the assumption of a constant membrane thickness introduces an additional source of uncertainty in the inferred elastic parameters. As noted in \textsc{afm} studies of phospholipid microbubbles, apparent variations in Young's modulus with \textsc{emb} size may arise from underlying variations in shell thickness, lipid packing or loading history, which can explain why the ordering of the reference experimental force--displacement curves does not necessarily follow the ordering of bubble diameter. To address this limitation, the \textsc{dpd} model could be extended to properly account for the variability of the shell-thickness, which could then be calibrated from the data. The next step, beyond the scope of the present quasi-static study, will be to test how the calibrated models perform in acoustic simulations. That setting \DIFdelbegin \DIFdel{provides dynamic observables absent from the current quasi-static datasets }\DIFdelend \DIFaddbegin \DIFadd{would test dynamic behavior beyond the acoustic-frequency observations used here }\DIFaddend and would therefore help to assess whether the reduced force field remains sufficient beyond compression and indentation. Such studies would also show how calibration uncertainty in the mechanical parameters propagates to acoustically relevant predictions. If direct \textsc{dpd} uncertainty bands become necessary, one possible route would be to use an Unscented Transform built around a small set of carefully selected \textsc{dpd} evaluations~\cite{julier2002reduced}, so that uncertainty bands from \textsc{dpd} simulations can be approximated without brute-force posterior propagation. \DIFdelbegin \DIFdel{Joint multimodal inference remains an interesting methodological extension, but the }\DIFdelend \DIFaddbegin \DIFadd{The }\DIFaddend more direct next step would be to carry the calibrated posterior distributions into acoustically relevant simulations and compare the resulting behavior across model choices. More broadly, this established surrogate-accelerated Bayesian route shows that rigorous \textsc{uq} for particle-based soft-matter models is feasible once high-fidelity simulations are coupled with surrogates and hierarchical Bayesian inference. This combination made it possible to calibrate parameters, compare reduced and full force fields, and identify weakly constrained terms. Even though the present study ultimately favored a reduced force field in this experimental regime, that outcome is still informative, because it identifies the level of model complexity supported by the current data and indicates what additional dynamic measurements and simulations would be needed to justify more complex models. Our force spectroscopy data-informed \textsc{emb} models provide a basis for large-scale acoustic simulations to determine key ultrasound parameters \cite{lah2025open}, such as intensity, pulse duration, and frequency for \textsc{usdg}. The methodology can be further extended to model development of ligand-functionalized \textsc{emb}s or encapsulated gas vesicles \cite{maresca2018biomolecular,salahshoor2022geometric,dutka2023structure,smith2025ultrafast,ntarakas2025dissipative}, and contrast agents for other imaging techniques including echocardiography \cite{kaufmann2007contrast}, magnetic resonance imaging, positron emission tomography, diffraction-enhanced X-ray imaging \cite{kogan2010microbubbles} and X-ray dark-field imaging \cite{velroyen2013microbubbles}.
+
+\section*{Supplementary Material}
+The supplementary material includes implementation details, experimental data information, hierarchical inference procedures, \textsc{tmcmc} and surrogate-model configurations, \DIFaddbegin \DIFadd{acoustic-frequency extraction, }\DIFaddend sensitivity-analysis methodology, and parameter tables.
+
+\begin{acknowledgments}
+The authors acknowledge financial support under the ERC Advanced Grant MULTraSonicA (Grant No.\,885155) from the European Research Council. We also acknowledge the EuroHPC Joint Undertaking for awarding the project ID EHPC-REG-2025R02-164 access to Vega at IZUM (Slovenia\DIFaddbegin \DIFadd{) and Karolina at e-INFRA CZ (Czech Republic}\DIFaddend ). 
+\end{acknowledgments}
+
+\section*{Author Declarations}
+
+\subsection*{Conflict of Interest}
+The authors have no conflicts to disclose.
+
+\subsection*{Author Contributions}
+
+\textbf{Brieuc Benvegnen:} Investigation, Methodology, Software, Validation, Writing – original draft, Writing - review and editing.
+\textbf{Nikolaos Ntarakas:} Investigation, Methodology, Software, Validation, Writing – original draft, Writing - review and editing.
+\textbf{Tilen Potisk:} Investigation, Methodology, Software, Validation, Writing - review and editing.
+\textbf{Ignacio Pagonabarraga:} Methodology, Supervision, Writing - review and editing.
+\textbf{Matej Praprotnik:} Conceptualization, Funding acquisition, Methodology, Resources, Supervision, Writing - review and editing.
+
+
+
+\section*{Data Availability}
+The data used in this study is maintained in a private GitHub repository and will be made public upon publication.
+
+\bibliography{refs}
+
+\end{document}
