@@ -140,7 +140,11 @@ def _resolve_surrogate_trained_dir(project_root: str, diameter_um: float) -> Pat
 
     for experiment in load_experiments(config, Path(project_root)):
         if experiment.name == "indentation" and diameter_um in experiment.diameters:
-            return experiment.surrogate_dir / f"{diameter_um}um" / "trained"
+            diameter_label = (
+                experiment._lookup_diameter_mapping(experiment.diameter_labels, diameter_um)
+                or str(diameter_um)
+            )
+            return experiment.surrogate_dir / f"{diameter_label}um" / "trained"
 
     return resolve_legacy_surrogate_trained_dir(project_root, "indentation", diameter_um)
 

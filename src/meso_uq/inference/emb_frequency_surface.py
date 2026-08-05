@@ -402,6 +402,10 @@ def leave_one_radius_out_metrics(
     unique_radii = np.unique(flat_radius)
     if unique_radii.size < 2:
         raise ValueError("Leave-one-radius-out validation requires at least two radius nodes.")
+    validation_radius_bounds = radius_bounds_um or (
+        float(np.min(flat_radius)),
+        float(np.max(flat_radius)),
+    )
     metrics: list[RadiusHoldoutMetric] = []
     for held_out in unique_radii:
         test_mask = flat_radius == held_out
@@ -411,7 +415,7 @@ def leave_one_radius_out_metrics(
             radius_um=flat_radius[~test_mask],
             frequency_mhz=flat_frequency[~test_mask],
             ka_bounds_dpd=ka_bounds_dpd,
-            radius_bounds_um=radius_bounds_um,
+            radius_bounds_um=validation_radius_bounds,
             ka_degree=ka_degree,
             radius_degree=radius_degree,
         )

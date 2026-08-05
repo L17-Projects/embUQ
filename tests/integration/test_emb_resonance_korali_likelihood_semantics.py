@@ -126,6 +126,23 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def test_runtime_config_cache_follows_environment_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_path = tmp_path / "first.yaml"
+    second_path = tmp_path / "second.yaml"
+    first_path.write_text("marker: first\n", encoding="utf-8")
+    second_path.write_text("marker: second\n", encoding="utf-8")
+    resonance._load_runtime_config.cache_clear()
+
+    monkeypatch.setenv("HUQ_INFERENCE_CONFIG", str(first_path))
+    assert resonance._load_runtime_config()["marker"] == "first"
+
+    monkeypatch.setenv("HUQ_INFERENCE_CONFIG", str(second_path))
+    assert resonance._load_runtime_config()["marker"] == "second"
+
+
 @pytest.mark.parametrize(
     ("diameter_um", "unsupported_ka_dpd", "observed_frequency_mhz"),
     (

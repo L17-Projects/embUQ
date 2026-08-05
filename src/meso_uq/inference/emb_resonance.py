@@ -1463,8 +1463,7 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
-@lru_cache(maxsize=None)
-def _load_runtime_config(config_path: str | None = None) -> dict[str, Any]:
+def _resolve_runtime_config_path(config_path: str | None = None) -> Path:
     project_root = _repo_root()
     selected = config_path or os.getenv("HUQ_INFERENCE_CONFIG") or os.getenv("CONFIG_PATH")
     if selected:
@@ -1473,11 +1472,25 @@ def _load_runtime_config(config_path: str | None = None) -> dict[str, Any]:
             path = project_root / path
     else:
         path = resolve_inference_config_path(project_root, experiment=EMB_RESONANCE_EXPERIMENT)
-    with Path(path).open("rb") as handle:
+    return Path(path).resolve()
+
+
+@lru_cache(maxsize=None)
+def _load_runtime_config_from_path(config_path: str) -> dict[str, Any]:
+    path = Path(config_path)
+    with path.open("rb") as handle:
         payload = yaml.load(handle, Loader=yaml.CLoader)
     if not isinstance(payload, dict):
         raise ValueError(f"Resonance inference config must be a mapping: {path}")
     return payload
+
+
+def _load_runtime_config(config_path: str | None = None) -> dict[str, Any]:
+    path = _resolve_runtime_config_path(config_path)
+    return _load_runtime_config_from_path(str(path))
+
+
+_load_runtime_config.cache_clear = _load_runtime_config_from_path.cache_clear  # type: ignore[attr-defined]
 
 
 def _sample_parts(params: Any) -> tuple[float, float, float]:

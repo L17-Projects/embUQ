@@ -66,6 +66,7 @@ def test_indentation_surrogate_uses_configured_external_directory(
                 {
                     "name": "indentation",
                     "diameters": [3.2],
+                    "diameter_labels": {"3.2": "3.20"},
                     "surrogate_dir": str(external_root),
                 }
             ],
@@ -74,4 +75,4 @@ def test_indentation_surrogate_uses_configured_external_directory(
 
     resolved = posterior_indentation._resolve_surrogate_trained_dir("/repo", 3.2)
 
-    assert resolved == external_root / "3.2um" / "trained"
+    assert resolved == external_root / "3.20um" / "trained"

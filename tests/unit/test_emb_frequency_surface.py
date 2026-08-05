@@ -131,6 +131,25 @@ def test_leave_one_radius_out_returns_one_metric_per_radius() -> None:
     assert max(metric.rmse_mhz for metric in metrics) < 1.0e-10
 
 
+def test_leave_one_radius_out_uses_full_input_bounds_when_omitted() -> None:
+    ka_values = np.linspace(0.0, 30000.0, 3)
+    radius_values = np.linspace(1.0, 4.0, 4)
+    ka_grid, radius_grid = np.meshgrid(ka_values, radius_values, indexing="ij")
+    frequency = np.sqrt(1.0 + ka_grid / 30000.0 + radius_grid)
+
+    metrics = leave_one_radius_out_metrics(
+        agent="definity",
+        ka_dpd=ka_grid,
+        radius_um=radius_grid,
+        frequency_mhz=frequency,
+        ka_degree=1,
+        radius_degree=1,
+    )
+
+    assert [metric.held_out_radius_um for metric in metrics] == pytest.approx(radius_values)
+    assert max(metric.rmse_mhz for metric in metrics) < 1.0e-10
+
+
 def test_leave_one_ka_out_returns_one_metric_per_ka_node() -> None:
     reference = _surface()
     ka_values = np.linspace(0.0, 30000.0, 9)
