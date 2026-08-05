@@ -289,3 +289,10 @@ If it fails:
 ```bash
 find "$PAPER_DATA_ROOT/logs/$CAMPAIGN_ID" \( -name '*.stderr.log' -o -name '*.err' \) -type f -size +0 -print
 ```
+
+## Current manuscript package
+
+The canonical current EMB manuscript package is `papers/UQ_EMB/`. Its frozen
+`editor_submission/review2_v1/` directory is an explicitly approved editorial
+snapshot governed by a complete checksum manifest. Heavy scientific run
+artifacts remain outside Git.

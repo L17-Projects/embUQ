@@ -1,0 +1,371 @@
+{
+  "schema_version": "1.0",
+  "paper_id": "UQ_EMB",
+  "artifact_set_id": "accepted-production-outputs-202607",
+  "artifact_set_dir": "accepted_production_outputs_202607",
+  "locked": true,
+  "source_spec_hint": "papers/UQ_EMB/manifests/accepted_production_outputs_202607.staging.json",
+  "destination_root": "$MESOUQ_UQ_EMB_ARTIFACT_ROOT",
+  "entries": [
+    {
+      "artifact_id": "sonovue-production-config",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/config/sonovue_liked_candidate_production50k.yaml",
+      "destination": "sonovue/config/sonovue_liked_candidate_production50k.yaml"
+    },
+    {
+      "artifact_id": "sonovue-hbi-runtime-inputs",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/_runtime",
+      "destination": "sonovue/hbi/runtime_inputs"
+    },
+    {
+      "artifact_id": "sonovue-hbi-logs",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/logs",
+      "destination": "sonovue/hbi/logs"
+    },
+    {
+      "artifact_id": "sonovue-hbi-receipts",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/receipts",
+      "destination": "sonovue/hbi/receipts"
+    },
+    {
+      "artifact_id": "sonovue-hbi-stage-timings",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/stage_timings.jsonl",
+      "destination": "sonovue/hbi/stage_timings.jsonl"
+    },
+    {
+      "artifact_id": "sonovue-phase1-indentation-3p2",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_1/indentation_3.2um",
+      "destination": "sonovue/hbi/results_phase_1/indentation_3.2um"
+    },
+    {
+      "artifact_id": "sonovue-phase1-indentation-3p4",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_1/indentation_3.4um",
+      "destination": "sonovue/hbi/results_phase_1/indentation_3.4um"
+    },
+    {
+      "artifact_id": "sonovue-phase1-indentation-5p8",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_1/indentation_5.8um",
+      "destination": "sonovue/hbi/results_phase_1/indentation_5.8um"
+    },
+    {
+      "artifact_id": "sonovue-phase1-acoustic-2p6",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_1/resonance_2.6um",
+      "destination": "sonovue/hbi/results_phase_1/resonance_2.6um"
+    },
+    {
+      "artifact_id": "sonovue-phase1-acoustic-3p2",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_1/resonance_3.2um",
+      "destination": "sonovue/hbi/results_phase_1/resonance_3.2um"
+    },
+    {
+      "artifact_id": "sonovue-phase1-acoustic-4p0",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_1/resonance_4.0um",
+      "destination": "sonovue/hbi/results_phase_1/resonance_4.0um"
+    },
+    {
+      "artifact_id": "sonovue-phase2",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_2",
+      "destination": "sonovue/hbi/results_phase_2"
+    },
+    {
+      "artifact_id": "sonovue-phase3b-indentation-3p2",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_3b/indentation_3.2um",
+      "destination": "sonovue/hbi/results_phase_3b/indentation_3.2um"
+    },
+    {
+      "artifact_id": "sonovue-phase3b-indentation-3p4",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_3b/indentation_3.4um",
+      "destination": "sonovue/hbi/results_phase_3b/indentation_3.4um"
+    },
+    {
+      "artifact_id": "sonovue-phase3b-indentation-5p8",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_3b/indentation_5.8um",
+      "destination": "sonovue/hbi/results_phase_3b/indentation_5.8um"
+    },
+    {
+      "artifact_id": "sonovue-phase3b-acoustic-2p6",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_3b/resonance_2.6um",
+      "destination": "sonovue/hbi/results_phase_3b/resonance_2.6um"
+    },
+    {
+      "artifact_id": "sonovue-phase3b-acoustic-3p2",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_3b/resonance_3.2um",
+      "destination": "sonovue/hbi/results_phase_3b/resonance_3.2um"
+    },
+    {
+      "artifact_id": "sonovue-phase3b-acoustic-4p0",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/run_50k/results_phase_3b/resonance_4.0um",
+      "destination": "sonovue/hbi/results_phase_3b/resonance_4.0um"
+    },
+    {
+      "artifact_id": "sonovue-direct-inputs",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/inputs",
+      "destination": "sonovue/direct_dpd/inputs"
+    },
+    {
+      "artifact_id": "sonovue-direct-mechanical-d4",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/runs/force_spectroscopy/3.2um",
+      "destination": "sonovue/direct_dpd/mechanical/d4"
+    },
+    {
+      "artifact_id": "sonovue-direct-mechanical-d5",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/runs/force_spectroscopy/3.4um",
+      "destination": "sonovue/direct_dpd/mechanical/d5"
+    },
+    {
+      "artifact_id": "sonovue-direct-mechanical-d6",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/runs/force_spectroscopy/5.8um",
+      "destination": "sonovue/direct_dpd/mechanical/d6"
+    },
+    {
+      "artifact_id": "sonovue-direct-acoustic-d4",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/runs/breathing_frequency/sonovue_3p20um",
+      "destination": "sonovue/direct_dpd/acoustic/d4"
+    },
+    {
+      "artifact_id": "sonovue-direct-acoustic-d5",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/runs/breathing_frequency/sonovue_3p40um",
+      "destination": "sonovue/direct_dpd/acoustic/d5"
+    },
+    {
+      "artifact_id": "sonovue-direct-acoustic-d6",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/runs/breathing_frequency/sonovue_5p80um",
+      "destination": "sonovue/direct_dpd/acoustic/d6"
+    },
+    {
+      "artifact_id": "sonovue-direct-comparison-evidence",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/evidence/forward_model_comparison",
+      "destination": "sonovue/direct_dpd/evidence/forward_model_comparison"
+    },
+    {
+      "artifact_id": "sonovue-direct-paper-figures",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/paper_facing_20260727/figures",
+      "destination": "sonovue/direct_dpd/paper_facing/figures"
+    },
+    {
+      "artifact_id": "sonovue-direct-paper-renderer",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_sonovue_50k_20260724/direct_dpd/paper_facing_20260727/render_direct_map_confirmation_july.py",
+      "destination": "sonovue/direct_dpd/paper_facing/render_direct_map_confirmation_july.py"
+    },
+    {
+      "artifact_id": "definity-production-config",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/config/definity_accepted_production50k.yaml",
+      "destination": "definity/config/definity_accepted_production50k.yaml"
+    },
+    {
+      "artifact_id": "definity-hbi-logs",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/logs",
+      "destination": "definity/hbi/logs"
+    },
+    {
+      "artifact_id": "definity-hbi-receipts",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/receipts",
+      "destination": "definity/hbi/receipts"
+    },
+    {
+      "artifact_id": "definity-hbi-stage-timings",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/stage_timings.jsonl",
+      "destination": "definity/hbi/stage_timings.jsonl"
+    },
+    {
+      "artifact_id": "definity-phase1-compression-2p1",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/results_phase_1/compression_2.1um",
+      "destination": "definity/hbi/results_phase_1/compression_2.1um"
+    },
+    {
+      "artifact_id": "definity-phase1-compression-2p9",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/results_phase_1/compression_2.9um",
+      "destination": "definity/hbi/results_phase_1/compression_2.9um"
+    },
+    {
+      "artifact_id": "definity-phase1-compression-3p0",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/results_phase_1/compression_3.0um",
+      "destination": "definity/hbi/results_phase_1/compression_3.0um"
+    },
+    {
+      "artifact_id": "definity-phase1-grouped-acoustic-source3",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/results_phase_1/resonance_source3_source3",
+      "destination": "definity/hbi/results_phase_1/resonance_source3_source3"
+    },
+    {
+      "artifact_id": "definity-phase2",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/results_phase_2",
+      "destination": "definity/hbi/results_phase_2"
+    },
+    {
+      "artifact_id": "definity-phase3b-compression-2p1",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/results_phase_3b/compression_2.1um",
+      "destination": "definity/hbi/results_phase_3b/compression_2.1um"
+    },
+    {
+      "artifact_id": "definity-phase3b-compression-2p9",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/results_phase_3b/compression_2.9um",
+      "destination": "definity/hbi/results_phase_3b/compression_2.9um"
+    },
+    {
+      "artifact_id": "definity-phase3b-compression-3p0",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/run_50k/results_phase_3b/compression_3.0um",
+      "destination": "definity/hbi/results_phase_3b/compression_3.0um"
+    },
+    {
+      "artifact_id": "definity-direct-runtime-manifest",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/materialized/launch_manifest.json",
+      "destination": "definity/direct_dpd/runtime/launch_manifest.json"
+    },
+    {
+      "artifact_id": "definity-direct-runtime-jobs",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/materialized/jobs",
+      "destination": "definity/direct_dpd/runtime/jobs"
+    },
+    {
+      "artifact_id": "definity-direct-mechanical-d1",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/materialized/mechanical/d1",
+      "destination": "definity/direct_dpd/mechanical/d1"
+    },
+    {
+      "artifact_id": "definity-direct-mechanical-d2",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/materialized/mechanical/d2",
+      "destination": "definity/direct_dpd/mechanical/d2"
+    },
+    {
+      "artifact_id": "definity-direct-mechanical-d3",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/materialized/mechanical/d3",
+      "destination": "definity/direct_dpd/mechanical/d3"
+    },
+    {
+      "artifact_id": "definity-direct-acoustic-d1",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/materialized/acoustic/d1",
+      "destination": "definity/direct_dpd/acoustic/d1"
+    },
+    {
+      "artifact_id": "definity-direct-acoustic-d2-near-map",
+      "source": "$MESOUQ_SCRATCH_ROOT/runs/definity_exact32_5pct_karolina_20260717T104600Z/production/definity/definity_2p90um/ka-index-014/definity_2p90um/seed-000",
+      "destination": "definity/direct_dpd/acoustic/d2_near_map_0p1482pct"
+    },
+    {
+      "artifact_id": "definity-direct-acoustic-d3",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/materialized/acoustic/d3",
+      "destination": "definity/direct_dpd/acoustic/d3"
+    },
+    {
+      "artifact_id": "definity-direct-logs",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/logs",
+      "destination": "definity/direct_dpd/logs"
+    },
+    {
+      "artifact_id": "definity-direct-collection-manifest",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/postprocessed/collection_manifest.json",
+      "destination": "definity/direct_dpd/postprocessed/collection_manifest.json"
+    },
+    {
+      "artifact_id": "definity-direct-acoustic-comparison",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/postprocessed/definity_direct_map_acoustic_comparison.csv",
+      "destination": "definity/direct_dpd/postprocessed/definity_direct_map_acoustic_comparison.csv"
+    },
+    {
+      "artifact_id": "definity-direct-preparation-manifest",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/preparation_manifest.json",
+      "destination": "definity/direct_dpd/preparation_manifest.json"
+    },
+    {
+      "artifact_id": "definity-direct-final-state",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/final_state_completion.json",
+      "destination": "definity/direct_dpd/final_state_completion.json"
+    },
+    {
+      "artifact_id": "definity-direct-readme",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/README.md",
+      "destination": "definity/direct_dpd/README.md"
+    },
+    {
+      "artifact_id": "definity-direct-materializer",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/scripts/materialize_definity_direct_map_dpd.py",
+      "destination": "definity/direct_dpd/code/materialize_definity_direct_map_dpd.py"
+    },
+    {
+      "artifact_id": "definity-direct-collector",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/postprocess/collect_definity_direct_map_results.py",
+      "destination": "definity/direct_dpd/code/collect_definity_direct_map_results.py"
+    },
+    {
+      "artifact_id": "definity-direct-paper-renderer",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/paper_facing_20260727/render_combined_direct_map_confirmation.py",
+      "destination": "definity/direct_dpd/paper_facing/render_combined_direct_map_confirmation.py"
+    },
+    {
+      "artifact_id": "definity-direct-paper-figures",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/direct_dpd_preparation/paper_facing_20260727/figures",
+      "destination": "definity/direct_dpd/paper_facing/figures"
+    },
+    {
+      "artifact_id": "combined-render-data",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/data",
+      "destination": "shared/figures/combined_50k/data"
+    },
+    {
+      "artifact_id": "combined-render-figures",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/figures",
+      "destination": "shared/figures/combined_50k/figures"
+    },
+    {
+      "artifact_id": "combined-render-audits",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/audit",
+      "destination": "shared/figures/combined_50k/audit"
+    },
+    {
+      "artifact_id": "combined-render-screens",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/screen",
+      "destination": "shared/figures/combined_50k/screen"
+    },
+    {
+      "artifact_id": "combined-render-checksums",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/figure_checksums.sha256",
+      "destination": "shared/figures/combined_50k/figure_checksums.sha256"
+    },
+    {
+      "artifact_id": "combined-render-definity-export-manifest",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/definity_export_manifest.stdout.yaml",
+      "destination": "shared/figures/combined_50k/definity_export_manifest.stdout.yaml"
+    },
+    {
+      "artifact_id": "combined-render-sonovue-export-manifest",
+      "source": "$MESOUQ_SCRATCH_ROOT/production_definity_50k_20260727/combined_50k_final/sonovue_export_manifest.stdout.yaml",
+      "destination": "shared/figures/combined_50k/sonovue_export_manifest.stdout.yaml"
+    },
+    {
+      "artifact_id": "combined-render-revision-code-f7",
+      "source": "$MESOUQ_SCRATCH_ROOT/combined_50k_render_revision_20260728/code/render_figure7_bin_revision.py",
+      "destination": "shared/figures/render_revision/code/render_figure7_bin_revision.py"
+    },
+    {
+      "artifact_id": "combined-render-revision-code-f9",
+      "source": "$MESOUQ_SCRATCH_ROOT/combined_50k_render_revision_20260728/code/render_figure9_likelihood_consistent.py",
+      "destination": "shared/figures/render_revision/code/render_figure9_likelihood_consistent.py"
+    },
+    {
+      "artifact_id": "combined-render-revision-code-june",
+      "source": "$MESOUQ_SCRATCH_ROOT/combined_50k_render_revision_20260728/code/render_revision_draft_assets_20260630_reference.py",
+      "destination": "shared/figures/render_revision/code/render_revision_draft_assets_20260630_reference.py"
+    },
+    {
+      "artifact_id": "combined-render-revision-code-near-map-audit",
+      "source": "$MESOUQ_SCRATCH_ROOT/combined_50k_render_revision_20260728/code/verify_figure9_accepted_near_map.py",
+      "destination": "shared/figures/render_revision/code/verify_figure9_accepted_near_map.py"
+    },
+    {
+      "artifact_id": "combined-render-revision-manifest",
+      "source": "$MESOUQ_SCRATCH_ROOT/combined_50k_render_revision_20260728/rendering_revision_manifest.json",
+      "destination": "shared/figures/render_revision/rendering_revision_manifest.json"
+    },
+    {
+      "artifact_id": "combined-render-revision-f8",
+      "source": "$MESOUQ_SCRATCH_ROOT/combined_50k_render_revision_20260728/final/f8",
+      "destination": "shared/figures/render_revision/final/f8"
+    },
+    {
+      "artifact_id": "combined-render-revision-f9-near-map",
+      "source": "$MESOUQ_SCRATCH_ROOT/combined_50k_render_revision_20260728/final/f9_accepted_near_map_legends_20260728",
+      "destination": "shared/figures/render_revision/final/f9_accepted_near_map_legends_20260728"
+    }
+  ]
+}

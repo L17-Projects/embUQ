@@ -1,0 +1,2 @@
+# Preserve the byte-frozen editor submission across Git checkout settings.
+papers/UQ_EMB/editor_submission/review2_v1/** -text

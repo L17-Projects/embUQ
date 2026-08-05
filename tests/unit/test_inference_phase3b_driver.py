@@ -316,6 +316,61 @@ def test_select_phase3b_targets_filters_by_diameter() -> None:
     assert selected[0][1] == 2.1
 
 
+def test_select_phase3b_targets_filters_by_experiment_and_diameters() -> None:
+    mod = _load_module()
+
+    class _IndentationSpec:
+        name = "indentation"
+        diameters = [3.2, 3.4, 5.8]
+
+        @staticmethod
+        def dataset_name(diameter_um: float) -> str:
+            return f"indentation_{diameter_um}um"
+
+    class _ResonanceSpec:
+        name = "resonance"
+        diameters = [2.6, 3.2, 4.0]
+
+        @staticmethod
+        def dataset_name(diameter_um: float) -> str:
+            return f"resonance_{diameter_um}um"
+
+    selected = mod._select_phase3b_targets(
+        [_IndentationSpec(), _ResonanceSpec()],
+        experiment_names=["indentation"],
+        diameters=[3.2, 5.8],
+    )
+
+    assert [(exp.name, diameter) for exp, diameter in selected] == [
+        ("indentation", 3.2),
+        ("indentation", 5.8),
+    ]
+
+
+def test_select_phase3b_targets_accepts_lane_and_canonical_experiment_names() -> None:
+    mod = _load_module()
+
+    class _Spec:
+        name = "compression"
+        lane = "soft"
+        routing_name = "compression_soft"
+        experiment_id = "emb:compression_soft"
+        diameters = [2.1]
+
+        @staticmethod
+        def dataset_name(diameter_um: float) -> str:
+            return f"compression_soft_{diameter_um}um"
+
+    for experiment_name in ("compression", "compression_soft", "emb:compression_soft"):
+        selected = mod._select_phase3b_targets(
+            [_Spec()],
+            experiment_names=[experiment_name],
+        )
+        assert [(exp.routing_name, diameter) for exp, diameter in selected] == [
+            ("compression_soft", 2.1),
+        ]
+
+
 def test_select_phase3b_targets_rejects_conflicting_filters() -> None:
     mod = _load_module()
 
@@ -329,3 +384,10 @@ def test_select_phase3b_targets_rejects_conflicting_filters() -> None:
 
     with pytest.raises(ValueError, match="Use either dataset_name or diameter, not both."):
         mod._select_phase3b_targets([_Spec()], dataset_name="compression_2.1um", diameter=2.1)
+
+    with pytest.raises(ValueError, match="dataset_name or config target filters"):
+        mod._select_phase3b_targets(
+            [_Spec()],
+            dataset_name="compression_2.1um",
+            experiment_names=["compression"],
+        )

@@ -325,6 +325,8 @@ def build_inference_command(
     phase2_backend: str | None = None,
     dataset_name: str | None = None,
     diameter: float | None = None,
+    korali_random_seed: int | None = None,
+    phase3b_seed_mode: str | None = None,
 ) -> list[str]:
     _ensure_runtime_supported(selection, "inference")
     driver = resolve_inference_stage_driver(repo_root, stage, selection.model_family)
@@ -345,8 +347,16 @@ def build_inference_command(
         )
     if stage != "phase3b" and (dataset_name is not None or diameter is not None):
         raise ValueError("dataset_name/diameter filters are only supported for phase3b")
+    if stage != "phase3b" and phase3b_seed_mode is not None:
+        raise ValueError("phase3b_seed_mode is only supported for phase3b")
     if dataset_name is not None and diameter is not None:
         raise ValueError("Use either dataset_name or diameter, not both.")
+    if korali_random_seed is not None and korali_random_seed <= 0:
+        raise ValueError("korali_random_seed must be a positive nonzero integer when provided.")
+    if phase3b_seed_mode is not None and phase3b_seed_mode not in {"repeat", "increment"}:
+        raise ValueError(
+            "phase3b_seed_mode must be either 'repeat' or 'increment' when provided."
+        )
 
     base_command = [
         python_bin,
@@ -356,6 +366,8 @@ def build_inference_command(
         "--output-dir",
         str(output_root),
     ]
+    if korali_random_seed is not None:
+        base_command.extend(["--korali-random-seed", str(korali_random_seed)])
     if profiling:
         base_command.append("--profiling")
     if stage == "phase1" and restart:
@@ -396,6 +408,8 @@ def build_inference_command(
     # phase1 and phase3b: device-aware
     base_command.extend(["--device", device])
     if stage == "phase3b":
+        if phase3b_seed_mode is not None:
+            base_command.extend(["--phase3b-seed-mode", phase3b_seed_mode])
         if dataset_name is not None:
             base_command.extend(["--dataset-name", dataset_name])
         if diameter is not None:

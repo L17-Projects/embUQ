@@ -48,3 +48,17 @@ Use absolute local paths only in private run records. Shared manifests should pr
 5. Write new figures, logs, samples, checkpoints, and temporary outputs under `PAPER_DATA_ROOT` or another ignored run directory, not under git-tracked source paths.
 
 Small fixtures in source control should exercise parsing and plotting contracts only. They are not substitutes for the full paper data bundle.
+
+## Frozen Editorial Exceptions
+
+An editor-submitted package may be retained verbatim in Git when all of the
+following hold:
+
+- the user explicitly designates it as an immutable editorial baseline;
+- its total size remains reviewable and below the agreed file-size limits;
+- a tracked manifest binds every file path, size, and SHA-256 value;
+- generated reruns continue to use external artifact storage; and
+- the exception is limited to the frozen submission, not its working or build
+  directories.
+
+The current scoped exception is `papers/UQ_EMB/editor_submission/review2_v1/`.

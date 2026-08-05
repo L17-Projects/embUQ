@@ -86,6 +86,53 @@ def test_phase2_hyperprior_specs_drop_fixed_parameters(full_config):
     assert hyperprior_specs[-1][2] == [1.3, 1.4]
 
 
+def test_direct_emb_ka_kb_phase_contract() -> None:
+    config = {
+        "structure": "emb",
+        "phase1_contract_mode": "emb_direct_ka_kb",
+        "prior_ka": [1000.0, 100000.0],
+        "prior_kb": [100.0, 100000.0],
+        "prior_d0": [0.0, 0.5],
+        "prior_sigma": [0.001, 0.5],
+        "hyperprior_mu_ka": [1000.0, 100000.0],
+        "hyperprior_sigma_ka": [0.0, 50000.0],
+        "hyperprior_mu_kb": [100.0, 100000.0],
+        "hyperprior_sigma_kb": [0.0, 50000.0],
+    }
+
+    assert active_variable_names(config) == ["ka", "kb", "d0", "sigma"]
+    assert phase1_variable_names(config, include_d0=False) == ["ka", "kb", "sigma"]
+    assert active_hierarchical_variable_names(config) == ["ka", "kb"]
+    assert [name for name, _bounds in phase1_prior_specs(config)] == ["ka", "kb", "d0", "sigma"]
+    assert [name for name, _mu, _sigma in phase2_hyperprior_specs(config)] == ["ka", "kb"]
+
+
+def test_phase1_prior_specs_apply_dataset_overrides_without_changing_variable_order() -> None:
+    config = {
+        "structure": "emb",
+        "phase1_contract_mode": "emb_direct_ka_kb",
+        "prior_ka": [1000.0, 100000.0],
+        "prior_kb": [100.0, 100000.0],
+        "prior_d0": [0.0, 0.5],
+        "prior_sigma": [0.001, 0.5],
+    }
+
+    specs = phase1_prior_specs(
+        config,
+        prior_overrides={
+            "ka": [17951.817681, 19959.913358],
+            "kb": [8369.922251, 9702.253910],
+        },
+    )
+
+    assert specs == [
+        ("ka", [17951.817681, 19959.913358]),
+        ("kb", [8369.922251, 9702.253910]),
+        ("d0", [0.0, 0.5]),
+        ("sigma", [0.001, 0.5]),
+    ]
+
+
 def test_gv_parameterization_uses_calibrated_material_order() -> None:
     config = {
         "structure": "gv",

@@ -31,6 +31,24 @@ Large tracked payloads are allowed only when they are curated scientific inputs,
 
 No broad size-based deletion is allowed. The baseline found no tracked generated-root drift, so the current action is ownership documentation, not removal.
 
+Create a content-addressed, non-destructive cleanup plan with:
+
+```bash
+/usr/bin/python3.11 scripts/qa/collect_open_pr_snapshot.py \
+  --output <open-pr-snapshot.json>
+/usr/bin/python3.11 scripts/qa/plan_repository_quarantine.py \
+  --orphan-report <orphan-candidates.json> \
+  --open-pr-snapshot <open-pr-snapshot.json> \
+  --manifest-dir papers/UQ_EMB/manifests \
+  --quarantine-root <scratch-quarantine-root> \
+  --output-json <cleanup-plan.json> \
+  --output-markdown <cleanup-plan.md>
+```
+
+The planner does not move or delete files. It records hashes, references,
+open-PR reachability, protected paths, and destination capacity so that any
+later quarantine can be reviewed independently.
+
 ## Static Quality And Dependency Gates
 
 The minimum enforced audit-polishing gates are docs link checks, structural governance tests, script path governance, repository governance, and workflow action pin policy tests. General lint, type checking, and dependency security checks remain advisory or deferred until a scoped baseline is accepted.

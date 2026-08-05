@@ -1,0 +1,10 @@
+# Generated replay products are external artifacts, never paper-source files.
+_runs/
+build/
+artifacts/
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc

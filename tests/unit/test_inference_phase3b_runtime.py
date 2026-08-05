@@ -186,11 +186,49 @@ def test_run_phase3b_dataset_cpu_configures_and_runs(
     assert final_experiment["Solver"]["Population Size"] == 17
     assert final_experiment["Solver"]["Burn In"] == 1
     assert final_experiment["Solver"]["Target Coefficient Of Variation"] == 0.55
+    assert final_experiment["Solver"]["Covariance Scaling"] == 0.04
     assert final_experiment["Solver"]["Termination Criteria"]["Max Generations"] == 4
     assert final_engine["Profiling"]["Detail"] == "Full"
     assert final_engine["Profiling"]["Frequency"] == 0.5
     assert (output_root / "results_phase_3b" / "compression_2.1um").is_dir()
     assert fake_comm.barrier_calls >= 2
+
+
+def test_run_phase3b_dataset_uses_registry_dataset_name_for_lanes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase3b_runtime,
+) -> None:
+    mod, fake_korali, _fake_comm = phase3b_runtime
+    output_root = tmp_path / "output"
+    dataset_name = "compression_soft_4.10um"
+    (output_root / "results_phase_2" / "latest").mkdir(parents=True)
+    (output_root / "results_phase_1" / dataset_name / "latest").mkdir(parents=True)
+    fake_korali.experiment_queue = [
+        _FakeExperiment(load_state_result=True),
+        _FakeExperiment(load_state_result=True, ref_data=[5.0]),
+        _FakeExperiment(),
+    ]
+
+    monkeypatch.setattr(mod, "configure_device_conduit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(mod, "to_korali_path", lambda path, *, base_dir: path)
+
+    mod.run_phase_3b_dataset(
+        experiment_name="compression",
+        diameter_um=4.1,
+        reference_points=[0.0],
+        compute_model=lambda *args, **kwargs: None,
+        pop_size=5,
+        max_gen=1,
+        target_cov=0.5,
+        output_root=output_root,
+        dataset_name=dataset_name,
+    )
+
+    assert fake_korali.created_experiments[1].loaded_paths == [
+        str(output_root / "results_phase_1" / dataset_name / "latest")
+    ]
+    assert (output_root / "results_phase_3b" / dataset_name).is_dir()
 
 
 def test_run_phase3b_dataset_gpu_uses_batch_conduit(
@@ -338,6 +376,9 @@ def test_run_phase3b_dispatches_selected_target_and_preloads(
                 "phase3b_pop_size": 77,
                 "phase3b_max_gen": 5,
                 "phase3b_target_cov": 0.42,
+                "phase3b_covariance_scaling": 0.015,
+                "phase3b_target_experiments": ["compression"],
+                "phase3b_target_diameters": [2.1, 2.9],
             }
         ),
         encoding="utf-8",
@@ -371,6 +412,7 @@ def test_run_phase3b_dispatches_selected_target_and_preloads(
         device="gpu",
         diameter=2.9,
         profiling=True,
+        korali_random_seed=3104,
     )
 
     assert os.environ["HUQ_INFERENCE_CONFIG"] == str(config_path.resolve())
@@ -381,14 +423,119 @@ def test_run_phase3b_dispatches_selected_target_and_preloads(
             "diameter_um": 2.9,
             "reference_points": [2.9, 3.9],
             "compute_model": mod.compute_compression_surrogate,
+            "compute_batch_model": mod.compute_compression_surrogate_batch,
             "pop_size": 77,
             "max_gen": 5,
             "target_cov": 0.42,
+            "covariance_scaling": 0.015,
             "output_root": output_root.resolve(),
             "profiling": True,
             "device": "gpu",
+            "dataset_name": "compression_2.9um",
+            "korali_random_seed": 3105,
+            "restart": False,
         }
     ]
+
+
+def test_run_phase3b_rejects_conflicting_cli_target_selectors(
+    phase3b_runtime,
+) -> None:
+    mod, _fake_korali, _fake_comm = phase3b_runtime
+
+    with pytest.raises(ValueError, match="either dataset_name or diameter"):
+        mod.run_phase_3b(dataset_name="compression_2.9um", diameter=2.9)
+
+
+def test_run_phase3b_offsets_seed_for_each_selected_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase3b_runtime,
+) -> None:
+    mod, _fake_korali, _fake_comm = phase3b_runtime
+    config_path = tmp_path / "phase3b.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "surrogate": {"backend": "bnn"},
+                "phase3b_target_experiments": ["compression"],
+                "phase3b_target_diameters": [2.1, 2.9],
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_root = tmp_path / "output"
+    (output_root / "results_phase_2" / "latest").mkdir(parents=True)
+    for diameter in (2.1, 2.9):
+        (output_root / "results_phase_1" / f"compression_{diameter}um" / "latest").mkdir(
+            parents=True
+        )
+
+    experiment = types.SimpleNamespace(
+        name="compression",
+        enabled=True,
+        diameters=[2.1, 2.9],
+        dataset_name=lambda diameter_um: f"compression_{diameter_um}um",
+        get_reference_points=lambda diameter_um: [diameter_um],
+    )
+    monkeypatch.setattr(mod, "load_experiments", lambda config, root: [experiment])
+    monkeypatch.setattr(mod, "preload_compression_surrogate", lambda *args, **kwargs: None)
+    run_calls = []
+    monkeypatch.setattr(mod, "run_phase_3b_dataset", lambda **kwargs: run_calls.append(kwargs))
+
+    mod.run_phase_3b(
+        config_path=str(config_path),
+        output_dir=str(output_root),
+        korali_random_seed=3104,
+    )
+
+    assert [call["korali_random_seed"] for call in run_calls] == [3104, 3105]
+
+
+def test_run_phase3b_repeats_seed_for_each_selected_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase3b_runtime,
+) -> None:
+    mod, _fake_korali, _fake_comm = phase3b_runtime
+    config_path = tmp_path / "phase3b.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "surrogate": {"backend": "bnn"},
+                "phase3b_target_experiments": ["compression"],
+                "phase3b_target_diameters": [2.1, 2.9],
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_root = tmp_path / "output"
+    (output_root / "results_phase_2" / "latest").mkdir(parents=True)
+    for diameter in (2.1, 2.9):
+        (output_root / "results_phase_1" / f"compression_{diameter}um" / "latest").mkdir(
+            parents=True
+        )
+
+    experiment = types.SimpleNamespace(
+        name="compression",
+        enabled=True,
+        diameters=[2.1, 2.9],
+        dataset_name=lambda diameter_um: f"compression_{diameter_um}um",
+        get_reference_points=lambda diameter_um: [diameter_um],
+    )
+    monkeypatch.setattr(mod, "load_experiments", lambda config, root: [experiment])
+    monkeypatch.setattr(mod, "preload_compression_surrogate", lambda *args, **kwargs: None)
+    run_calls = []
+    monkeypatch.setattr(mod, "run_phase_3b_dataset", lambda **kwargs: run_calls.append(kwargs))
+
+    mod.run_phase_3b(
+        config_path=str(config_path),
+        output_dir=str(output_root),
+        korali_random_seed=3104,
+        phase3b_seed_mode="repeat",
+    )
+
+    assert [call["korali_random_seed"] for call in run_calls] == [3104, 3104]
 
 
 def test_run_phase3b_rejects_unknown_preload_target(
