@@ -102,6 +102,19 @@ CASES: tuple[dict[str, Any], ...] = (
 )
 
 
+def _require_output_outside_locked_root(*, output: Path, locked_root: Path) -> None:
+    output = output.expanduser().resolve()
+    locked_root = locked_root.expanduser().resolve()
+    try:
+        output.relative_to(locked_root)
+    except ValueError:
+        return
+    raise ValueError(
+        "DNN audit receipt must remain outside the immutable dependency root: "
+        f"receipt={output}, dependency_root={locked_root}"
+    )
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -273,8 +286,12 @@ def main() -> int:
     parser.add_argument("--receipt", type=Path, required=True)
     args = parser.parse_args()
 
+    dependency_root = args.dependency_root.resolve()
+    receipt = args.receipt.resolve()
+    _require_output_outside_locked_root(output=receipt, locked_root=dependency_root)
+
     payload = audit(
-        dependency_root=args.dependency_root.resolve(),
+        dependency_root=dependency_root,
         manifest_path=args.manifest.resolve(),
         repo_root=args.repo_root.resolve(),
         output_root=args.output_root.resolve(),
@@ -282,8 +299,8 @@ def main() -> int:
         seed=args.seed,
         max_epoch=args.max_epoch,
     )
-    args.receipt.parent.mkdir(parents=True, exist_ok=True)
-    args.receipt.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    receipt.parent.mkdir(parents=True, exist_ok=True)
+    receipt.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(payload, indent=2))
     return 0
 

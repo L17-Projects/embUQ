@@ -122,3 +122,14 @@ def test_audit_rejects_unlocked_manifest(tmp_path: Path) -> None:
             seed=17,
             max_epoch=80,
         )
+
+
+def test_audit_receipt_must_remain_outside_dependency_root(tmp_path: Path) -> None:
+    module = _load_module()
+    dependency_root = tmp_path / "dependencies"
+
+    with pytest.raises(ValueError, match="outside the immutable dependency root"):
+        module._require_output_outside_locked_root(
+            output=dependency_root / "audit.json",
+            locked_root=dependency_root,
+        )

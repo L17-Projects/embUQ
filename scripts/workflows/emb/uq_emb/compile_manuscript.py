@@ -63,6 +63,17 @@ def _require_fresh_directory(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
+def _require_build_outside_bundle(*, build_root: Path, bundle_root: Path) -> None:
+    try:
+        build_root.relative_to(bundle_root)
+    except ValueError:
+        return
+    raise ValueError(
+        "Manuscript build root must remain outside the frozen bundle root: "
+        f"build_root={build_root}, bundle_root={bundle_root}"
+    )
+
+
 def _copy_manifest_files(bundle_root: Path, build_root: Path, manifest: dict[str, Any]) -> None:
     for entry in manifest["files"]:
         relative = Path(str(entry["path"]))
@@ -115,6 +126,8 @@ def compile_manuscript(
     bundle_root = bundle_root.expanduser().resolve()
     manifest_path = manifest_path.expanduser().resolve()
     build_root = build_root.expanduser().resolve()
+
+    _require_build_outside_bundle(build_root=build_root, bundle_root=bundle_root)
 
     frozen_report = verify_snapshot(root=bundle_root, manifest_path=manifest_path)
     if frozen_report["status"] != "PASS":

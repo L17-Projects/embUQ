@@ -134,7 +134,10 @@ def _select_phase3b_targets(
 
     selected: list[tuple[object, float]] = []
     for exp in experiments:
-        if allowed_experiments is not None and exp.name not in allowed_experiments:
+        routing_name = getattr(exp, "routing_name", exp.name)
+        experiment_id = getattr(exp, "experiment_id", routing_name)
+        experiment_aliases = {exp.name, routing_name, experiment_id}
+        if allowed_experiments is not None and experiment_aliases.isdisjoint(allowed_experiments):
             continue
         for diameter_um in exp.diameters:
             current_dataset = exp.dataset_name(diameter_um)

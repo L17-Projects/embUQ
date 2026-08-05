@@ -67,6 +67,20 @@ def _command_environment(command: list[str]) -> tuple[str, str]:
     return paths[0], hashes[0]
 
 
+def _require_receipt_outside_accepted_root(*, receipt: Path, plan_path: Path) -> None:
+    payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    accepted_root = Path(str(payload.get("accepted_artifact_root", ""))).resolve()
+    receipt = receipt.expanduser().resolve()
+    try:
+        receipt.relative_to(accepted_root)
+    except ValueError:
+        return
+    raise ValueError(
+        "Direct-DPD verification receipt must remain outside the accepted artifact root: "
+        f"receipt={receipt}, accepted_root={accepted_root}"
+    )
+
+
 def verify(
     plan_path: Path,
     acoustic_runner: Path,
@@ -246,16 +260,19 @@ def main() -> int:
     parser.add_argument("--materializer", type=Path, default=DEFAULT_MATERIALIZER)
     parser.add_argument("--receipt", type=Path, required=True)
     args = parser.parse_args()
+    plan_path = args.plan.resolve()
+    receipt = args.receipt.resolve()
     try:
+        _require_receipt_outside_accepted_root(receipt=receipt, plan_path=plan_path)
         report = verify(
-            args.plan.resolve(),
+            plan_path,
             args.acoustic_runner.resolve(),
             args.materializer.resolve(),
         )
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         parser.exit(2, f"error: {exc}\n")
-    args.receipt.parent.mkdir(parents=True, exist_ok=True)
-    args.receipt.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    receipt.parent.mkdir(parents=True, exist_ok=True)
+    receipt.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(
         f"PASS: verified {report['planned_command_count']} direct-DPD commands and "
         f"loaded {report['bubble_count']} acoustic inputs; no DPD was executed."

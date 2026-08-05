@@ -347,6 +347,30 @@ def test_select_phase3b_targets_filters_by_experiment_and_diameters() -> None:
     ]
 
 
+def test_select_phase3b_targets_accepts_lane_and_canonical_experiment_names() -> None:
+    mod = _load_module()
+
+    class _Spec:
+        name = "compression"
+        lane = "soft"
+        routing_name = "compression_soft"
+        experiment_id = "emb:compression_soft"
+        diameters = [2.1]
+
+        @staticmethod
+        def dataset_name(diameter_um: float) -> str:
+            return f"compression_soft_{diameter_um}um"
+
+    for experiment_name in ("compression", "compression_soft", "emb:compression_soft"):
+        selected = mod._select_phase3b_targets(
+            [_Spec()],
+            experiment_names=[experiment_name],
+        )
+        assert [(exp.routing_name, diameter) for exp, diameter in selected] == [
+            ("compression_soft", 2.1),
+        ]
+
+
 def test_select_phase3b_targets_rejects_conflicting_filters() -> None:
     mod = _load_module()
 

@@ -13,10 +13,22 @@ SCRIPT = (
     Path(__file__).resolve().parents[1]
     / "scripts/workflows/emb/uq_emb/materialize_direct_dpd_replay.py"
 )
+VERIFY_SCRIPT = (
+    Path(__file__).resolve().parents[1]
+    / "scripts/workflows/emb/uq_emb/verify_direct_dpd_replay_plan.py"
+)
 
 
 def _module():
     spec = importlib.util.spec_from_file_location("uq_emb_direct_dpd_replay", SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _verify_module():
+    spec = importlib.util.spec_from_file_location("uq_emb_verify_direct_dpd_replay", VERIFY_SCRIPT)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -218,6 +230,20 @@ def test_materializer_rejects_output_inside_accepted_root(tmp_path: Path) -> Non
         )
 
     assert not forbidden_output.exists()
+
+
+def test_verifier_rejects_receipt_inside_accepted_root(tmp_path: Path) -> None:
+    module = _verify_module()
+    accepted_root = tmp_path / "accepted"
+    accepted_root.mkdir()
+    plan = tmp_path / "direct_dpd_replay_plan.json"
+    _write_json(plan, {"accepted_artifact_root": str(accepted_root)})
+
+    with pytest.raises(ValueError, match="outside the accepted artifact root"):
+        module._require_receipt_outside_accepted_root(
+            receipt=accepted_root / "verification.json",
+            plan_path=plan,
+        )
 
 
 def test_materializer_rejects_conflicting_site_environment(tmp_path: Path, monkeypatch) -> None:

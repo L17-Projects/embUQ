@@ -5,6 +5,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = (
@@ -114,6 +116,23 @@ def test_compile_manuscript_rejects_nonempty_build_root(tmp_path: Path) -> None:
         assert "non-empty" in str(exc)
     else:  # pragma: no cover - explicit failure message
         raise AssertionError("Expected a non-empty build root to be rejected")
+
+
+def test_compile_manuscript_rejects_build_root_inside_bundle(tmp_path: Path) -> None:
+    module = _load_module()
+    bundle_root = tmp_path / "bundle"
+    bundle_root.mkdir()
+
+    with pytest.raises(ValueError, match="outside the frozen bundle root"):
+        module.compile_manuscript(
+            bundle_root=bundle_root,
+            manifest_path=tmp_path / "manifest.json",
+            build_root=bundle_root / "build",
+            pdflatex="pdflatex",
+            bibtex="bibtex",
+        )
+
+    assert not (bundle_root / "build").exists()
 
 
 def test_log_audit_covers_natbib_references_and_rerun(tmp_path: Path) -> None:
