@@ -21,7 +21,6 @@ Please do not casually add:
 - private/local cluster assumptions
 - manuscript-only `_paper` material
 - broad unreviewed dumps from upstream research repos
-- AI-agent attribution clutter inside scientific code or docs
 
 ## Provenance expectations
 
