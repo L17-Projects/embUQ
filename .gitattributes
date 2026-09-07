@@ -1,2 +1,4 @@
 # Preserve the byte-frozen editor submission across Git checkout settings.
 papers/UQ_EMB/editor_submission/review2_v1/** -text
+papers/UQ_EMB/pca_table_s7/inputs/** -text whitespace=-trailing-space
+scripts/workflows/emb/uq_emb/pca_table_s7/*.py -text whitespace=-trailing-space

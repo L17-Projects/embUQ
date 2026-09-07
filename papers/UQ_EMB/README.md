@@ -342,6 +342,14 @@ Each renderer refuses a non-empty output directory and writes a receipt. With
 the frozen toolchain, the rasterized result must match the submitted editor
 asset exactly.
 
+## Table S7 PCA replay
+
+The recovered, hash-locked PCA analysis scripts and small input tables are now
+tracked in this repository. The six complete trajectories remain in the
+reproduction bundle's `recovery-v4` layer; compact case metadata and meshes are
+in `recovery-v2`. See [`pca_table_s7/README.md`](pca_table_s7/README.md) for the
+expected merged case layout and the site-neutral replay command.
+
 ## Mechanical DNN provenance
 
 The accepted DNN training tables and weights are immutable runtime dependencies.

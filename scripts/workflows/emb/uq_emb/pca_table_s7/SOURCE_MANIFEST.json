@@ -1,0 +1,42 @@
+{
+  "schema_version": "mesouq.uq_emb.pca_table_s7_sources.v1",
+  "paper_snapshot": "review2_v1",
+  "bundle_source": "recovery-v2/vega_pca_table_s7/latest_map_campaign/cases/d1/case",
+  "note": "These five files are byte-identical across accepted cases d1-d6.",
+  "files": [
+    {
+      "path": "scripts/workflows/emb/uq_emb/pca_table_s7/all_analysis.py",
+      "sha256": "3e36a3c08d859ca4553896eca0396f8ab6a8c287c89c368dbba2c4d236254e54"
+    },
+    {
+      "path": "scripts/workflows/emb/uq_emb/pca_table_s7/breathing_subspace.py",
+      "sha256": "d76ef2357e3dec29216caf2c036a1ea4fdcfb2724b760a0c5a1b3595649460bc"
+    },
+    {
+      "path": "scripts/workflows/emb/uq_emb/pca_table_s7/eigenfreq2.py",
+      "sha256": "a648a79ec3fc069215544fccd7a2b568a793fddb4f7eda82cc65eee92cc0dc1d"
+    },
+    {
+      "path": "scripts/workflows/emb/uq_emb/pca_table_s7/identify_breathing_by_volume.py",
+      "sha256": "aee54a04a23f3d25a344f30cb77d9c329acadbd7bddeff258bfae6d8ca4574b8"
+    },
+    {
+      "path": "scripts/workflows/emb/uq_emb/pca_table_s7/select_individual_breathing_mode.py",
+      "sha256": "ff02e40710d0eb9280cb82dbdd8de108451e1eb813f8f5be61c9fec0929582a1"
+    }
+  ],
+  "tracked_inputs": [
+    {
+      "path": "papers/UQ_EMB/pca_table_s7/inputs/pca_global_metadata.yaml",
+      "sha256": "02460afeda6fe580ed49b9a7d247a43898cb7425fbf34c17b5355016aa771b85"
+    },
+    {
+      "path": "papers/UQ_EMB/pca_table_s7/inputs/pca_map_6_cases.csv",
+      "sha256": "e612fd362a6c870982c7f6389f0ea0d834852bb5c1c1e1d3369c736f1370ee54"
+    },
+    {
+      "path": "papers/UQ_EMB/pca_table_s7/inputs/pca_omega0_18_cases.csv",
+      "sha256": "2ab2efcb5a511063b85c0447723c9288f895afae506eacd20beab2d14104484f"
+    }
+  ]
+}

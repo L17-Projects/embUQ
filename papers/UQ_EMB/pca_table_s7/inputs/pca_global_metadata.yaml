@@ -1,0 +1,9 @@
+tau_dpd_seconds: 8.86564957825223e-06
+unit_length_m: 2.5e-07
+stored_omega_definition: fitted damped angular frequency omega_d
+omega0_definition: sqrt(omega_d^2 + lambda^2)
+damping_convention: x(t) = x_inf + A * exp(-lambda*t) * sin(omega_d*t + phi)
+omega0_uncertainty: delta method using stored omega/lambda covariance variances and lambda-omega correlation
+selection: minimum, nearest midpoint, and maximum eligible ka for each of d1-d6
+source_labels: /home/it4i-bbenvegnen/workspace/paperWeek20Jul/evidence/physical_resonance_polynomial_emulators_20260722/physical_resonance_labels.csv
+source_fit_audit: /home/it4i-bbenvegnen/workspace/paperWeek20Jul/evidence/all_exact_grid_relaxation_curve_independent_audit_20260722/fit_audit.csv
