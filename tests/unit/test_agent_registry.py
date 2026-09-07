@@ -28,7 +28,7 @@ def test_agent_registry_contains_emb_definition():
 
 
 def test_agent_registry_resolves_supported_combinations():
-    agent, modality = resolve_agent_modality("elastic_microbubble", "compression")
+    agent, modality = resolve_agent_modality("encapsulated_microbubble", "compression")
 
     assert agent.family is AgentFamily.EMB
     assert modality.modality is Modality.COMPRESSION

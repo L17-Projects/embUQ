@@ -2,12 +2,21 @@
 
 [![CI](https://github.com/L17-Projects/embUQ/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/L17-Projects/embUQ/actions/workflows/ci.yml)
 [![Release Smoke](https://github.com/L17-Projects/embUQ/actions/workflows/release-smoke.yml/badge.svg?branch=main)](https://github.com/L17-Projects/embUQ/actions/workflows/release-smoke.yml)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![codecov](https://codecov.io/github/L17-Projects/embUQ/graph/badge.svg)](https://codecov.io/github/L17-Projects/embUQ)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](./pyproject.toml)
+[![Docs](https://img.shields.io/badge/docs-included-blueviolet.svg)](./docs/)
+[![Linux](https://img.shields.io/badge/platform-Linux-lightgrey.svg)](#)
+[![MPI](https://img.shields.io/badge/MPI-supported-orange.svg)](#)
+[![CUDA](https://img.shields.io/badge/CUDA-optional-green.svg)](#)
+[![SLURM](https://img.shields.io/badge/SLURM-supported-blue.svg)](#)
+[![DPD](https://img.shields.io/badge/model-DPD-informational.svg)](#)
+[![Hierarchical Bayes](https://img.shields.io/badge/inference-Hierarchical%20Bayes-purple.svg)](#)
 
-`embUQ` is the reference codebase for the elastic-microbubble uncertainty-
-quantification paper and its frozen `review2_v1` submission. It contains the
-production HBI, surrogate, direct-DPD, PCA, figure, and manuscript replay code
-for SonoVue and Definity on Karolina and Vega.
+`embUQ` is the reference codebase for the encapsulated microbubble
+uncertainty-quantification paper and its frozen `review2_v1` submission. It
+contains the production HBI, surrogate, direct-DPD, PCA, figure, and manuscript
+replay code for SonoVue and Definity on Karolina and Vega.
 
 The immutable submitted manuscript and figures are tracked under
 [`papers/UQ_EMB/editor_submission/review2_v1`](papers/UQ_EMB/editor_submission/review2_v1).
@@ -63,7 +72,6 @@ new results into the recovered bundle.
 | Accepted acoustic polynomial surrogates | `replay_acoustic_polynomial_surrogates.py` |
 | Table S7 PCA values | [`pca_table_s7/run_replay.py`](scripts/workflows/emb/uq_emb/pca_table_s7/run_replay.py) |
 | Figures 6, 7, and 9 | `render_figure6_replay.py`, `render_figure7_replay.py`, and `render_figure9_replay.py` |
-| Submitted manuscript | `compile_manuscript.py` |
 
 Exact commands, safety guards, and output receipts are documented in the
 [`review2_v1` reproduction guide](papers/UQ_EMB/README.md) and the
