@@ -19,8 +19,6 @@ include:
 exclude:
   - '**/_paper/**'
   - '**/markdowns/**'
-  - '**/.claude/**'
-  - '**/CLAUDE.md'
   - '**/.pytest_cache/**'
   - '**/__pycache__/**'
   - '**/.coverage*'
@@ -34,6 +32,5 @@ exclude:
   - '**/docs/_build/**'
 
 filters:
-  remove_ai_agent_markers: true
   use_git_lfs_for_large_binaries_if_needed: true
   defer_nonessential_large_artifacts: true

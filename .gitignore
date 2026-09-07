@@ -35,10 +35,8 @@ logs/
 /mesouq-*.err
 /slurm-*.out
 /slurm-*.err
-/AGENTS.md
 **/dir.md
 /.last_huqemb_campaign_id
-CLAUDE.md
 emb/compression/surrogate/diameters/*/trained/*BNN*_loss_hist.json
 emb/indentation/surrogate/diameters/*/trained/*BNN*_loss_hist.json
 emb/compression/surrogate/diameters/*/plots/
