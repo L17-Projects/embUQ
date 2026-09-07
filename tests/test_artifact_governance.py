@@ -60,15 +60,8 @@ SOURCE_EXCEPTION_FILES = (
     "src/meso_uq/mirheo/__init__.py",
     "src/meso_uq/modalities/__init__.py",
     "src/meso_uq/postprocess/__init__.py",
-    "src/meso_uq/references/__init__.py",
     "src/meso_uq/sensitivity/__init__.py",
     "src/meso_uq/structures/__init__.py",
-    "src/meso_uq/structures/gv/__init__.py",
-    "src/meso_uq/structures/gv/paper_replay/__init__.py",
-    "src/meso_uq/structures/gv/paper_replay_lanes/__init__.py",
-    "src/meso_uq/structures/gv/postprocessing/__init__.py",
-    "src/meso_uq/structures/gv/runtime/__init__.py",
-    "src/meso_uq/structures/gv/sampling/__init__.py",
     "src/meso_uq/surrogate/__init__.py",
 )
 
@@ -124,7 +117,7 @@ def test_gitignore_capture_governance_for_generated_roots() -> None:
 
 def test_root_runtime_ignore_does_not_hide_source_runtime_packages() -> None:
     ignored = subprocess.run(
-        ["git", "check-ignore", "-q", "src/meso_uq/structures/gv/runtime/new_module.py"],
+        ["git", "check-ignore", "-q", "src/meso_uq/platforms/runtime/new_module.py"],
         cwd=str(REPO_ROOT),
         check=False,
     )
