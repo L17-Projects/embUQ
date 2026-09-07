@@ -1,6 +1,6 @@
 # EMB Numerical Experiment Assets
 
-`emb/` contains elastic microbubble numerical experiment assets. It is not the reusable package layer; shared package behavior belongs under `src/meso_uq`.
+`emb/` contains encapsulated microbubble numerical experiment assets. It is not the reusable package layer; shared package behavior belongs under `src/meso_uq`.
 
 Canonical shape:
 

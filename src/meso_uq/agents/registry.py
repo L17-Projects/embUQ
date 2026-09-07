@@ -20,8 +20,16 @@ from meso_uq.modalities import get_modality_descriptor, list_modality_descriptor
 AGENT_REGISTRY: dict[AgentFamily, AgentDefinition] = {
     AgentFamily.EMB: AgentDefinition(
         family=AgentFamily.EMB,
-        label="Elastic microbubble",
-        aliases=("elastic_microbubble", "elastic-microbubble", "microbubble", "uqdpd", "emb"),
+        label="Encapsulated microbubble",
+        aliases=(
+            "encapsulated_microbubble",
+            "encapsulated-microbubble",
+            "elastic_microbubble",
+            "elastic-microbubble",
+            "microbubble",
+            "uqdpd",
+            "emb",
+        ),
         supported_modalities=(Modality.COMPRESSION, Modality.INDENTATION),
         supported_backends=(ModelBackend.DNN, ModelBackend.BNN, ModelBackend.PYRO_BNN, ModelBackend.DPD),
         default_backend=ModelBackend.DNN,

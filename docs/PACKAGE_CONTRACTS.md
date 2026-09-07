@@ -31,7 +31,7 @@ Core contracts:
 - no workflow execution, filesystem probing, checkpoint loading, plotting, simulator execution, or HPC module handling.
 
 Agent packages:
-- family identity and aliases, such as `emb`, `elastic_microbubble`, `gv`, and `gas_vesicle`;
+- family identity and aliases, such as `emb`, `encapsulated_microbubble`, `gv`, and `gas_vesicle`;
 - which modalities, backends, inference backends, platforms, artifact classes, and runtime requirements a family supports;
 - whether a family is the legacy default.
 

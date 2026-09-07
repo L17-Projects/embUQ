@@ -15,7 +15,15 @@ from .workflows import (
 
 
 FAMILY = AgentFamily.EMB
-ALIASES = ("elastic_microbubble", "elastic-microbubble", "microbubble", "uqdpd", "emb")
+ALIASES = (
+    "encapsulated_microbubble",
+    "encapsulated-microbubble",
+    "elastic_microbubble",
+    "elastic-microbubble",
+    "microbubble",
+    "uqdpd",
+    "emb",
+)
 LEGACY_ROOTS = ("compression", "indentation")
 SUPPORTED_MODALITIES = (Modality.COMPRESSION, Modality.INDENTATION)
 
