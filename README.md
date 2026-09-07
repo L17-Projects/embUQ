@@ -58,11 +58,6 @@ ${PAPER_BUNDLE_ROOT}/
 ${MESOUQ_SCRATCH_ROOT}/papers/UQ_EMB/replay/   # new outputs only
 ```
 
-The five artifact directories are verified against the tracked manifests. The
-two PCA recovery layers jointly contain the compact case metadata and the six
-complete trajectories needed to regenerate supplementary Table S7. Never write
-new results into the recovered bundle.
-
 ## What the code regenerates
 
 | Paper product | Maintained entrypoint |
@@ -80,8 +75,7 @@ Exact commands, safety guards, and output receipts are documented in the
 The paper consumes deterministic `*_BEST.pkl` DNN surrogates. Their accepted
 weights and training tables are checksum-verifiable, but byte-identical
 retraining is not claimed because the original architecture-sweep seeds and
-receipts were not preserved. BNN/Pyro support is optional and is not used by
-the paper.
+receipts were not preserved.
 
 Raw observations and immutable accepted baselines cannot be recreated from
 source code alone; they must first be restored in the layout above. Given those
