@@ -24,7 +24,6 @@ from meso_uq.inference.emb_parameterization import (
     resolve_direct_compression_surrogate_surface,
     surrogate_parameterization_for_experiment,
 )
-from meso_uq.inference import run_gv_phase1_dnn_execution, write_gv_phase1_setup_manifest
 from meso_uq.inference.emb_resonance import (
     compute_emb_resonance,
     compute_emb_resonance_batch,
@@ -232,7 +231,6 @@ def run_inference(
     config_path: str = None,
     output_dir: str = "_setup",
     device: str = "cpu",
-    setup_only: bool = False,
     korali_random_seed: int | None = None,
 ):
     korali_random_seed = validate_korali_random_seed(
@@ -258,47 +256,6 @@ def run_inference(
     is_generic_direct_phase1 = is_generic_direct_phase1_contract(config)
 
     experiments = [exp for exp in load_experiments(config, PROJECT_ROOT) if exp.enabled]
-    if experiments and any(getattr(exp, "structure", "emb") == "gv" for exp in experiments):
-        if not all(getattr(exp, "structure", "emb") == "gv" for exp in experiments):
-            raise ValueError("Mixed EMB/GV Phase 1 configurations are not supported in the GV setup-validation path.")
-        if restart:
-            raise NotImplementedError("GV Phase 1 restart is not implemented in this tranche.")
-        if dry_run or setup_only:
-            manifest_path = write_gv_phase1_setup_manifest(
-                config,
-                experiments=experiments,
-                repo_root=PROJECT_ROOT,
-                output_root=output_root,
-                config_path=config_path_resolved,
-            )
-            print(f"GV Phase 1 setup manifest: {manifest_path}")
-            return
-        write_gv_phase1_setup_manifest(
-            config,
-            experiments=experiments,
-            repo_root=PROJECT_ROOT,
-            output_root=output_root,
-            config_path=config_path_resolved,
-        )
-        korali, MPI = _load_korali_runtime()
-        comm = MPI.COMM_WORLD
-        require_single_rank(comm, "GV Phase 1 DNN execution")
-        k = korali.Engine()
-        if device == "cpu":
-            k.setMPIComm(MPI.COMM_WORLD)
-        configure_device_conduit(k, device=device, mpi_ranks=comm.Get_size())
-        execution_manifest_path = run_gv_phase1_dnn_execution(
-            config,
-            experiments=experiments,
-            repo_root=PROJECT_ROOT,
-            output_root=output_root,
-            korali_module=korali,
-            engine=k,
-            config_path=config_path_resolved,
-        )
-        print(f"GV Phase 1 execution manifest: {execution_manifest_path}")
-        return
-
     os.environ["HUQ_INFERENCE_CONFIG"] = str(config_path_resolved)
     from emb.compression.evalkit.posterior_compression import (
         compute_compression,
@@ -598,12 +555,6 @@ def main(argv):
     parser.add_argument("--config", type=str, default=None)
     parser.add_argument("--output-dir", type=str, default="_setup")
     parser.add_argument(
-        "--setup-only",
-        action="store_true",
-        default=False,
-        help="Validate GV Phase 1 setup and write a manifest without running Korali.",
-    )
-    parser.add_argument(
         "--device",
         choices=["cpu", "gpu"],
         default="cpu",
@@ -627,7 +578,6 @@ def main(argv):
         config_path=args.config,
         output_dir=args.output_dir,
         device=args.device,
-        setup_only=args.setup_only,
         korali_random_seed=args.korali_random_seed,
     )
 

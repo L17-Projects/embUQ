@@ -30,7 +30,6 @@ def _run_import_probe(code: str) -> subprocess.CompletedProcess[str]:
     (
         "meso_uq",
         "meso_uq.structures",
-        "meso_uq.structures.gv",
         "meso_uq.artifacts",
         "meso_uq.artifacts.policy",
         "meso_uq.artifacts.relocation",
@@ -38,7 +37,6 @@ def _run_import_probe(code: str) -> subprocess.CompletedProcess[str]:
         "meso_uq.surrogate.catalogs",
         "meso_uq.surrogate.compat",
         "meso_uq.surrogate.emb_workflows",
-        "meso_uq.surrogate.gv_catalog",
         "meso_uq.surrogate.emb_catalog",
         "meso_uq.agents",
         "meso_uq.agents.emb",
@@ -72,7 +70,7 @@ assert loaded == [], loaded
     (
         """
 import sys
-import meso_uq.surrogate.gv_catalog
+import meso_uq.surrogate.emb_catalog
 import meso_uq.surrogate.catalogs
 loaded = [name for name in ('torch', 'pyro', 'matplotlib', 'mpi4py', 'mirheo', 'korali') if name in sys.modules]
 assert loaded == [], loaded
@@ -82,14 +80,7 @@ import sys
 from meso_uq.surrogate.catalogs import iter_surrogate_catalog_entries
 entries = iter_surrogate_catalog_entries(include_experimental=True)
 assert entries
-import meso_uq.surrogate.gv_catalog
-loaded = [name for name in ('torch', 'pyro', 'matplotlib', 'mpi4py', 'mirheo', 'korali') if name in sys.modules]
-assert loaded == [], loaded
-""",
-        """
-import sys
-import meso_uq.structures
-import meso_uq.structures.gv
+import meso_uq.surrogate.emb_catalog
 loaded = [name for name in ('torch', 'pyro', 'matplotlib', 'mpi4py', 'mirheo', 'korali') if name in sys.modules]
 assert loaded == [], loaded
 """,

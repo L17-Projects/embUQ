@@ -6,8 +6,8 @@
     "native_cuda_phase2_public_claim": false
   },
   "github_ci": {
-    "ci_workflow_url": "https://github.com/BrieucB/MesoUQ/actions/runs/24182978893",
-    "release_smoke_url": "https://github.com/BrieucB/MesoUQ/actions/runs/24182978877"
+    "ci_workflow_url": "https://github.com/L17-Projects/embUQ/actions/runs/24182978893",
+    "release_smoke_url": "https://github.com/L17-Projects/embUQ/actions/runs/24182978877"
   },
   "reports": {
     "vega_validation_matrix": "/tmp/mesouq_release_evidence/vega/validation_matrix/workflow_matrix_report.json",

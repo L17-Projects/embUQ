@@ -55,7 +55,6 @@ _PLATFORM_POLICIES: dict[PlatformPolicy, PlatformPolicyRecord] = {
             "${MESOUQ_SITE_RUNTIME_ROOT}/korali/env.sh",
             "${MESOUQ_SITE_RUNTIME_ROOT}/mirheo/env.sh",
             "${MESOUQ_SITE_RUNTIME_ROOT}/mirheoOBMD/env.sh",
-            "${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools/env.sh",
         ),
     ),
     "vega": PlatformPolicyRecord(
@@ -68,7 +67,6 @@ _PLATFORM_POLICIES: dict[PlatformPolicy, PlatformPolicyRecord] = {
             "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh",
             "${MESOUQ_SITE_RUNTIME_ROOT}/korali/env.sh",
             "${MESOUQ_SITE_RUNTIME_ROOT}/mirheo/env.sh",
-            "${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools/env.sh",
         ),
     ),
     "workstation": PlatformPolicyRecord(

@@ -256,6 +256,6 @@ The command writes:
 
 Gate 07 reads the release manifest and verifies the closeout-facing claims:
 
-`python scripts/qa/noise_gate07_release_checks.py --release-manifest <release-root>/noise_release_readiness_manifest.json --output-root <gate07-root> --github-pr <PR number> --github-run-id <workflow run id> --repo BrieucB/MesoUQ`
+`python scripts/qa/noise_gate07_release_checks.py --release-manifest <release-root>/noise_release_readiness_manifest.json --output-root <gate07-root> --github-pr <PR number> --github-run-id <workflow run id> --repo L17-Projects/embUQ`
 
 Gate 07 independently verifies that configs pass, required evidence entries exist, sidecars are present, scenario gates pass, Git commits and regeneration commands are recorded, Gate 06 passes, release artifacts exist, the release manifest was generated from a clean worktree, GitHub checks are green or explicitly skipped with `--allow-missing-github-checks`, the project is either merged or explicitly at a human review/merge boundary, and the manifest records an explicit no-Karolina-interaction confirmation.

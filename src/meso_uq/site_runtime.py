@@ -100,12 +100,10 @@ def _resolve_provenance_root(
     env_root = env.get("MESOUQ_PROVENANCE_ROOT", "").strip()
     if env_root:
         return Path(env_root).expanduser().resolve()
-    if site == "karolina":
-        scratch_root = env.get("MESOUQ_SCRATCH_ROOT", "").strip()
-        if scratch_root:
-            return (Path(scratch_root).expanduser().resolve() / "provenance").resolve()
-        return (site_root.parent / "provenance").resolve()
-    return (repo_root / "gv").resolve()
+    scratch_root = env.get("MESOUQ_SCRATCH_ROOT", "").strip()
+    if scratch_root:
+        return (Path(scratch_root).expanduser().resolve() / "provenance").resolve()
+    return (site_root.parent / "provenance").resolve()
 
 
 def get_site_runtime_paths(

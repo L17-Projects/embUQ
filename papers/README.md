@@ -198,44 +198,7 @@ python papers/huq_emb/run_exact_uqdpd_asset_port.py \
 SBATCH
 ```
 
-## 4. Build the extra figures
-
-Run this only after step 3 finished.
-
-Mapping:
-
-- `d1`: compression `2.1um`
-- `d2`: compression `2.9um`
-- `d3`: compression `3.0um`
-- `d4`: indentation `3.2um`
-- `d5`: indentation `3.4um`
-- `d6`: indentation `5.8um`
-
-```bash
-set -euo pipefail
-
-export PAPER_DATA_ROOT="${PAPER_DATA_ROOT:-$HOME/mesouq_paper_data}"
-export CAMPAIGN_ID="${CAMPAIGN_ID:-$(cat "$PAPER_DATA_ROOT/LAST_CAMPAIGN_ID.txt")}"
-
-module purge
-module load Python/3.10.8-GCCcore-12.2.0 openmpi/4.1.2.1 CUDA/12.2.2 GSL/2.7-GCC-12.2.0 Eigen/3.4.0-GCCcore-12.2.0 HDF5/1.14.0-gompi-2022b
-source "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
-source "${MESOUQ_SITE_RUNTIME_ROOT}/tinytex/env.sh"
-
-python papers/huq_emb/generate_out_of_scope_figures.py \
-  --paper-data-root "$PAPER_DATA_ROOT" \
-  --campaign-id "$CAMPAIGN_ID" \
-  --max-posterior-samples 50000
-```
-
-Extra figures are in:
-
-- `$PAPER_DATA_ROOT/figures/out_of_paper_scope/grouped_holdout_validation/`
-- `$PAPER_DATA_ROOT/figures/out_of_paper_scope/sobol_sensitivity/`
-- `$PAPER_DATA_ROOT/figures/out_of_paper_scope/posterior_marginals_phase1/`
-- `$PAPER_DATA_ROOT/figures/out_of_paper_scope/map_vs_simulation/`
-
-## 5. Check
+## 4. Check
 
 ```bash
 set -euo pipefail
@@ -259,7 +222,6 @@ checks = [
     ("50k campaign", root / "logs" / cid / "vega_50k_campaign_report.json", "status", "passed"),
     ("paper release", root / "manifests" / "paper_release_manifest.json", "release_status", "PASS"),
     ("paper figures", root / "runs" / cid / "paper_exact_stage" / "run_exact_uqdpd_asset_port.report.json", "status", "passed"),
-    ("extra figures", root / "figures" / "out_of_paper_scope" / "out_of_scope_figures_manifest.json", "status", "passed"),
 ]
 
 for label, path, key, expected in checks:
@@ -269,17 +231,8 @@ for label, path, key, expected in checks:
     if actual != expected:
         raise SystemExit(f"ERROR: {label} failed: {path}")
 
-extra = json.loads((root / "figures" / "out_of_paper_scope" / "out_of_scope_figures_manifest.json").read_text())
-warnings = extra.get("data_quality_warnings", [])
-if warnings:
-    print("extra figure warnings:")
-    for warning in warnings:
-        print(f"  - {warning}")
-    raise SystemExit("ERROR: rerun from the full 50k campaign outputs.")
-
 print("main:", root / "figures" / "main")
 print("supp:", root / "figures" / "supplementary")
-print("extra:", root / "figures" / "out_of_paper_scope")
 print("tables:", root / "tables")
 PY
 ```

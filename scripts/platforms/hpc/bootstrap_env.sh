@@ -4,8 +4,8 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage: bootstrap_env.sh [--site SITE] [--python-bin PYTHON] [--recreate] [--system-site-packages]
-                        [--skip-python-deps] [--with-korali] [--with-mirheo] [--with-gv-cgal]
-                        [--mirheo-source PATH] [--gv-cgal-source PATH] [--jobs N] [--reconfigure]
+                        [--skip-python-deps] [--with-korali] [--with-mirheo]
+                        [--mirheo-source PATH] [--jobs N] [--reconfigure]
 
 Create or refresh the canonical MesoUQ site environment:
   ${MESOUQ_SITE_RUNTIME_ROOT}/env
@@ -23,9 +23,7 @@ system_site_packages=0
 install_python_deps=1
 with_korali=0
 with_mirheo=0
-with_gv_cgal=0
 mirheo_source=""
-gv_cgal_source=""
 build_jobs="${MESOUQ_BUILD_JOBS:-}"
 reconfigure=0
 
@@ -63,16 +61,8 @@ while [[ $# -gt 0 ]]; do
       with_mirheo=1
       shift
       ;;
-    --with-gv-cgal)
-      with_gv_cgal=1
-      shift
-      ;;
     --mirheo-source)
       mirheo_source="$2"
-      shift 2
-      ;;
-    --gv-cgal-source)
-      gv_cgal_source="$2"
       shift 2
       ;;
     --jobs)
@@ -217,25 +207,6 @@ if [[ "$with_mirheo" -eq 1 ]]; then
     mirheo_args+=(--reconfigure)
   fi
   bash "$repo_root/scripts/platforms/hpc/bootstrap_mirheo.sh" "${mirheo_args[@]}"
-fi
-
-if [[ "$with_gv_cgal" -eq 1 ]]; then
-  gv_cgal_args=(--python-bin "$env_python")
-  if [[ -n "$gv_cgal_source" ]]; then
-    gv_cgal_args+=(--source "$gv_cgal_source")
-  fi
-  if [[ -n "$build_jobs" ]]; then
-    gv_cgal_args+=(--jobs "$build_jobs")
-  fi
-  if [[ "$reconfigure" -eq 1 ]]; then
-    gv_cgal_args+=(--reconfigure)
-  fi
-  site_gv_cgal_script="$repo_root/scripts/platforms/$SITE/bootstrap_gv_cgal_tools.sh"
-  if [[ -x "$site_gv_cgal_script" ]]; then
-    bash "$site_gv_cgal_script" "${gv_cgal_args[@]}"
-  else
-    bash "$repo_root/scripts/platforms/hpc/bootstrap_gv_cgal_tools.sh" --site "$SITE" "${gv_cgal_args[@]}"
-  fi
 fi
 
 "$env_python" - <<'PY' "$repo_root" "$ENV_SCRIPT"

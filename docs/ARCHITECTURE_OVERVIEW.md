@@ -14,7 +14,7 @@ This page is the current architecture map for the migrated slice. It is intentio
 |---|---|---|
 | Shared runtime/API package | `src/meso_uq` | stable |
 | Core workflow orchestration | `scripts/workflows/`, `scripts/platforms/`, `scripts/shared/` | active |
-| Public configs (examples, schema-first) | `configs/` (`agents`, `modalities`, `datasets`, `surrogates`, `inference`, `noise`, `active_learning`, `platforms`, `reports`, `artifacts`) | active |
+| Public configs (examples, schema-first) | `configs/` (`agents`, `modalities`, `datasets`, `surrogates`, `inference`, `noise`, `platforms`, `reports`, `artifacts`) | active |
 | Legacy production configs | `inference/configs/*`, `reduced/configs/*` | active legacy + compatibility |
 | Validation profiles | `inference/configs/validation/*`, `reduced/configs/validation/*`, plus workflow guides | active |
 | Output roots and generated state | `_runs`, `_out`, `_ci`, `_init_*`, `_vega`, `logs` | transitional/non-reproducible roots |

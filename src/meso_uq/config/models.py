@@ -4,12 +4,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 EMB_EXPERIMENTS = {"compression", "indentation", "resonance"}
-GV_EXPERIMENTS = {"stretching", "buckling", "torsion", "eigenmodes", "shear_flow"}
 STRUCTURE_EXPERIMENTS = {
     "emb": EMB_EXPERIMENTS,
-    "gv": GV_EXPERIMENTS,
 }
-SUPPORTED_STRUCTURES = {"emb", "gv"}
+SUPPORTED_STRUCTURES = {"emb"}
 EMB_PHASE1_PRIOR_FIELDS = (
     "prior_Yt",
     "prior_kb",
@@ -27,19 +25,7 @@ EMB_DIRECT_PHASE1_PRIOR_FIELDS = (
     "prior_d0",
     "prior_sigma",
 )
-GV_PHASE1_PRIOR_FIELDS = (
-    "prior_ka",
-    "prior_kb",
-    "prior_mu",
-    "prior_b1",
-    "prior_b2",
-    "prior_a3",
-    "prior_a4",
-    "prior_mu_l",
-    "prior_c",
-    "prior_sigma",
-)
-PHASE1_PRIOR_FIELDS = tuple(dict.fromkeys((*EMB_PHASE1_PRIOR_FIELDS, *GV_PHASE1_PRIOR_FIELDS)))
+PHASE1_PRIOR_FIELDS = EMB_PHASE1_PRIOR_FIELDS
 
 
 def format_emb_diameter(diameter_um: float) -> str:
@@ -481,8 +467,6 @@ class InferenceConfig(BaseModel):
                 self._require_prior_fields(EMB_DIRECT_PHASE1_PRIOR_FIELDS, structure="direct EMB")
             else:
                 self._require_prior_fields(EMB_PHASE1_PRIOR_FIELDS, structure="EMB")
-        if "gv" in active_structures:
-            self._require_prior_fields(GV_PHASE1_PRIOR_FIELDS, structure="GV")
         return self
 
     def _require_prior_fields(self, fields: Tuple[str, ...], *, structure: str) -> None:

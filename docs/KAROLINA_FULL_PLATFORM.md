@@ -1,6 +1,6 @@
 # Karolina full-platform enablement
 
-This page defines the initial Karolina acceptance contract. Karolina is intended to become a first-class MesoUQ execution platform for EMB workflows, surrogate utilities, hierarchical inference, Mirheo, mirheoOBMD, GV paper replay, and machine-readable validation evidence.
+This page defines the initial Karolina acceptance contract. Karolina is a first-class execution platform for EMB workflows, surrogate utilities, hierarchical inference, Mirheo, mirheoOBMD, and machine-readable validation evidence.
 
 ## Storage policy
 
@@ -21,7 +21,6 @@ The site-neutral runtime helper resolves Karolina bootstrap state under `MESOUQ_
 - `${MESOUQ_SITE_RUNTIME_ROOT}/env`
 - `${MESOUQ_SITE_RUNTIME_ROOT}/korali`
 - `${MESOUQ_SITE_RUNTIME_ROOT}/mirheo`
-- `${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools`
 
 The supported activation contract is site-neutral:
 
@@ -64,7 +63,7 @@ Do not expect `/ceph/hpc/home/eubrieucb` to be mounted on Karolina. That path is
 
 ## Runtime env-script contract
 
-Generated GV runtime commands source the canonical env script:
+Generated EMB runtime commands source the canonical env script:
 
 ```bash
 "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh"
@@ -74,15 +73,7 @@ Generated GV runtime commands source the canonical env script:
 under that root. Vega compatibility is preserved through `get_vega_paths()`,
 but resolved paths now come from the canonical site runtime root.
 
-GV geometry tooling is staged under:
-
-```bash
-"${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools/bin/scale_space"
-```
-
-When present, `${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools/env.sh` exports `GV_SCALE_SPACE_BINARY`, `GV_CGAL_TOOLS_ROOT`, updates `PATH`, and adds the Karolina MPFR/GMP runtime library paths needed by the CGAL `scale_space` binary.
-
-Standard Mirheo and mirheoOBMD follow the Vega runtime policy: they are separate lane/process imports, not same-interpreter imports. Non-shear GV lanes use `mirheo` by default; `shear_flow` uses `mirheoOBMD`. Validation should import each module in a separate subprocess.
+Standard Mirheo and mirheoOBMD follow the Vega runtime policy: they are separate lane/process imports, not same-interpreter imports. Validation should import each module in a separate subprocess.
 
 ## Initial evidence target
 
@@ -90,7 +81,6 @@ Karolina acceptance evidence must be machine-readable and include:
 
 - source branch, commit, and clean/dirty state;
 - Slurm account, QOS, partition, GPU allocation, and node metadata;
-- runtime doctor report for Python, CUDA, OpenMPI, GSL/Eigen/HDF5, Korali, Mirheo, mirheoOBMD, h5py, MDAnalysis, trimesh, and GV geometry tools;
+- runtime doctor report for Python, CUDA, OpenMPI, GSL/Eigen/HDF5, Korali, Mirheo, mirheoOBMD, h5py, MDAnalysis, and trimesh;
 - EMB validation matrix and production-sanity report paths;
-- GV non-shear canary report paths for stretching, buckling, torsion, and eigenmodes;
-- explicit blockers, especially missing Vega provenance or unresolved eigenmodes paper-replay mismatch.
+- explicit blockers, especially missing Vega provenance or cross-site runtime mismatches.

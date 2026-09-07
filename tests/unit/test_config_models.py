@@ -10,21 +10,6 @@ from meso_uq.config.models import (
 )
 
 
-def _gv_prior_kwargs() -> dict[str, list[float]]:
-    return {
-        "prior_ka": [0.1, 1.1],
-        "prior_kb": [0.2, 1.2],
-        "prior_mu": [0.3, 1.3],
-        "prior_b1": [0.0, 1.0],
-        "prior_b2": [0.0, 1.0],
-        "prior_a3": [-1.0, 1.0],
-        "prior_a4": [0.0, 1.0],
-        "prior_mu_l": [0.8, 1.8],
-        "prior_c": [0.9, 1.9],
-        "prior_sigma": [0.0, 1.0],
-    }
-
-
 def test_prior_bounds_from_list_and_contains():
     bounds = PriorBounds.from_list([1.0, 3.0])
     assert bounds.contains(2.0)
@@ -353,70 +338,9 @@ def test_inference_config_rejects_unknown_phase1_contract_mode():
         )
 
 
-def test_inference_config_supports_gv_without_emb_diameters():
-    config = InferenceConfig(
-        structure="gv",
-        structures=["gv", "gv"],
-        experiments=[
-            {
-                "structure": "gv",
-                "name": "stretching",
-                "geometries": ["gv_rad2_height14_28"],
-            }
-        ],
-        **_gv_prior_kwargs(),
-    )
-
-    assert config.emb_diameters is None
-    assert config.geometries is None
-    assert config.structures == ["gv"]
-    assert config.prior_Yt is None
-    assert config.prior_d0 is None
-    assert config.get_prior_bounds("ka").as_list() == [0.1, 1.1]
-
-
-def test_inference_config_merges_scalar_structure_into_structures():
-    config = InferenceConfig(
-        structure="emb",
-        structures=["gv"],
-        experiment="compression",
-        emb_diameters=[2.1],
-        prior_Yt=[1.0, 2.0],
-        prior_kb=[1.0, 2.0],
-        prior_b1=[0.0, 1.0],
-        prior_b2=[0.0, 1.0],
-        prior_a3=[-1.0, 1.0],
-        prior_a4=[0.0, 1.0],
-        prior_d0=[0.0, 0.5],
-        prior_sigma=[0.0, 1.0],
-        prior_ka=[0.1, 1.1],
-        prior_mu=[0.3, 1.3],
-        prior_mu_l=[0.8, 1.8],
-        prior_c=[0.9, 1.9],
-    )
-
-    assert config.structures == ["emb", "gv"]
-
-
-def test_inference_config_rejects_missing_gv_prior_bounds():
-    with pytest.raises(ValueError, match="Missing required GV Phase 1 prior bounds"):
-        InferenceConfig(
-            structure="gv",
-            structures=["gv"],
-            experiments=[
-                {
-                    "structure": "gv",
-                    "name": "torsion",
-                    "geometries": ["gv_rad2_height14_28"],
-                }
-            ],
-            prior_kb=[0.2, 1.2],
-            prior_b1=[0.0, 1.0],
-            prior_b2=[0.0, 1.0],
-            prior_a3=[-1.0, 1.0],
-            prior_a4=[0.0, 1.0],
-            prior_sigma=[0.0, 1.0],
-        )
+def test_inference_config_rejects_removed_gv_structure():
+    with pytest.raises(ValueError, match="Unsupported structure 'gv'"):
+        InferenceConfig(structure="gv")
 
 
 def test_inference_config_rejects_unknown_structures_entry():

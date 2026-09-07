@@ -56,10 +56,6 @@ bnn = [
 mpi = [
   "mpi4py>=4.1.1",
 ]
-gv = [
-  "h5py>=3.11.0",
-  "MDAnalysis>=2.8.0",
-]
 hpc-build = [
   "pybind11>=2.12.0",
   "meson>=1.4.0",
@@ -110,12 +106,9 @@ dev = [
   "ninja>=1.11.0",
 ]
 
-[project.scripts]
-mesouq-al = "meso_uq.active_learning.cli:main"
-
 [project.urls]
-Repository = "https://github.com/BrieucB/MesoUQ"
-Issues = "https://github.com/BrieucB/MesoUQ/issues"
+Repository = "https://github.com/L17-Projects/embUQ"
+Issues = "https://github.com/L17-Projects/embUQ/issues"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -123,9 +116,6 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["meso_uq*", "learning*"]
-
-[tool.setuptools.package-data]
-"meso_uq.structures.gv" = ["references/*.csv"]
 
 [tool.pytest.ini_options]
 addopts = ["-ra", "--tb=short"]

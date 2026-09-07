@@ -112,13 +112,7 @@ class StructureSpec:
         raise KeyError(f"Unknown experiment '{experiment_name}' for structure '{self.name}'.")
 
 
-def _load_structures() -> dict[str, StructureSpec]:
-    from .gv import GV_STRUCTURE
-
-    return {GV_STRUCTURE.name: GV_STRUCTURE}
-
-
-STRUCTURE_REGISTRY = _load_structures()
+STRUCTURE_REGISTRY: dict[str, StructureSpec] = {}
 
 
 def get_structure(structure_name: str) -> StructureSpec:

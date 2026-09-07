@@ -503,7 +503,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--release-manifest", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--github-pr", help="GitHub PR number, URL, or branch to verify checks for.")
-    parser.add_argument("--repo", default="BrieucB/MesoUQ", help="GitHub repository for GitHub checks or workflow runs.")
+    parser.add_argument("--repo", default="L17-Projects/embUQ", help="GitHub repository for GitHub checks or workflow runs.")
     parser.add_argument("--github-run-id", action="append", default=[], help="GitHub Actions workflow run ID to verify as explicit release evidence; may be repeated.")
     parser.add_argument("--allow-missing-github-checks", action="store_true", help="Explicitly allow local-only Gate07 validation without GitHub checks.")
     args = parser.parse_args(argv)

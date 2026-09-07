@@ -1,7 +1,7 @@
-# MesoUQ
-[![CI](https://github.com/BrieucB/MesoUQ/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BrieucB/MesoUQ/actions/workflows/ci.yml)
-[![Release Smoke](https://github.com/BrieucB/MesoUQ/actions/workflows/release-smoke.yml/badge.svg?branch=main)](https://github.com/BrieucB/MesoUQ/actions/workflows/release-smoke.yml)
-[![codecov](https://codecov.io/github/BrieucB/MesoUQ/graph/badge.svg?token=WNXV45WSWM)](https://codecov.io/github/BrieucB/MesoUQ)
+# embUQ
+[![CI](https://github.com/L17-Projects/embUQ/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/L17-Projects/embUQ/actions/workflows/ci.yml)
+[![Release Smoke](https://github.com/L17-Projects/embUQ/actions/workflows/release-smoke.yml/badge.svg?branch=main)](https://github.com/L17-Projects/embUQ/actions/workflows/release-smoke.yml)
+[![codecov](https://codecov.io/github/L17-Projects/embUQ/graph/badge.svg)](https://codecov.io/github/L17-Projects/embUQ)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](./pyproject.toml)
 [![Docs](https://img.shields.io/badge/docs-included-blueviolet.svg)](./docs/)
@@ -12,11 +12,13 @@
 [![DPD](https://img.shields.io/badge/model-DPD-informational.svg)](#)
 [![Hierarchical Bayes](https://img.shields.io/badge/inference-Hierarchical%20Bayes-purple.svg)](#)
 
-MesoUQ is a public software line for Bayesian uncertainty quantification and calibration of mesoscopic DPD models.
+embUQ is a production repository for Bayesian uncertainty quantification and calibration of elastic-microbubble (EMB) mesoscopic DPD models and for reproducing the associated paper.
 
-The repository now separates reusable package code from numerical-experiment assets. The installable package under `src/meso_uq` owns contracts, registries, config schemas, orchestration helpers, surrogate/inference APIs, validation helpers, reporting helpers, and platform-neutral runtime utilities. The EMB and GV numerical experiment trees own the Mirheo/evalkit/surrogate assets that are specific to a physical experiment family.
+The repository separates reusable package code from numerical-experiment assets. The installable package under `src/meso_uq` owns contracts, registries, config schemas, orchestration helpers, surrogate/inference APIs, validation helpers, reporting helpers, and platform-neutral runtime utilities. The `emb/` tree owns the Mirheo, evalkit, and surrogate assets specific to elastic microbubbles.
 
-The release workflow surface covers EMB compression and indentation calibration, hierarchical inference, surrogate retraining and model selection, MAP extraction, plotting, propagation, a public validation matrix, HPC acceptance, GV runtime and sampling support, and supporting operator utilities.
+The release workflow surface covers EMB compression and indentation calibration, hierarchical inference, surrogate retraining and model selection, MAP extraction, plotting, propagation, a public validation matrix, HPC acceptance, and supporting operator utilities.
+
+The paper uses the committed deterministic DNN (`*_BEST.pkl`) surrogate artifacts. Optional Bayesian neural-network (BNN/Pyro) training and evaluation support is retained as a tested production capability.
 
 ## Architecture split
 
@@ -24,11 +26,10 @@ The main source and asset layers are:
 
 - `src/meso_uq/`: reusable package layer. Put shared contracts, registries, package APIs, validation logic, config helpers, orchestration helpers, platform/runtime helpers, and cross-experiment surrogate/inference code here.
 - `emb/`: elastic microbubble numerical experiment assets. The canonical layout is `emb/compression/{src,evalkit,surrogate}` and `emb/indentation/{src,evalkit,surrogate}`.
-- `gv/`: gas-vesicle numerical experiment assets. The canonical layout is `gv/<modality>/{src,evalkit,surrogate}`. Current modalities are `buckling`, `eigenmodes`, `shear_flow`, `stretching`, and `torsion`.
 - `configs/`: schema-versioned composition examples for agents, modalities, datasets, surrogates, inference settings, noise, platforms, reports, and artifacts. Current operator-facing EMB production and validation configs still live under `inference/configs/` and `reduced/configs/`.
 - `scripts/`, `inference/`, `reduced/`, `propagation/`, `sampling/`: maintained workflow and compatibility entrypoints that call package helpers and experiment assets.
 
-Use `src/meso_uq` for reusable behavior that should be importable and tested independently of one physical experiment. Use `emb/` or `gv/` for experiment-local Mirheo source templates, evalkit reference data/helpers, surrogate training/evaluation entrypoints, small curated fixtures, and asset descriptors tied to that experiment family.
+Use `src/meso_uq` for reusable behavior that should be importable and tested independently of one physical experiment. Use `emb/` for experiment-local Mirheo source templates, evalkit reference data/helpers, surrogate training/evaluation entrypoints, small curated fixtures, and asset descriptors tied to EMB.
 
 ## Validation split
 
@@ -37,7 +38,7 @@ The release validation contract is intentionally split across two environments:
 - GitHub CI is the fast PR gate. It proves package/tests/docs health, one real CPU micro workflow lane, and one real public surrogate retraining smoke.
 - Vega and Karolina are the HPC proof surfaces for broader validation matrices, acceptance, production sanity, and hardware-specific backend claims.
 
-The GitHub CI test job also publishes line coverage for the committed Python surface across `src/meso_uq`, `emb/compression`, `emb/indentation`, `gv`, `inference`, `propagation`, `reduced`, and `scripts`, excluding vendored code, tests, and data-only directories.
+The GitHub CI test job also publishes line coverage for the committed Python surface across `src/meso_uq`, `emb/compression`, `emb/indentation`, `inference`, `propagation`, `reduced`, and `scripts`, excluding vendored code, tests, and data-only directories.
 
 For this private repo, Codecov uploads support either GitHub OIDC or a repository secret named `CODECOV_TOKEN`. The README badge itself also needs the private badge token from Codecov's `Badges & Graphs` settings appended to the badge URL query string before it will render real coverage instead of `unknown`.
 
@@ -265,7 +266,7 @@ Conceptually, this lane runs as follows:
 4. Package registries and contracts provide the shared vocabulary: `meso_uq.agents.registry` declares EMB support for `compression` and `indentation`, `meso_uq.modalities.registry` declares the compression modality contract, and `meso_uq.surrogate.catalogs`/`emb_catalog` record the canonical EMB surrogate artifact locations under `emb/compression/surrogate/diameters/.../trained/`.
 5. The EMB evalkit prepares reference data under `emb/compression/evalkit/data`, preloads the selected DNN or BNN surrogate, and wires Korali to `compute_compression_surrogate` or the GPU batch variant from `emb/compression/evalkit/posterior_compression.py`.
 6. Korali executes TMCMC for Phase 1 and writes phase outputs below the selected output root, for example `_runs/<site>/runs/<run-tag>/compression/reduced-model/validation/results_phase_1/...` when using the platform default root.
-7. Downstream validation/reporting wrappers read those artifacts for MAP extraction, propagation, plotting, lane manifests, and workflow-matrix reports. Reports and logs stay in the run root rather than in `src/meso_uq`, `emb/`, or `gv/`.
+7. Downstream validation/reporting wrappers read those artifacts for MAP extraction, propagation, plotting, lane manifests, and workflow-matrix reports. Reports and logs stay in the run root rather than in `src/meso_uq` or `emb/`.
 
 ## Documentation index
 
@@ -299,7 +300,7 @@ Start here:
 ## Repository layout
 
 ```text
-MesoUQ/
+embUQ/
 ├── README.md
 ├── pyproject.toml
 ├── src/meso_uq/
@@ -311,11 +312,6 @@ MesoUQ/
 ├── extern/korali/
 ├── emb/compression/
 ├── emb/indentation/
-├── gv/buckling/
-├── gv/eigenmodes/
-├── gv/shear_flow/
-├── gv/stretching/
-├── gv/torsion/
 ├── inference/
 ├── propagation/
 ├── reduced/

@@ -60,48 +60,6 @@ AGENT_REGISTRY: dict[AgentFamily, AgentDefinition] = {
         default_for_legacy=True,
         metadata={"legacy_roots": ("emb/compression", "emb/indentation")},
     ),
-    AgentFamily.GV: AgentDefinition(
-        family=AgentFamily.GV,
-        label="Gas vesicle",
-        aliases=("gas_vesicle", "gas-vesicle", "vesicle", "gv"),
-        supported_modalities=(
-            Modality.STRETCHING,
-            Modality.BUCKLING,
-            Modality.TORSION,
-            Modality.EIGENMODES,
-            Modality.SHEAR_FLOW,
-        ),
-        supported_backends=(ModelBackend.DNN, ModelBackend.SYNTHETIC, ModelBackend.DPD, ModelBackend.ANALYTICAL),
-        default_backend=ModelBackend.DNN,
-        inference_backends=(InferenceBackend.KORALI, InferenceBackend.DRY_RUN),
-        platforms=(Platform.WORKSTATION, Platform.VEGA, Platform.KAROLINA),
-        artifact_classes=(
-            ArtifactClass.REFERENCE,
-            ArtifactClass.RUNTIME_MANIFEST,
-            ArtifactClass.METADATA,
-            ArtifactClass.SIMULATION_OUTPUT,
-        ),
-        runtime_requirements=(
-            RuntimeRequirement(
-                name="mirheo",
-                kind=RuntimeRequirementKind.PYTHON_PACKAGE,
-                state=RequirementState.EXTERNAL,
-                package="mirheo",
-                description="Standard GV runtime package for non-shear lanes when runtime execution is invoked.",
-                platforms=(Platform.VEGA, Platform.KAROLINA),
-            ),
-            RuntimeRequirement(
-                name="mirheoOBMD",
-                kind=RuntimeRequirementKind.PYTHON_PACKAGE,
-                state=RequirementState.EXTERNAL,
-                package="mirheoOBMD",
-                description="Shear-flow runtime package used only by the experimental GV shear-flow lane.",
-                platforms=(Platform.VEGA, Platform.KAROLINA),
-            ),
-        ),
-        default_for_legacy=False,
-        metadata={"legacy_roots": ("gv/stretching", "gv/buckling", "gv/torsion", "gv/eigenmodes", "gv/shear_flow")},
-    ),
 }
 
 _AGENT_ALIAS_TO_FAMILY: dict[str, AgentFamily] = {

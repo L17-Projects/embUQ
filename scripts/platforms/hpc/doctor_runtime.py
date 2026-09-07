@@ -322,24 +322,25 @@ def collect_diagnostics(
                 str(paths.env_script),
             )
         )
-        scale_binary, scale_origin = _resolve_scale_space_binary()
-        if scale_binary:
-            scale_status, scale_details = _resolve_scale_space_dynamic_libs(scale_binary)
-            checks.append(
-                _check(
-                    f"scale_space_binary:{scale_origin}",
-                    "ok" if scale_status else "warn",
-                    f"{scale_binary}: {scale_details}",
+        if with_gv_runtime:
+            scale_binary, scale_origin = _resolve_scale_space_binary()
+            if scale_binary:
+                scale_status, scale_details = _resolve_scale_space_dynamic_libs(scale_binary)
+                checks.append(
+                    _check(
+                        f"scale_space_binary:{scale_origin}",
+                        "ok" if scale_status else "warn",
+                        f"{scale_binary}: {scale_details}",
+                    )
                 )
-            )
-        else:
-            checks.append(
-                _check(
-                    "scale_space_binary",
-                    "warn",
-                    "GV_SCALE_SPACE_BINARY was not set and scale_space is not resolvable from PATH/GV_CGAL_TOOLS_ROOT",
+            else:
+                checks.append(
+                    _check(
+                        "scale_space_binary",
+                        "warn",
+                        "GV_SCALE_SPACE_BINARY was not set and scale_space is not resolvable from PATH/GV_CGAL_TOOLS_ROOT",
+                    )
                 )
-            )
         if any(check["name"] == "command:mpicxx" and check["status"] == "ok" for check in checks):
             checks.append(
                 _check(

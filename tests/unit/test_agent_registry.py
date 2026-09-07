@@ -16,20 +16,13 @@ from meso_uq.agents import (
 from meso_uq.core import AgentFamily, Modality, RequirementState
 
 
-def test_agent_registry_contains_emb_and_gv_definitions():
+def test_agent_registry_contains_emb_definition():
     definitions = {definition.family: definition for definition in list_agent_definitions()}
 
-    assert set(definitions) == {AgentFamily.EMB, AgentFamily.GV}
+    assert set(definitions) == {AgentFamily.EMB}
     assert tuple(item.value for item in definitions[AgentFamily.EMB].supported_modalities) == (
         "compression",
         "indentation",
-    )
-    assert tuple(item.value for item in definitions[AgentFamily.GV].supported_modalities) == (
-        "stretching",
-        "buckling",
-        "torsion",
-        "eigenmodes",
-        "shear_flow",
     )
     assert definitions[AgentFamily.EMB].default_for_legacy is True
 
@@ -39,18 +32,12 @@ def test_agent_registry_resolves_supported_combinations():
 
     assert agent.family is AgentFamily.EMB
     assert modality.modality is Modality.COMPRESSION
-    assert supported_modalities_for_agent("gv") == (
-        Modality.STRETCHING,
-        Modality.BUCKLING,
-        Modality.TORSION,
-        Modality.EIGENMODES,
-        Modality.SHEAR_FLOW,
-    )
+    assert supported_modalities_for_agent("emb") == (Modality.COMPRESSION, Modality.INDENTATION)
     assert tuple(descriptor.modality for descriptor in list_agent_modalities("emb")) == (
         Modality.COMPRESSION,
         Modality.INDENTATION,
     )
-    assert resolve_agent_family_identifier("gas-vesicle") is AgentFamily.GV
+    assert resolve_agent_family_identifier("microbubble") is AgentFamily.EMB
 
 
 def test_agent_registry_rejects_invalid_family_identifier():
@@ -61,14 +48,14 @@ def test_agent_registry_rejects_invalid_family_identifier():
 def test_agent_registry_rejects_unsupported_family_modality_combinations():
     with pytest.raises(ValueError, match="Agent family 'emb' does not support modality 'buckling'"):
         resolve_agent_modality("emb", "buckling")
-    with pytest.raises(ValueError, match="Agent family 'gv' does not support modality 'compression'"):
+    with pytest.raises(ValueError, match="Agent family 'gv' is not registered"):
         resolve_agent_modality("gv", "compression")
 
 
 def test_agent_registry_reports_support_and_dependency_state():
-    status = classify_agent_modality_support("gv", "stretching")
+    status = classify_agent_modality_support("emb", "compression")
     unsupported = classify_agent_modality_support("emb", "shear_flow")
-    requirements = runtime_requirements_for_agent("gv")
+    requirements = runtime_requirements_for_agent("emb")
     missing = missing_dependency_requirements_for_agent("emb", {"torch": False, "pyro": False, "korali": False})
 
     assert status["status"] == "supported"

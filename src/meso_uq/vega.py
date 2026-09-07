@@ -90,7 +90,7 @@ CAPTURED_RUNTIME_SCALAR_VARS = (
     "EBROOTEIGEN",
     "HDF5_DIR",
 )
-UNIFIED_ENV_EXTRAS = ("dev", "bnn", "plot", "mpi", "gv", "hpc-build", "hpc")
+UNIFIED_ENV_EXTRAS = ("dev", "bnn", "plot", "mpi", "hpc-build", "hpc")
 MIRHEO_LOCK_FILENAME = "mirheo.lock.json"
 MIRHEO_TREE_HASH_IGNORE = {
     ".git",
@@ -472,7 +472,6 @@ def render_unified_env_script(
         "_mesouq_native_env_scripts=(",
         f"  {shlex.quote(str(paths.mirheo_env_script))}",
         '  "${MESOUQ_SITE_RUNTIME_ROOT}/mirheoOBMD/env.sh"',
-        f"  {shlex.quote(str(paths.gv_cgal_tools_env_script))}",
         f"  {shlex.quote(str(paths.tinytex_env_script))}",
         ")",
         'for _mesouq_native_env_script in "${_mesouq_native_env_scripts[@]}"; do',

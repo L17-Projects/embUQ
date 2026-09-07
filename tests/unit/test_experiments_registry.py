@@ -269,79 +269,11 @@ def test_load_experiments_rejects_missing_diameters(tmp_path: Path):
         load_experiments(config, tmp_path)
 
 
-def test_load_experiments_supports_canonical_gv_dataset_identity(tmp_path: Path):
-    config = {
-        "experiments": [
-            {
-                "structure": "gv",
-                "name": "stretching",
-                "geometries": ["gv_rad2_height14_28"],
-                "controls": ["tot_force_500_50000__bpress_-91"],
-                "data_dir": "gv/stretching/data",
-                "surrogate_dir": "gv/stretching/surrogate",
-            }
-        ]
-    }
-    exp = load_experiments(config, tmp_path)[0]
-    assert exp.experiment_id == canonical_experiment_id("gv", "stretching")
-    assert exp.diameters == []
-    assert exp.dataset_name("gv_rad2_height14_28") == canonical_dataset_id(
-        "gv",
-        "stretching",
-        "gv_rad2_height14_28",
-        "tot_force_500_50000__bpress_-91",
-    )
-    assert exp.dataset_name("gv_rad2_height14_28", control="tot_force_500_50000__bpress_-91") == canonical_dataset_id(
-        "gv",
-        "stretching",
-        "gv_rad2_height14_28",
-        "tot_force_500_50000__bpress_-91",
-    )
-
-
-def test_gv_dataset_name_rejects_unknown_control_and_geometry(tmp_path: Path):
-    config = {
-        "experiments": [
-            {
-                "structure": "gv",
-                "name": "stretching",
-                "geometries": ["gv_rad2_height14_28"],
-                "controls": ["tot_force_500_50000__bpress_-91"],
-            }
-        ]
-    }
-    exp = load_experiments(config, tmp_path)[0]
-
-    with pytest.raises(ValueError, match="is not configured"):
-        exp.dataset_name("gv_rad2_height14_28", control="unknown")
-    with pytest.raises(ValueError, match="is not configured"):
-        exp.dataset_name("gv_rad3_height14_28", control="tot_force_500_50000__bpress_-91")
-
-
 def test_emb_dataset_name_rejects_unconfigured_geometry(tmp_path: Path):
     exp = load_experiments({"experiment": "compression", "emb_diameters": [2.1]}, tmp_path)[0]
 
     with pytest.raises(ValueError, match="is not configured"):
         exp.dataset_name(2.9)
-
-
-def test_gv_dataset_name_rejects_ambiguous_default_control(tmp_path: Path):
-    config = {
-        "experiments": [
-            {
-                "structure": "gv",
-                "name": "stretching",
-                "geometries": ["gv_rad2_height14_28"],
-                "controls": [
-                    "tot_force_500_50000__bpress_-91",
-                    "tot_force_1000_50000__bpress_-91",
-                ],
-            }
-        ]
-    }
-    exp = load_experiments(config, tmp_path)[0]
-    with pytest.raises(ValueError, match="requires an explicit control selection"):
-        exp.dataset_name("gv_rad2_height14_28")
 
 
 def test_load_experiments_rejects_ambiguous_structureless_non_emb_experiment(tmp_path: Path):
@@ -360,25 +292,6 @@ def test_load_experiments_rejects_ambiguous_structureless_non_emb_experiment(tmp
 def test_load_experiments_rejects_default_structureless_non_emb_experiment(tmp_path: Path):
     with pytest.raises(ValueError, match="requires an explicit structure"):
         load_experiments({"experiment": "stretching"}, tmp_path)
-
-
-def test_load_experiments_rejects_gv_without_geometries(tmp_path: Path):
-    config = {"experiments": [{"structure": "gv", "name": "stretching"}]}
-
-    with pytest.raises(ValueError, match="must define geometries"):
-        load_experiments(config, tmp_path)
-
-
-def test_load_experiments_rejects_duplicate_structure_scoped_experiment(tmp_path: Path):
-    config = {
-        "experiments": [
-            {"structure": "gv", "name": "stretching", "geometries": ["gv_rad2_height14_28"]},
-            {"structure": "gv", "name": "stretching", "geometries": ["gv_rad3_height14_28"]},
-        ]
-    }
-
-    with pytest.raises(ValueError, match="Duplicate experiment reference"):
-        load_experiments(config, tmp_path)
 
 
 def test_load_experiments_rejects_duplicate_lanes(tmp_path: Path):

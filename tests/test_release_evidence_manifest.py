@@ -33,8 +33,8 @@ def test_validator_enforces_v010_native_cuda_non_claim() -> None:
         "candidate_commit": "abc123",
         "claims": {"native_cuda_phase2_public_claim": True},
         "github_ci": {
-            "ci_workflow_url": "https://github.com/BrieucB/MesoUQ/actions/runs/1",
-            "release_smoke_url": "https://github.com/BrieucB/MesoUQ/actions/runs/2",
+            "ci_workflow_url": "https://github.com/L17-Projects/embUQ/actions/runs/1",
+            "release_smoke_url": "https://github.com/L17-Projects/embUQ/actions/runs/2",
         },
         "reports": {
             "vega_validation_matrix": "/tmp/validation.json",
@@ -71,8 +71,8 @@ def test_validator_accepts_existing_paths(tmp_path: Path) -> None:
         "candidate_commit": "3be8f4ccbc55d90d4ed58141c8268718fbd841d6",
         "claims": {"native_cuda_phase2_public_claim": False},
         "github_ci": {
-            "ci_workflow_url": "https://github.com/BrieucB/MesoUQ/actions/runs/24182978893",
-            "release_smoke_url": "https://github.com/BrieucB/MesoUQ/actions/runs/24182978877",
+            "ci_workflow_url": "https://github.com/L17-Projects/embUQ/actions/runs/24182978893",
+            "release_smoke_url": "https://github.com/L17-Projects/embUQ/actions/runs/24182978877",
         },
         "reports": {
             "vega_validation_matrix": str(validation_report),

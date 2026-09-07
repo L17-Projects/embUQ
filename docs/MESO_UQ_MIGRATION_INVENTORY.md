@@ -64,7 +64,6 @@ Snapshot date: 2026-05-13.
 | `scripts/platforms/karolina` | Karolina-specific launchers, sbatch templates, and validation helpers |
 | `scripts/platforms/vega` | Vega-specific launchers, sbatch templates, and validation helpers |
 | `scripts/workflows/emb/huq_emb` | HUQ-EMB campaign orchestration |
-| `scripts/workflows/gv` | GV workflow orchestration and canary surfaces |
 | `scripts/qa` | Documentation and release sanity checks |
 | `inference/scripts`, `reduced/scripts` | Public phase runners |
 | `scripts/run_vega_acceptance.py` | Thin Vega acceptance wrapper |

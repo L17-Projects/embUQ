@@ -11,14 +11,6 @@ from .contracts import (
     SamplerBackendContract,
     unsupported_gv_inference_contract,
 )
-from .gv_hbi import (
-    GV_HBI_EXPERIMENTAL_FLAG,
-    GV_PHASE1_EXECUTION_MANIFEST,
-    build_gv_phase1_setup_manifest,
-    run_gv_phase1_dnn_execution,
-    write_gv_phase1_execution_manifest,
-    write_gv_phase1_setup_manifest,
-)
 from .posterior_equivalence import (
     DEFAULT_POSTERIOR_EQUIVALENCE_THRESHOLDS,
     PosteriorEquivalenceReport,
@@ -43,8 +35,6 @@ from .native_cuda_performance import (
 __all__ = [
     "DEFAULT_POSTERIOR_EQUIVALENCE_THRESHOLDS",
     "DEFAULT_NATIVE_CUDA_PERFORMANCE_THRESHOLDS",
-    "GV_HBI_EXPERIMENTAL_FLAG",
-    "GV_PHASE1_EXECUTION_MANIFEST",
     "InferenceContract",
     "InferenceLayer",
     "InferenceSupportState",
@@ -59,17 +49,13 @@ __all__ = [
     "PosteriorSummary",
     "PriorContract",
     "SamplerBackendContract",
-    "build_gv_phase1_setup_manifest",
     "check_native_cuda_profile",
     "compare_native_cuda_profile",
     "compare_posterior_samples",
     "compare_posterior_summaries",
     "load_phase2_posterior_samples",
     "load_native_cuda_profile_records",
-    "run_gv_phase1_dnn_execution",
     "summarize_posterior_samples",
     "summarize_native_cuda_profile",
     "unsupported_gv_inference_contract",
-    "write_gv_phase1_execution_manifest",
-    "write_gv_phase1_setup_manifest",
 ]

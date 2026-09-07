@@ -206,7 +206,7 @@ def test_karolina_doctor_propagates_site_env(monkeypatch):
     assert captured["args"][1].endswith("scripts/platforms/hpc/doctor_hpc.py")
 
 
-def test_doctor_mirheo_diagnostics_cover_source_and_scale_space_warnings(tmp_path, monkeypatch):
+def test_doctor_mirheo_diagnostics_cover_source_warnings(tmp_path, monkeypatch):
     module = _load_doctor_module()
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -224,7 +224,6 @@ def test_doctor_mirheo_diagnostics_cover_source_and_scale_space_warnings(tmp_pat
         "resolve_mirheo_source",
         lambda _root, **_kwargs: (_ for _ in ()).throw(RuntimeError("no source")),
     )
-    monkeypatch.setattr(module, "_resolve_scale_space_binary", lambda: ("", ""))
     monkeypatch.delenv("MESOUQ_OPENMPI_LIB_DIR", raising=False)
 
     report = module.collect_diagnostics("python", with_mirheo=True)
@@ -232,8 +231,7 @@ def test_doctor_mirheo_diagnostics_cover_source_and_scale_space_warnings(tmp_pat
 
     assert checks["mirheo_source"]["status"] == "warn"
     assert checks["mirheo_source"]["details"] == "no source"
-    assert checks["scale_space_binary"]["status"] == "warn"
-    assert "GV_SCALE_SPACE_BINARY" in checks["scale_space_binary"]["details"]
+    assert "scale_space_binary" not in checks
     assert checks["openmpi_lib_path"]["status"] == "warn"
 
 

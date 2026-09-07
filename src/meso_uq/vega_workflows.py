@@ -11,13 +11,11 @@ import yaml
 from meso_uq.experiments import load_experiments
 from meso_uq.hpc_paths import default_runs_root, detect_hpc_site
 
-VALID_STRUCTURES = ("emb", "gv")
+VALID_STRUCTURES = ("emb",)
 VALID_EXPERIMENTS = ("compression", "indentation")
-VALID_GV_EXPERIMENTS = ("stretching", "buckling", "torsion", "eigenmodes", "shear_flow")
-ALL_WORKFLOW_EXPERIMENTS = VALID_EXPERIMENTS + VALID_GV_EXPERIMENTS
+ALL_WORKFLOW_EXPERIMENTS = VALID_EXPERIMENTS
 _STRUCTURE_EXPERIMENTS = {
     "emb": VALID_EXPERIMENTS,
-    "gv": VALID_GV_EXPERIMENTS,
 }
 VALID_MODEL_FAMILIES = ("full-model", "reduced-model")
 VALID_PROFILES = ("production", "validation")
@@ -41,11 +39,6 @@ class VegaWorkflowSelection:
         if resolved_structure is None:
             if self.experiment in VALID_EXPERIMENTS:
                 resolved_structure = "emb"
-            elif self.experiment in VALID_GV_EXPERIMENTS:
-                raise ValueError(
-                    f"Experiment '{self.experiment}' requires an explicit structure. "
-                    "Use structure='gv' or the selection form structure:experiment:model-family:profile."
-                )
         if resolved_structure not in VALID_STRUCTURES:
             raise ValueError(f"Unsupported structure: {resolved_structure}")
         if self.experiment not in ALL_WORKFLOW_EXPERIMENTS:

@@ -98,7 +98,7 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     assert codecov_upload["uses"] == CODECOV_ACTION_SHA
     assert codecov_upload["with"]["token"] == "${{ secrets.CODECOV_TOKEN }}"
     assert codecov_upload["with"]["use_oidc"] == "${{ secrets.CODECOV_TOKEN == '' }}"
-    assert codecov_upload["with"]["slug"] == "BrieucB/MesoUQ"
+    assert codecov_upload["with"]["slug"] == "L17-Projects/embUQ"
     assert codecov_upload["with"]["files"] == "coverage.xml"
     assert codecov_upload["with"]["disable_search"] is True
     assert codecov_upload["with"]["codecov_yml_path"] == "codecov.yml"
@@ -120,7 +120,6 @@ def test_ci_workflow_has_concurrency_timeouts_and_canary_artifacts():
     assert "tests/test_script_path_governance.py" in platform_run
     assert "tests/test_karolina_validation_matrix.py" in platform_run
     assert "tests/test_vega_matrix_sbatch.py" in platform_run
-    assert "tests/unit/test_gv_platform_routing.py" in platform_run
     assert "tests/unit/test_dpd_production_preflight.py" in platform_run
 
     workflow_steps = workflow["jobs"]["workflow-canary"]["steps"]

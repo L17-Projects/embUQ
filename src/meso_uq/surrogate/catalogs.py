@@ -145,11 +145,8 @@ def _iter_emb_catalog_entries() -> Iterable[SurrogateCatalogEntry]:
 
 
 def iter_surrogate_catalog_entries(*, include_experimental: bool = False) -> tuple[SurrogateCatalogEntry, ...]:
-    from .gv_catalog import iter_gv_surrogate_catalog_entries
-
-    entries = list(_iter_emb_catalog_entries())
-    entries.extend(iter_gv_surrogate_catalog_entries(include_experimental=include_experimental))
-    return tuple(entries)
+    del include_experimental
+    return tuple(_iter_emb_catalog_entries())
 
 
 def resolve_surrogate_catalog_entries(
@@ -186,18 +183,8 @@ def resolve_surrogate_catalog_entry(
     surrogate_backend: str = "dnn",
     include_experimental: bool = False,
 ) -> dict[str, Any]:
-    if structure == "gv":
-        from .gv_catalog import resolve_gv_surrogate_catalog_entry
-
-        return resolve_gv_surrogate_catalog_entry(
-            repo_root,
-            experiment=experiment,
-            geometry=geometry,
-            controls=controls,
-            reference_kind=reference_kind or "synthetic",
-            surrogate_backend=surrogate_backend,
-            include_experimental=include_experimental,
-        )
+    if structure != "emb":
+        raise ValueError(f"Unsupported surrogate structure '{structure}'. Expected 'emb'.")
 
     if geometry is None:
         raise ValueError(

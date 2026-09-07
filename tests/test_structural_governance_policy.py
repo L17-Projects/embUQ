@@ -224,9 +224,8 @@ def test_import_cycle_allowlist_structure_matches_expected_sequences() -> None:
         tuple(sequence)
         for sequence in import_cycles["sequences"]
     } == {
-        ("meso_uq.surrogate.catalogs", "meso_uq.surrogate.gv_catalog"),
-        ("meso_uq.surrogate.gv_catalog", "meso_uq.surrogate.catalogs"),
-        ("meso_uq.structures", "meso_uq.structures.gv"),
+        ("meso_uq.surrogate.catalogs", "meso_uq.surrogate.emb_catalog"),
+        ("meso_uq.surrogate.emb_catalog", "meso_uq.surrogate.catalogs"),
     }
 
 

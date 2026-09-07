@@ -230,7 +230,6 @@ sys.path.insert(0, str(repo_root / "src"))
 from meso_uq.vega import (
     gather_mirheo_source_snapshot,
     get_runtime_paths,
-    render_gv_cgal_tools_env_script,
     render_mirheo_env_script,
     render_unified_env_script,  # noqa: E402
 )
@@ -251,18 +250,9 @@ unified_env_script.write_text(
     render_unified_env_script(paths, source_root=source_root, snapshot_path=snapshot_path),
     encoding="utf-8",
 )
-if not paths.gv_cgal_tools_env_script.is_file():
-    paths.gv_cgal_tools_env_script.parent.mkdir(parents=True, exist_ok=True)
-    paths.gv_cgal_tools_env_script.write_text(
-        render_gv_cgal_tools_env_script(paths),
-        encoding="utf-8",
-    )
 PY
 
 chmod +x "$MIRHEO_ENV_SCRIPT" "$ENV_ENV_SCRIPT"
-if [[ -f "$(dirname "$ENV_ENV_SCRIPT")/../gv_cgal_tools/env.sh" ]]; then
-  chmod +x "$(dirname "$ENV_ENV_SCRIPT")/../gv_cgal_tools/env.sh"
-fi
 
 echo "Verifying Mirheo and h5py imports"
 "$runtime_python" - <<'PY'
@@ -282,4 +272,4 @@ echo "Source the repo-local runtime before running MAP Mirheo workflows:"
 echo "  source $MIRHEO_ENV_SCRIPT"
 echo "  source $ENV_ENV_SCRIPT"
 echo "Then re-run the doctor in strict mode:"
-echo "  $runtime_python $repo_root/scripts/platforms/hpc/doctor_hpc.py --strict --with-gv-runtime"
+echo "  $runtime_python $repo_root/scripts/platforms/hpc/doctor_hpc.py --strict --with-mirheo"

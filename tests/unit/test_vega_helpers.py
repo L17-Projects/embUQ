@@ -258,7 +258,6 @@ def test_render_unified_env_script_exports_single_canonical_activation(tmp_path)
     assert str(paths.korali_site_packages) in env_script
     assert str(paths.korali_env_script) not in env_script
     assert str(paths.mirheo_env_script) in env_script
-    assert str(paths.gv_cgal_tools_env_script) in env_script
     assert str(paths.tinytex_env_script) in env_script
     assert str(hdf5_root) in env_script
     assert str(python_lib) in env_script

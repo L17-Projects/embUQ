@@ -1,11 +1,11 @@
 cff-version: 1.2.0
-title: MesoUQ
-message: "If you use MesoUQ, please cite this software."
+title: embUQ
+message: "If you use embUQ, please cite this software."
 type: software
 authors:
   - family-names: Benvegnen
     given-names: Brieuc
-repository-code: "https://github.com/BrieucB/MesoUQ"
+repository-code: "https://github.com/L17-Projects/embUQ"
 license: MIT
 version: 0.1.0
 date-released: 2026-04-04

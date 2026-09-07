@@ -206,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
         "commands": {
             "executed_argv": list(sys.argv),
             "regenerate": "python scripts/qa/noise_hierarchy_release_readiness.py --output-root <output-root> --confirm-no-karolina-interaction ...",
-            "gate07": "python scripts/qa/noise_gate07_release_checks.py --release-manifest <manifest> --output-root <gate-root> --github-pr <PR number> --github-run-id <workflow run id> --repo BrieucB/MesoUQ",
+            "gate07": "python scripts/qa/noise_gate07_release_checks.py --release-manifest <manifest> --output-root <gate-root> --github-pr <PR number> --github-run-id <workflow run id> --repo L17-Projects/embUQ",
         },
         "modes": mode_specs,
         "selected_mode": selected_mode,

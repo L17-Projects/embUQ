@@ -49,7 +49,6 @@ def test_karolina_platform_policy_forbids_private_root() -> None:
         "${MESOUQ_SITE_RUNTIME_ROOT}/korali/env.sh",
         "${MESOUQ_SITE_RUNTIME_ROOT}/mirheo/env.sh",
         "${MESOUQ_SITE_RUNTIME_ROOT}/mirheoOBMD/env.sh",
-        "${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools/env.sh",
     )
 
 

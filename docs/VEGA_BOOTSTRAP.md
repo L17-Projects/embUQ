@@ -147,21 +147,7 @@ python scripts/platforms/hpc/doctor_hpc.py --site vega --strict --with-mirheo --
 
 The generated env script for Korali intentionally replaces inherited `PYTHONPATH` entries so the repo-local install wins over any preexisting user-global Korali.
 The Mirheo env script records the resolved source path, repo-local build/install locations, and the source snapshot manifest used for reproducibility.
-The canonical `${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh` script activates the unified MesoUQ Python path, records Mirheo import paths, sources `${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools/env.sh` and `${MESOUQ_SITE_RUNTIME_ROOT}/tinytex/env.sh` when present, and exports OpenMPI plus HDF5 library roots explicitly for rank launches and direct Mirheo imports. It honors `MESOUQ_HDF5_ROOT`, `EBROOTHDF5`, and `HDF5_DIR`, and captures the HDF5 root present during bootstrap.
-
-Build GV CGAL geometry tooling with the same interface:
-
-```bash
-bash scripts/platforms/vega/bootstrap_env.sh --with-gv-cgal
-# or, for only the CGAL helper after the unified env already exists:
-bash scripts/platforms/vega/bootstrap_gv_cgal_tools.sh
-```
-
-For GV runtime hardening checks (mirheo import, `libmirheo`, `scale_space` resolution, MDAnalysis), run:
-
-```bash
-python scripts/platforms/hpc/doctor_hpc.py --site vega --with-gv-runtime
-```
+The canonical `${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh` script activates the unified MesoUQ Python path, records Mirheo import paths, sources `${MESOUQ_SITE_RUNTIME_ROOT}/tinytex/env.sh` when present, and exports OpenMPI plus HDF5 library roots explicitly for rank launches and direct Mirheo imports. It honors `MESOUQ_HDF5_ROOT`, `EBROOTHDF5`, and `HDF5_DIR`, and captures the HDF5 root present during bootstrap.
 
 ## Build repo-local TinyTeX for paper-facing figures
 

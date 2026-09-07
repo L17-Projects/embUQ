@@ -313,83 +313,12 @@ def test_extract_map_writes_manifest_for_single_selected_dataset(tmp_path, monke
     assert Path(manifest["datasets"]["compression_2.1um"]["output_csv"]).exists()
 
 
-def test_run_inference_stage_rejects_gv_runtime_before_dispatch(tmp_path, monkeypatch):
-    repo_root = Path(__file__).resolve().parents[1]
-    module = _load_module(
-        repo_root / "scripts" / "platforms" / "hpc" / "run_inference_stage.py",
-        "run_inference_stage_gv_runtime_rejection_test",
-    )
-
-    def fake_run(command, cwd=None, check=False):
-        raise AssertionError("subprocess.run should not be reached for unsupported GV runtime")
-
-    monkeypatch.setattr(module.subprocess, "run", fake_run)
-
-    with pytest.raises(ValueError, match="GV workflow runtime/config resolution is not implemented yet"):
-        module.main(
-            [
-                "--structure",
-                "gv",
-                "--experiment",
-                "stretching",
-                "--model-family",
-                "full-model",
-                "--profile",
-                "validation",
-                "--stage",
-                "phase1",
-                "--output-dir",
-                str(tmp_path / "run"),
-                "--python-bin",
-                "python",
-            ]
-        )
-
-
-def test_run_propagation_rejects_gv_runtime_before_dispatch_with_override(tmp_path, monkeypatch):
-    repo_root = Path(__file__).resolve().parents[1]
-    module = _load_module(
-        repo_root / "scripts" / "platforms" / "hpc" / "run_propagation.py",
-        "run_propagation_gv_runtime_rejection_test",
-    )
-    config_path = tmp_path / "gv_config.yaml"
-    config_path.write_text("structure: gv\nexperiment: stretching\n", encoding="utf-8")
-
-    def fake_run(command, cwd=None, check=False):
-        raise AssertionError("subprocess.run should not be reached for unsupported GV propagation")
-
-    monkeypatch.setattr(module.subprocess, "run", fake_run)
-
-    with pytest.raises(ValueError, match="GV workflow propagation is not implemented yet"):
-        module.main(
-            [
-                "--structure",
-                "gv",
-                "--experiment",
-                "stretching",
-                "--model-family",
-                "full-model",
-                "--profile",
-                "validation",
-                "--stage",
-                "phase1",
-                "--config",
-                str(config_path),
-                "--output-dir",
-                str(tmp_path / "run"),
-                "--python-bin",
-                "python",
-            ]
-        )
-
-
 def test_vega_sbatch_templates_expose_model_family_and_profile_axes() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     template_dir = repo_root / "scripts" / "platforms" / "vega" / "sbatch"
     templates = sorted(template_dir.glob("*.sbatch"))
     fixed_scope_templates = {
         "dpd_production_preflight_canary.sbatch",
-        "gv_paper_figure_replay.sbatch",
         "train_dnn_arch_array.sbatch",
         "train_dnn_surrogates.sbatch",
         "uq_emb_forward_canary.sbatch",
@@ -413,56 +342,6 @@ def test_vega_sbatch_templates_expose_model_family_and_profile_axes() -> None:
         assert 'source "${REPO_ROOT}/scripts/platforms/hpc/site_env.sh"' in text
         assert "mesouq_activate_site_env vega" in text
         assert ("_vega" + "/") not in text
-
-
-def test_gv_paper_figure_replay_template_uses_public_command_and_gv_runtime() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    template = repo_root / "scripts" / "platforms" / "vega" / "sbatch" / "gv_paper_figure_replay.sbatch"
-
-    text = template.read_text(encoding="utf-8")
-
-    assert 'REPO_ROOT="${REPO_ROOT:-${SLURM_SUBMIT_DIR:-$(pwd)}}"' in text
-    assert 'CAMPAIGN_ID="${CAMPAIGN_ID:-}"' in text
-    assert 'LANES="${LANES:-}"' in text
-    assert 'PAPER_EXACT="${PAPER_EXACT:-0}"' in text
-    assert 'OUTPUT_ROOT="${OUTPUT_ROOT:-_runs/gv/figure_replay/${CAMPAIGN_ID}}"' in text
-    assert 'STRETCHING_POINT_START="${STRETCHING_POINT_START:-}"' in text
-    assert 'STRETCHING_POINT_STOP="${STRETCHING_POINT_STOP:-}"' in text
-    assert 'BUCKLING_TIMEOUT_SECONDS="${BUCKLING_TIMEOUT_SECONDS:-}"' in text
-    assert "run_paper_figure_replay.py" in text
-    assert 'command+=(--lane "${lane}")' in text
-    assert "command+=(--paper-exact)" in text
-    assert 'command+=(--stretching-point-start "${STRETCHING_POINT_START}")' in text
-    assert 'command+=(--stretching-point-stop "${STRETCHING_POINT_STOP}")' in text
-    assert 'command+=(--buckling-timeout-seconds "${BUCKLING_TIMEOUT_SECONDS}")' in text
-    assert 'source "${REPO_ROOT}/scripts/platforms/hpc/site_env.sh"' in text
-    assert "mesouq_activate_site_env vega" in text
-    assert ("_vega" + "/") not in text
-    assert "OpenMPI/4.1.4-GCC-12.2.0" in text
-    assert "#SBATCH --partition=gpu" in text
-    assert "#SBATCH --time=24:00:00" in text
-    assert "#SBATCH --ntasks=2" in text
-    assert 'MESOUQ_GV_MPI_RANKS="${MESOUQ_GV_MPI_RANKS:-2}"' in text
-    assert 'MESOUQ_GV_EIGENMODES_MPI_RANKS="${MESOUQ_GV_EIGENMODES_MPI_RANKS:-2}"' in text
-    assert 'MESOUQ_GV_EIGENMODES_DOMAIN_RANKS="${MESOUQ_GV_EIGENMODES_DOMAIN_RANKS:-1,1,1}"' in text
-    assert "#SBATCH --gres=gpu:1" in text
-
-
-def test_gv_paper_figure_replay_submitter_sets_lane_aware_walltime() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    submitter = repo_root / "scripts" / "platforms" / "vega" / "submit_gv_paper_figure_replay.sh"
-
-    text = submitter.read_text(encoding="utf-8")
-
-    assert "GV_PAPER_REPLAY_TIME_LIMIT" in text
-    assert 'exec sbatch --time="${TIME_LIMIT}"' in text
-    assert "STRETCHING_POINT_START" in text
-    assert "STRETCHING_POINT_STOP" in text
-    assert "BUCKLING_TIMEOUT_SECONDS" in text
-    assert "torsion)" in text and 'echo "01:00:00"' in text
-    assert "buckling)" in text and 'echo "04:00:00"' in text
-    assert "eigenmodes)" in text and 'echo "08:00:00"' in text
-    assert "count <= 30" in text and 'echo "03:00:00"' in text
 
 
 def test_production_sanity_template_uses_public_command() -> None:

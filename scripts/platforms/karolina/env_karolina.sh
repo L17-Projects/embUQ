@@ -34,8 +34,7 @@ export LD_LIBRARY_PATH="${MESOUQ_HDF5_PARALLEL_PREFIX}/lib${LD_LIBRARY_PATH:+:${
 for _mesouq_env_script in \
   "${MESOUQ_SITE_RUNTIME_ROOT}/env/env.sh" \
   "${MESOUQ_SITE_RUNTIME_ROOT}/mirheo/env.sh" \
-  "${MESOUQ_SITE_RUNTIME_ROOT}/mirheoOBMD/env.sh" \
-  "${MESOUQ_SITE_RUNTIME_ROOT}/gv_cgal_tools/env.sh"; do
+  "${MESOUQ_SITE_RUNTIME_ROOT}/mirheoOBMD/env.sh"; do
   if [[ -f "${_mesouq_env_script}" ]]; then
     source "${_mesouq_env_script}"
   fi

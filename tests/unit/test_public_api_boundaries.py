@@ -22,7 +22,7 @@ def test_public_api_exposes_narrow_contract_boundary():
     assert "ManifestMetadata" in exported
     assert "SerializedSurrogateAlias" in exported
     assert "resolve_agent_modality" in exported
-    assert public_api.resolve_agent_modality("gv", "torsion")[1].modality.value == "torsion"
+    assert public_api.resolve_agent_modality("emb", "compression")[1].modality.value == "compression"
     aliases = public_api.list_serialized_surrogate_aliases()
     assert aliases[0].legacy_module == "learning.model"
     assert aliases[0].replacement_module == "meso_uq.surrogate.model"

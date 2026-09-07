@@ -836,7 +836,7 @@ def test_gate07_reports_missing_gh_without_traceback(tmp_path):
             "--github-pr",
             "202",
             "--repo",
-            "BrieucB/MesoUQ",
+            "L17-Projects/embUQ",
         ],
         cwd=repo_root,
         env=env,

@@ -30,7 +30,6 @@ ignore:
   - "scripts/platforms/vega/*.sh"
   - "scripts/platforms/vega/run_validation_matrix.py"
   - "scripts/platforms/vega/sbatch/**"
-  - "scripts/platforms/vega/submit_gv_paper_figure_replay.sh"
 
 coverage:
   status:

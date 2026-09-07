@@ -29,27 +29,15 @@ SMOKE_MODULES = (
     "meso_uq.modalities.registry",
     "meso_uq.structures",
     "meso_uq.structures.registry",
-    "meso_uq.structures.gv",
-    "meso_uq.structures.gv.runtime.catalog",
-    "meso_uq.structures.gv.staging",
-    "meso_uq.structures.gv.staging_manifest",
-    "meso_uq.references",
-    "meso_uq.references.gv_common",
-    "meso_uq.references.synthetic",
-    "meso_uq.references.dpd_generated",
     "meso_uq.surrogates",
     "meso_uq.surrogates.contracts",
     "meso_uq.surrogates.registry",
     "meso_uq.surrogate.compat",
     "meso_uq.surrogate.catalogs",
     "meso_uq.surrogate.emb_catalog",
-    "meso_uq.surrogate.gv_catalog",
     "meso_uq.noise",
     "meso_uq.noise.contracts",
     "meso_uq.noise.registry",
-    "meso_uq.active_learning",
-    "meso_uq.active_learning.contracts",
-    "meso_uq.active_learning.engine",
     "meso_uq.config",
     "meso_uq.config.loader",
     "meso_uq.config.aliases",
@@ -73,9 +61,7 @@ SMOKE_MODULES = (
     "meso_uq.site_runtime",
     "meso_uq.workflows.legacy",
 )
-PACKAGE_DATA_FILES = (
-    ("meso_uq.structures.gv", "references/eigenmodes_fig8g_digitized.csv"),
-)
+PACKAGE_DATA_FILES: tuple[tuple[str, str], ...] = ()
 
 
 @dataclasses.dataclass(frozen=True)

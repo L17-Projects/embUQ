@@ -55,7 +55,6 @@ Workflow code:
 - Serialized artifact compatibility takes precedence over import cleanup. Do not remove legacy modules used by pickle artifacts unless a shim is present and tested.
 - The current serialized surrogate compatibility manifest is `meso_uq.surrogate.compat.SURROGATE_SERIALIZATION_ALIASES`. It records `learning.model.MLP` as a legacy pickle class path whose canonical replacement is `meso_uq.surrogate.model.MLP`.
 - The installed `learning.model` shim exists only for pickle/import compatibility. New code must import `meso_uq.surrogate` or `meso_uq.surrogate.model`, and the shim is scheduled for Phase 6 retirement only after release-critical pickles are migrated or regenerated.
-- GV runtime source layout must remain manifest-driven; contract metadata must not assume permanent checked-in runtime source ownership.
 
 ## Import-safety guards
 
@@ -70,12 +69,10 @@ Workflow code:
 - `meso_uq.platforms`
 - `meso_uq.platforms.policy`
 - `meso_uq.structures`
-- `meso_uq.structures.gv`
 - `meso_uq.surrogate.catalogs`
 - `meso_uq.surrogate.compat`
 - `meso_uq.surrogate.emb_catalog`
-- `meso_uq.surrogate.gv_catalog`
 - `meso_uq.workflows`
 - `meso_uq.workflows.legacy`
 
-The tests also exercise cycle-sensitive import orders for the GV structure registry and surrogate catalog modules. Heavy optional dependencies must be imported only when dependent functionality is invoked.
+The tests also exercise cycle-sensitive import orders for the EMB surrogate catalog modules. Heavy optional dependencies must be imported only when dependent functionality is invoked.
