@@ -51,7 +51,7 @@ sensitivity = [
   "torch>=2.11.0",
 ]
 bnn = [
-  "pyro-ppl==1.9.1",
+  "pyro-ppl==1.9.2",
 ]
 mpi = [
   "mpi4py>=4.1.1",
@@ -97,7 +97,7 @@ dev = [
   "pytest>=9.0.3",
   "scipy>=1.15.3",
   "torch>=2.11.0",
-  "pyro-ppl==1.9.1",
+  "pyro-ppl==1.9.2",
   "mpi4py>=4.1.1",
   "h5py>=3.11.0",
   "MDAnalysis>=2.8.0",
